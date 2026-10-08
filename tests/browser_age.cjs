@@ -1,0 +1,42 @@
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
+const assert=require('node:assert/strict');
+let browser,page;
+(async()=>{
+ browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{})});
+ page=await browser.newPage({viewport:{width:1440,height:1000}});
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto(process.env.THESIS_TEST_URL);
+ await page.getByRole('button',{name:'Save my reasoning',exact:true}).click();
+ await page.getByLabel('My reasoning',{exact:true}).fill('Fictional workflow check: my evidence should not remain eligible indefinitely.');
+ await page.getByRole('button',{name:'Add condition',exact:true}).click();
+ await page.getByLabel('Percent',{exact:true}).last().fill('15');
+ await page.getByLabel('Days since period end 1',{exact:true}).fill('30');
+ await page.getByRole('button',{name:'Add condition',exact:true}).click();
+ await page.getByLabel('Percent',{exact:true}).last().fill('15');
+ await page.getByLabel('Metric',{exact:true}).nth(1).selectOption('operating_margin');
+ await page.getByLabel('Days since period end 2',{exact:true}).fill('60');
+ await page.getByRole('checkbox').check();
+ await page.getByRole('button',{name:'Approve monitoring',exact:true}).click();
+ await page.locator('.idea-panel').getByText('All conditions met',{exact:true}).waitFor();
+ // A source development arrives in the background; the page has no pending work.
+ // Its idle local refresh must reveal the worker's intervening expiry assessments.
+ const response=await page.request.post(process.env.THESIS_TEST_URL+'/api/v1/demo/advance',{headers:{'x-thesis-request':'local-ui'},data:{expected_stage:0}});
+ assert.equal(response.status(),200);
+ await page.locator('.idea-panel').getByText('Evidence is incomplete',{exact:true}).waitFor({timeout:35000});
+ await page.getByRole('button',{name:'Updates',exact:true}).click();
+ const expiries=page.locator('.change-summary').filter({hasText:'Reporting figures passed your age limit'});
+ await expiries.first().waitFor();
+ assert.equal(await expiries.count(),2);
+ assert.match(await expiries.first().innerText(),/No new figure was received/);
+ assert.doesNotMatch(await expiries.first().innerText(),/18%.*→.*18%/);
+ await page.setViewportSize({width:390,height:1000});
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ await page.screenshot({path:'/private/tmp/thesis-age-updates-mobile.png',fullPage:true});
+ await expiries.first().click();
+ await page.locator('.history-page').getByText(/Too old to assess/).first().waitFor();
+ await page.getByText('Evidence available at this assessment',{exact:true}).click();
+ assert.match(await page.locator('.history-page').innerText(),/Assessed: 2025-08-30T00:00:00/);
+ assert.match(await page.locator('.history-page').innerText(),/Source cutoff: 24 Jul 2025/);
+ assert.equal(errors.length,0,errors.join('\n'));
+ console.log('Reporting-age browser passed: background development, idle update delivery, two distinct expirations, explicit unchanged-figure wording, mobile Updates, historical assessment/source clocks. No live calls.');
+})().catch(async e=>{console.error(e);if(page) console.error((await page.locator('body').innerText()).slice(-10000));process.exitCode=1;}).finally(async()=>{if(browser)await browser.close();});

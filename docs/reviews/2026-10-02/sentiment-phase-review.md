@@ -1,0 +1,29 @@
+# Sentiment and alerts: phase review
+
+This is a parent-authored review through five professional perspectives, not five independent consultants, student feedback or a validated accuracy study. Additional independent agents were unavailable under the account's usage limit.
+
+| Perspective | Purpose check | Required response |
+| --- | --- | --- |
+| Product | Returning users need changes worth reviewing, not a sentiment number alone. | Source-linked grouped alerts and saved-reasoning context are included. Private relevance filtering remains incomplete. |
+| UX | Readers must distinguish news framing, investor opinions, rumours and missing coverage. | Separate source tabs, counts, exact excerpts, original links, thin-sample/age warnings and review history. |
+| Data/ML | Source attribution and valid JSON cannot prove a label is semantically correct. | Inspect actual company cases after freezing expectations, preserve failures and avoid accuracy claims. |
+| Architecture | Schedulers can repeat alerts or deliver late results after a watch changes. | Durable seen-content records, transactional baseline/alerts, lease/token fencing, immutable history and shared accounting. |
+| Commercial | A news/sentiment dashboard alone may be replaceable. | The pitch should demonstrate evidence leading to reassessment. Retention and willingness to pay still require student research. |
+
+Code verification passed 290 backend checks with the saved actual SEC corpus, five frontend checks and the frontend build. No provider calls occurred in those tests. Browser and live findings will be appended below.
+
+The dedicated browser journey passed watch on/off and interval persistence, separate source samples, original social-source modal, grouped sample/news alerts, reasoning revision context, immutable reviewed/unresolved choices, reload persistence and 390/1440 layouts. The prior saved-idea browser journey also passed at 320/390/1440. Initial browser assertions were corrected for CSS capitalization and asynchronous server-confirmed controls; these were test timing/text issues, not model or source results. Visual inspection prompted compact alert cards with two initial evidence items, expandable remaining items and inspectable previous samples. No automatic external/model requests occurred in these browser tests.
+
+## Actual-source and model checks
+
+Evidence is retained under `.local/live-tests/sentiment-v1-20261002T015353Z/`. Retrieval read 50 recent r/stocks posts, producing 16 company matches across the catalogue. r/investing and r/wallstreetbets returned HTTP 429; those failures remain visible and no bypass was used. Three Finnhub refreshes and three OpenAI calls then analysed MSFT (8 news, 4 social), AAPL (8 news, 3 social) and GOOGL (8 news, 8 social). These are 39 source/company assignments, not 39 independent opinions. Three unchanged repeats made no new paid requests. All 77 selected quotations matched their stored original source text.
+
+Thirteen item-level expectations were written before classification. The results matched these narrow checks: vague teasers stayed unclear; Apple’s forecast/cost trade-off was mixed; portfolio and generic buyback questions did not become Apple sentiment; two generic daily threads using “google” were unrelated to Alphabet; the explicit seller post was negative opinion; the Gemini post was positive social commentary; litigation exposure was not described as an award; the Microsoft departure retained future wording. This is the implementing assistant’s development review, not an independent labelled accuracy benchmark.
+
+Review also found a material aggregation failure. Two Apple stories carried the same substantive body under slightly different headlines, contributing two positive counts. The first rule allowed that positive minority to label a predominantly mixed/neutral sample positive leaning. The original result is preserved. Policy `sentiment-counts-2` groups identical substantive news bodies, resolves conflicting within-group labels conservatively and requires a strict majority among at least three interpretable groups. Apple then has seven relevant text groups, one positive count, and a mixed/balanced summary. Classification requests and summary policy now have separate identities, so recalculation reuses the original paid responses. Twenty-three final sentiment checks pass, including this case, cached-response reuse and withheld previous-alert evidence. The revised browser journey and production build pass.
+
+Six additional no-network real-record replay checks passed, including 77 quote matches, one newly available Google litigation report producing one grouped news alert, unchanged/previously seen reports producing none, a two-post social baseline remaining too thin for a shift alert, and Apple copied-body correction. Availability ordering in these replay cases is controlled test input; these are not alerts that historically fired on the live market. Tests do not establish detection recall, delay or user usefulness.
+
+Remaining interpretation limits include subjective management-change framing and compressed future/product descriptions. Users must inspect the quoted source; no label proves a reported claim. Identical-body grouping does not identify every paraphrase of the same event. Current source coverage is one successful subreddit sample, and neutral news relay in a social post is not independent verification. Alerts are company-based and include saved reasoning context; private automatic thesis-relevance filtering remains incomplete.
+
+The three paid calls cost US$0.169365 in total. Cumulative confirmed usage is US$1.5783225, with the unchanged US$0.13926 authorized maximum hold; 75 total ledger calls and no newly blocking unresolved charge. The original US$10 allowance remains unchanged, leaving US$8.2824175 after the hold. All app-owner watches remain off by default; the live tests do not silently enable recurring spending.

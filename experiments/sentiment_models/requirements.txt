@@ -1,0 +1,4 @@
+# Optional local benchmark only. Never install into the application environment.
+torch==2.14.1
+transformers==5.18.0
+vaderSentiment==3.3.2

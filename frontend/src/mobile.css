@@ -1,0 +1,285 @@
+/* Phone density: keep readable content and touch targets without desktop gutters. */
+@media (max-width: 740px) {
+  .private-check-body .sentiment-controls {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+}
+@media (max-width: 600px) {
+  .app-shell {
+    --workspace-gutter: 12px;
+    --space-card: 14px;
+    --space-section: 20px;
+    --reading-size: 14px;
+  }
+  .app-shell .topbar {
+    padding: 8px var(--workspace-gutter) 0;
+  }
+  .app-shell .topbar nav {
+    gap: 4px;
+    justify-content: space-between;
+  }
+  .app-shell .topbar nav button {
+    min-height: 42px;
+    padding-inline: 4px;
+    font-size: 13px;
+  }
+  .app-shell .demo-bar {
+    padding: 8px var(--workspace-gutter);
+    gap: 4px 8px;
+  }
+  .app-shell .mobile-company-picker {
+    padding: 8px var(--workspace-gutter);
+    gap: 8px;
+  }
+  .mobile-company-picker .custom-select {
+    flex: 1;
+    min-width: 0;
+  }
+  .app-shell .mobile-company-picker button {
+    padding-inline: 10px;
+    font-size: 13px;
+    min-height: 42px;
+  }
+  .app-shell .company-header {
+    padding-block: 18px 12px;
+    gap: 10px;
+  }
+  .app-shell .company-header h1 {
+    font-size: 21px;
+    line-height: 1.25;
+  }
+  .app-shell .company-header p {
+    margin-top: 6px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .app-shell .company-header .quick-save {
+    margin-top: 0;
+    min-height: 38px;
+    font-size: 13px;
+  }
+  .app-shell .market-quote {
+    padding-block: 14px;
+    gap: 12px 20px;
+  }
+  .app-shell .quote-primary strong {
+    font-size: 30px;
+  }
+  .app-shell :is(.quote-primary small, .quote-range, .price-session) {
+    font-size: 12px;
+  }
+  .app-shell .historical-prices {
+    padding-block: 16px;
+  }
+  .app-shell .historical-prices > .market-section-head > .fine {
+    display: none;
+  }
+  .app-shell .historical-prices > .market-section-head .fine,
+  .app-shell .chart-head small {
+    font-size: 12px;
+  }
+  .app-shell .chart-head {
+    gap: 12px;
+  }
+  .app-shell .segmented button {
+    font-size: 12px;
+    min-height: 38px;
+    padding-inline: 10px;
+  }
+  .app-shell .content-tabs {
+    gap: 18px;
+    height: 48px;
+  }
+  .app-shell .content-tabs button {
+    font-size: 13px;
+    min-height: 44px;
+  }
+  .app-shell .research-content {
+    padding-block: 18px 28px;
+  }
+  .app-shell .workspace-page {
+    padding-block: 4px 28px;
+  }
+  .app-shell :is(.research-content, .workspace-page, .idea-panel) p {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .app-shell :is(.research-content, .workspace-page, .idea-panel) p.fine,
+  .app-shell .fine {
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .app-shell
+    :is(.market-section-head, .radar-intro, .collection-page, .history-page)
+    h2 {
+    font-size: 21px;
+  }
+  .app-shell :is(.market-section-head, .row) {
+    gap: 10px;
+  }
+  .app-shell .market-section-head {
+    margin-bottom: 12px;
+  }
+  .app-shell :is(.research-content, .workspace-page) summary {
+    font-size: 13px;
+    line-height: 1.6;
+    padding-block: 8px;
+  }
+  .app-shell
+    :is(
+      .idea-alert-checks,
+      .idea-alert-card,
+      .proposal-card,
+      .analyst-targets
+    ) {
+    padding: 14px;
+  }
+  .app-shell .question-research {
+    margin-block: 14px 18px;
+  }
+  .app-shell .question-research .question-library {
+    padding: 14px 14px 0;
+    gap: 10px;
+  }
+  .app-shell .question-library-heading {
+    gap: 4px 12px;
+  }
+  .app-shell .question-library-actions {
+    gap: 8px;
+  }
+  .app-shell .question-research .question-library-heading label {
+    font-size: 15px;
+  }
+  .app-shell .question-library :is(.edit-question, .add-question) {
+    font-size: 13px;
+    min-height: 40px;
+    padding-inline: 0;
+  }
+  .app-shell #question-workbench {
+    padding: 0 14px 16px;
+  }
+  .app-shell .question-controls {
+    margin-top: 14px;
+    gap: 14px;
+  }
+  .app-shell .question-controls label {
+    font-size: 13px;
+    min-height: 36px;
+  }
+  .app-shell .sentiment-toolbar {
+    display: grid;
+    gap: 14px;
+    margin-block: 16px;
+  }
+  .app-shell .sentiment-toolbar > label:has(.custom-select) {
+    display: grid;
+    gap: 6px;
+  }
+  .app-shell .sentiment-toolbar > label:has(.custom-checkbox) {
+    flex-wrap: nowrap;
+    min-height: 40px;
+  }
+  .app-shell .sentiment-toolbar .custom-select {
+    width: 100%;
+  }
+  .app-shell .watch-settings-group > .secondary-details {
+    padding: 14px;
+  }
+  .app-shell .watch-settings-group > details > summary {
+    padding-block: 4px;
+    font-size: 14px;
+  }
+  .app-shell .watch-settings-group > details[open] > summary {
+    margin-bottom: 16px;
+  }
+  .app-shell .watch-options .event-watch-control > summary {
+    padding-block: 4px;
+  }
+  .app-shell .watch-option-body > label,
+  .app-shell .private-check-body label {
+    font-size: 13px;
+  }
+  .app-shell .sentiment-counts {
+    gap: 8px;
+  }
+  .app-shell .sentiment-items article {
+    padding: 12px;
+    margin-bottom: 0;
+  }
+  .app-shell .research-progress {
+    margin-top: 10px;
+  }
+  .app-shell .research-loading,
+  .app-shell .ai-activity {
+    padding: 12px var(--workspace-gutter);
+  }
+  .app-shell .workspace-footer {
+    padding-inline: var(--workspace-gutter);
+  }
+  .modal {
+    width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
+  }
+  .idea-dialog > header,
+  .idea-writing,
+  .idea-monitoring,
+  .question-dialog form {
+    padding-inline: 16px;
+  }
+  .idea-dialog > header h2 {
+    font-size: 21px;
+  }
+  .modal p {
+    --reading-size: 14px;
+    line-height: 1.6;
+  }
+  /* Keep editable controls at 16px to avoid iPhone focus zoom. */
+  .app-shell
+    :is(input:not([type="checkbox"]), textarea, .custom-select > select),
+  .modal :is(input:not([type="checkbox"]), textarea, select) {
+    font-size: 16px;
+  }
+}
+
+.provider-coverage {
+  margin-block: 24px;
+}
+.provider-coverage > p {
+  margin-block: 16px;
+}
+.provider-list {
+  display: grid;
+  gap: 0;
+}
+.provider-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(0, 2fr);
+  gap: 24px;
+  padding: 18px 0;
+  border-top: 1px solid var(--border, #303b3f);
+}
+.provider-row span {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted, #9daab1);
+  font-size: 14px;
+}
+.provider-row p {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.provider-state {
+  font-size: 14px;
+  font-weight: 500;
+}
+.provider-state.ready {
+  color: #c6eb88;
+}
+@media (max-width: 600px) {
+  .provider-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}

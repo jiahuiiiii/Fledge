@@ -1,0 +1,30 @@
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
+const assert=require('node:assert/strict');const fs=require('node:fs');let browser;
+(async()=>{
+ browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH});
+ const page=await browser.newPage({viewport:{width:1440,height:1050},reducedMotion:'reduce'});
+ const errors=[],external=[],paid=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.route('**/*',r=>{const u=new URL(r.request().url());if(!['127.0.0.1','localhost'].includes(u.hostname)){external.push(u.href);return r.abort();}if(/\/(sentiment|refresh|generate|event-review|evidence-review|brief|idea-alert-check)$/.test(u.pathname))paid.push(u.href);return r.continue();});
+ const base=process.env.THESIS_TEST_URL,iid='c767e09f-35ea-5eaf-a626-ff5d3aa4709b';
+ await page.goto(base+'/?company='+iid+'&view=updates');
+ await page.getByRole('button',{name:'Open weekly review ↗',exact:true}).click();
+ const region=page.getByRole('region',{name:'Periodic research review',exact:true});await region.waitFor();await region.getByText('Saved updates',{exact:true}).waitFor();
+ assert.match(await region.innerText(),/quiet private checks in period/);assert.match(await region.innerText(),/Research question left unresolved/);
+ let data=(await(await page.request.get(base+'/api/v1/research-review')).json()).result;
+ assert.deepEqual(new Set(data.records.map(r=>r.kind)),new Set(['condition','company','idea']));
+ assert.equal(data.companies.length,2);assert.equal(data.totals.quiet_checks,1);
+ await region.getByRole('button',{name:'Review MSFT updates',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('.review-company').length===1);
+ assert.equal(await region.getByLabel('Review company').inputValue(),iid);
+ assert.equal(await region.locator('.review-record').count(),4);
+ assert.equal(await region.getByText('Inspect this reasoning check',{exact:true}).count(),2);
+ const open=region.getByText('Inspect this reasoning check',{exact:true}).first();await open.click();
+ const check=region.getByRole('region',{name:'Evidence linked to saved reasoning',exact:true});await check.getByText('Inspect the source evidence',{exact:true}).first().click();await check.getByRole('button',{name:'Open cited source ↗',exact:true}).first().click();await page.getByRole('dialog').waitFor();assert.match(await page.getByRole('dialog').innerText(),/Microsoft/);await page.keyboard.press('Escape');
+ const downloadEvent=page.waitForEvent('download');await region.getByRole('link',{name:'Download this review',exact:true}).click();const download=await downloadEvent;const html=fs.readFileSync(await download.path(),'utf8');assert.match(html,/Private research record/);assert.equal((html.match(/<section>/g)||[]).length,4);assert.doesNotMatch(html,/<script/);
+ await check.getByRole('button',{name:'Leave idea alert unresolved',exact:true}).click();await region.getByText('Saved updates',{exact:true}).waitFor();
+ await region.getByLabel('Review record status').selectOption('unresolved');await page.waitForFunction(()=>document.querySelectorAll('.review-record').length===1);assert.match(await region.locator('.review-record').innerText(),/Left unresolved/);
+ await region.getByLabel('Review record status').selectOption('all');await region.getByLabel('Review company').selectOption('');await page.waitForFunction(()=>document.querySelectorAll('.review-company').length===2);
+ for(const width of [320,390,1440]){await page.setViewportSize({width,height:1050});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Overflow at ${width}`);await page.screenshot({path:`/private/tmp/thesis-digest-${width}.png`,fullPage:true});}
+ await region.getByRole('button',{name:'Open exact assessment ↗',exact:true}).first().click();await page.getByText('Research history',{exact:true}).waitFor();assert.ok(new URL(page.url()).searchParams.get('evaluation'));
+ assert.deepEqual(errors,[]);assert.deepEqual(external,[]);assert.deepEqual(paid,[]);
+ console.log('Periodic review browser passed: all three update types, company/status filters, source access, full private export, acknowledgement, exact assessment link and 320/390/1440 layouts; no external/model requests.');await browser.close();
+})().catch(async e=>{console.error(e);if(browser)await browser.close();process.exit(1);});

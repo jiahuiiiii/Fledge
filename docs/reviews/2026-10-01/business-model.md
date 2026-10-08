@@ -1,0 +1,43 @@
+# Commercial strategy and unit economics review
+
+Thesis has a plausible subscription hypothesis, but no demonstrated willingness to pay or viable cost structure. Its commercial test should sell a bounded amount of useful monitoring and reassessment, then measure renewal and contribution after support. Existing code reduces development work; it does not settle data licences, model spending, acquisition or operating costs. This is a separately scoped commercial assessment conducted in the same reviewer thread as the product-strategy review, not another independent agent.
+
+Two commercial strengths are present. First, the proposed paid value concerns continuing work—research capacity, monitoring and review history—rather than assuming educational content or referrals generate revenue. The plan explicitly distinguishes interview interest from paid continuation. [Revenue hypothesis, lines 47–56](../../archive/planning/product-and-launch-plan.md). Second, shared company research, private evaluations and durable call accounting create a sensible basis for controlling costs without exposing private ideas. These remain proposed capabilities. [Research workflow, lines 119–129](../../archive/planning/architecture.md).
+
+The five priority commercial issues are:
+
+1. **The paid boundary sells quantity before identifying what users will miss.** The paid tier bundles more theses, capacity, configuration, history and exports, without evidence identifying the purchase trigger. [Packaging, lines 49–54](../../archive/planning/product-and-launch-plan.md). A beginner following very few companies may never hit a useful limit. Conversely, withholding old history could make payment feel necessary merely to recover previous work.
+
+   Free substitutes raise the hurdle: Quartr advertises mobile AI chat, earnings calls and transcripts at no charge, with source traceability. That is an observed vendor offering, not a quality comparison. [Quartr mobile](https://quartr.com/products/mobile-app). Test payment for saved monitoring effort and understandable changes. Keep a recorded sample and existing completed results accessible, subject to source rights; charge for new monitoring capacity and refresh work. Avoid indefinite free live monitoring until its acquisition value and cost are measured.
+
+2. **The revenue cadence is assumed rather than matched to the occasion of value.** The plan proposes weekly reviews, four-week observation and subscription continuation. [Use sequence, lines 25–31](../../archive/planning/product-and-launch-plan.md); [pilot, lines 65–69](../../archive/planning/product-and-launch-plan.md). Users interested mainly around company results may value the product intermittently. A short cohort may also contain no relevant development.
+
+   The consequence is misleading retention and an untested cancellation pattern. Compare a cancellable monthly offer with a clearly defined earnings-season pass. Observe renewal after users experience both an event and a quiet interval. Never infer annual retention from a one-month conversion rate, or manufacture updates to justify billing. A periodic purchase could still be viable if acquisition and serving economics support it.
+
+3. **The largest commercial data commitments remain unknown.** Price, news, consensus and transcripts require actual access decisions; the plan correctly says connectors do not supply subscriptions. [Data access, lines 164–170](../../archive/planning/architecture.md). Finnhub's official enterprise listing identifies commercial use and redistribution rights with contact-sales pricing; it does not provide Thesis a usable cost quotation. [Finnhub enterprise listing](https://api.finnhub.io/pricing-startups-and-enterprise).
+
+   Fixed minimum fees could dominate a small paid cohort even with cheap inference. Before selecting launch coverage, obtain an authorised quotation for the specific display, retention, caching and derived-output uses, and model its minimum commitment. Until then, use recorded or otherwise permitted evidence and mark unavailable categories explicitly. Do not construct margins from developer API prices or treat owned code as a substitute for data rights.
+
+4. **A thesis quota does not bound operating cost or abuse.** Shared research is cacheable, but private conditions may require separate calls; refresh cadence is unresolved. [Cost behaviour, lines 127–131](../../archive/planning/architecture.md). The gateway and abuse controls are planned, not verified. [Operating controls, lines 156–160](../../archive/planning/architecture.md).
+
+   Users with identical thesis counts can generate very different costs through long conditions, novel companies, chat, edits and repeated refreshes. Define a supported company set, condition limits, request budgets, refresh cooldowns and per-account spending ceilings. Reserve estimated spend before work, block ambiguous paid-call retries and measure burst loads around earnings. Explain product limits plainly; do not advertise unlimited research. Track correction/support time alongside provider charges, including founders' time valued at an explicit internal rate.
+
+5. **Campus access has no demonstrated acquisition economics.** The plan proposes clubs, sessions and referrals, and appropriately separates friends from independent users. [Audience, line 11](../../archive/planning/product-and-launch-plan.md); [launch sequence, lines 64–67](../../archive/planning/product-and-launch-plan.md). Convenient access can still require substantial demonstration, onboarding and support effort.
+
+   Measure cost per paying, retained customer—not attendance or registrations. Include preparation, travel where incurred, follow-up and free serving costs. Report founder-connected and independent cohorts separately. Do not assume scalable acquisition from a supportive first club; the next unrelated group should receive the same offer and comparable assistance.
+
+A minimal paid-value test could offer three supported company ideas, up to three conditions each, scheduled evidence checks, one digest, source-linked change reviews and export. A **hypothetical experimental price is S$12 per month, billed monthly**, cancellable before the next period. This is an unvalidated offer to test, not a launch-price recommendation. Proceed only after a measured cost ceiling supports it; an earnings-season alternative needs an equally explicit duration and price. No billing or recruitment is authorised by this review.
+
+Use a monthly per-paying-user contribution calculation:
+
+`Contribution = net collected revenue − payment fees − private model work − allocated shared research work − usage-based data/infrastructure/delivery − support labour`
+
+Net revenue excludes taxes, discounts and refunds. Allocate shared company work across actual beneficiaries, including free users, using a declared rule; do not assume all users watch the same companies. Record support minutes multiplied by an explicit hourly rate. Every input is currently unmeasured. Separately deduct fixed provider minimums, fixed hosting, free-user serving costs and acquisition spend from total paid contribution to assess operating viability. Avoid double counting; contribution is not profit, and development cost remains outside this formula. Report both typical and heavy-user economics.
+
+Three proposed experiments would provide commercial evidence:
+
+- **Paid continuation:** After one complete review, present the same bounded offer to ten independent qualified users. Proposed gate: at least four purchase and at least three renew after another event or quiet interval. These are directional small-sample criteria, not proof of demand.
+- **Cost envelope:** Replay typical use, the maximum included usage and refresh-abuse cases with recorded fixtures and call/token accounting. Apply later authorised supplier quotes. Proposed gate: the fully used plan remains contribution-positive, observed support is included, and limits stop excess spending before it occurs.
+- **Acquisition replication:** Compare two unrelated acquisition cohorts using the same offer. Proposed gate: each cohort's observed cumulative contribution covers its attributable acquisition cost within a predeclared observation window. Otherwise revise channel, price or service before expansion; do not rescue the result with speculative lifetime value.
+
+The central uncertainties are payment motivation, quiet-period renewal, permitted data cost, private-call volume and support burden. No measured cost, market-size estimate, founder capacity or supplier agreement is assumed. External pages were reviewed on 1 October 2026; their advertised availability does not establish contractual suitability or comparative quality.
