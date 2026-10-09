@@ -282,6 +282,16 @@ function HistoryChart({ rows, series, active, onSelect, label }) {
                           : "No matching figure"}
                     </small>
                     {s.key === "net_income" && <small>{row?.label}</small>}
+                    {s.key === "free_cash_flow" &&
+                      row?.spending_basis === "productive_assets" && (
+                        <small>
+                          Includes cash spending on software and intangible
+                          assets
+                        </small>
+                      )}
+                    {row?.value == null && row?.reason && (
+                      <small>{row.reason}</small>
+                    )}
                   </article>
                 );
               })}

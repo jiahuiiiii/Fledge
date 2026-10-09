@@ -302,8 +302,22 @@ def refresh_rss(iid,*,fetcher=None):
     failed=sum(r['status']=='failed' for r in results)
     waiting=sum(r['status']=='cached' for r in results)
     blocked=all(r['status']=='blocked' for r in results)
+    checked=sum(r['status']=='ready' for r in results)
     return dict(status='blocked' if blocked else 'partial' if failed else 'cached' if waiting==len(results) else 'ready',
-                message=results[0]['message'] if blocked else f'{matched} matching publisher reports; {failed} failed checks; {waiting} checks deferred by the refresh schedule. Open source coverage for details.')
+                message=results[0]['message'] if blocked else rss_sample_message(matched,checked,failed,waiting))
+
+
+def rss_sample_message(matched, checked, failed, waiting):
+    if checked is None:
+        # Older journals did not retain the successful-feed count. Do not
+        # reconstruct it from today's potentially different feed catalogue.
+        parts = [f'{matched} report matches in that publisher-feed sample (7 days).']
+    else:
+        parts = [f'{matched} report matches across {checked} checked publisher feeds in the 7-day sample.' if checked else 'No publisher feeds were checked in this attempt.']
+    if failed: parts.append(f'{failed} failed checks.')
+    if waiting: parts.append(f'{waiting} checks deferred by the refresh schedule.')
+    parts.append('General headline feeds are a limited sample; saved company news is separate.')
+    return ' '.join(parts)
 
 
 def status(conn,iid):

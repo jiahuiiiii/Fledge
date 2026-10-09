@@ -1,4 +1,5 @@
 import { modelAvailability } from "../lib/modelAvailability";
+import { mentionsCompany, savedDevelopments } from "../lib/companyHeadlines";
 import Select from "./Select";
 import { useId, useState } from "react";
 import { latestPriceQuote, quoteMovement } from "../lib/priceRefresh";
@@ -130,6 +131,7 @@ export default function MarketResearch({
   modelStatus,
   onGenerate,
   onSource,
+  headlinesOnly = false,
 }) {
   const [expanded, setExpanded] = useState(false);
   const [pointKind, setPointKind] = useState("all");
@@ -158,19 +160,21 @@ export default function MarketResearch({
           .map((s) => s.id)
       : [],
   );
-  const news = unique.filter((d) => !analysed.has(d.id));
-  const labelled = unique.length - news.length;
-  const status = data.market?.status,
-    brief = data.market_brief;
+  const unanalysed = unique.filter((d) => !analysed.has(d.id));
+  const news = unanalysed.filter((d) => mentionsCompany(d, data.instrument));
+  const availability = modelAvailability(modelStatus, "briefing_enabled");
+  const brief = data.market_brief;
   const kinds = {
     reported: "Reported developments",
     interpretation: "AI interpretation",
     uncertainty: "Uncertainty",
   };
   const points = brief?.points || [];
-  const visiblePoints = points.filter(
+  const developments = savedDevelopments(data.sentiment).slice(0, 3);
+  const matchingPoints = points.filter(
     (p) => pointKind === "all" || p.kind === pointKind,
   );
+  const visiblePoints = expanded ? matchingPoints : matchingPoints.slice(0, 3);
   const focus =
     question === "What could weaken the growth story?"
       ? "Look for developments that could challenge growth and what remains unconfirmed. Reported developments can contain risks even when they are not labelled uncertainty."
@@ -179,177 +183,198 @@ export default function MarketResearch({
         : question === "Can growth hold up without sacrificing margins?"
           ? "Compare growth and margins across matching periods. A report about spending or demand does not by itself establish a change in reported margins."
           : "Compare each sourced development with your question and assumptions. A company-wide briefing does not automatically answer a custom research question.";
-  return (
-    <section className="market-research" aria-label="Company news and briefing">
-      <div className="market-section-head news-heading">
-        <h2>Recent company news</h2>
-        <span className="fine">
-          {labelled
-            ? `${labelled} labelled ${labelled === 1 ? "story is" : "stories are"} under What’s the tone?`
-            : "Company mentions first, newest within each group"}
-        </span>
-      </div>
-      {status?.news_error && (
-        <p className="warning" role="status">
-          Finnhub news check unavailable. {status.news_error}{" "}
-          {news.length > 0 && "Previously retrieved stories remain below."}
-        </p>
-      )}
-      {!status?.news_error && status?.news_count === 0 && (
+  if (headlinesOnly)
+    return (
+      <details className="market-research unanalysed-headlines">
+        <summary>
+          More headlines{" "}
+          <span>{news.length} company mentions · not analysed</span>
+        </summary>
         <p className="fine">
-          No articles returned for the seven-day window ending{" "}
-          {status?.last_attempt_at?.slice(0, 10)}.{" "}
-          {news.length > 0 &&
-            "Showing previously retrieved stories and any saved briefing below."}
+          Only headlines or supplied snippets that name {data.instrument.symbol}{" "}
+          or the company appear here.{" "}
+          {unanalysed.length - news.length > 0
+            ? `${unanalysed.length - news.length} without an explicit mention are hidden from this list. `
+            : ""}
+          These have no saved tone label.
         </p>
-      )}
-      {!news.length && status?.news_count !== 0 && (
-        <p className="fine">
-          {status?.news_count === 0
-            ? "The last successful check returned no company news."
-            : "No news retrieved yet. Choose Refresh research."}
-        </p>
-      )}
-      {all.length > unique.length && (
-        <p className="fine">
-          Duplicate supplied text is grouped. Multiple articles do not
-          necessarily provide independent confirmation.
-        </p>
-      )}
-      <div className="news-list">
-        {(expanded ? news : news.slice(0, 5)).map((d) => (
-          <article key={d.id} className="news-item">
-            <div className="news-meta">
-              <span>{d.source}</span>
-              <time dateTime={d.published_at}>{stamp(d.published_at)}</time>
-            </div>
-            <button className="news-title" onClick={() => onSource(d.id)}>
-              {d.title} <span>↗</span>
-            </button>
-            {d.body && <p>{d.body}</p>}
-            <a
-              href={d.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="source-link"
-              aria-label={`Read original: ${d.title}`}
-            >
-              Read original ↗
-            </a>
-          </article>
-        ))}
-      </div>
-      {news.length > 5 && (
-        <button className="news-more" onClick={() => setExpanded(!expanded)}>
-          {expanded ? "Show fewer stories" : `Show all ${news.length} stories`}
-        </button>
-      )}
-      <details className="news-brief-details">
-        <summary>AI company briefing · {brief ? "saved" : "optional"}</summary>
-        <div className="market-section-head">
-          <div>
-            <span className="section-label">RESEARCH BRIEF</span>
-            <h2>What’s developing</h2>
-          </div>
-          {!brief && (
-            <button
-              disabled={
-                busy ||
-                !news.length ||
-                !modelStatus?.briefing_enabled ||
-                modelStatus?.budget.unresolved > 0
-              }
-              onClick={onGenerate}
-            >
-              {busy ? "Reading sources…" : "Summarise sources"}
-            </button>
-          )}
-        </div>
-        {question && (
+        {!news.length && (
           <p className="fine">
-            <strong>Reading focus:</strong> {focus} The shared company briefing
-            stays the same when you change questions.
+            No additional unanalysed company headlines. Saved readings and the
+            complete source sample remain available above.
           </p>
         )}
-        {!brief &&
-          (!modelStatus?.briefing_enabled ||
-            modelStatus?.budget.unresolved > 0) && (
-            <p className="fine" role="status">
-              {modelAvailability(modelStatus, "briefing_enabled").message}
-            </p>
-          )}
-        {brief ? (
-          <>
-            <p className="fine">
-              AI summary · {brief.included_news_count} supplied
-              headlines/snippets · latest news {stamp(brief.latest_news_at)}.
-              Interpretation may omit context.
-            </p>
-            <label className="field" htmlFor={viewId}>
-              Briefing view
-              <Select
-                id={viewId}
-                aria-label="Briefing view"
-                value={pointKind}
-                onChange={(e) => setPointKind(e.target.value)}
-                aria-controls={`${viewId}-points`}
-              >
-                <option value="all">All points ({points.length})</option>
-                {Object.entries(kinds).map(([kind, label]) => (
-                  <option key={kind} value={kind}>
-                    {label} ({points.filter((p) => p.kind === kind).length})
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <p className="fine" role="status">
-              {visiblePoints.length
-                ? `Showing ${visiblePoints.length} of ${points.length} briefing points. Labels describe the AI summary’s type, not whether a development is favourable.`
-                : `No points in this briefing are labelled ${kinds[pointKind]?.toLowerCase()}. This does not establish that no risks or uncertainty exist; inspect All points and the original sources.`}
-            </p>
-            <div className="market-brief-points" id={`${viewId}-points`}>
-              {visiblePoints.map((p, i) => (
-                <article key={i} className={`market-point ${p.kind}`}>
-                  <span className="section-label">
-                    {p.kind === "reported"
-                      ? "REPORTED"
-                      : p.kind === "interpretation"
-                        ? "AI INTERPRETATION"
-                        : "UNCERTAINTY"}
-                  </span>
-                  <h3>{p.title}</h3>
-                  <p>{p.text}</p>
-                  <div className="brief-citations">
-                    {p.citations.map((c, j) => (
-                      <button
-                        key={j}
-                        className="source-link"
-                        onClick={() => onSource(c.source_id)}
-                        title={c.quote}
-                        aria-label={`Inspect source ${j + 1}: ${data.documents.find((d) => d.id === c.source_id)?.title || "Source unavailable"}`}
-                      >
-                        {data.documents.find((d) => d.id === c.source_id)
-                          ?.source || "Source"}{" "}
-                        {j + 1} ↗
-                      </button>
-                    ))}
-                  </div>
-                </article>
-              ))}
-            </div>
-            <details className="brief-unknowns">
-              <summary>About this AI summary</summary>
-              <p className="fine">{brief.limitation}</p>
-            </details>
-          </>
-        ) : (
+        {all.length > unique.length && (
           <p className="fine">
-            Read the news below, or request a concise AI briefing of the
-            supplied headlines and snippets. Your saved reasoning stays
-            separate. No AI call runs when you open or refresh this page.
+            Duplicate supplied text is grouped. Multiple articles do not
+            necessarily provide independent confirmation.
           </p>
+        )}
+        <div className="news-list">
+          {(expanded ? news : news.slice(0, 5)).map((d) => (
+            <article key={d.id} className="news-item">
+              <div className="news-meta">
+                <span>{d.source}</span>
+                <time dateTime={d.published_at}>{stamp(d.published_at)}</time>
+              </div>
+              <button className="news-title" onClick={() => onSource(d.id)}>
+                {d.title} <span>↗</span>
+              </button>
+              {d.body && <p>{d.body}</p>}
+              <a
+                href={d.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="source-link"
+                aria-label={`Read original: ${d.title}`}
+              >
+                Read original ↗
+              </a>
+            </article>
+          ))}
+        </div>
+        {news.length > 5 && (
+          <button className="news-more" onClick={() => setExpanded(!expanded)}>
+            {expanded
+              ? "Show fewer stories"
+              : `Show all ${news.length} stories`}
+          </button>
         )}
       </details>
+    );
+  return (
+    <section
+      className="market-research news-developments"
+      aria-label="Company developments"
+    >
+      <div className="market-section-head">
+        <div>
+          <h2>What’s developing</h2>
+        </div>
+        {!brief && (
+          <button
+            disabled={busy || !unique.length || availability.blocked}
+            onClick={onGenerate}
+            aria-describedby={
+              availability.blocked && availability.state !== "running"
+                ? "sentiment-disabled-reason"
+                : undefined
+            }
+          >
+            {busy ? "Reading sources…" : "Summarise sources"}
+          </button>
+        )}
+      </div>
+      {brief ? (
+        <>
+          <p className="fine">
+            AI summary · {brief.included_news_count} supplied headlines/snippets
+            · latest news {stamp(brief.latest_news_at)}. Interpretation may omit
+            context.
+          </p>
+          <label className="field" htmlFor={viewId}>
+            Briefing view
+            <Select
+              id={viewId}
+              aria-label="Briefing view"
+              value={pointKind}
+              onChange={(e) => setPointKind(e.target.value)}
+              aria-controls={`${viewId}-points`}
+            >
+              <option value="all">All points ({points.length})</option>
+              {Object.entries(kinds).map(([kind, label]) => (
+                <option key={kind} value={kind}>
+                  {label} ({points.filter((p) => p.kind === kind).length})
+                </option>
+              ))}
+            </Select>
+          </label>
+          <p className="fine" role="status">
+            {visiblePoints.length
+              ? `Showing ${visiblePoints.length} of ${matchingPoints.length} developments. Labels describe the kind of statement, not whether it is favourable.`
+              : `No points in this briefing are labelled ${kinds[pointKind]?.toLowerCase()}. This does not establish that no risks or uncertainty exist; inspect All points and the original sources.`}
+          </p>
+          <div className="market-brief-points" id={`${viewId}-points`}>
+            {visiblePoints.map((p, i) => (
+              <article key={i} className={`market-point ${p.kind}`}>
+                <span className="section-label">
+                  {p.kind === "reported"
+                    ? "REPORTED"
+                    : p.kind === "interpretation"
+                      ? "AI INTERPRETATION"
+                      : "UNCERTAINTY"}
+                </span>
+                <h3>{p.title}</h3>
+                <p>{p.text}</p>
+                <div className="brief-citations">
+                  {p.citations.map((c, j) => (
+                    <button
+                      key={j}
+                      className="source-link"
+                      onClick={() => onSource(c.source_id)}
+                      title={c.quote}
+                      aria-label={`Inspect source ${j + 1}: ${data.documents.find((d) => d.id === c.source_id)?.title || "Source unavailable"}`}
+                    >
+                      {data.documents.find((d) => d.id === c.source_id)
+                        ?.source || "Source"}{" "}
+                      {j + 1} ↗
+                    </button>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+          {matchingPoints.length > 3 && (
+            <button
+              type="button"
+              className="news-more"
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded
+                ? "Show fewer developments"
+                : `Read all ${matchingPoints.length} developments`}
+            </button>
+          )}
+          <details className="brief-unknowns">
+            <summary>About this AI summary</summary>
+            <p className="fine">{brief.limitation}</p>
+            {question && (
+              <p className="fine">
+                <strong>Reading focus:</strong> {focus}
+              </p>
+            )}
+          </details>
+        </>
+      ) : developments.length ? (
+        <>
+          <p className="fine">
+            Latest reported developments from the saved reading ·{" "}
+            {stamp(data.sentiment.created_at)}. Headlines and snippets from the
+            original publishers.
+          </p>
+          <div className="development-headlines">
+            {developments.map((story) => (
+              <article key={story.id}>
+                <span className="fine">
+                  {story.source} · {stamp(story.published_at)}
+                </span>
+                <button
+                  className="news-title"
+                  onClick={() => onSource(story.id)}
+                >
+                  {story.title} <span>↗</span>
+                </button>
+                {story.body && <p>{story.body}</p>}
+              </article>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="fine">
+          No reported developments in the saved reading yet. Read the tone and
+          original sources below, or summarise sources when AI is available.
+        </p>
+      )}
     </section>
   );
 }

@@ -16,7 +16,7 @@ def fixture():
     for tag, value in [('ProfitLoss', 20), ('NetIncomeLoss', 19),
                        ('NetCashProvidedByUsedInOperatingActivities', '31.1234567890123456789'),
                        ('PaymentsToAcquirePropertyPlantAndEquipment', '4.1234567890123456788'),
-                       ('InterestExpenseNonOperating', 5)]:
+                       ('InterestExpenseNonoperating', 5)]:
         facts[tag] = {'units': {'USD': [dict(base, val=value)]}}
     for tag, value in [('Assets', 200), ('Liabilities', 90), ('AssetsCurrent', 60),
                        ('LiabilitiesCurrent', 30), ('CashAndCashEquivalentsAtCarryingValue', 25),
@@ -52,6 +52,64 @@ def test_trailing_history_reuses_exact_three_filing_bridge():
     assert income['operating_income']['value'] is None
     assert balance['debt']['value'] == '37'
     assert keyed(result['balances'][0])['debt']['value'] is None  # newer borrowing never moves backwards
+
+
+def test_revenue_concept_transition_does_not_erase_independent_trailing_figures():
+    data = trailing_bundle()
+    facts = data['companyfacts']['facts']['us-gaap']
+    original = facts[REVENUE[0]]['units']['USD']
+    annual = [row for row in original if row['form'] == '10-K']
+    facts['Revenues'] = {'units': {'USD': annual}}
+    facts[REVENUE[0]]['units']['USD'] = [row for row in original if row['form'] != '10-K']
+    before = deepcopy(data)
+    income = keyed(normalized(data)['trailing'][-1])
+    assert income['revenue']['value'] is None
+    assert 'different reporting labels' in income['revenue']['reason']
+    assert income['revenue']['start'] == '2025-07-01'
+    assert income['revenue']['end'] == '2026-06-30'
+    assert len(income['revenue']['inputs']) == 3
+    assert income['net_income']['value'] == '90'
+    assert income['operating_cash']['value'] == '110'
+    assert income['capital_spending']['value'] == '40'
+    assert income['free_cash_flow']['value'] == '70'
+    assert income['net_margin']['value'] is None
+    assert income['operating_margin']['value'] is None
+    assert data == before
+
+
+@pytest.mark.parametrize('kind', ['annual', 'trailing'])
+def test_absent_revenue_keeps_independently_valid_income_and_cash(kind):
+    data = fixture() if kind == 'annual' else trailing_bundle()
+    for tag in REVENUE:
+        data['companyfacts']['facts']['us-gaap'].pop(tag, None)
+    income = keyed(normalized(data)[kind][-1])
+    assert income['revenue']['value'] is None and income['revenue']['start'] is None
+    assert income['net_income']['value'] == ('20' if kind == 'annual' else '90')
+    assert income['free_cash_flow']['value'] == ('27.0000000000000000001' if kind == 'annual' else '70')
+    assert income['net_margin']['value'] is None
+
+
+def test_missing_revenue_does_not_relax_cash_dates_or_consolidated_conflicts():
+    data = fixture(); facts = data['companyfacts']['facts']['us-gaap']
+    for tag in REVENUE: facts.pop(tag, None)
+    facts['NetCashProvidedByUsedInOperatingActivities']['units']['USD'][0]['start'] = '2024-10-02'
+    row = facts['ProfitLoss']['units']['USD'][0]
+    facts['ProfitLoss']['units']['USD'].append(dict(row, val=21))
+    income = keyed(normalized(data)['annual'][-1])
+    assert income['free_cash_flow']['value'] is None
+    assert income['net_income']['value'] is None
+    assert 'Conflicting' in income['net_income']['reason']
+
+
+def test_known_revenue_dates_still_withhold_a_different_income_window():
+    data = fixture()
+    data['companyfacts']['facts']['us-gaap']['ProfitLoss']['units']['USD'][0]['start'] = '2024-10-02'
+    # Both parent and consolidated use the incompatible window, so neither
+    # can be presented as if it matched the selected revenue period.
+    data['companyfacts']['facts']['us-gaap']['NetIncomeLoss']['units']['USD'][0]['start'] = '2024-10-02'
+    income = keyed(normalized(data)['annual'][-1])
+    assert income['net_income']['value'] is None
+    assert income['net_margin']['value'] is None
 
 
 @pytest.mark.parametrize('case', ['period', 'unit', 'accession', 'conflict', 'duration'])

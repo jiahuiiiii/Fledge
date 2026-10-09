@@ -59,14 +59,16 @@ let browser;
       .waitFor();
   };
   await open();
+  assert.equal(await panel.locator('.sentiment-source-list').getAttribute('open'), null);
+  await panel.locator('.sentiment-source-list > summary').click();
   const saved = (
     await (
       await page.request.get(base + `/api/v1/workspace?instrument_id=${iid}`)
     ).json()
   ).result;
   const news = saved.sentiment.items
-    .filter((i) => i.channel === "news")
-    .slice(0, 12)
+    .filter((i) => i.channel === "news" && i.relevance === "relevant")
+    .slice(0, 6)
     .map((i) => saved.sentiment.sources.find((s) => s.id === i.source_id));
   assert.deepEqual(
     await panel.locator(".story-source-text").allTextContents(),
@@ -186,6 +188,8 @@ let browser;
     await route.fulfill({ response, json: body });
   });
   await open();
+  await panel.locator('.sentiment-source-list > summary').click();
+  await panel.getByLabel('Source relevance', {exact:true}).selectOption('all');
   for (const scope of ["all", "news", "reddit", "hackernews", "x"]) {
     await filters
       .getByRole("button", { name: names[scope], exact: true })

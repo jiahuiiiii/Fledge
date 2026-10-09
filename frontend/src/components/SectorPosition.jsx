@@ -309,6 +309,17 @@ function Bars({ rows, symbol, expected, label }) {
   );
 }
 function Map({ members, symbol }) {
+  const viewport = useRef(null);
+  const [width, setWidth] = useState(660);
+  useEffect(() => {
+    const element = viewport.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setWidth(Math.max(540, Math.round(entry.contentRect.width)));
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [members]);
   const rows = members.map((member) => ({
     growth: reportedRow(member, "revenue_growth"),
     margin: reportedRow(member, "operating_margin"),
@@ -322,7 +333,8 @@ function Map({ members, symbol }) {
   );
   const xs = scale(valid.map((r) => r.growth)),
     ys = scale(valid.map((r) => r.margin));
-  const x = (v) => 72 + ((v - xs.low) / xs.span) * 530,
+  const plotWidth = width - 116;
+  const x = (v) => 72 + ((v - xs.low) / xs.span) * plotWidth,
     y = (v) => 270 - ((v - ys.low) / ys.span) * 218;
   return (
     <div className="position-map-wrap">
@@ -335,30 +347,43 @@ function Map({ members, symbol }) {
         <>
           <div
             className="position-map-viewport"
+            ref={viewport}
             tabIndex={0}
             role="region"
             aria-label="Growth and profitability map"
           >
             <svg
-              viewBox="0 0 660 320"
+              viewBox={`0 0 ${width} 320`}
+              width={width}
+              height={320}
               role="img"
               aria-label="Fiscal-year revenue growth against reported GAAP operating margin for the chosen competitors"
             >
               {[0, 0.5, 1].map((f) => (
                 <g key={f} className="position-grid">
-                  <line x1="72" x2="602" y1={52 + 218 * f} y2={52 + 218 * f} />
+                  <line
+                    x1="72"
+                    x2={width - 44}
+                    y1={52 + 218 * f}
+                    y2={52 + 218 * f}
+                  />
                   <text x="62" y={56 + 218 * f} textAnchor="end">
                     {percent(ys.high - ys.span * f)}
                   </text>
-                  <line x1={72 + 530 * f} x2={72 + 530 * f} y1="52" y2="270" />
-                  <text x={72 + 530 * f} y="292" textAnchor="middle">
+                  <line
+                    x1={72 + plotWidth * f}
+                    x2={72 + plotWidth * f}
+                    y1="52"
+                    y2="270"
+                  />
+                  <text x={72 + plotWidth * f} y="292" textAnchor="middle">
                     {percent(xs.low + xs.span * f)}
                   </text>
                 </g>
               ))}
               <text
                 className="position-axis"
-                x="337"
+                x={72 + plotWidth / 2}
                 y="317"
                 textAnchor="middle"
               >

@@ -14,7 +14,7 @@ from thesis.db import one, rows
 from .normalize import filing_rows
 from .disclosure_text import FilingHTML, archive_url, METHOD as TEXT_METHOD
 
-METHOD = 'sec-amendment-resolution-1'
+METHOD = 'sec-amendment-resolution-2'
 MAX_CHAIN = 8
 META = ('period_type', 'accession', 'form', 'period_end', 'published_at', 'filed_on', 'filing_url')
 
@@ -83,6 +83,31 @@ def note_evidence(document):
             start = body.index(sentence, match.end())
             return dict(kind='unchanged_statements', quote=sentence, start=start, end=start + len(sentence))
     return None
+
+
+def unchanged_statement_section(document):
+    """An explicit MD&A-only annual amendment leaves Item 8 outside its scope.
+
+    Require both a sole-purpose declaration and an unchanged-other-items clause,
+    plus Item 7 content (and optionally the Item 15 exhibit index). Generic wording
+    alone is never enough. All source identity/chain/conflict checks still apply.
+    """
+    if document['form'] != '10-K/A':return None
+    body=document['data']['body']
+    match=re.search(r'(?im)^explanatory\s+note\s*$',body)
+    if not match:return None
+    end=re.search(r'(?im)^(?:part\s+[ivx]+|item\s+\d|signatures)\b',body[match.end():])
+    if not end:return None
+    stop=match.end()+end.start();note=body[match.end():stop].strip()
+    if not note or len(note)>8000 or re.search(r'restat|non.reliance|no longer.{0,30}relied|financial statements|material (?:error|misstatement)|item\s+8',note,re.I):return None
+    purpose=re.search(r'\bsolely for the purpose of correcting[^.!?]{0,400}\bdisclosures?\s+in\s+(?:the\s+)?Management[’\x27]s Discussion and Analysis of Financial Condition and Results of Operations\s*\([^)]*MD&A[^)]*\)',note,re.I)
+    unchanged=re.search(r'Except as described above, this Amendment does not amend, update or change any other items or disclosures contained in the Original Filing\.',note,re.I)
+    items=set(re.findall(r'(?im)^item\s+(\d+[a-z]?)\.?\s+',body[stop:]))
+    if not purpose or not unchanged or '7' not in items or not items <= {'7','15'}:return None
+    if not re.search(r'(?im)^item\s+7\.?\s+management[’\x27]s discussion and analysis',body[stop:]):return None
+    start=body.index(note,match.end())
+    return dict(kind='unchanged_statement_section',quote=note,start=start,end=start+len(note),
+                unchanged_item='8',amended_items=sorted(items),explanation='The amendment explicitly confines its correction to MD&A (Item 7) and leaves other items unchanged; annual financial statements are in Item 8. The exhibit index may also be included.')
 
 
 def date_pattern(value):
@@ -156,7 +181,7 @@ class Resolver:
             raise ValueError('Amendment evidence belongs to another issuer.')
         self.bundle, self.cik, self.now, self.documents = bundle, cik, now, documents
         self.documents_allowed = documents_allowed
-        self.basis_id = hashlib.sha256(json.dumps({a: (str(d['id']),d['content_hash']) for a,d in documents.items()},sort_keys=True).encode()).hexdigest()
+        self.basis_id = hashlib.sha256(json.dumps(dict(method=METHOD,documents={a: (str(d['id']),d['content_hash']) for a,d in documents.items()}),sort_keys=True).encode()).hexdigest()
         self.filings = filing_rows(bundle['submissions'], now)
         self.cache = {}
         self.proofs = {}
@@ -224,7 +249,7 @@ class Resolver:
         cache_key = (amendment['accessionNumber'], ancestor['accessionNumber'])
         if cache_key not in self.proofs:
             report = self.report(ancestor)
-            note = note_evidence(doc)
+            note = note_evidence(doc) or unchanged_statement_section(doc)
             if note and any(self.conflicts(amendment, m) for m in report['metrics']):
                 note = None
             self.proofs[cache_key] = (note, repeated_totals(doc, report))

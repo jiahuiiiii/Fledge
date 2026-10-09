@@ -141,7 +141,7 @@ let browser, page;
   assert.equal(await top.getByRole("button",{name:"History",exact:true}).count(),0);
   assert.equal(await page.locator('.watchlist').getAttribute('data-collapsed'),'true');
   assert.equal(await page.getByRole('button',{name:'Notebook',exact:true}).count(),0);
-  await page.getByRole('button',{name:'Expand company sidebar',exact:true}).click();await page.locator('.sidebar-research').waitFor();assert.equal(await page.locator('.sidebar-research').getByRole('heading',{name:'Your research',exact:true}).count(),1);
+  await page.getByRole('button',{name:'Expand company sidebar',exact:true}).click();assert.equal(await page.locator('.sidebar-research').count(),0);assert.equal(await page.locator('#companies-sidebar').getByRole('button',{name:/Ask a question/}).count(),0);
   await page.getByRole('button',{name:'Collapse company sidebar',exact:true}).click();
   await page.getByRole('button',{name:'Ask a question',exact:true}).click();const notebook=page.getByRole('dialog',{name:'Your research',exact:true});await notebook.getByRole('button',{name:'Start with a question',exact:true}).click();await page.getByRole('dialog',{name:'Start with a question',exact:true}).waitFor();await page.keyboard.press('Escape');assert.equal(await notebook.isVisible(),true);await notebook.getByRole('button',{name:'Edit question',exact:true}).click();await notebook.locator('#specific-question').fill('What would change my view?');await page.keyboard.press('Escape');
   await sections.getByRole('tab',{name:'Financials',exact:true}).click();const story=page.locator('.financials-story'), history=page.getByRole('region',{name:'Earnings and cash-flow history',exact:true}), more=page.locator('.financial-more-detail');

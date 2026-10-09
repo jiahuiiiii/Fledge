@@ -616,14 +616,6 @@ function CompanyWorkspace({
         </header>
         <div className="workspace-grid">
           <CompanySidebar
-            research={
-              ideaSidebarAvailable
-                ? {
-                    onOpen: () => setResearchOpen(true),
-                    question: null,
-                  }
-                : null
-            }
             loading
             collapsed={!!layout.companiesHidden}
             onToggle={() => toggleLayout("companiesHidden")}
@@ -1359,14 +1351,6 @@ function CompanyWorkspace({
       </label>
       <div className="workspace-grid">
         <CompanySidebar
-          research={
-            ideaSidebarAvailable
-              ? {
-                  onOpen: () => setResearchOpen(true),
-                  question: current?.question,
-                }
-              : null
-          }
           companies={visibleCompanies}
           selectedCompanyId={selectedCompanyId}
           collapsed={!!layout.companiesHidden}
@@ -1452,6 +1436,10 @@ function CompanyWorkspace({
                   aria-haspopup="dialog"
                 >
                   <Icon name="pulse" />
+                  <span className="company-action-label company-action-full">
+                    Research updates
+                  </span>
+                  <span className="company-action-short">Status</span>
                   {loadingRun?.active && (
                     <span className="research-updates-dot" aria-hidden="true" />
                   )}
@@ -1621,6 +1609,13 @@ function CompanyWorkspace({
                                     : "Automatic event checks stopped.",
                                 )
                               }
+                            />
+                          )}
+                          {!isRecorded && (
+                            <MarketResearch
+                              headlinesOnly
+                              data={data}
+                              onSource={openSource}
                             />
                           )}
                           {isRecorded && (
@@ -1952,6 +1947,7 @@ function CompanyWorkspace({
                             }
                             key={data.instrument.id}
                             instrument={data.instrument}
+                            performance={data.performance}
                             quote={data.market?.quote?.quote}
                           />
                           {!isRecorded && (

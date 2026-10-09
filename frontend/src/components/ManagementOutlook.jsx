@@ -105,19 +105,7 @@ function Forecast({ forecast, release }) {
               </a>
             </details>
           </>
-        ) : (
-          <>
-            <strong>Comparison unavailable</strong>
-            <details>
-              <summary>What is missing?</summary>
-              <ul>
-                {compared.reasons.map((reason) => (
-                  <li key={reason}>{reason}</li>
-                ))}
-              </ul>
-            </details>
-          </>
-        )}
+        ) : null}
       </div>
     </article>
   );
@@ -230,6 +218,29 @@ export default function ManagementOutlook({ data }) {
                   />
                 ))}
               </div>
+              {section.forecasts.some(
+                (forecast) => forecast.comparison.status !== "compared",
+              ) && (
+                <details className="outlook-comparison-gaps">
+                  <summary>
+                    Why guidance isn’t compared with results yet
+                  </summary>
+                  {section.forecasts
+                    .filter(
+                      (forecast) => forecast.comparison.status !== "compared",
+                    )
+                    .map((forecast) => (
+                      <div key={forecast.id}>
+                        <strong>{forecast.label}</strong>
+                        <ul>
+                          {forecast.comparison.reasons.map((reason) => (
+                            <li key={reason}>{reason}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                </details>
+              )}
               <details className="outlook-context">
                 <summary>Read the outlook in context</summary>
                 {release.stated_release_date && (

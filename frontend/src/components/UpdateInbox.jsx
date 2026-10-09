@@ -174,9 +174,11 @@ export default function UpdateInbox({
           <span>
             {companies.find((c) => c.id === company)?.symbol || "All companies"}{" "}
             ·{" "}
-            {review === "all"
-              ? "All updates"
-              : reviewName(review === "pending" ? null : review)}
+            {loading
+              ? "Loading…"
+              : data
+                ? `${data.total} ${review === "all" ? (data.total === 1 ? "update" : "updates") : reviewName(review === "pending" ? null : review).toLowerCase()} · newest first`
+                : "Choose a review status"}
           </span>
         </summary>
         <div className="inbox-filters">
@@ -215,6 +217,14 @@ export default function UpdateInbox({
             </Select>
           </label>
         </div>
+        {data && (
+          <p className="fine">
+            Showing {data.records.length ? page * data.page_size + 1 : 0}–
+            {page * data.page_size + data.records.length} of {data.total} ·
+            recorded through {stamp(data.cutoff)}. Review status is current;
+            source event dates may be earlier.
+          </p>
+        )}
       </details>
       {notice && (
         <p role="status" className="notice">
@@ -241,24 +251,6 @@ export default function UpdateInbox({
       )}
       {!loading && !error && !isEmptyCompany && data && (
         <>
-          <div className="inbox-counts" aria-label="Update counts">
-            <strong>{data.totals.pending_count} awaiting review</strong>
-            {data.totals.unresolved_count > 0 && (
-              <span>{data.totals.unresolved_count} left unresolved</span>
-            )}
-          </div>
-          <details className="inbox-list-meta">
-            <summary>
-              {data.total} matching {data.total === 1 ? "update" : "updates"} ·
-              newest first
-            </summary>
-            <p>
-              Showing {data.records.length ? page * data.page_size + 1 : 0}–
-              {page * data.page_size + data.records.length} · recorded through{" "}
-              {stamp(data.cutoff)}. Review status is current; source event dates
-              may be earlier.
-            </p>
-          </details>
           {!data.records.length && (
             <div className="empty-history">
               <h3>

@@ -6,6 +6,7 @@ for acquisition and the existing cumulative ledger; uncertain calls never retry.
 from datetime import datetime, timezone
 from copy import deepcopy
 import json
+import re
 from uuid import uuid4
 from psycopg.types.json import Jsonb
 from thesis.db import transaction, one, rows
@@ -32,7 +33,77 @@ def worker_lease():
 def latest(owner, iid):
     with transaction(owner) as conn:
         run = one(conn, 'SELECT * FROM research_loads WHERE instrument_id=%s ORDER BY created_at DESC,id DESC LIMIT 1', (iid,))
-        return explain_saved_failure(conn, run)
+        return explain_source_counts(conn, explain_saved_failure(conn, run))
+
+
+def explain_source_counts(conn, run):
+    """Read-time wording and permitted saved coverage; never rewrite the journal."""
+    if not run:
+        return run
+    from thesis import service
+    from . import market_brief, social
+    from .reddit_research import reddit_sample_message
+    from .source_hub import rss_sample_message
+    from .sec.checkpoint import current_documents, active_document
+    result = deepcopy(run)
+    days = run['lookback_days']
+    now = datetime.now(timezone.utc)
+    docs = service.permitted_documents(conn, now, run['instrument_id'])
+    active = active_document(conn, run['instrument_id'], now, docs)
+    news = market_brief.ordered_news(current_documents(docs, active), run['instrument_id'], now)
+    posts = social.documents(conn, run['instrument_id'], now, days)
+    result['saved_coverage'] = dict(news=len(news), reddit=sum(p['platform']=='reddit' for p in posts),
+                                  hackernews=sum(p['platform']=='hackernews' for p in posts),
+                                  discussion_days=days, as_of=now)
+    for step in result['steps']:
+        message = step.get('message', '')
+        if step['key']=='reddit' and step['status'] in ('ready','cached'):
+            match = re.fullmatch(r'(\d+) company posts and (\d+) replies collected through company RSS search\.', message)
+            if match:
+                step['message'] = reddit_sample_message(int(match[1]),int(match[2]),days,step['status']=='cached')
+        elif step['key']=='hackernews' and step['status']=='ready':
+            match = re.fullmatch(r'(\d+) company-related comments verified across direct mentions and discussions\.', message)
+            if match:
+                step['message'] = f'{match[1]} verified comments matched in this {days}-day search sample. This is a limited sample, not all Hacker News discussion.'
+        elif step['key']=='rss' and step['status'] in ('ready','cached','partial'):
+            match = re.fullmatch(r'(\d+) matching publisher reports; (\d+) failed checks; (\d+) checks deferred by the refresh schedule\. Open source coverage for details\.', message)
+            if match and (step['status']!='cached' or int(match[1])==0):
+                step['message'] = rss_sample_message(int(match[1]),0 if step['status']=='cached' else None,int(match[2]),int(match[3]))
+        elif step['key']=='market' and step['status']=='ready' and message=='Source check complete':
+            step['message'] = 'Quote and company news checked. Currently available saved news is counted above.'
+    add_previous_results(conn, result)
+    from thesis.providers.settings import settings
+    for step in result['steps']:
+        if step['key']=='x' and step['status']=='blocked' and settings().get('THESIS_X_ENABLED')!='true':
+            step['optional_source_off'] = True
+    return result
+
+
+def add_previous_results(conn, run):
+    """Keep the last recorded result visible beside a skipped repeat attempt.
+
+    This is dated history, never proof that a source remains permitted today.
+    Current readable counts are computed separately through the evidence layer.
+    """
+    keys = [s['key'] for s in run['steps'] if s['status']=='cached' and s['key']!='analysis']
+    if not keys:
+        return
+    previous = rows(conn, """SELECT DISTINCT ON (step->>'key')
+                    r.id AS run_id,step,r.lookback_days
+                FROM research_loads r CROSS JOIN LATERAL jsonb_array_elements(r.steps) step
+                WHERE r.instrument_id=%s AND r.owner_id=%s
+                  AND (r.created_at,r.id)<(%s,%s)
+                  AND step->>'key'=ANY(%s)
+                  AND step->>'status'=ANY(%s) AND step ? 'finished_at'
+                  AND (step->>'key' NOT IN ('reddit','hackernews','x') OR r.lookback_days=%s)
+                ORDER BY step->>'key',r.created_at DESC,r.id DESC""",
+                (run['instrument_id'],run['owner_id'],run['created_at'],run['id'],keys,
+                 ['ready','partial','failed','blocked','interrupted'],run['lookback_days']))
+    by_key = {r['step']['key']:dict(status=r['step']['status'],message=r['step'].get('message',''),
+                                  finished_at=r['step']['finished_at'],run_id=r['run_id']) for r in previous}
+    for step in run['steps']:
+        if step['key'] in by_key and step['status']=='cached':
+            step['previous_check'] = by_key[step['key']]
 
 
 def explain_saved_failure(conn, run):

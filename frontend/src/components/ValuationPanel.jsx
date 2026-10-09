@@ -276,6 +276,7 @@ export default function ValuationPanel({
   const performance = currentPerformance?.recorded_basis || currentPerformance;
   const [context, setContext] = useState(initialRead?.data || null);
   const [base, setBase] = useState(null);
+  const [builderOpen, setBuilderOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [method, setMethod] = useState("earnings");
   const [years, setYears] = useState("1");
@@ -394,6 +395,7 @@ export default function ValuationPanel({
     perform(async () => setResult(await api.valuationRecord(id)));
   };
   const copy = () => {
+    setBuilderOpen(true);
     const a = result.assumptions;
     clear();
     setTitle(a.title + " — revised");
@@ -412,6 +414,7 @@ export default function ValuationPanel({
     );
   };
   const examples = () => {
+    setBuilderOpen(true);
     clear();
     setTitle("Illustrative sensitivity — not a forecast");
     setYears("1");
@@ -464,7 +467,34 @@ export default function ValuationPanel({
         growth assumptions and your chosen multiple. Every calculation is local
         and uses no AI.
       </p>
-      <details className="valuation-references">
+      <div className="valuation-entry">
+        <button
+          className="primary"
+          type="button"
+          disabled={!ready}
+          aria-expanded={builderOpen}
+          aria-controls="scenario-builder"
+          aria-describedby={!ready ? "valuation-base-unavailable" : undefined}
+          onClick={() => {
+            setBuilderOpen(!builderOpen);
+            if (selected) clear();
+          }}
+        >
+          {builderOpen ? "Close scenario builder" : "Build a scenario"}
+        </button>
+        {!builderOpen && (
+          <button type="button" disabled={!ready} onClick={examples}>
+            Try illustrative assumptions
+          </button>
+        )}
+        {!ready && (
+          <p className="fine" id="valuation-base-unavailable">
+            No compatible annual revenue is saved for this company. Check
+            filings in Data &amp; sources to prepare a scenario.
+          </p>
+        )}
+      </div>
+      <details className="valuation-references" hidden={!builderOpen}>
         <summary>Compare reference multiples</summary>
         <p>
           Supported companies for context; they are not an automatically
@@ -519,22 +549,24 @@ export default function ValuationPanel({
           your decision.
         </p>
       </details>
-      <label className="valuation-history">
-        Saved comparisons
-        <Select
-          aria-label="Saved valuation comparison"
-          value={selected}
-          disabled={busy}
-          onChange={(e) => open(e.target.value)}
-        >
-          <option value="">New comparison</option>
-          {context?.saved.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.title} · {stamp(s.created_at)}
-            </option>
-          ))}
-        </Select>
-      </label>
+      {context?.saved?.length > 0 && (
+        <label className="valuation-history">
+          Saved comparisons
+          <Select
+            aria-label="Saved valuation comparison"
+            value={selected}
+            disabled={busy}
+            onChange={(e) => open(e.target.value)}
+          >
+            <option value="">New comparison</option>
+            {context?.saved.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.title} · {stamp(s.created_at)}
+              </option>
+            ))}
+          </Select>
+        </label>
+      )}
       {error && (
         <p className="form-error" role="alert">
           {error}
@@ -549,13 +581,7 @@ export default function ValuationPanel({
           </button>
         </>
       ) : (
-        <>
-          {!ready && (
-            <p className="financial-note">
-              A positive reported annual revenue base is required. Refresh
-              filings to prepare it; quarterly figures are not annualised.
-            </p>
-          )}
+        <div id="scenario-builder" hidden={!builderOpen || !ready}>
           {ready && report && (
             <div className="valuation-base">
               <strong>
@@ -977,7 +1003,7 @@ export default function ValuationPanel({
             </fieldset>
           </form>
           <Results record={result} />
-        </>
+        </div>
       )}
     </section>
   );

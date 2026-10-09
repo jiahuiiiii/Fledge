@@ -18,7 +18,7 @@ for index, year in enumerate(range(2021, 2026)):
         ('ProfitLoss', [5,7,-3,14,20][index]),
         ('NetCashProvidedByUsedInOperatingActivities', [9,12,11,24,45][index]),
         ('PaymentsToAcquirePropertyPlantAndEquipment', [2,3,4,4,5][index]),
-        ('InterestExpenseNonOperating', [2,2,3,3,4][index]),
+        ('InterestExpenseNonoperating', [2,2,3,3,4][index]),
     ]:
         rows = facts.setdefault(concept, {'units': {'USD': []}})['units']['USD']
         rows[:] = [row for row in rows if row['accn'] != accession]

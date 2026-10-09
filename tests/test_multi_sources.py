@@ -359,7 +359,9 @@ def test_all_deferred_feeds_are_not_reported_as_success(monkeypatch):
     monkeypatch.setattr(hub, 'refresh', lambda *args, **kwargs: dict(status='cached', message=hub.RECENT_CHECK, deferred=True))
     result = hub.refresh_rss('unused')
     assert result['status'] == 'cached'
-    assert '0 failed checks; 11 checks deferred' in result['message']
+    assert 'No publisher feeds were checked' in result['message']
+    assert '11 checks deferred' in result['message']
+    assert '0 report' not in result['message']
 
 
 def test_disabled_x_is_optional_not_a_news_outage(owner, monkeypatch):

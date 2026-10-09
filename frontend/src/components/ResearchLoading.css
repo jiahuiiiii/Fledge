@@ -1,0 +1,27 @@
+.loading-steps .loading-source-count {
+  color: var(--color-text);
+  font-weight: 600;
+}
+.loading-steps .loading-check-date {
+  display: block;
+  margin-top: 5px;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+.loading-steps details {
+  margin-top: 4px;
+  font-size: var(--text-xs);
+}
+.loading-steps details > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+  color: var(--color-accent);
+}
+.loading-steps details > summary:focus-visible {
+  outline-offset: -2px;
+}
+.loading-steps .loading-check-warning {
+  color: var(--color-gold);
+}

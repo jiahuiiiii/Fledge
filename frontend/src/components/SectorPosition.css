@@ -79,6 +79,7 @@
 .position-map-viewport svg {
   width: 100%;
   min-width: 540px;
+  height: 320px;
   display: block;
   overflow: visible;
 }

@@ -14,9 +14,9 @@ export function sentimentSummaryLabel(sample) {
         : null;
   const amount =
     majority == null
-      ? `${usable} interpretable groups`
-      : `${majority} of ${usable} interpretable groups`;
-  return `${sample.tone} · ${amount} · ${unclear} unclear`;
+      ? `${usable} clear readings`
+      : `${majority} of ${usable} clear readings`;
+  return `${["mixed", "mixed / balanced"].includes(sample.tone) ? "Mixed tone" : sample.tone} · ${amount}${unclear ? ` · ${unclear} unclear` : ""}`;
 }
 
 export function priceComparisonText(value) {

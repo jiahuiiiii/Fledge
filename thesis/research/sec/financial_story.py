@@ -6,10 +6,10 @@ from decimal import Decimal, localcontext
 from thesis.db import one
 from .normalize import filing_rows, REVENUE
 from .performance import collect, select, decimal_text
-from .financial_depth import trailing, total_debt
+from .financial_depth import trailing, total_debt, capital_spending, reported
 from .disclosure_text import archive_url
 
-METHOD = 'sec-financial-story-1'
+METHOD = 'sec-financial-story-2'
 MISSING = 'No compatible whole-company USD fact in the selected filing.'
 BALANCES = {
     'assets': ('Total assets', ('Assets',)),
@@ -62,12 +62,13 @@ def income_period(bundle, filings, filing, kind, resolver=None):
         ('capital_spending', 'Cash capital spending', ('PaymentsToAcquirePropertyPlantAndEquipment',)),
         ('net_consolidated', 'Net result including non-controlling interests', ('ProfitLoss',)),
         ('net_parent', 'Net income attributable to parent', ('NetIncomeLoss',)),
-        ('interest', 'Reported non-operating interest expense', ('InterestExpenseNonOperating',)),
+        ('interest', 'Reported non-operating interest expense', ('InterestExpenseNonoperating',)),
     ]:
         rows[key] = dict(key=key, label=label, unit='USD', **trailing(bundle, filings, filing, tags,resolver))
+    rows['capital_spending']=dict(key='capital_spending',unit='USD',**capital_spending(bundle,filings,filing,resolver))
     revenue = rows['revenue']
     for key, row in rows.items():
-        if key != 'revenue' and row['value'] is not None and (row['start'], row['end']) != (revenue['start'], revenue['end']):
+        if key != 'revenue' and revenue['start'] is not None and row['value'] is not None and (row['start'], row['end']) != (revenue['start'], revenue['end']):
             row.update(value=None, reason='This figure covers different dates from the selected revenue period.')
     # Match the existing income-flow policy: a conflicting consolidated result
     # cannot be concealed by a parent-only result. Definitions remain visible.
@@ -79,6 +80,7 @@ def income_period(bundle, filings, filing, kind, resolver=None):
     if capex['value'] is not None and Decimal(capex['value']) < 0:
         capex = dict(capex, value=None, reason='Negative capital spending is unsupported by this free-cash-flow convention.')
     rows['free_cash_flow'] = calculation('free_cash_flow', 'Free cash flow', cash, capex, 'subtract', 'Operating cash flow − cash capital spending')
+    rows['free_cash_flow'].update(spending_basis=capex['spending_basis'],explanation=capex['explanation'])
     rows['net_margin'] = calculation('net_margin', 'Net result / revenue', rows['net_income'], rows['revenue'], 'ratio', 'Selected net result / matching revenue × 100', percent=True)
     rows['operating_margin'] = calculation('operating_margin', 'Operating margin', rows['operating_income'], rows['revenue'], 'ratio', 'Operating income / matching revenue × 100', percent=True)
     rows['interest_coverage'] = calculation('interest_coverage', 'Operating profit / non-operating interest expense', rows['operating_income'], rows['interest'], 'ratio', 'Operating profit / matching non-operating interest expense')
@@ -93,6 +95,26 @@ def balance_period(bundle, filing):
         fact, reason = select(collect(bundle, filing, tags), filing, 'quarter', 'Balance sheet', tags)
         metrics[key] = dict(key=key, label=label, value=fact['value'] if fact else None, unit='USD',
                             start=None, end=filing['end'].isoformat(), inputs=[fact] if fact else [], reason=reason, calculated=False)
+    # These are explicitly labelled broader/narrower categories, not aliases.
+    # Use them only when no preferred current-period fact was reported.
+    for key,label,tag in [
+        ('receivables','Accounts & other receivables','AccountsAndOtherReceivablesNetCurrent'),
+        ('property','Property & equipment, including finance-lease assets','PropertyPlantAndEquipmentAndFinanceLeaseRightOfUseAssetAfterAccumulatedDepreciationAndAmortization'),
+        ('intangibles','Intangible assets excluding goodwill','IntangibleAssetsNetExcludingGoodwill'),
+        ('payables','Trade payables','AccountsPayableTradeCurrent'),
+    ]:
+        if not reported(bundle,filing,BALANCES[key][1]):
+            fact,reason=select(collect(bundle,filing,(tag,)),filing,'quarter','Balance sheet',(tag,))
+            if fact or reported(bundle,filing,(tag,)):
+                metrics[key].update(label=label,value=fact['value'] if fact else None,inputs=[fact] if fact else [],reason=reason,
+                                    explanation='Uses the explicitly named reported category; its scope can differ from other companies or periods.')
+    if not reported(bundle,filing,('Liabilities',)):
+        current,noncurrent=metrics['current_liabilities'],metrics['noncurrent_liabilities']
+        if all(r['value'] is not None and Decimal(r['value'])>=0 for r in (current,noncurrent)):
+            with localcontext() as ctx:
+                ctx.prec=110;value=decimal_text(Decimal(current['value'])+Decimal(noncurrent['value']))
+            metrics['liabilities'].update(value=value,inputs=current['inputs']+noncurrent['inputs'],reason=None,calculated=True,
+                                          formula='Current liabilities + noncurrent liabilities')
     for target, left, right in [('noncurrent_assets', 'assets', 'current_assets'), ('noncurrent_liabilities', 'liabilities', 'current_liabilities')]:
         if metrics[target]['reason'] == MISSING:
             metrics[target] = calculation(target, metrics[target]['label'], metrics[left], metrics[right], 'subtract',

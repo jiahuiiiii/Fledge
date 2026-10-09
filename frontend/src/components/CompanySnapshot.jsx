@@ -52,7 +52,7 @@ function Activity({ data, instrumentId, onUpdates, onView }) {
             {" "}
             · check incomplete{" "}
             <button className="glance-link" onClick={() => onView("evidence")}>
-              View feed status and next steps →
+              Feed status →
             </button>
           </>
         )}

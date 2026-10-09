@@ -4,9 +4,9 @@
 }
 .app-shell .company-actions .research-updates-trigger {
   position: relative;
-  width: 44px;
   min-height: 44px;
-  padding: 0;
+  padding: 0 var(--space-3);
+  gap: var(--space-2);
 }
 .app-shell .research-updates-dot {
   position: absolute;
@@ -93,7 +93,7 @@
 @media (max-width: 600px) {
   .app-shell .company-header {
     display: grid;
-    grid-template-columns: 32px minmax(0, 1fr) auto;
+    grid-template-columns: 32px minmax(0, 1fr);
     gap: var(--space-2);
     padding-block: var(--space-2);
   }
@@ -122,26 +122,27 @@
     display: none;
   }
   .app-shell .company-header .company-actions {
-    grid-column: 3;
-    grid-row: 1;
-    width: auto;
+    grid-column: 1 / -1;
+    grid-row: 3;
+    display: flex;
+    width: 100%;
     margin: 0;
-    order: initial;
-    gap: var(--space-1);
-    flex-wrap: nowrap;
+    gap: var(--space-2);
+    flex-wrap: wrap;
   }
   .app-shell .company-header .company-actions > button {
-    width: 44px;
-    height: 44px;
-    min-width: 44px;
+    width: auto;
     min-height: 44px;
-    padding: 0;
-    flex: none;
-  }
-  .app-shell .company-actions .company-action-icon {
-    display: inline-flex;
+    padding: var(--space-2);
+    gap: var(--space-1);
+    flex: 1 1 auto;
+    font-size: var(--text-xs);
+    white-space: normal;
   }
   .app-shell .company-actions .company-action-label {
+    display: inline;
+  }
+  .app-shell .company-header .company-actions svg {
     display: none;
   }
   .app-shell .company-header .market-quote.compact {
@@ -165,5 +166,41 @@
   }
   .app-shell .research-navigation {
     padding-block: var(--space-1);
+  }
+}
+
+/* Keep the help target attached to the growth text, including wrapped headings. */
+.app-shell .research-content .glance-summary .glance-growth-title {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+}
+.app-shell .research-content .glance-growth-title > strong {
+  display: inline;
+}
+.app-shell .glance-activity .glance-link {
+  white-space: nowrap;
+}
+.valuation-entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-block: var(--space-4);
+}
+.valuation-entry > p {
+  flex-basis: 100%;
+}
+
+.app-shell .company-action-short {
+  display: none;
+}
+@media (max-width: 600px) {
+  .app-shell .company-actions .company-action-full {
+    display: none;
+  }
+  .app-shell .company-actions .company-action-short {
+    display: inline;
   }
 }

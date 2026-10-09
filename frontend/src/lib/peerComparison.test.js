@@ -42,6 +42,16 @@ const financial = (value, unit = "USD") => ({
   },
 });
 
+test("current financial method keeps broader cash-spending evidence", () => {
+  const item = financial("127006000000");
+  item.financials.method = "sec-financial-depth-2";
+  item.financials.trailing[0].explanation =
+    "Includes software and intangible assets.";
+  const [row] = peerRows([item], metric("fcf_sec"));
+  assert.equal(row.exact, "127006000000");
+  assert.match(row.basis, /software and intangible/);
+});
+
 test("peer sources keep their own value, identity and date without fallback", () => {
   const item = member(null);
   let [row] = peerRows([item], metric("pe_finnhub"));
@@ -189,6 +199,11 @@ test("annual amendment projections keep their own identity and original source e
   assert.equal(
     row.filingResolution.amendments[0].document_id,
     "amended-filing",
+  );
+  source.projection_method = "sec-amendment-resolution-2";
+  assert.equal(
+    peerRows([item], metric("growth_sec"))[0].identity,
+    "current-proof",
   );
   source.based_on_snapshot_id = null;
   assert.equal(peerRows([item], metric("growth_sec"))[0].value, null);

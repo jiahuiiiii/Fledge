@@ -2,7 +2,7 @@ import SourceFilters, { SourceLabel, sourceScope } from "./SourceFilters";
 import { originalSample } from "../lib/originalSample";
 import { sourceHeadline } from "../lib/sourceHeadline";
 import SentimentLimits from "./SentimentLimits";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { stamp } from "./MarketResearch";
 import { sourceExclusionLabels } from "../lib/sourceCoverage";
 
@@ -21,8 +21,13 @@ export default function CurrentSentimentSources({
   data,
   onSource,
   expanded = false,
+  inline = false,
+  scope,
 }) {
-  const [selected, setSelected] = useState("all");
+  const [localScope, setSelected] = useState("all");
+  const selected = scope || localScope;
+  const [page, setPage] = useState(1);
+  useEffect(() => setPage(1), [selected, data?.as_of]);
   if (!data) return null;
   const sources =
     selected === "all"
@@ -53,86 +58,113 @@ export default function CurrentSentimentSources({
       (selected === "all" || scope === selected) &&
       Object.values(sample.excluded || {}).some((count) => count > 0),
   );
+  const totalPages = Math.max(1, Math.ceil(sources.length / 6));
+  const currentPage = Math.min(page, totalPages);
+  const shown = inline
+    ? sources.slice((currentPage - 1) * 6, currentPage * 6)
+    : sources;
+  const Container = inline ? "div" : "details";
   return (
-    <section className="original-sample" aria-label="Current sentiment inputs">
-      <p role="status">{states[data.status]}</p>
-      <SentimentLimits value={data.input_limits} />
-      <details open={expanded || undefined}>
-        <summary>Read current sources · {data.sources.length} eligible</summary>
+    <section
+      className={`original-sample${inline ? " collected-source-reading" : ""}`}
+      aria-label={
+        inline ? "Collected news and discussion" : "Current sentiment inputs"
+      }
+    >
+      {!inline && <p role="status">{states[data.status]}</p>}
+      {!inline && <SentimentLimits value={data.input_limits} />}
+      <Container {...(!inline ? { open: expanded || undefined } : {})}>
+        {!inline && (
+          <summary>
+            Read current sources · {data.sources.length} eligible
+          </summary>
+        )}
         <div className="source-preview-content">
-          {data.status === "changed" && (
-            <p className="fine">
-              Saved labels still describe the earlier sample. A different source
-              selection is not a measured change in market sentiment.
+          {inline && (
+            <p className="fine" role="status">
+              {sources.length} collected{" "}
+              {sources.length === 1 ? "source" : "sources"} in this view ·
+              original wording, not yet analysed for tone or relevance.
             </p>
           )}
-          <p className="fine">
-            Selection as of {stamp(data.as_of)}, from locally saved sources in
-            the selected window. Opening this preview makes no source or AI
-            request. Source checks may be older; inspect their dates and
-            coverage.
-          </p>
-          {data.saved_cutoff && (
-            <p className="fine">
-              Saved sentiment source cutoff {stamp(data.saved_cutoff)}.
-            </p>
-          )}
-          <SourceFilters
-            selected={selected}
-            onChange={setSelected}
-            label="Current source type"
-          />
-          <p className="fine">
-            {counts.selected} eligible from {counts.available} available
-            candidate texts. Every eligible candidate will be analysed in
-            batches. Relevance has not been assessed in this preview.
-          </p>
-          {exclusions.length > 0 && (
-            <details className="secondary-details">
-              <summary>Excluded before analysis</summary>
-              {exclusions.map(([scope, sample]) => (
-                <p key={scope}>
-                  <SourceLabel scope={scope} />:{" "}
-                  {Object.entries(sample.excluded)
-                    .map(
-                      ([reason, count]) =>
-                        `${sourceExclusionLabels[reason] || reason}: ${count}`,
-                    )
-                    .join(" · ")}
+          {!inline && (
+            <>
+              {data.status === "changed" && (
+                <p className="fine">
+                  Saved labels still describe the earlier sample. A different
+                  source selection is not a measured change in market sentiment.
                 </p>
-              ))}
+              )}
               <p className="fine">
-                These texts receive no sentiment label. Original saved sources
-                remain available in Data &amp; sources.
+                Selection as of {stamp(data.as_of)}, from locally saved sources
+                in the selected window. Opening this preview makes no source or
+                AI request. Source checks may be older; inspect their dates and
+                coverage.
               </p>
-            </details>
-          )}
-          {counts.added != null && (
-            <p className="fine">
-              Compared with the saved sample: {counts.added} not previously
-              selected, {counts.no_longer_selected} no longer selected,{" "}
-              {counts.retained} retained. These are source-version differences,
-              not counts of new events.
-            </p>
-          )}
-          {!!data.parents_changed && (
-            <p className="fine">
-              Saved parent context differs for {data.parents_changed} retained
-              replies. This can reflect availability or age as well as changed
-              wording.
-            </p>
-          )}
-          {data.comparison_sources_changed && (
-            <p className="fine">
-              The additional news-comparison pool also differs. Its reports are
-              not counted or shown as selected sentiment sources here.
-            </p>
-          )}
-          {selected === "hackernews" && (
-            <p className="fine">
-              Tech-community replies are not representative investor sentiment.
-              Open a source to inspect its separately saved original parent.
-            </p>
+              {data.saved_cutoff && (
+                <p className="fine">
+                  Saved sentiment source cutoff {stamp(data.saved_cutoff)}.
+                </p>
+              )}
+              <SourceFilters
+                selected={selected}
+                onChange={setSelected}
+                label="Current source type"
+              />
+              <p className="fine">
+                {counts.selected} eligible from {counts.available} available
+                candidate texts. Every eligible candidate will be analysed in
+                batches. Relevance has not been assessed in this preview.
+              </p>
+              {exclusions.length > 0 && (
+                <details className="secondary-details">
+                  <summary>Excluded before analysis</summary>
+                  {exclusions.map(([scope, sample]) => (
+                    <p key={scope}>
+                      <SourceLabel scope={scope} />:{" "}
+                      {Object.entries(sample.excluded)
+                        .map(
+                          ([reason, count]) =>
+                            `${sourceExclusionLabels[reason] || reason}: ${count}`,
+                        )
+                        .join(" · ")}
+                    </p>
+                  ))}
+                  <p className="fine">
+                    These texts receive no sentiment label. Original saved
+                    sources remain available in Data &amp; sources.
+                  </p>
+                </details>
+              )}
+              {counts.added != null && (
+                <p className="fine">
+                  Compared with the saved sample: {counts.added} not previously
+                  selected, {counts.no_longer_selected} no longer selected,{" "}
+                  {counts.retained} retained. These are source-version
+                  differences, not counts of new events.
+                </p>
+              )}
+              {!!data.parents_changed && (
+                <p className="fine">
+                  Saved parent context differs for {data.parents_changed}{" "}
+                  retained replies. This can reflect availability or age as well
+                  as changed wording.
+                </p>
+              )}
+              {data.comparison_sources_changed && (
+                <p className="fine">
+                  The additional news-comparison pool also differs. Its reports
+                  are not counted or shown as selected sentiment sources here.
+                </p>
+              )}
+              {selected === "hackernews" && (
+                <p className="fine">
+                  Tech-community replies are not representative investor
+                  sentiment. Open a source to inspect its separately saved
+                  original parent.
+                </p>
+              )}
+            </>
           )}
           {!sources.length && (
             <p>
@@ -140,7 +172,7 @@ export default function CurrentSentimentSources({
               neutral sentiment.
             </p>
           )}
-          {sources.map((s) => (
+          {shown.map((s) => (
             <article key={s.id}>
               <div className="row">
                 <span className="fine">
@@ -152,27 +184,55 @@ export default function CurrentSentimentSources({
                 </time>
               </div>
               {sourceHeadline(s) && <h3>{sourceHeadline(s)}</h3>}
-              <p className="fine">
-                First available here {stamp(s.available_at)}
-                {s.in_saved_sample === false
-                  ? " · not in the saved selected sample"
-                  : ""}
-                {s.has_parent_context ? " · eligible saved parent context" : ""}
-                .
-              </p>
+              {!inline && (
+                <p className="fine">
+                  First available here {stamp(s.available_at)}
+                  {s.in_saved_sample === false
+                    ? " · not in the saved selected sample"
+                    : ""}
+                  {s.has_parent_context
+                    ? " · eligible saved parent context"
+                    : ""}
+                  .
+                </p>
+              )}
               <p className="original-source-text">{s.body}</p>
               <button className="source-link" onClick={() => onSource(s.id)}>
                 Inspect current source ↗
               </button>
             </article>
           ))}
-          <p className="fine">
-            These supplied snippets and posts have no AI labels in this view. A
-            mention may be unrelated to the company; public opinions and
-            secondary reporting are not verified facts.
-          </p>
+          {inline && totalPages > 1 && (
+            <nav
+              className="sentiment-pagination"
+              aria-label="Collected source pages"
+            >
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setPage(currentPage - 1)}
+              >
+                Previous sources
+              </button>
+              <span className="fine">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setPage(currentPage + 1)}
+              >
+                Next sources
+              </button>
+            </nav>
+          )}
+          {!inline && (
+            <p className="fine">
+              These supplied snippets and posts have no AI labels in this view.
+              A mention may be unrelated to the company; public opinions and
+              secondary reporting are not verified facts.
+            </p>
+          )}
         </div>
-      </details>
+      </Container>
     </section>
   );
 }

@@ -119,7 +119,7 @@ export function incomeInsights(active, previous, mode) {
         number(fcf.value) >= 0
           ? "Cash left after capital spending"
           : "Capital spending exceeded operating cash",
-      text: `${money(cash.value)} of operating cash flow ${number(fcf.value) >= 0 ? `left ${money(fcf.value)}` : `fell short by ${money(Math.abs(number(fcf.value)))}`} after cash spending on property, plant and equipment.`,
+      text: `${money(cash.value)} of operating cash flow ${number(fcf.value) >= 0 ? `left ${money(fcf.value)}` : `fell short by ${money(Math.abs(number(fcf.value)))}`} after cash spending on ${fcf.spending_basis === "productive_assets" ? "property, equipment, software and other intangible assets" : "property, plant and equipment"}.`,
       detail:
         "This calculation excludes acquisitions, debt repayments and dividends; it is not all cash available to spend.",
       rows: [cash, metric(active, "capital_spending"), fcf],

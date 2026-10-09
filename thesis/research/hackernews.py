@@ -12,23 +12,13 @@ from datetime import datetime, timezone, timedelta
 from uuid import uuid4, uuid5, NAMESPACE_URL
 import httpx
 from thesis.db import transaction, one, rows
-from .catalogue import COMPANIES, mentions, company_alias
+from .catalogue import COMPANIES, mentions, company_search_name
 from .social import plain_summary
 
 RECRUITMENT = re.compile(
     r"r[ée]sum[ée]|willing to relocate|looking for (?:work|a job)|(?:remote|onsite).{0,80}(?:full[ -]time|founding engineer)|we(?:’|'|&#x27;)?re hiring",
     re.I,
 )
-
-QUERIES = dict(
-    MSFT="Microsoft",
-    AAPL="Apple",
-    GOOGL="Google",
-    NVDA="Nvidia",
-    AMZN="Amazon",
-    META="Meta",
-)
-
 
 def fetch(kind, value, now, *, lookback_days=7, company_name=None):
     # Cross-company persisted request pacing, with no transaction during HTTP.
@@ -46,7 +36,7 @@ def fetch(kind, value, now, *, lookback_days=7, company_name=None):
     if kind in {"search", "stories"} and valid_symbol(value):
         url = "https://hn.algolia.com/api/v1/search_by_date"
         params = dict(
-            query='"' + (QUERIES.get(value) or company_alias(company_name) or value) + '"',
+            query='"' + company_search_name(value, company_name) + '"',
             tags="story" if kind == "stories" else "comment",
             hitsPerPage=8 if kind == "stories" else 40,
             typoTolerance="false", queryType="prefixNone",
@@ -155,7 +145,7 @@ def refresh(iid, *, fetcher=None, now=None, lookback_days=7, include_threads=Fal
         if not one(conn, "SELECT enabled FROM social_feeds WHERE feed='hackernews'")[
             "enabled"
         ]:
-            return dict(checked=[], failures=0)
+            return dict(checked=[], failures=0, status='blocked', message='Hacker News is switched off; no discussion check was made.')
         conn.execute(
             "INSERT INTO hn_refresh_state(instrument_id) VALUES(%s) ON CONFLICT DO NOTHING",
             (iid,),
@@ -324,5 +314,5 @@ def refresh(iid, *, fetcher=None, now=None, lookback_days=7, include_threads=Fal
         )
     result=dict(checked=["hackernews"], failures=int(bool(error)))
     if include_threads:
-        result.update(message=error or f'{len(posts)} company-related comments verified across direct mentions and discussions.', matched=len(posts))
+        result.update(message=error or f'{len(posts)} verified comments matched in this {lookback_days}-day search sample; {checked} original comments checked. This is a limited sample, not all Hacker News discussion.', matched=len(posts))
     return result

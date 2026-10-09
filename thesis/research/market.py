@@ -393,7 +393,9 @@ def refresh(iid, *, transport=None):
             ),
         )
     return dict(
-        quote_ok=quote is not None, news_ok="company-news" not in errors, errors=errors
+        quote_ok=quote is not None, news_ok="company-news" not in errors, errors=errors,
+        message=('Quote checked. ' if quote is not None else 'Quote unavailable; saved values retained. ') +
+                (f'{len(articles)} company news reports returned by Finnhub; counts can include saved reports.' if 'company-news' not in errors else 'Company news check failed; saved reports retained.')
     )
 
 

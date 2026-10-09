@@ -10,7 +10,7 @@ from .financial_depth import trailing
 from .disclosure_text import archive_url
 from thesis.db import one
 
-METHOD = 'sec-income-flow-1'
+METHOD = 'sec-income-flow-2'
 DEFINITIONS = {
     'revenue': ('Revenue', REVENUE),
     'cost': ('Cost of revenue', ('CostOfRevenue', 'CostOfGoodsAndServicesSold')),
@@ -25,31 +25,37 @@ DEFINITIONS = {
 
 
 def difference(key, label, left, right):
+    from .amendments import combined_evidence
+    evidence=combined_evidence(left,right)
     inputs = left['inputs'] + right['inputs']
     valid = left['value'] is not None and right['value'] is not None and (left['start'], left['end']) == (right['start'], right['end'])
+    if evidence and {f['accession'] for f in left['inputs']} != {f['accession'] for f in right['inputs']}:valid=False
     with localcontext() as ctx:
         ctx.prec = 110
         value = decimal_text(Decimal(left['value']) - Decimal(right['value'])) if valid else None
     return dict(key=key, label=label, value=value, unit='USD', inputs=inputs,
                 start=left['start'], end=left['end'], calculated=True,
                 formula=f"{left['label']} − {right['label']}",
-                reason=None if valid else 'Compatible figures for the same period are unavailable.')
+                reason=None if valid else 'Compatible figures for the same period are unavailable.',**(evidence if valid else {}))
 
 
-def build_period(bundle, filings, current, kind, cik):
+def build_period(bundle, filings, current, kind, cik, resolver=None):
     metrics = {}
     for key, (label, tags) in DEFINITIONS.items():
         if kind == 'trailing':
-            row = trailing(bundle, filings, current, tags)
+            row = trailing(bundle, filings, current, tags,resolver)
         else:
             fact, reason = select(collect(bundle, current, tags), current, kind, 'Business performance', tags)
             row = dict(value=fact['value'] if fact else None, inputs=[fact] if fact else [],
                        reason=reason, start=fact['start'] if fact else None,
                        end=current['end'].isoformat(), calculated=False, formula=None)
         metrics[key] = dict(key=key, label=label, unit='USD', **row)
+    if resolver and current['form'].endswith('/A'):
+        resolved,_=resolver.resolve(current,list(metrics.values()),lambda earlier:build_period(bundle,filings,earlier,kind,cik)['metrics'])
+        metrics={m['key']:m for m in resolved}
     revenue = metrics['revenue']
     for key, row in metrics.items():
-        if key != 'revenue' and row['value'] is not None and (row['start'], row['end']) != (revenue['start'], revenue['end']):
+        if key != 'revenue' and revenue['start'] is not None and row['value'] is not None and (row['start'], row['end']) != (revenue['start'], revenue['end']):
             row.update(value=None, reason='This figure covers different dates from revenue.')
     # Only absent facts may be derived; conflicts/unsupported facts are not masked.
     for target, left, right in [('gross', 'revenue', 'cost'), ('cost', 'revenue', 'gross'), ('expenses', 'gross', 'operating')]:
@@ -67,6 +73,8 @@ def build_period(bundle, filings, current, kind, cik):
     core = [metrics[k] for k in ['revenue', 'cost', 'gross', 'operating', 'expenses']]
     if any(row['value'] is None for row in core):
         reason = 'Some compatible revenue, cost or profit figures are missing. Available figures remain below.'
+    elif any(row.get('filing_resolution') for row in core) and len({tuple(sorted({f['accession'] for f in row['inputs']})) for row in core})>1:
+        reason = 'Inputs use different amended filing vintages. Available figures remain below.'
     elif Decimal(revenue['value']) <= 0 or any(Decimal(row['value']) < 0 for row in core):
         reason = 'This period contains a loss, negative cost or non-positive revenue. Signed figures are shown below instead of positive-width flows.'
     else:
@@ -109,7 +117,7 @@ def build_period(bundle, filings, current, kind, cik):
                 chartable=not reason, reason=reason, notes=notes, expense_parts=expense_parts)
 
 
-def normalize_flow(bundle, cik, now):
+def normalize_flow(bundle, cik, now,resolver=None):
     if any(int(bundle[key].get('cik', 0)) != int(cik) for key in ['companyfacts', 'submissions']):
         raise ValueError('SEC evidence belongs to another company.')
     filings = filing_rows(bundle['submissions'], now)
@@ -121,9 +129,9 @@ def normalize_flow(bundle, cik, now):
     for kind in ['annual', 'quarter']:
         selected = [(key, value) for key, value in chosen.items() if key[0] == kind][-5:]
         for _, filing in reversed(selected):
-            periods.append(build_period(bundle, filings, filing, kind, cik))
+            periods.append(build_period(bundle, filings, filing, kind, cik,resolver))
     if filings[-1]['form'].startswith('10-Q'):
-        periods.insert(0, build_period(bundle, filings, filings[-1], 'trailing', cik))
+        periods.insert(0, build_period(bundle, filings, filings[-1], 'trailing', cik,resolver))
     periods.sort(key=lambda p: (p['end'], p['kind'] == 'trailing'), reverse=True)
     return dict(method=METHOD, periods=periods,
                 limitations=['Income-statement revenue and profit are not cash receipts and payments.',
@@ -138,7 +146,10 @@ def present(conn, iid):
     saved = one(conn, 'SELECT p.id,p.payload,p.retrieved_at,c.cik,k.checked_at FROM sec_payload_current k JOIN source_payloads p ON p.id=k.payload_id AND p.instrument_id=k.instrument_id JOIN sec_companies c ON c.instrument_id=k.instrument_id WHERE k.instrument_id=%s', (iid,))
     if not saved:
         return dict(status='empty', periods=[], reason='Collect company filings to see the revenue and expense flow.', method=METHOD)
-    try: result = normalize_flow(saved['payload'], saved['cik'], saved['checked_at'])
+    from .amendments import retained_resolver
+    try:
+        resolver=retained_resolver(conn,iid,saved['payload'],saved['cik'],saved['checked_at'])
+        result = normalize_flow(saved['payload'], saved['cik'], saved['checked_at'],resolver)
     except (ValueError, KeyError):
         return dict(status='unavailable', periods=[], reason='The saved filing facts are unsupported for this flow. Existing financial reports remain available.', method=METHOD)
-    return dict(status='available', payload_id=str(saved['id']), first_recorded_at=saved['retrieved_at'], checked_at=saved['checked_at'], **result)
+    return dict(status='available', payload_id=str(saved['id']), amendment_basis=resolver.basis_id, first_recorded_at=saved['retrieved_at'], checked_at=saved['checked_at'], **result)

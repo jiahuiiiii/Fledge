@@ -91,6 +91,21 @@ test("missing current obligations stay unknown and cash does not establish repay
   assert.equal(balanceInsights(current)[0].tone, "unknown");
   assert.match(balanceInsights(current)[1].text, /US\$43 remains/);
 });
+
+test("cash remaining preserves the broader productive-asset definition", () => {
+  const current = period("2025-09-30", {
+    operating_cash: "30",
+    capital_spending: "10",
+    free_cash_flow: "20",
+  });
+  current.metrics.find((m) => m.key === "free_cash_flow").spending_basis =
+    "productive_assets";
+  const reading = incomeInsights(current, null).find((r) =>
+    r.title.startsWith("Cash left"),
+  );
+  assert.match(reading.text, /software and other intangible assets/);
+  assert.match(reading.text, /left US\$20/);
+});
 test("balance map reconciles classified and unclassified amounts and withholds negative equity", () => {
   const current = {
     end: "2025-09-30",

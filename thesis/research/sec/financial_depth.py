@@ -10,7 +10,7 @@ from .performance import collect,unique,select,decimal_text,duration
 from thesis.db import one
 from .disclosure_text import archive_url
 
-METHOD='sec-financial-depth-1'
+METHOD='sec-financial-depth-2'
 FLOW={
  'revenue':('Revenue',REVENUE),
  'operating_income':('Operating income',('OperatingIncomeLoss',)),
@@ -18,6 +18,48 @@ FLOW={
  'operating_cash':('Operating cash flow',('NetCashProvidedByUsedInOperatingActivities',)),
  'capital_spending':('Cash capital spending',('PaymentsToAcquirePropertyPlantAndEquipment',)),
 }
+
+
+def reported(bundle, filing, tags):
+    """Any reported current-period input, including unusable currencies.
+
+    Broader definitions must not conceal a conflicting or unsupported preferred
+    fact. Missing comparative inputs also do not authorize a definition switch.
+    """
+    return any(row.get('accn') == filing['accessionNumber'] and row.get('form') == filing['form']
+               and row.get('filed') == filing['filingDate'] and row.get('end') == filing['end'].isoformat()
+               for tag in tags for values in bundle['companyfacts'].get('facts', {}).get('us-gaap', {}).get(tag, {}).get('units', {}).values() for row in values)
+
+
+def common_concept(bundle, filings, inputs, tags):
+    """Choose a common tag only when every exact input is also reported in it.
+
+    This is not an alias across reporting definitions: the values, fiscal dates
+    and filing vintages must already match for all three original inputs.
+    """
+    choices=[]
+    for fact in inputs:
+        filing=next((f for f in filings if f['accessionNumber']==fact['accession']),None)
+        alternatives=collect(bundle,filing,tags) if filing else []
+        choices.append({f['concept']:f for f in alternatives if all(f[k]==fact[k] for k in ('value','start','end','accession','form','filed','unit'))})
+    for tag in tags:
+        if all(tag in group for group in choices):return [group[tag] for group in choices]
+    return inputs
+
+
+def capital_spending(bundle, filings, current, resolver=None):
+    if resolver and current['form'].endswith('/A'):
+        raw=dict(key='capital_spending',**capital_spending(bundle,filings,current))
+        values,_=resolver.resolve(current,[raw],lambda earlier:[dict(key='capital_spending',**capital_spending(bundle,filings,earlier))])
+        result=values[0];result.pop('key',None)
+        return result
+    tags=('PaymentsToAcquirePropertyPlantAndEquipment',)
+    broader=not reported(bundle,current,tags)
+    if broader:tags=('PaymentsToAcquireProductiveAssets',)
+    result=trailing(bundle,filings,current,tags,resolver)
+    return dict(result,label='Cash spending on property, equipment, software & intangibles' if broader else 'Cash capital spending',
+                spending_basis='productive_assets' if broader else 'property_plant_equipment',
+                explanation='Cash purchases of property, plant, equipment, software and other intangible assets; this broader reported category is used in free cash flow.' if broader else 'Cash purchases of property, plant and equipment.')
 
 
 def trailing(bundle,filings,current,tags, resolver=None):
@@ -56,16 +98,18 @@ def trailing(bundle,filings,current,tags, resolver=None):
     value=None
     start=None
     if not reason:
-        if len({f['concept'] for f in inputs})!=1:
-            reason='The selected filings use different financial concepts; trailing results are withheld.'
+        inputs=common_concept(bundle,filings,inputs,tags)
+        # Dates remain known when the amount is withheld for a definition
+        # change. Other measures must not inherit this measure's missing value.
+        start=(date.fromisoformat(prior['end'])+timedelta(days=1)).isoformat()
+        if not 350<=(current['end']-date.fromisoformat(start)).days+1<=380:
+            reason='The annual/YTD bridge does not cover a compatible trailing fiscal year.'
+        elif len({f['concept'] for f in inputs})!=1:
+            reason='These filings use different reporting labels; a comparable past-12-month total has not been established.'
         else:
-            start=(date.fromisoformat(prior['end'])+timedelta(days=1)).isoformat()
-            if not 350<=(current['end']-date.fromisoformat(start)).days+1<=380:
-                reason='The annual/YTD bridge does not cover a compatible trailing fiscal year.'
-            else:
-                with localcontext() as ctx:
-                    ctx.prec=28
-                    value=decimal_text(Decimal(base['value'])+Decimal(ytd['value'])-Decimal(prior['value']))
+            with localcontext() as ctx:
+                ctx.prec=28
+                value=decimal_text(Decimal(base['value'])+Decimal(ytd['value'])-Decimal(prior['value']))
     return dict(value=value,inputs=inputs,reason=reason,start=start,end=current['end'].isoformat(),
                 formula='Previous fiscal year + current fiscal year to date − comparable prior fiscal year to date',calculated=True,**base_resolution)
 
@@ -74,13 +118,16 @@ def total_debt(bundle,current):
     def instant(tags):return select(collect(bundle,current,tags),current,'quarter','Balance sheet',tags)[0]
     direct_facts=collect(bundle,current,('DebtLongtermAndShorttermCombinedAmount',))
     direct,direct_error=select(direct_facts,current,'quarter','Balance sheet',('DebtLongtermAndShorttermCombinedAmount',))
-    reported=[f for f in direct_facts if f['start'] is None and f['end']==current['end'].isoformat()]
-    if reported and (not direct or Decimal(direct['value'])<0):
-        return dict(key='total_debt',label='Reported combined borrowing',value=None,unit='USD',inputs=reported,end=current['end'].isoformat(),start=None,
+    reported_facts=[f for f in direct_facts if f['start'] is None and f['end']==current['end'].isoformat()]
+    if reported_facts and (not direct or Decimal(direct['value'])<0):
+        return dict(key='total_debt',label='Reported combined borrowing',value=None,unit='USD',inputs=reported_facts,end=current['end'].isoformat(),start=None,
                     formula=None,reason=direct_error or 'The reported borrowing total is negative; this debt convention is not applied.',calculated=False,explanation='An unusable reported total is not masked with a different component sum.')
     if direct and Decimal(direct['value'])>=0:
         return dict(key='total_debt',label='Reported combined borrowing',value=direct['value'],unit='USD',inputs=[direct],end=direct['end'],start=None,
                     formula=None,reason=None,calculated=False,explanation='Standard whole-company long- and short-term debt combined amount. Lease obligations and other liabilities are separate.')
+    if reported(bundle,current,('DebtLongtermAndShorttermCombinedAmount',)):
+        return dict(key='total_debt',label='Reported combined borrowing',value=None,unit='USD',inputs=direct_facts,end=current['end'].isoformat(),start=None,
+                    formula=None,reason=direct_error,calculated=False,explanation='An unsupported reported total is not replaced by another definition.')
     # A reported total long-term debt already includes current maturities; do
     # not add its current/noncurrent portions to it again.
     long_total=instant(('LongTermDebt',))
@@ -89,7 +136,16 @@ def total_debt(bundle,current):
     inputs=([long_total] if long_total else [p for p in parts if p])+([short] if short else [])
     valid=short is not None and (long_total is not None or all(parts))
     value=None;reason=None
-    if not valid:reason='A complete reported borrowing total or all compatible long-/short-term components are unavailable. Missing borrowing is not zero.'
+    if not valid:
+        combined=instant(('DebtAndCapitalLeaseObligations',))
+        leases=instant(('FinanceLeaseLiability',))
+        if combined and leases and Decimal(combined['value'])>=Decimal(leases['value'])>=0:
+            with localcontext() as ctx:
+                ctx.prec=110;value=decimal_text(Decimal(combined['value'])-Decimal(leases['value']))
+            return dict(key='total_debt',label='Borrowing excluding finance leases (app calculation)',value=value,unit='USD',inputs=[combined,leases],start=None,end=current['end'].isoformat(),
+                        formula='Reported debt and finance-lease obligations − reported finance-lease liability',reason=None,calculated=True,
+                        explanation='Both complete balances come from the same filing and date. Finance leases are removed to preserve the borrowing definition; no missing component is assumed to be zero.')
+        reason='A complete reported borrowing total or all compatible long-/short-term components are unavailable. Missing borrowing is not zero.'
     elif any(Decimal(f['value'])<0 for f in inputs):reason='A borrowing component is negative; this debt convention is not applied.'
     else:
         with localcontext() as ctx:
@@ -102,11 +158,12 @@ def total_debt(bundle,current):
 def normalize_depth(bundle,cik,now,resolver=None):
     if any(int(bundle[k].get('cik',0))!=int(cik) for k in ('companyfacts','submissions')):raise ValueError('SEC evidence belongs to another company.')
     filings=filing_rows(bundle['submissions'],now);current=filings[-1]
-    flows=[dict(key=key,label=label,unit='USD',**trailing(bundle,filings,current,tags,resolver)) for key,(label,tags) in FLOW.items()]
+    flows=[dict(key=key,unit='USD',**(capital_spending(bundle,filings,current,resolver) if key=='capital_spending' else dict(label=label,**trailing(bundle,filings,current,tags,resolver)))) for key,(label,tags) in FLOW.items()]
     indexed={row['key']:row for row in flows}
     cash,capex=indexed['operating_cash'],indexed['capital_spending']
     fcf=dict(key='free_cash_flow',label='Free cash flow (app calculation)',unit='USD',value=None,inputs=cash['inputs']+capex['inputs'],
              start=cash['start'],end=cash['end'],formula='Trailing operating cash flow − trailing cash capital spending',reason='Compatible cash-flow and capital-spending inputs are unavailable.',calculated=True)
+    fcf['explanation']=capex['explanation'];fcf['spending_basis']=capex['spending_basis']
     if cash['value'] is not None and capex['value'] is not None and (cash['start'],cash['end'])==(capex['start'],capex['end']) and Decimal(capex['value'])>=0:
         with localcontext() as ctx:
             ctx.prec=28;fcf.update(value=decimal_text(Decimal(cash['value'])-Decimal(capex['value'])),reason=None)

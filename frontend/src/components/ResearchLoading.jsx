@@ -1,21 +1,23 @@
 import { useState } from "react";
-const states = {
-  queued: "Queued",
-  running: "Working",
-  ready: "Complete",
-  partial: "Partial coverage",
-  cached: "Cooling down",
-  failed: "Needs attention",
-  blocked: "Blocked",
-  interrupted: "Interrupted",
-};
+import { researchStep } from "../lib/researchProgress";
+import "./ResearchLoading.css";
+function checkDate(value) {
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime())
+    ? parsed.toLocaleString("en-GB", {
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZoneName: "short",
+      })
+    : null;
+}
 export function ResearchProgressToggle({ run, error, onExpand }) {
   if (!run && !error) return null;
   const attention =
     error ||
-    run?.steps.some((s) =>
-      ["failed", "blocked", "partial", "interrupted"].includes(s.status),
-    );
+    run?.steps.some((s) => researchStep(s, run.saved_coverage).attention);
   return (
     <button
       className="progress-restore"
@@ -54,9 +56,13 @@ export default function ResearchLoading({
   const finished = steps.filter(
     (s) => !["running", "queued"].includes(s.status),
   ).length;
-  const attention = steps.filter((s) =>
-    ["failed", "blocked", "partial", "interrupted"].includes(s.status),
+  const attention = steps.filter(
+    (s) => researchStep(s, run.saved_coverage).attention,
   ).length;
+  const deferred = steps.filter((s) => s.status === "cached").length;
+  const hasSaved = ["news", "reddit", "hackernews"].some(
+    (k) => run?.saved_coverage?.[k] > 0,
+  );
   const active = run?.active;
   const working = steps
     .filter((s) => s.status === "running")
@@ -78,9 +84,11 @@ export default function ResearchLoading({
               <strong>
                 {active
                   ? "Updating your research"
-                  : attention
-                    ? "Research updated with gaps"
-                    : "Research check complete"}
+                  : hasSaved
+                    ? "Saved research available"
+                    : attention
+                      ? "Research check finished with gaps"
+                      : "Research check complete"}
               </strong>
               <p role="status">
                 {error ||
@@ -89,7 +97,7 @@ export default function ResearchLoading({
                       ? working.join(" · ")
                       : steps.find((s) => s.status === "queued")?.message ||
                         "Waiting for the next step"
-                    : `${finished} of ${steps.length} steps finished${attention ? ` · ${attention} need attention` : ""}`)}
+                    : `${finished} of ${steps.length} steps finished${deferred ? ` · ${deferred} repeat checks skipped` : ""}${attention ? ` · ${attention} need attention` : ""}`)}
               </p>
             </div>
             <div className="loading-actions">
@@ -125,6 +133,15 @@ export default function ResearchLoading({
               </button>
             </div>
           </div>
+          {run?.saved_coverage && (
+            <p className="fine" aria-label="Saved source counts">
+              Available saved sources now: {run.saved_coverage.news} news
+              reports (7 days) · {run.saved_coverage.reddit} Reddit
+              posts/comments · {run.saved_coverage.hackernews} Hacker News
+              comments ({run.saved_coverage.discussion_days}-day discussion
+              window). Source counts, not analysed developments.
+            </p>
+          )}
           <div
             className="research-progress"
             role="progressbar"
@@ -146,23 +163,74 @@ export default function ResearchLoading({
             inert={!expanded ? "" : undefined}
           >
             <div className="research-loading-clip">
+              <p className="fine">
+                Saved results remain readable when a repeat check is skipped.
+                Expand refresh details for timing and connection information.
+              </p>
               <ol className="loading-steps">
-                {steps.map((step) => (
-                  <li key={step.key} data-status={step.status}>
-                    <span className="step-indicator" aria-hidden="true">
-                      {step.status === "ready"
-                        ? "✓"
-                        : step.status === "queued"
-                          ? "·"
-                          : ""}
-                    </span>
-                    <div>
-                      <strong>{step.label}</strong>
-                      <span>{states[step.status]}</span>
-                      <p>{step.message}</p>
-                    </div>
-                  </li>
-                ))}
+                {steps.map((step) => {
+                  const view = researchStep(step, run.saved_coverage);
+                  const date = view.date && checkDate(view.date);
+                  return (
+                    <li key={step.key} data-status={view.state}>
+                      <span className="step-indicator" aria-hidden="true">
+                        {view.state === "ready"
+                          ? "✓"
+                          : step.status === "queued"
+                            ? "·"
+                            : ""}
+                      </span>
+                      <div>
+                        <strong>{step.label}</strong>
+                        <span>{view.label}</span>
+                        {view.summary && (
+                          <p className="loading-source-count">{view.summary}</p>
+                        )}
+                        {date && (
+                          <time
+                            className="loading-check-date"
+                            dateTime={view.date}
+                          >
+                            {view.prior ? "Previous result" : "Checked"} ·{" "}
+                            {date}
+                          </time>
+                        )}
+                        {view.attention && view.prior && (
+                          <p className="loading-check-warning">
+                            The previous check reported a gap; this attempt did
+                            not recheck it.
+                          </p>
+                        )}
+                        {view.details ? (
+                          <details>
+                            <summary>
+                              Refresh details
+                              <span className="sr-only"> · {step.label}</span>
+                            </summary>
+                            {view.prior && (
+                              <p>Previous result: {view.prior.message}</p>
+                            )}
+                            {checkDate(step.finished_at || step.started_at) && (
+                              <p>
+                                Refresh attempt ·{" "}
+                                <time
+                                  dateTime={step.finished_at || step.started_at}
+                                >
+                                  {checkDate(
+                                    step.finished_at || step.started_at,
+                                  )}
+                                </time>
+                              </p>
+                            )}
+                            <p>{step.message}</p>
+                          </details>
+                        ) : (
+                          <p>{view.message}</p>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
               </ol>
             </div>
           </div>

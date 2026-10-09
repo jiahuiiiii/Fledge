@@ -13,7 +13,7 @@ import httpx
 from thesis.db import transaction, one, rows
 from thesis.service import Conflict
 from . import social
-from .catalogue import company_alias, mentions
+from .catalogue import company_search_name, mentions
 from .social_threads import save
 
 
@@ -71,8 +71,8 @@ def request(url, params=None, *, atom=False, html_page=False):
 
 def fetch(kind, company, days, post=None, feeds=social.FEEDS):
     if kind=='search':
-        alias=company_alias(company['name'])
-        query=f'"{company["symbol"]}"' + (f' OR "{alias}"' if alias else '')
+        alias=company_search_name(company['symbol'],company['name'])
+        query=f'"{company["symbol"]}"' + (f' OR "{alias}"' if alias != company['symbol'] else '')
         return request('https://www.reddit.com/r/' + '+'.join(feeds) + '/search.rss',
                        dict(q=query,restrict_sr='on',sort='new',t={1:'day',7:'week',30:'month'}[days],limit=50),atom=True)
     if kind=='comments' and post:
@@ -167,7 +167,7 @@ def refresh(iid, *, lookback_days=7, fetcher=None, now=None, collector=None):
             raise ValueError('Choose a registered company.')
         enabled=social.company_feeds(company['symbol'], [r['feed'] for r in rows(c,'SELECT feed FROM social_feeds WHERE enabled')])
         if not enabled:
-            return dict(checked=[],failures=0,matched=0)
+            return dict(checked=[],failures=0,status='blocked',message='No Reddit communities are enabled; no discussion check was made.')
         c.execute('INSERT INTO reddit_company_checks(instrument_id) VALUES(%s) ON CONFLICT DO NOTHING',(iid,))
         state=one(c,'SELECT * FROM reddit_company_checks WHERE instrument_id=%s FOR UPDATE',(iid,))
         if state['lease_until'] and state['lease_until']>now:
@@ -253,8 +253,17 @@ def refresh(iid, *, lookback_days=7, fetcher=None, now=None, collector=None):
     result=dict(checked=['reddit'],failures=int(bool(error)),matched=retained,posts=len(posts),comments=len(comments),
                 collector=collector,message=error or f'{len(posts)} company posts and {len(comments)} replies collected through {"public HTML" if adapter else "company RSS search" if collector == "rss" else "public feeds"}.')
     if collector == 'rss':
+        if not error:
+            result['message'] = reddit_sample_message(len(posts), len(comments), lookback_days, cache_only)
         result['status']='partial' if error and retained else 'blocked' if error else 'cached' if cache_only else 'ready'
         return result
     if error and ('Reddit denied access.' in error or 'HTTP 403' in error or 'HTTP 401' in error or 'switched off' in error):
         result['status']='blocked'
     return result
+
+
+def reddit_sample_message(posts, comments, days, cached=False):
+    prefix = 'Reused saved feeds; no new source request. ' if cached else ''
+    if not posts:
+        return prefix + f'No matching company posts in this {days}-day sample from enabled communities. Comments were not checked because no matching posts were found.'
+    return prefix + f'{posts} company posts and {comments} company-matched comments in this {days}-day feed sample. Counts can include previously saved items.'

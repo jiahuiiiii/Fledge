@@ -11,14 +11,14 @@ test("leaning shows its usable denominator and the separate unclear count", () =
       tone: "positive leaning",
       counts: { positive: 5, negative: 2, neutral: 2, unclear: 3 },
     }),
-    "positive leaning · 5 of 9 interpretable groups · 3 unclear",
+    "positive leaning · 5 of 9 clear readings · 3 unclear",
   );
   assert.equal(
     sentimentSummaryLabel({
       tone: "thin sample",
       counts: { positive: 4, unclear: 1 },
     }),
-    "thin sample · 4 interpretable groups · 1 unclear",
+    "thin sample · 4 clear readings · 1 unclear",
   );
 });
 test("price display formats the server result without calculating a new return", () => {

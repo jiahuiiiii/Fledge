@@ -71,7 +71,7 @@ export const peerMetrics = [
     key: "free_cash_flow",
     unit: "USD",
     explanation:
-      "Operating cash flow less cash capital spending over the displayed trailing dates. This app calculation excludes noncash capital additions; company-defined free cash flow can differ.",
+      "Operating cash flow less cash capital spending over the displayed trailing dates. Reported spending may include software and intangible assets; inspect each company’s definition. Noncash additions are excluded and company-defined free cash flow can differ.",
   },
   {
     id: "debt_sec",
@@ -160,8 +160,9 @@ export function peerRows(members, metric) {
     if (metric.key === "revenue_growth") {
       const source = member.annual_growth;
       const projected =
-        source?.projection_method === "sec-amendment-resolution-1" &&
-        source.based_on_snapshot_id;
+        ["sec-amendment-resolution-1", "sec-amendment-resolution-2"].includes(
+          source?.projection_method,
+        ) && source.based_on_snapshot_id;
       const identity = projected ? source.projection_id : source?.snapshot_id;
       const report = source?.report;
       const row = source?.metric;
@@ -220,7 +221,7 @@ export function peerRows(members, metric) {
     const source = member.financials;
     const data =
       source?.status === "available" &&
-      source.method === "sec-financial-depth-1"
+      ["sec-financial-depth-1", "sec-financial-depth-2"].includes(source.method)
         ? source
         : null;
     const row =

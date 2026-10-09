@@ -19,7 +19,7 @@ from thesis.db import transaction, one
 from thesis.providers.settings import settings
 from thesis.service import Conflict
 from . import social
-from .catalogue import company_alias
+from .catalogue import company_search_name
 
 METHOD = 'reddit-hot-rss-1'
 SEARCH_METHOD = 'reddit-company-search-rss-1'
@@ -51,8 +51,8 @@ def endpoint(kind, value):
                 and isinstance(feeds, (list, tuple)) and feeds
                 and all(feed in social.FEEDS for feed in feeds)
                 and type(days) is int and days in (1, 7, 30)):
-            alias = company_alias(value.get('name'))
-            query = f'"{symbol}"' + (f' OR "{alias}"' if alias else '')
+            alias = company_search_name(symbol, value.get('name'))
+            query = f'"{symbol}"' + (f' OR "{alias}"' if alias != symbol else '')
             communities = '+'.join(sorted(set(feeds)))
             return f'https://www.reddit.com/r/{communities}/search.rss?' + urlencode(dict(
                 q=query, restrict_sr='on', sort='new', t={1:'day',7:'week',30:'month'}[days], limit=50))
