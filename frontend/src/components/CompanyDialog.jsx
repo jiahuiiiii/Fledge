@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Modal from "./Modal";
 import LoadingSkeleton from "./LoadingSkeleton";
 import { api } from "../api/client";
+import { companyName } from "../lib/companyIdentity";
 
 function ActionIcon({ restore = false }) {
   return (
@@ -165,7 +166,7 @@ export default function CompanyDialog({
                           {company.symbol}
                           <small>{company.exchange}</small>
                         </strong>
-                        <span>{company.name}</span>
+                        <span title={company.name}>{companyName(company)}</span>
                         {company.limitation && <em>{company.limitation}</em>}
                       </span>
                       <span className="company-result-action">
@@ -228,7 +229,7 @@ export default function CompanyDialog({
               {visible.map((company) => (
                 <li key={company.id}>
                   <span>
-                    <strong>{company.symbol}</strong> {company.name}
+                    <strong>{company.symbol}</strong> {companyName(company)}
                   </span>
                   <button
                     type="button"
@@ -249,7 +250,7 @@ export default function CompanyDialog({
                   {hidden.map((company) => (
                     <li key={company.id}>
                       <span>
-                        <strong>{company.symbol}</strong> {company.name}
+                        <strong>{company.symbol}</strong> {companyName(company)}
                       </span>
                       <button
                         type="button"

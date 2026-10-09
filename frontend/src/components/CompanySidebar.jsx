@@ -1,4 +1,5 @@
 import CompanyAvatar from "./CompanyAvatar";
+import { companyName, companyMatches } from "../lib/companyIdentity";
 import LoadingSkeleton from "./LoadingSkeleton";
 import { WorkspaceSidebar } from "./WorkspaceControls";
 
@@ -42,11 +43,7 @@ export default function CompanySidebar({
 }) {
   const shownCompanies = collapsed
     ? companies
-    : companies.filter((company) =>
-        `${company.name} ${company.symbol}`
-          .toLowerCase()
-          .includes(search.toLowerCase()),
-      );
+    : companies.filter((company) => companyMatches(company, search));
   const toggleLabel = `${collapsed ? "Expand" : "Collapse"} company sidebar`;
   return (
     <WorkspaceSidebar
@@ -111,7 +108,7 @@ export default function CompanySidebar({
                 >
                   <button
                     className={`watch-item ${company.id === selectedCompanyId ? "selected" : ""}`}
-                    aria-label={`${company.symbol} · ${company.name}`}
+                    aria-label={`${company.symbol} · ${companyName(company)}`}
                     title={`${company.symbol} · ${company.name}`}
                     aria-pressed={company.id === selectedCompanyId}
                     disabled={busy}
@@ -120,7 +117,7 @@ export default function CompanySidebar({
                     <CompanyAvatar company={company} small />
                     <span className="company-row-label">
                       <strong title={company.symbol}>{company.symbol}</strong>
-                      <small title={company.name}>{company.name}</small>
+                      <small title={company.name}>{companyName(company)}</small>
                     </span>
                     {company.unread > 0 && <span className="watch-dot" />}
                   </button>

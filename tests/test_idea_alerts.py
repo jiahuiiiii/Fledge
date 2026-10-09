@@ -654,11 +654,12 @@ def test_full_selected_news_and_social_sample_is_covered(owner):
     )
     add_social(iid, combined)
     analysis = sentiment.generate(iid, transport=sentiment_provider("positive"))
-    assert len(analysis["items"]) == 16
+    assert len(analysis["items"]) == 17
     checked = idea_alerts.generate(
         owner, iid, analysis["id"], transport=provider("context")
     )
     with transaction(owner) as c:
         record = idea_alerts.list_for(c, owner)[0]
-        assert len(record["items"]) == 16 and record["pending_source_count"] == 0
+        # Private idea matching retains its separately disclosed 16-item scope.
+        assert len(record["items"]) == 16 and record["pending_source_count"] == 1
         assert len([i for i in record["items"] if i["channel"] == "social"]) == 8

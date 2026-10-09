@@ -75,6 +75,10 @@ async function request(path, { method = "GET", body } = {}) {
 }
 export const api = {
   fmp: (id) => request(`/companies/${id}/fmp`),
+  sectorPosition: (id, peers) =>
+    request(
+      `/companies/${id}/sector-position${peers == null ? "" : `?peers=${encodeURIComponent(peers.join(","))}`}`,
+    ),
   refreshFmp: (id) =>
     request(`/companies/${id}/fmp/refresh`, { method: "POST" }),
   refreshPublicForecasts: (id) =>
@@ -174,6 +178,7 @@ export const api = {
     ),
   researchAnswer: (id) => request(`/research-answers/${id}`),
   priceHistory: (id) => request(`/companies/${id}/price-history`),
+  financialStory: (id) => request(`/companies/${id}/financial-story`),
   refreshPriceHistory: (id) =>
     request(`/companies/${id}/price-history/refresh`, { method: "POST" }),
   valuationContext: (id) => request(`/companies/${id}/valuation`),

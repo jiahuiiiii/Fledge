@@ -12,7 +12,7 @@ MAX_PARENT_BYTES = 3000
 MAX_PARENTS = 4
 
 
-def attach(conn, sources, cutoff):
+def attach(conn, sources, cutoff, *, batch_limits=True):
     used_bytes = count = 0
     for source in sources:
         if source.get("platform") not in {"hackernews", "reddit"}:
@@ -47,9 +47,9 @@ def attach(conn, sources, cutoff):
             source["context_status"] = "no_complete_passages"
             continue
         if (
-            count >= MAX_PARENTS
+            (batch_limits and count >= MAX_PARENTS)
             or size > MAX_PARENT_BYTES
-            or used_bytes + size > MAX_BYTES
+            or (batch_limits and used_bytes + size > MAX_BYTES)
         ):
             source["context_status"] = "sample_limit"
             continue

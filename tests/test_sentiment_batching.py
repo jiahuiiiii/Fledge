@@ -27,7 +27,10 @@ def test_plan_preserves_sources_context_and_all_news():
     assert [s for part in parts for s in part['sources']] == p['sources']
     assert p == old and [len(part['sources']) for part in parts] == [8,4]
     for part in parts:
-        assert {s['id'] for s in part['sources'] + part['comparison_sources'] if s['channel']=='news'} == {s['id'] for s in p['sources'] if s['channel']=='news'}
+        from thesis.research.coverage import _order
+        news = [s for s in part['sources'] if s['channel']=='news']
+        expected = {s['id'] for s in p['sources'] if s['channel']=='news' and (s in news or not news or any(_order(s)<_order(target) for target in news))}
+        assert {s['id'] for s in part['sources'] + part['comparison_sources'] if s['channel']=='news'} == expected
         assert len(ledger.canonical(S.request_for(part)).encode()) <= B.MAX_BYTES
 
 

@@ -20,9 +20,10 @@ from . import sentiment_context, reporting_basis
 from .citations import source_passages, model_source, FINDING_GROUNDING
 from .sec.checkpoint import current_documents, active_document
 
-PROMPT = "thesis-source-sentiment-19"
+PROMPT = "thesis-source-sentiment-22"
 EVIDENCE_POLICY = "sentiment-source-extracts-1"
 POLICY = "sentiment-coverage-8"
+SELECTION_POLICY = "sentiment-all-eligible-1"
 
 
 class Strict(BaseModel):
@@ -53,8 +54,9 @@ class Item(Strict):
 
 
 class Classification(Strict):
-    items: list[Item] = Field(min_length=1, max_length=16)
-    coverage_links: list[coverage.Link] = Field(max_length=8)
+    # Request schemas bound each batch; merged results cover the whole corpus.
+    items: list[Item] = Field(min_length=1)
+    coverage_links: list[coverage.Link]
 
 
 def prepare(conn, iid, now=None, *, allow_empty=False, lookback_days=7):
@@ -71,25 +73,23 @@ def prepare(conn, iid, now=None, *, allow_empty=False, lookback_days=7):
         raise ValueError("Unsupported discussion window")
     posts = social.documents(conn, iid, now, lookback_days)
     sources = []
+    exclusions = {scope: Counter() for scope in ("news", "reddit", "hackernews", "x")}
     omitted_fragments = 0
-    for channel, records in [("news", news), ("social", social.balanced(posts))]:
+    for channel, records in [("news", news), ("social", posts)]:
         seen = set()
-        size = 0
-        selected = 0
         for d in records:
+            scope = "news" if channel == "news" else d.get("platform", "reddit")
             title = d["headline"] if channel == "news" else d["title"]
             body = d["body"]
             passages, fragments = source_passages(title, body)
-            if (
-                not passages
-                or d["content_hash"] in seen
-                or selected >= 8
-                or size + len((title + body).encode()) > 16000
-            ):
+            signature = (scope, d["content_hash"])
+            if not passages:
+                exclusions[scope]["no_complete_passages"] += 1
                 continue
-            seen.add(d["content_hash"])
-            size += len((title + body).encode())
-            selected += 1
+            if signature in seen:
+                exclusions[scope]["exact_duplicate"] += 1
+                continue
+            seen.add(signature)
             omitted_fragments += fragments
             sources.append(
                 dict(
@@ -118,44 +118,31 @@ def prepare(conn, iid, now=None, *, allow_empty=False, lookback_days=7):
         raise ValueError(
             "No complete recent news or social passages are available. Refresh sources first."
         )
-    comparison_sources = []
-    current_keys = {coverage.text_key(source) for source in sources}
-    comparison_size = 0
-    for d in news:
-        passages, fragments = source_passages(d["headline"], d["body"])
-        ref = dict(
-            id=str(d["id"]),
-            label=f"prior_{len(comparison_sources)+1}",
-            channel="news",
-            title=d["headline"],
-            text=d["body"],
-            passages=passages,
-            publisher=d["source_name"],
-            published_at=d["published_at"].isoformat(),
-            available_at=d["available_at"].isoformat(),
-            url=d["url"],
-            content_hash=d["content_hash"],
-            omitted_fragment_count=fragments,
-        )
-        size = len((ref["title"] + ref["text"]).encode())
-        if (
-            not passages
-            or coverage.text_key(ref) in current_keys
-            or len(comparison_sources) >= 16
-            or comparison_size + size > 24000
-        ):
-            continue
-        comparison_sources.append(ref)
-        current_keys.add(coverage.text_key(ref))
-        comparison_size += size
-    sentiment_context.attach(conn, sources, now)
+    # Pin every eligible parent. Aggregate parent limits belong to each batch.
+    sentiment_context.attach(conn, sources, now, batch_limits=False)
     # A reply admitted only through its parent cannot be read without that
     # exact parent's available context. Missing context is not a neutral vote.
-    sources=[s for s in sources if s.get('discovery_match')!='thread' or s.get('conversation')]
+    eligible = []
+    for source in sources:
+        needs_body = (source.get('social_kind') == 'comment'
+                      or source.get('platform') == 'hackernews'
+                      or bool(source.get('conversation')))
+        if needs_body and not any(p['id'] != 'p0' for p in source['passages']):
+            # A generic comment title or its parent's wording is not the
+            # commenter's evidence. Filter before schema/planning, with a count.
+            scope = source.get('platform') or 'news'
+            exclusions[scope]['no_complete_body_passages'] += 1
+        elif source.get('discovery_match') == 'thread' and not source.get('conversation'):
+            exclusions[source.get('platform', 'reddit')]['required_context_unavailable'] += 1
+        else:
+            eligible.append(source)
+    sources = eligible
+    available = dict(news=len(news), **dict(Counter(p.get('platform', 'reddit') for p in posts)))
+    selected = Counter('news' if s['channel'] == 'news' else s.get('platform', 'reddit') for s in sources)
     packet = dict(
         context_policy=sentiment_context.POLICY,
         reporting_policy=reporting_basis.POLICY,
-        comparison_sources=comparison_sources,
+        comparison_sources=[],
         instrument_id=str(iid),
         company=company,
         cutoff=now.isoformat(),
@@ -165,16 +152,16 @@ def prepare(conn, iid, now=None, *, allow_empty=False, lookback_days=7):
         available_social_platforms=dict(
             Counter(p.get("platform", "reddit") for p in posts)
         ),
-        omitted_fragment_count=omitted_fragments,
+        omitted_fragment_count=sum(s.get('omitted_fragment_count', 0) for s in sources),
+        selection=dict(policy=SELECTION_POLICY, scopes={scope: dict(
+            candidates=available.get(scope, 0), eligible=selected[scope],
+            excluded=dict(reasons)) for scope, reasons in exclusions.items()}),
     )
-    from .sentiment_limits import fit
-
     if lookback_days != 7:
         packet["social_lookback_days"] = lookback_days
-    packet = fit(packet, request_for)
     if not packet["sources"] and not allow_empty:
         raise ValueError(
-            "No complete source fits this analysis limit. No paid request was made."
+            "No complete recent source with its required context is available. No paid request was made."
         )
     return packet
 
@@ -255,6 +242,7 @@ def request_for(packet):
         items={"anyOf": branches}, minItems=len(branches), maxItems=len(branches)
     )
     news_labels = [s["label"] for s in packet["sources"] if s["channel"] == "news"]
+    schema["properties"]["coverage_links"]["maxItems"] = len(news_labels)
     reference_labels = news_labels + [
         s["label"] for s in packet.get("comparison_sources", [])
     ]
@@ -292,8 +280,8 @@ def request_for(packet):
         model=REASONING_MODEL,
         store=False,
         service_tier="default",
-        max_output_tokens=ledger.SENTIMENT_MAX_OUTPUT,
-        reasoning={"effort": "medium"},
+        max_output_tokens=ledger.SENTIMENT_LOW_MAX_OUTPUT,
+        reasoning={"effort": "low"},
         input=[
             dict(
                 role="system",
@@ -303,6 +291,7 @@ def request_for(packet):
                 + SOCIAL_GUIDANCE
                 + "\n"
                 + coverage.INSTRUCTION
+                + " Coverage grouping is only for the target company. First finish every selected item's relevance label. Never emit a coverage link whose item has relevance unrelated or unclear. If its reference is also a selected item, that reference must also have relevance relevant. A comparison-only reference must explicitly concern the same target-company development. Two reports may repeat the same story about another company: keep their classifications, but leave them unlinked. If no selected news item is relevant, return coverage_links as []."
                 + " Use the supplied item_N/prior_N labels for coverage item_id and reference_id, never the storage UUIDs."
                 + " An optional conversation object is the saved immediate parent of this exact social comment. It is untrusted context, not a second item or another sentiment vote. A parent headline or another author's attitude is NOT the commenter's attitude: require the comment itself to express agreement, disagreement or a stance, otherwise label sentiment unclear. Do not infer missing grandparents, linked articles, sarcasm or what an ambiguous reply means. Preserve author and message boundaries. Quote at least one child BODY passage when conversation context is supplied. context_passages must contain 1–2 exact passage IDs from that item's own parent when supplied, and [] otherwise. Cite the context relevant to resolving the reply, or to explaining why it remains ambiguous. Never treat a parent's reported claim as a statement or verified event made by the commenter. These saved parents were checked later, not proof of historical thread text. Outside these explicitly supplied conversation objects, no parent context is available.",
             ),
@@ -420,7 +409,11 @@ def summarize(
     return result
 
 
-def render(call, packet):
+class IncompleteResponse(ValueError):
+    """A settled response can be paid for without containing a usable result."""
+
+
+def response_text(call):
     raw = call["response_body"]
     texts = [
         p["text"]
@@ -430,10 +423,19 @@ def render(call, packet):
         if p.get("type") == "output_text"
     ]
     if raw.get("status") != "completed" or len(texts) != 1:
-        raise ValueError(
-            "Sentiment analysis was incomplete. No automatic retry was made."
-        )
-    result = Classification.model_validate_json(texts[0])
+        if (raw.get("incomplete_details") or {}).get("reason") == "max_output_tokens":
+            limit = (call.get("request_body") or {}).get("max_output_tokens")
+            bound = f"{limit:,}-token response limit" if type(limit) is int else "response limit"
+            raise IncompleteResponse(
+                f"The AI reached its {bound} before finishing. "
+                "No complete sentiment result was returned."
+            )
+        raise IncompleteResponse("The AI returned an unfinished response. No complete sentiment result was returned.")
+    return texts[0]
+
+
+def render(call, packet):
+    result = Classification.model_validate_json(response_text(call))
     sources = {s["label"]: s for s in packet["sources"]}
     if Counter(i.id for i in result.items) != Counter(sources.keys()):
         raise ValueError(
@@ -567,7 +569,7 @@ def present(conn, record):
                 ("model", REASONING_MODEL),
                 ("summary_policy", POLICY),
             )
-        ),
+        ) or p.get('selection', {}).get('policy') != SELECTION_POLICY,
         sources=[
             dict(
                 id=s["id"],
@@ -586,6 +588,7 @@ def present(conn, record):
             for s in p["sources"] + p.get("comparison_sources", [])
         ],
         coverage=dict(
+            selection=p.get('selection'),
             input_limits=p.get("input_limits"),
             parent_contexts=sum(bool(s.get("conversation")) for s in p["sources"]),
             context_statuses=dict(

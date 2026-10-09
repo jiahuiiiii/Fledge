@@ -1,6 +1,8 @@
 import { modelAvailability } from "../lib/modelAvailability";
 import Select from "./Select";
 import { useId, useState } from "react";
+import { latestPriceQuote, quoteMovement } from "../lib/priceRefresh";
+import PriceChange from "./PriceChange";
 export const stamp = (value) =>
   value
     ? new Date(value).toLocaleString("en-GB", {
@@ -19,36 +21,61 @@ const money = (value) =>
         maximumFractionDigits: 2,
       });
 
-export function MarketQuote({ market }) {
+export function MarketQuote({ market, history, compact = false }) {
   const record = market?.quote,
     q = record?.quote,
     status = market?.status;
+  const latest = latestPriceQuote(market, history);
+  const movement = quoteMovement(market, history);
   const interrupted =
     status?.lease_until && new Date(status.lease_until) < new Date();
   return (
-    <section className="market-quote" aria-label="Market quote">
+    <section
+      className={`market-quote${compact ? " compact" : ""}`}
+      aria-label="Market quote"
+    >
       <div className="quote-primary">
-        <span className="section-label">PRICE CONTEXT · FINNHUB</span>
-        {q ? (
+        {!compact && (
+          <span className="section-label">PRICE CONTEXT · FINNHUB</span>
+        )}
+        {latest ? (
+          <>
+            <div className="quote-value">
+              <strong>{money(latest.price)}</strong>
+              <span>USD</span>
+              {movement ? (
+                <PriceChange movement={movement} />
+              ) : (
+                <span className="fine">Change unavailable</span>
+              )}
+            </div>
+            <small>
+              Yahoo Finance · {latest.session} · {stamp(latest.quoted_at)}
+            </small>
+          </>
+        ) : q ? (
           <>
             <div className="quote-value">
               <strong>{money(q.price)}</strong>
               <span>USD</span>
-              <span className={q.change >= 0 ? "positive" : "negative"}>
-                {q.change == null
-                  ? "Change unavailable"
-                  : `${q.change >= 0 ? "+" : ""}${money(q.change)} (${money(q.change_percent)}%)`}
-              </span>
+              {movement ? (
+                <PriceChange movement={movement} />
+              ) : (
+                <span className="fine">Change unavailable</span>
+              )}
             </div>
-            <small>Quote as of {stamp(q.quoted_at)}</small>
+            <small>
+              {compact ? "Finnhub · " : "Quote as of "}
+              {stamp(q.quoted_at)}
+            </small>
           </>
         ) : (
           <p>No quote retrieved. Choose Refresh research to load it.</p>
         )}
         {status?.quote_error && (
           <p className="warning" role="status">
-            Quote check unavailable. {status.quote_error}{" "}
-            {q && "Showing the previous quote."}
+            Finnhub quote check unavailable. {status.quote_error}{" "}
+            {q && !latest && "Showing the previous Finnhub quote."}
           </p>
         )}
         {interrupted && (
@@ -57,7 +84,7 @@ export function MarketQuote({ market }) {
           </p>
         )}
       </div>
-      {q && (
+      {q && !compact && (
         <div className="quote-range">
           <div className="row">
             <span>DAY RANGE</span>
@@ -80,16 +107,18 @@ export function MarketQuote({ market }) {
           </div>
         </div>
       )}
-      <details className="quote-foot secondary-details">
-        <summary>Quote source details</summary>
-        <p>
-          Retrieved {stamp(record?.retrieved_at)} from Finnhub. Market data may
-          be delayed.
-        </p>
-        <p>
-          Price movement does not establish why a company’s outlook changed.
-        </p>
-      </details>
+      {!compact && (
+        <details className="quote-foot secondary-details">
+          <summary>Quote source details</summary>
+          <p>
+            Retrieved {stamp(record?.retrieved_at)} from Finnhub. Market data
+            may be delayed.
+          </p>
+          <p>
+            Price movement does not establish why a company’s outlook changed.
+          </p>
+        </details>
+      )}
     </section>
   );
 }
@@ -115,11 +144,22 @@ export default function MarketResearch({
         (order.get(a.id) ?? 9999) - (order.get(b.id) ?? 9999) ||
         new Date(b.published_at) - new Date(a.published_at),
     );
-  const news = all.filter((d) => {
+  const unique = all.filter((d) => {
     if (seen.has(d.content_hash)) return false;
     seen.add(d.content_hash);
     return true;
   });
+  // Stories in the saved tone reading are listed once, with their label, in
+  // the tone section below; this list carries the rest.
+  const analysed = new Set(
+    data.sentiment && !data.sentiment.withheld
+      ? (data.sentiment.sources || [])
+          .filter((s) => s.kind === "news" && !s.comparison_only)
+          .map((s) => s.id)
+      : [],
+  );
+  const news = unique.filter((d) => !analysed.has(d.id));
+  const labelled = unique.length - news.length;
   const status = data.market?.status,
     brief = data.market_brief;
   const kinds = {
@@ -143,12 +183,12 @@ export default function MarketResearch({
     <section className="market-research" aria-label="Company news and briefing">
       <div className="market-section-head news-heading">
         <h2>Recent company news</h2>
-        <span className="fine">Saved headlines &amp; snippets</span>
+        <span className="fine">
+          {labelled
+            ? `${labelled} labelled ${labelled === 1 ? "story is" : "stories are"} under What’s the tone?`
+            : "Company mentions first, newest within each group"}
+        </span>
       </div>
-      <p className="fine">
-        Company mentions first, then related market coverage. Newest within each
-        group.
-      </p>
       {status?.news_error && (
         <p className="warning" role="status">
           Finnhub news check unavailable. {status.news_error}{" "}
@@ -170,7 +210,7 @@ export default function MarketResearch({
             : "No news retrieved yet. Choose Refresh research."}
         </p>
       )}
-      {all.length > news.length && (
+      {all.length > unique.length && (
         <p className="fine">
           Duplicate supplied text is grouped. Multiple articles do not
           necessarily provide independent confirmation.
@@ -204,10 +244,6 @@ export default function MarketResearch({
           {expanded ? "Show fewer stories" : `Show all ${news.length} stories`}
         </button>
       )}
-      <p className="fine">
-        Original reporting remains with the named publishers. Open a headline to
-        inspect the saved text and its dates.
-      </p>
       <details className="news-brief-details">
         <summary>AI company briefing · {brief ? "saved" : "optional"}</summary>
         <div className="market-section-head">

@@ -8,7 +8,7 @@
   gap: 24px;
 }
 .revenue-flow h2 {
-  font-size: 25px;
+  font-size: var(--text-xl);
   margin: 8px 0 10px;
 }
 .revenue-flow p {
@@ -19,18 +19,18 @@
   gap: 4px;
   flex-shrink: 0;
   padding: 4px;
-  border: 1px solid #35434a;
-  border-radius: 9px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-md);
 }
 .flow-kind button {
   padding: 9px 11px;
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
 .flow-kind button[aria-pressed="true"] {
-  background: #31474d;
-  color: #dceff3;
+  background: var(--color-line-strong);
+  color: var(--color-text);
 }
 .flow-timeline {
   display: flex;
@@ -38,31 +38,31 @@
   gap: 7px;
   margin-top: 26px;
   padding: 6px;
-  background: #10191d;
-  border-radius: 10px;
+  background: var(--color-bg);
+  border-radius: var(--radius-lg);
 }
 .flow-timeline button {
   min-width: 115px;
   flex: 1 0 auto;
   text-align: left;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   padding: 12px 16px;
 }
 .flow-timeline button span {
   display: block;
-  font-size: 16px;
+  font-size: var(--text-md);
   font-weight: 600;
 }
 .flow-timeline button small {
   display: block;
-  color: #aabcbe;
-  font-size: 11px;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
   margin-top: 4px;
 }
 .flow-timeline button[aria-pressed="true"] {
-  background: #223e49;
-  border-color: #548298;
+  background: var(--color-line);
+  border-color: var(--color-info-mid);
 }
 .flow-meta {
   display: flex;
@@ -70,14 +70,14 @@
   justify-content: space-between;
   gap: 24px;
   margin: 22px 0 8px;
-  font-size: 13px;
-  color: #bdcdd0;
+  font-size: var(--text-sm);
+  color: var(--color-text-2);
 }
 .flow-meta p {
   margin: 0;
 }
 .flow-meta small {
-  color: #9fb2b6;
+  color: var(--color-muted);
 }
 .flow-meta label {
   display: grid;
@@ -87,7 +87,7 @@
 .flow-viewport {
   overflow-x: auto;
   padding: 6px 0 0;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 .flow-svg {
   width: 100%;
@@ -95,13 +95,13 @@
   overflow: visible;
 }
 .flow-revenue {
-  --flow-colour: #59b6ec;
+  --flow-colour: var(--color-info-light);
 }
 .flow-profit {
-  --flow-colour: #65d7bc;
+  --flow-colour: var(--color-positive);
 }
 .flow-expense {
-  --flow-colour: #deb372;
+  --flow-colour: var(--color-gold);
 }
 .flow-link {
   fill: var(--flow-colour);
@@ -125,21 +125,21 @@
   fill: #ffffff06;
 }
 .flow-node-label {
-  fill: #d1dee0;
-  font-size: 13px;
+  fill: var(--color-text-2);
+  font-size: var(--text-sm);
   font-weight: 500;
 }
 .flow-node-amount {
   fill: var(--flow-colour);
-  font-size: 19px;
+  font-size: var(--text-lg);
   font-weight: 600;
 }
 .flow-calculated {
-  font-size: 14px;
+  font-size: var(--text-base);
 }
 .flow-footnote {
-  color: #adbdc2;
-  font-size: 12px;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
   margin: 14px 0;
 }
 .flow-phone-hint {
@@ -154,30 +154,30 @@
 .flow-figure {
   text-align: left;
   padding: 14px;
-  border: 1px solid #36454b;
-  border-radius: 8px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 .flow-figure > span {
-  font-size: 12px;
-  color: #bdcccf;
+  font-size: var(--text-xs);
+  color: var(--color-text-2);
   line-height: 1.5;
 }
 .flow-figure strong {
-  font-size: 18px;
+  font-size: var(--text-md);
   font-weight: 600;
 }
 .flow-figure small {
-  color: #a8bcb7;
-  font-size: 11px;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
   margin-top: auto;
 }
 .flow-all-figures,
 .flow-expenses,
 .flow-definitions {
-  border-top: 1px solid #344248;
+  border-top: 1px solid var(--color-line-strong);
   margin-top: 24px;
   padding-top: 20px;
 }
@@ -185,12 +185,12 @@
 .flow-expenses summary,
 .flow-definitions summary {
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--text-base);
 }
 .flow-expenses p,
 .flow-definitions p {
-  font-size: 13px;
-  color: #b7c7cb;
+  font-size: var(--text-sm);
+  color: var(--color-text-2);
   margin: 14px 0;
 }
 .flow-expense-list {
@@ -203,22 +203,22 @@
   text-align: left;
   gap: 20px;
   padding: 12px 16px;
-  background: #deb3720b;
-  border-radius: 6px;
-  font-size: 13px;
+  background: color-mix(in srgb, var(--color-gold) 4%, transparent);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
 }
 .flow-expense-list strong {
   white-space: nowrap;
-  color: #deb372;
+  color: var(--color-gold);
 }
 .flow-gap {
   padding: 20px;
-  background: #deb3720a;
-  border-left: 2px solid #deb372;
-  font-size: 14px;
+  background: color-mix(in srgb, var(--color-gold) 4%, transparent);
+  border-left: 2px solid var(--color-gold);
+  font-size: var(--text-base);
 }
 .flow-exact {
-  font-size: 20px;
+  font-size: var(--text-lg);
   font-weight: 600;
 }
 .flow-evidence {
@@ -235,7 +235,7 @@
     padding: 18px 14px;
   }
   .revenue-flow h2 {
-    font-size: 22px;
+    font-size: var(--text-lg);
   }
   .flow-meta {
     flex-direction: column;
@@ -254,12 +254,12 @@
     padding: 12px 10px;
   }
   .flow-figure strong {
-    font-size: 16px;
+    font-size: var(--text-md);
   }
   .flow-phone-hint {
     display: block;
-    font-size: 12px;
-    color: #9fb2b6;
+    font-size: var(--text-xs);
+    color: var(--color-muted);
     margin: 14px 0 0;
   }
   .flow-timeline button {

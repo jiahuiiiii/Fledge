@@ -1,6 +1,9 @@
 import Select from "./Select";
 import { resultLabel } from "../lib/conditionRoles";
 import { useState } from "react";
+import CompanyAvatar from "./CompanyAvatar";
+import { companyName } from "../lib/companyIdentity";
+import "./IdeasAndChanges.css";
 const metrics = {
   revenue_growth: "Revenue growth",
   operating_margin: "Operating margin",
@@ -14,7 +17,14 @@ const date = (value) =>
         timeZone: "UTC",
       })
     : "Time unavailable";
-export default function IdeasAndChanges({ mode, catalogue, changes, onOpen }) {
+export default function IdeasAndChanges({
+  mode,
+  catalogue,
+  changes,
+  onOpen,
+  selectedCompany,
+  onCreate,
+}) {
   const [filter, setFilter] = useState("unreviewed");
   const ideas = catalogue
     .filter((c) => c.status)
@@ -27,14 +37,27 @@ export default function IdeasAndChanges({ mode, catalogue, changes, onOpen }) {
         : !c.review_action),
   );
   return (
-    <section className="collection-page">
-      <span className="section-label">YOUR RESEARCH</span>
-      <h2>{mode === "ideas" ? "My ideas" : "What changed"}</h2>
-      <p className="muted">
-        {mode === "ideas"
-          ? "Your reasoning stays separate for each company. Monitoring is optional."
-          : "New evidence, age limits and coverage changes, linked to the reasoning you saved at the time."}
-      </p>
+    <section
+      className={`collection-page${mode === "ideas" ? " ideas-page" : ""}`}
+      aria-label={mode === "ideas" ? "Saved ideas" : undefined}
+    >
+      {mode !== "ideas" && <span className="section-label">YOUR RESEARCH</span>}
+      <div className="ideas-heading">
+        <div>
+          <h2>{mode === "ideas" ? "My ideas" : "What changed"}</h2>
+          <p className="muted">
+            {mode === "ideas"
+              ? "Your point of view, with the evidence to revisit it."
+              : "New evidence, age limits and coverage changes, linked to the reasoning you saved at the time."}
+          </p>
+        </div>
+        {mode === "ideas" && (
+          <span className="ideas-scope">
+            {selectedCompany && <span>{selectedCompany.symbol}</span>}
+            {ideas.length} saved {ideas.length === 1 ? "idea" : "ideas"}
+          </span>
+        )}
+      </div>
       {mode === "ideas" ? (
         ideas.length ? (
           <div className="idea-collection">
@@ -44,32 +67,90 @@ export default function IdeasAndChanges({ mode, catalogue, changes, onOpen }) {
                 className="idea-summary"
                 onClick={() => onOpen(c.id, "idea")}
               >
-                <div className="row">
-                  <strong>
-                    {c.name} <small>{c.symbol}</small>
-                  </strong>
-                  <span className="status">{c.status}</span>
+                <div className="saved-idea-head">
+                  <CompanyAvatar company={c} small />
+                  <div className="saved-idea-company">
+                    <strong title={c.name}>{companyName(c)}</strong>
+                    <span>{c.symbol}</span>
+                  </div>
+                  <span className="status saved-idea-status">{c.status}</span>
                 </div>
-                <h3>{c.question}</h3>
-                <p>{c.reasoning || "Draft with no reasoning yet."}</p>
-                <span className={c.unread ? "attention" : "muted"}>
-                  {c.unread
-                    ? `${c.unread} update${c.unread === 1 ? "" : "s"} awaiting review`
-                    : "No unreviewed updates"}
-                </span>
-                <small>
-                  Evidence cutoff {date(c.cutoff)} · Revision {c.revision}
-                </small>
+                <h3>{c.question || "Your saved idea"}</h3>
+                <p className="saved-idea-reasoning">
+                  {c.reasoning || "Draft with no reasoning yet."}
+                </p>
+                <div className="saved-idea-meta">
+                  <span
+                    className={
+                      c.unread
+                        ? "saved-idea-updates attention"
+                        : "saved-idea-updates muted"
+                    }
+                  >
+                    {c.unread
+                      ? `${c.unread} update${c.unread === 1 ? "" : "s"} awaiting review`
+                      : "No unreviewed updates"}
+                  </span>
+                  <span>
+                    Evidence cutoff {date(c.cutoff)} · Revision {c.revision}
+                  </span>
+                </div>
+                <div className="saved-idea-footer">
+                  <span>Open idea</span>
+                  <IdeaArrow />
+                </div>
               </button>
             ))}
           </div>
         ) : (
-          <div className="empty-history">
-            <h3>No saved ideas yet</h3>
-            <p>
-              Open a company, read its evidence, and save your reasoning when
-              you are ready.
-            </p>
+          <div className="ideas-empty">
+            <div className="ideas-empty-icon" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M8 17h8M9 21h6M8 14a6 6 0 1 1 8 0c-1 1-1 2-1 3H9c0-1 0-2-1-3Z" />
+                <path d="M10 8c.5-.8 1.2-1.2 2-1.2" />
+              </svg>
+            </div>
+            <div className="ideas-empty-copy">
+              <span className="section-label">YOUR FIRST IDEA</span>
+              <h3>
+                {selectedCompany
+                  ? `Save your view on ${selectedCompany.symbol}`
+                  : "Turn your research into an idea"}
+              </h3>
+              <p>
+                Keep your question and reasoning together, then revisit them as
+                the evidence changes. Monitoring is optional.
+              </p>
+              <div className="ideas-empty-actions">
+                {onCreate ? (
+                  <>
+                    <button className="primary" onClick={onCreate}>
+                      Save my reasoning <IdeaArrow />
+                    </button>
+                    <button
+                      className="ideas-research-link"
+                      onClick={() => onOpen(selectedCompany.id, "workspace")}
+                    >
+                      Read company research
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="primary"
+                    onClick={() => onOpen("", "workspace")}
+                  >
+                    Choose a company <IdeaArrow />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         )
       ) : (
@@ -108,6 +189,23 @@ export default function IdeasAndChanges({ mode, catalogue, changes, onOpen }) {
         </>
       )}
     </section>
+  );
+}
+
+function IdeaArrow() {
+  return (
+    <svg
+      className="idea-arrow"
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 10h12m-5-5 5 5-5 5" />
+    </svg>
   );
 }
 

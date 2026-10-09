@@ -37,7 +37,7 @@ let browser;
 
  await panel.getByRole('button',{name:'Reddit discussion',exact:true}).click();
  assert.match(await panel.innerText(),/negative leaning/i);
- assert.match(await panel.innerText(),/8 relevant of 8 selected posts/);
+ assert.match(await panel.innerText(),/16 relevant of 16 analysed posts/);
  assert.match(await panel.innerText(),/1 distinct author represented/);
  await panel.locator('.sentiment-items article').filter({hasText:'Synthetic Microsoft negative opinion 0'}).getByRole('button',{name:'Inspect evidence',exact:true}).click();
  assert.match(await story.innerText(),/View used for this label/);
@@ -75,6 +75,55 @@ let browser;
  assert.match(await alerts.innerText(),/Reviewed/);assert.match(await alerts.innerText(),/Left unresolved/);
  await page.screenshot({path:'/private/tmp/thesis-sentiment-alerts.png',fullPage:true});
  await page.reload();await alerts.getByLabel('Show updates').selectOption('all');await alerts.locator('.inbox-record').first().waitFor();await expand();assert.equal(await alerts.locator('.sentiment-alert').count(),2);
+ // Authored browser-only full-pool fixtures; these are not owner/model results.
+ const savedState=(await(await page.request.get(base+'/api/v1/workspace?instrument_id='+iid)).json()).result;
+ let shownState=JSON.parse(JSON.stringify(savedState));
+ shownState.sentiment.coverage.available_news=66;
+ shownState.sentiment.coverage.social_platforms={reddit:51,hackernews:7,x:0};
+ shownState.sentiment.coverage.selection=null;
+ await page.route('**/api/v1/workspace?*',r=>r.fulfill({json:{result:shownState}}));
+ await page.route('**/api/v1/companies/'+iid+'/loading',r=>r.fulfill({json:{result:{active:false,steps:[],lookback_days:7}}}));
+ await page.goto(base+'/?company='+iid+'&view=workspace');await page.getByRole('tab',{name:'News & discussion',exact:true}).click();
+ await panel.getByRole('button',{name:'All sources',exact:true}).click();
+ await panel.locator('.source-analysis-coverage').waitFor();
+ assert.match(await panel.locator('.source-analysis-coverage').innerText(),/Earlier limited reading/);
+ assert.match(await panel.locator('.source-analysis-coverage').innerText(),/124/);
+ const prototype=shownState.sentiment.items.find(i=>i.channel==='news'),source=shownState.sentiment.sources.find(s=>s.id===prototype.source_id);
+ shownState.sentiment.items=Array.from({length:66},(_,n)=>({...prototype,id:'full_item_'+n,source_id:'full_source_'+n,relevance:n<60?'relevant':n<64?'unrelated':'unclear',sentiment:n<60?'neutral':'unclear'}));
+ shownState.sentiment.sources=Array.from({length:66},(_,n)=>({...source,id:'full_source_'+n,title:'Authored complete report '+n,published_at:new Date(Date.UTC(2026,9,9,0,n)).toISOString()}));
+ shownState.sentiment.id='authored-full-reading';shownState.sentiment.coverage.available_social=0;shownState.sentiment.coverage.social_platforms={reddit:0,hackernews:0,x:0};
+ shownState.sentiment.coverage.selection={policy:'sentiment-all-eligible-1',scopes:{news:{candidates:66,eligible:66,excluded:{}},reddit:{candidates:0,eligible:0,excluded:{}},hackernews:{candidates:2,eligible:0,excluded:{no_complete_body_passages:2}},x:{candidates:0,eligible:0,excluded:{}}}};
+ shownState.sentiment.summary={news:{selected:66,relevant:60,tone:'mixed / balanced',counts:{positive:0,negative:0,mixed:0,neutral:60,unclear:0}},social_platforms:{}};
+ shownState.sentiment.batching={completed:9,total:9};shownState.sentiment.coverage_links=[];
+ shownState.sentiment_inputs={status:'same',as_of:new Date().toISOString(),saved_cutoff:shownState.sentiment.cutoff,
+  selection:JSON.parse(JSON.stringify(shownState.sentiment.coverage.selection)),parents_changed:0,comparison_sources_changed:false,
+  sources:shownState.sentiment.sources.map(s=>({...s,kind:'news',platform:null,in_saved_sample:true})),
+  scopes:{news:{selected:66,available:66,added:0,no_longer_selected:0,retained:66},reddit:{selected:0,available:0,added:0,no_longer_selected:0,retained:0},hackernews:{selected:0,available:2,added:0,no_longer_selected:0,retained:0},x:{selected:0,available:0,added:0,no_longer_selected:0,retained:0}}};
+ await page.reload();await page.getByRole('tab',{name:'News & discussion',exact:true}).click();await panel.getByRole('button',{name:'All sources',exact:true}).click();
+ await panel.getByText('Every eligible source in this saved pool was analysed. 2 excluded before analysis.',{exact:true}).waitFor();
+ await panel.locator('.source-analysis-coverage').getByText('How sources are counted',{exact:true}).click();
+ assert.match(await panel.locator('.source-analysis-coverage').innerText(),/No complete comment body to read: 2/);
+ assert.match(await panel.locator('.source-analysis-coverage').innerText(),/9 batches combined/);
+ assert.equal(await panel.locator('.sentiment-items > article').count(),12);
+ await panel.getByRole('button',{name:'Next sources',exact:true}).click();assert.match(await panel.locator('.sentiment-pagination').innerText(),/Page 2 of 6/);
+ await panel.getByLabel('Source relevance',{exact:true}).selectOption('unrelated');assert.equal(await panel.locator('.sentiment-items > article').count(),4);
+ await panel.getByLabel('Source relevance',{exact:true}).selectOption('unclear');assert.equal(await panel.locator('.sentiment-items > article').count(),2);
+ await panel.getByLabel('Source relevance',{exact:true}).selectOption('relevant');assert.equal(await panel.locator('.sentiment-items > article').count(),12);
+ for(const width of [320,390,1440]){await page.setViewportSize({width,height:1100});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'coverage overflow '+width);await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:(process.env.THESIS_SCREENSHOT_DIR||'/private/tmp')+'/thesis-full-coverage-page-'+width+'.png',fullPage:true});await panel.locator('.source-analysis-coverage').screenshot({path:(process.env.THESIS_SCREENSHOT_DIR||'/private/tmp')+'/thesis-full-coverage-'+width+'.png'});}
+ await panel.getByLabel('Source relevance',{exact:true}).selectOption('all');
+ await panel.getByRole('button',{name:'Evidence',exact:true}).click();
+ const allEvidence=page.getByRole('dialog',{name:'News & discussion · evidence',exact:true});
+ await allEvidence.getByRole('button',{name:'Current sources',exact:true}).click();
+ const currentInputs=allEvidence.getByRole('region',{name:'Current sentiment inputs',exact:true});
+ await currentInputs.getByText('Excluded before analysis',{exact:true}).click();
+ assert.match(await currentInputs.innerText(),/No complete comment body to read: 2/);
+ await currentInputs.getByRole('group',{name:'Current source type',exact:true}).getByRole('button',{name:'Company news',exact:true}).click();
+ assert.equal(await currentInputs.getByText('Excluded before analysis',{exact:true}).count(),0);
+ await currentInputs.getByRole('group',{name:'Current source type',exact:true}).getByRole('button',{name:'Hacker News',exact:true}).click();
+ await currentInputs.getByText('Excluded before analysis',{exact:true}).click();
+ assert.match(await currentInputs.innerText(),/No complete comment body to read: 2/);
+ for(const width of [320,390,1440]){await page.setViewportSize({width,height:1100});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'exclusion overflow '+width);await allEvidence.screenshot({path:(process.env.THESIS_SCREENSHOT_DIR||'/private/tmp')+'/thesis-own-body-exclusions-'+width+'.png'});}
+ await page.keyboard.press('Escape');
  let batchingRun={id:'batch-ui-check',active:true,lookback_days:7,steps:[{key:'analysis',label:'Sentiment analysis',status:'running',message:'1 of 2 batches complete · reading batch 2',batches:{completed:1,total:2,source_counts:[8,4],message:'1 of 2 batches complete · reading batch 2'}}]};
  await page.route('**/api/v1/companies/'+iid+'/loading',r=>r.fulfill({json:{result:batchingRun}}));
  await page.getByRole('button',{name:'Workspace',exact:true}).click();
@@ -82,9 +131,15 @@ let browser;
  const batchProgress=panel.getByRole('progressbar',{name:'Sentiment batches complete'});
  await batchProgress.waitFor();assert.equal(await batchProgress.getAttribute('aria-valuenow'),'1');
  for(const width of [320,390,1440]){await page.setViewportSize({width,height:1100});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await panel.locator('.sentiment-batch-progress').screenshot({path:`/private/tmp/thesis-batch-progress-${width}.png`});}
- batchingRun={...batchingRun,active:false,steps:[{...batchingRun.steps[0],status:'blocked',batches:{...batchingRun.steps[0].batches,message:'Batch 2 could not finish; 1 completed batches are saved.'}}]};
+ const stoppedMessage='Batch 2 of 15 stopped. The AI reached its 9,000-token response limit before finishing. No complete sentiment result was returned. 1 completed batch is saved. 13 later batches were not sent in this run. The unsuccessful call cost US$0.1612. No combined reading was published and no automatic retry was made.';
+ batchingRun={...batchingRun,active:false,steps:[{...batchingRun.steps[0],status:'blocked',message:stoppedMessage,batches:{...batchingRun.steps[0].batches,total:15,source_counts:Array(15).fill(8),failed:2,message:stoppedMessage,failure:{code:'output_limit',charged_usd:'0.1611525'}}}]};
  await panel.getByText(/Refresh & analyse reuses completed batches/).waitFor();
  await page.reload();await page.getByRole('tab',{name:'News & discussion',exact:true}).click();await batchProgress.waitFor();assert.equal(await batchProgress.getAttribute('aria-valuenow'),'1');
+ await panel.locator('.sentiment-batch-progress').getByText(stoppedMessage,{exact:true}).waitFor();
+ await page.locator('button.progress-restore').click();
+ await page.getByRole('button',{name:'View progress',exact:true}).click();
+ await page.locator('.loading-steps').getByText(stoppedMessage,{exact:true}).waitFor();
+ for(const width of [320,390,1440]){await page.setViewportSize({width,height:1100});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'failure feedback overflow '+width);await page.screenshot({path:(process.env.THESIS_SCREENSHOT_DIR||'/private/tmp')+'/thesis-output-limit-'+width+'.png',fullPage:true});}
  assert.deepEqual(errors,[]);assert.deepEqual(external,[]);assert.deepEqual(paid,[]);
  console.log('Sentiment browser passed: separate samples, exact social sources, watch controls persisted, two grouped alerts, saved reasoning, immutable review status, reload, phone/desktop, no automatic external/paid requests.');
  await browser.close();

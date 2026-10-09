@@ -17,6 +17,8 @@ MAX_OUTPUT = 2000
 REASONING_MAX_OUTPUT = 6000
 SENTIMENT_MAX_OUTPUT = 9000
 SENTIMENT_PRICE_VERSION = "openai-gpt-5.4-sentiment-9000-20261002"
+SENTIMENT_LOW_MAX_OUTPUT = 12000
+SENTIMENT_LOW_PRICE_VERSION = "openai-gpt-5.4-sentiment-low-12000-20261009"
 SENTIMENT_DEPTH_MAX_OUTPUT = 12000
 SENTIMENT_DEPTH_PRICE_VERSION = "openai-gpt-5.4-sentiment-depth-high-20261003"
 FINDING_CHECK_MAX_OUTPUT = 9000
@@ -101,6 +103,16 @@ PROFILES = (
         SENTIMENT_DEPTH_MAX_OUTPUT,
         "high",
     ),
+    # Owner-authorized classification tuning; old profiles/charges stay exact.
+    PriceProfile(
+        REASONING_MODEL,
+        SENTIMENT_LOW_PRICE_VERSION,
+        2500,
+        250,
+        15000,
+        SENTIMENT_LOW_MAX_OUTPUT,
+        "low",
+    ),
 )
 
 
@@ -112,6 +124,15 @@ def price_profile(model, version=None):
 
 
 def request_profile(body):
+    if (
+        body.get("model") == REASONING_MODEL
+        and body.get("max_output_tokens") == SENTIMENT_LOW_MAX_OUTPUT
+        and body.get("reasoning") == {"effort": "low"}
+        and isinstance(body.get("text"), dict)
+        and isinstance(body["text"].get("format"), dict)
+        and body["text"]["format"].get("name") == "source_sentiment"
+    ):
+        return price_profile(REASONING_MODEL, SENTIMENT_LOW_PRICE_VERSION)
     if (
         body.get("model") == REASONING_MODEL
         and body.get("max_output_tokens") == SENTIMENT_DEPTH_MAX_OUTPUT

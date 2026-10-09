@@ -135,13 +135,12 @@ def test_html_collection_integrates_with_source_context_and_sentiment(owner):
         assert len(sources) == 3 and all(p['thread_key'] == 't3_abc123' for p in sources)
         assert one(conn, 'SELECT method FROM social_discovery LIMIT 1')['method'] == html.METHOD
         packet = sentiment.prepare(conn, iid, NOW)
-        # Existing two-per-thread selection remains; additional collection is
-        # not a bypass of the original bounded analysis policy.
-        assert len([p for p in packet['sources'] if p['channel'] == 'social']) == 2
+        # All distinct replies stay eligible, with their own pinned context.
+        assert len([p for p in packet['sources'] if p['channel'] == 'social']) == 3
         child = next(p for p in packet['sources'] if p.get('social_kind') == 'comment')
         assert child['conversation'] and child['conversation']['body'] not in child['text']
     result = sentiment.generate(iid, now=NOW, transport=provider())
-    assert result['summary']['social_platforms']['reddit']['selected'] == 2
+    assert result['summary']['social_platforms']['reddit']['selected'] == 3
 
 
 def test_blocked_html_keeps_existing_sources(owner):

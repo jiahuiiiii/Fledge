@@ -2,6 +2,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const assert=require('node:assert/strict');
 let browser;
 (async()=>{
+ const {sourceHeadline}=await import("../frontend/src/lib/sourceHeadline.js");
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH});
  const page=await browser.newPage({viewport:{width:1440,height:1100},reducedMotion:'reduce'});
  const errors=[],external=[],paid=[];
@@ -25,7 +26,7 @@ let browser;
   await panel.getByRole('button',{name:'Original sources',exact:true}).click();
   const original=panel.getByRole('region',{name:'Original selected sources',exact:true});
   const expected=raw.sources.filter(s=>!s.comparison_only&&s.kind===channel).sort((a,b)=>Date.parse(b.published_at)-Date.parse(a.published_at)||a.id.localeCompare(b.id));
-  assert.deepEqual(await original.locator('article h3').allTextContents(),expected.map(s=>s.title));
+  assert.deepEqual(await original.locator('article h3').allTextContents(),expected.map(sourceHeadline).filter(Boolean));
   assert.deepEqual(await original.locator('.original-source-text').allTextContents(),expected.map(s=>s.body));
   assert.equal(await panel.locator('.sentiment-counts').count(),0);
   assert.equal(await panel.locator('.sentiment-tag').count(),0);

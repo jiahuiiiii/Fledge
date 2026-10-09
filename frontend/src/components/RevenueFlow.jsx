@@ -20,7 +20,11 @@ const metricKeys = [
   "net_items",
 ];
 
-export default function RevenueFlow({ data, segments }) {
+export default function RevenueFlow({
+  data,
+  segments,
+  compactHeading = false,
+}) {
   const id = useId();
   const [kind, setKind] = useState("");
   const [selection, setSelection] = useState("");
@@ -69,7 +73,7 @@ export default function RevenueFlow({ data, segments }) {
       aria-labelledby={`${id}-heading`}
     >
       <div className="flow-heading">
-        <div>
+        <div className={compactHeading ? "flow-heading-compact" : undefined}>
           <span className="section-label">FOLLOW THE REVENUE</span>
           <h2 id={`${id}-heading`}>Revenue &amp; expenses</h2>
           <p>

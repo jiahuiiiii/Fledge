@@ -470,6 +470,14 @@ def fmp_research(instrument_id: UUID):
     return {"result": context(auth.current_owner(), str(instrument_id))}
 
 
+@app.get("/api/v1/companies/{instrument_id}/sector-position")
+def sector_position(instrument_id: UUID, peers: str | None = None):
+    from .research.sector_position import context
+    if peers is not None and len(peers) > 127:
+        raise ValueError('Choose up to eight comparison companies.')
+    return {"result": context(auth.current_owner(), str(instrument_id), None if peers is None else peers.split(',') if peers else [])}
+
+
 @app.post("/api/v1/companies/{instrument_id}/fmp/refresh")
 def fmp_refresh(instrument_id: UUID):
     from .research.fmp import refresh_company
@@ -492,7 +500,7 @@ class PeerSelection(BaseModel):
 
 class PeerSelections(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    selections: list[PeerSelection] = Field(max_length=3)
+    selections: list[PeerSelection] = Field(max_length=8)
 
 
 @app.put("/api/v1/companies/{instrument_id}/fmp/peers")
@@ -907,6 +915,15 @@ def price_history(instrument_id: UUID):
     from .research.price_history import present
 
     return {"result": present(str(instrument_id))}
+
+
+@app.get("/api/v1/companies/{instrument_id}/financial-story")
+def financial_story(instrument_id: UUID):
+    from .research.sec.financial_story import present
+    from .db import transaction
+
+    with transaction(consistent=True) as conn:
+        return {"result": present(conn, str(instrument_id))}
 
 
 @app.post("/api/v1/companies/{instrument_id}/price-history/refresh")

@@ -6,7 +6,8 @@ let browser;
  const page=await browser.newPage({viewport:{width:1440,height:1050},reducedMotion:'reduce'});
  const errors=[],external=[],paid=[];
  page.on('pageerror',e=>errors.push(e.message));
- await page.route('**/*',r=>{const u=new URL(r.request().url());if(!['127.0.0.1','localhost'].includes(u.hostname)){external.push(u.href);return r.abort();}if(/\/(sentiment|refresh|generate|event-review|evidence-review|brief|idea-alert-check)$/.test(u.pathname))paid.push(u.href);return r.continue();});
+ await page.route('**/*',r=>{const u=new URL(r.request().url());if(u.hostname==='financialmodelingprep.com'&&u.pathname.startsWith('/image-stock/'))return r.fulfill({status:404,body:'Authored missing logo'});if(!['127.0.0.1','localhost'].includes(u.hostname)){external.push(u.href);return r.abort();}if(/\/(sentiment|refresh|generate|event-review|evidence-review|brief|idea-alert-check)$/.test(u.pathname))paid.push(u.href);return r.continue();});
+ await page.route('**/companies/*/loading',r=>r.fulfill({json:{result:{active:false,steps:[]}}}));
  const base=process.env.THESIS_TEST_URL,iid='c767e09f-35ea-5eaf-a626-ff5d3aa4709b';
  await page.goto(base+'/?view=updates');
  const inbox=page.getByRole('region',{name:'Research update inbox',exact:true});
@@ -15,6 +16,16 @@ let browser;
  assert.equal(await page.locator('.idea-panel').isVisible(),false);
  assert.equal(await page.locator('.mobile-company-picker').isVisible(),false);
  assert.equal(await page.getByRole('button',{name:'Refresh market',exact:true}).isVisible(),false);
+ for(const width of [1440,390,320]){
+   await page.setViewportSize({width,height:1050});
+   await page.evaluate(()=>{window.scrollTo(0,0);const main=document.querySelector('.main-workspace');if(main)main.scrollTop=0;});
+   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`inbox header overflow ${width}`);
+   assert.ok(await page.locator('.periodic-review-entry').evaluate(el=>parseFloat(getComputedStyle(el).paddingLeft)>=16),'weekly review banner keeps its padding');
+   assert.ok(await inbox.locator('.inbox-coverage > summary').evaluate(el=>el.getBoundingClientRect().height>=44));
+   if(process.env.THESIS_UPDATES_SCREENSHOTS)await page.screenshot({path:`${process.env.THESIS_UPDATES_SCREENSHOTS}/overview-${width}.png`,animations:'disabled'});
+ }
+ await page.setViewportSize({width:1440,height:1050});
+
  const raw=(await(await page.request.get(base+'/api/v1/research-review?days=0&review=pending')).json()).result;
  const rowkeys=()=>inbox.locator('.inbox-record').evaluateAll(rows=>rows.map(r=>r.dataset.kind+':'+r.dataset.recordId));
  assert.deepEqual(await rowkeys(),raw.records.map(r=>r.kind+':'+r.id));
@@ -55,10 +66,38 @@ let browser;
  await inbox.getByText('Page 1 of 2',{exact:true}).waitFor();
  await inbox.getByRole('button',{name:'Next updates',exact:true}).click();
  await inbox.getByText('Page 2 of 2',{exact:true}).waitFor();
- for(const width of [320,390,1440]){
-   await page.setViewportSize({width,height:1050});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`overflow ${width}`);
+ const card=inbox.locator('.inbox-record[data-kind="company"]').first();
+ const cardSummary=card.locator(':scope > summary');
+ for(const width of [1440,980,390,320]){
+   await page.setViewportSize({width,height:1050});
+   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`overflow ${width}`);
+   await cardSummary.scrollIntoViewIfNeeded();
+   const placement=await cardSummary.evaluate(el=>{
+     const pseudo=getComputedStyle(el,'::before'),style=getComputedStyle(el),head=el.querySelector('.inbox-record-head');
+     return {content:pseudo.content,display:pseudo.display,inset:head.getBoundingClientRect().top-el.getBoundingClientRect().top,padding:parseFloat(style.paddingTop)};
+   });
+   assert.equal(placement.display,'none');assert.equal(placement.content,'none');
+   assert.ok(Math.abs(placement.inset-placement.padding)<1,'company header starts at card padding, without a stray arrow row');
+   assert.equal(await cardSummary.locator('.inbox-evidence-control svg').count(),1);
+   assert.equal(await cardSummary.getByText('Inspect evidence',{exact:true}).isVisible(),true);
+   if(process.env.THESIS_UPDATES_SCREENSHOTS)await page.screenshot({path:`${process.env.THESIS_UPDATES_SCREENSHOTS}/cards-${width}.png`,animations:'disabled'});
    await page.screenshot({path:`/private/tmp/thesis-inbox-${width}.png`,fullPage:true});
  }
+ await page.setViewportSize({width:1440,height:1050});
+ await page.getByRole('button',{name:'Collapse company sidebar',exact:true}).click();
+ await cardSummary.scrollIntoViewIfNeeded();
+ if(process.env.THESIS_UPDATES_SCREENSHOTS)await page.screenshot({path:`${process.env.THESIS_UPDATES_SCREENSHOTS}/cards-compact-1440.png`,animations:'disabled'});
+ await page.getByRole('button',{name:'Expand company sidebar',exact:true}).click();
+ await cardSummary.focus();await page.keyboard.press('Enter');
+ assert.equal(await card.evaluate(el=>el.open),true);
+ assert.equal(await cardSummary.getByText('Hide evidence',{exact:true}).isVisible(),true);
+ assert.equal(await cardSummary.getByText('Inspect evidence',{exact:true}).isVisible(),false);
+ assert.equal(await cardSummary.locator('.inbox-evidence-control svg').evaluate(el=>getComputedStyle(el).transitionDuration),'0s');
+ await page.keyboard.press('Enter');
+ assert.equal(await card.evaluate(el=>el.open),false);
+ assert.equal(await cardSummary.evaluate(el=>document.activeElement===el),true);
+ const coverageChevron=await inbox.locator('.inbox-coverage > summary').evaluate(el=>getComputedStyle(el,'::before').display);
+ assert.notEqual(coverageChevron,'none','coverage keeps its separate disclosure chevron');
  const companyRow=inbox.locator('.inbox-record[data-kind="company"]').first();
  await companyRow.locator(':scope > summary').click();
  await companyRow.getByRole('button',{name:'Inspect alert source ↗',exact:true}).first().click();await page.getByRole('dialog').waitFor();await page.keyboard.press('Escape');
@@ -86,5 +125,5 @@ let browser;
  await page.route('**/api/v1/research-review?**',async route=>{const response=await route.fetch();const body=await response.json();for(const r of body.result.records){r.detail.withheld=true;r.title='RETAINED_SECRET';r.detail.payload={title:'RETAINED_SECRET',reason:'RETAINED_SECRET'};}await route.fulfill({response,json:body});});
  await inbox.getByRole('button',{name:'Refresh inbox',exact:true}).click();await inbox.getByRole('heading',{name:'Source access changed',exact:true}).waitFor();assert.doesNotMatch(await inbox.innerText(),/RETAINED_SECRET/);
  assert.deepEqual(errors,[]);assert.deepEqual(external,[]);assert.deepEqual(paid,[]);
- console.log('Inbox browser passed: all three types, exact chronological pages/counts, sidebar/dropdown company filters, empty-company view, status preservation, page reset, all-company reset, source inspection, independent acknowledgement, exact assessment links, stale-response/error recovery/withholding, 320/390/1440 layouts; no model/source requests.');
+ console.log('Inbox browser passed: all three types, exact chronological pages/counts, sidebar/dropdown company filters, empty-company view, status preservation, page reset, all-company reset, source inspection, independent acknowledgement, exact assessment links, stale-response/error recovery/withholding, 320/390/980/1440 layouts and compact company rail, no stray card chevron, keyboard evidence disclosure and reduced motion; no model/source requests.');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();});

@@ -20,6 +20,7 @@ from .sec.service import COMPANIES, collection_lock
 NY = ZoneInfo("America/New_York")
 SOURCE = "yahoo-price-history"
 BASIS = "Yahoo OHLC, split-adjusted as supplied; not dividend-adjusted. No independent corporate-action reconciliation."
+REFRESH_INTERVAL = timedelta(seconds=60)
 
 
 def configured():
@@ -37,8 +38,31 @@ def allowed(conn):
 
 
 def window(now):
-    end = now.astimezone(NY).replace(hour=0, minute=0, second=0, microsecond=0)
-    return end - timedelta(days=366), end
+    end = now.astimezone(NY)
+    start = end.replace(hour=0, minute=0, second=0, microsecond=0)
+    return start - timedelta(days=366), end
+
+
+def latest_quote(meta, end):
+    """Optional provider quote, kept separate from daily OHLC and its date."""
+    quotes = []
+    for price_key, time_key, session in (
+        ("regularMarketPrice", "regularMarketTime", "regular session"),
+        ("preMarketPrice", "preMarketTime", "pre-market"),
+        ("postMarketPrice", "postMarketTime", "after-hours"),
+    ):
+        try:
+            price = decimal(meta.get(price_key))
+            stamp = meta.get(time_key)
+            if isinstance(stamp, bool) or not isinstance(stamp, int) or stamp <= 0:
+                continue
+            at = datetime.fromtimestamp(stamp, timezone.utc)
+            if not end - timedelta(days=7) <= at <= end:
+                continue
+            quotes.append(dict(price=str(price), quoted_at=at.isoformat(), session=session))
+        except (ValueError, OverflowError, OSError):
+            continue
+    return max(quotes, key=lambda q: q["quoted_at"]) if quotes else None
 
 
 def fetch(symbol, start, end, *, transport=None):
@@ -115,7 +139,8 @@ def at(values, index):
     return values[index] if isinstance(values, list) and index < len(values) else None
 
 
-def normalize(payload, symbol, start, end):
+def normalize(payload, symbol, start, end, *, observed_at=None):
+    observed_at = observed_at or end
     try:
         chart = payload["chart"]
         if chart.get("error") or len(chart["result"]) != 1:
@@ -149,7 +174,7 @@ def normalize(payload, symbol, start, end):
             if isinstance(stamp, bool) or not isinstance(stamp, int) or stamp <= 0:
                 raise ValueError()
             day = datetime.fromtimestamp(stamp, NY).date()
-            if not start.date() <= day < end.date():
+            if not start.date() <= day <= end.date() or stamp > int(observed_at.timestamp()):
                 outside += 1
                 continue
             if day.isoformat() in seen:
@@ -181,11 +206,31 @@ def normalize(payload, symbol, start, end):
                     date=day.isoformat(),
                     **{k: str(v) for k, v in values.items()},
                     volume=str(volume) if volume is not None else None,
+                    provisional=day == end.date(),
                 )
             )
         bars.sort(key=lambda b: b["date"])
         if not bars:
             raise ValueError("No complete past trading session was supplied.")
+        # A same-day bar is final only after a supplied, matching regular-session
+        # end. Never invent a close time for holidays, early closes or missing metadata.
+        regular = meta.get("currentTradingPeriod", {}).get("regular", {})
+        regular_end = regular.get("end")
+        regular_start = regular.get("start")
+        quote_time = meta.get("regularMarketTime")
+        if (
+            type(regular_end) is int and type(regular_start) is int
+            and 0 < regular_start < regular_end <= int(observed_at.timestamp())
+            and type(quote_time) is int
+            and regular_end <= quote_time <= int(observed_at.timestamp())
+            and datetime.fromtimestamp(regular_start, NY).date() == end.date()
+            and datetime.fromtimestamp(regular_end, NY).date() == end.date()
+        ):
+            for bar in bars:
+                if bar["date"] == end.date().isoformat():
+                    bar["provisional"] = False
+        delay = meta.get("exchangeDataDelayedBy")
+        delay = delay if type(delay) is int and 0 <= delay <= 1440 else None
         return dict(
             symbol=symbol,
             currency="USD",
@@ -193,7 +238,10 @@ def normalize(payload, symbol, start, end):
             interval="1d",
             basis=BASIS,
             requested_start=start.date().isoformat(),
-            requested_end_exclusive=end.date().isoformat(),
+            requested_end_exclusive=(end.date() + timedelta(days=1)).isoformat(),
+            requested_through=end.isoformat(),
+            latest_quote=latest_quote(meta, observed_at),
+            delay_minutes=delay,
             bars=bars,
             omitted_sessions=omitted,
             missing_volume_sessions=missing_volume,
@@ -239,11 +287,9 @@ def refresh(iid, *, fetcher=None):
         )
         if state["lease_until"] and state["lease_until"] > now:
             raise ValueError("A price-history refresh is already running.")
-        if state["last_attempt_at"] and now - state["last_attempt_at"] < timedelta(
-            hours=1
-        ):
+        if state["last_attempt_at"] and now - state["last_attempt_at"] < REFRESH_INTERVAL:
             raise ValueError(
-                "Daily-history refreshes are one hour apart. Saved prices remain available."
+                "Price refreshes are one minute apart. Saved prices remain available."
             )
         conn.execute(
             "UPDATE price_history_state SET attempt_id=%s,last_attempt_at=%s,lease_until=%s,error=NULL WHERE instrument_id=%s",
@@ -252,7 +298,10 @@ def refresh(iid, *, fetcher=None):
     start, end = window(now)
     try:
         payload = (fetcher or fetch)(company["symbol"], start, end)
-        series = normalize(payload, company["symbol"], start, end)
+        series = normalize(
+            payload, company["symbol"], start, end,
+            observed_at=datetime.now(timezone.utc),
+        )
         with transaction(source=True) as conn:
             collection_lock(conn)
             now = datetime.now(timezone.utc)
@@ -356,11 +405,12 @@ def present(iid):
             ),
             last_attempt_at=state["last_attempt_at"] if state else None,
             next_refresh_at=(
-                state["last_attempt_at"] + timedelta(hours=1)
+                state["last_attempt_at"] + REFRESH_INTERVAL
                 if state and state["last_attempt_at"]
                 else None
             ),
             check_stale=bool(
                 snapshot and now - snapshot["retrieved_at"] > timedelta(hours=24)
             ),
+            refresh_interval_seconds=int(REFRESH_INTERVAL.total_seconds()),
         )

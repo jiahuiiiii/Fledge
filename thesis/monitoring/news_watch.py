@@ -561,7 +561,7 @@ def run_once(
             stage = "sentiment analysis"
             watch_context.require_active(owner, iid, token, supplied_clock)
             record = analyzer(iid) if analyzer else sentiment.generate(
-                iid, progress=lambda _: watch_context.require_active(owner, iid, token, supplied_clock)
+                iid, progress=lambda _: watch_context.require_active(owner, iid, token, supplied_clock, renew=True)
             )
             analysis_id = record["id"]
             details["analysis"] = "completed"

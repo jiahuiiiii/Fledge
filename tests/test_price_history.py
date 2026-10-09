@@ -75,13 +75,13 @@ def age(iid):
         )
 
 
-def test_exact_prices_alignment_missing_volume_and_current_day_exclusion():
+def test_exact_prices_alignment_missing_volume_and_incomplete_current_day():
     raw = payload()
     r = raw["chart"]["result"][0]
     q = r["indicators"]["quote"][0]
     q["close"][1] = None
     q["volume"][3] = None
-    # An incomplete current-day entry must not be called yesterday's closing price.
+    # A current-day entry without OHLC stays unknown; arrays cannot shift.
     r["timestamp"].append(
         int(
             datetime.now(timezone.utc)
@@ -90,17 +90,104 @@ def test_exact_prices_alignment_missing_volume_and_current_day_exclusion():
             .timestamp()
         )
     )
-    series = norm(raw)
+    cutoff = datetime.now(timezone.utc).astimezone(ph.NY).replace(hour=17)
+    series = ph.normalize(raw, "MSFT", *ph.window(cutoff))
     assert (
         len(series["bars"]) == 5
-        and series["omitted_sessions"] == 1
-        and series["outside_window_sessions"] == 1
+        and series["omitted_sessions"] == 2
+        and series["outside_window_sessions"] == 0
     )
     assert series["bars"][0]["open"] == "100.123456789"
     assert (
         series["bars"][1]["volume"] == "1000002" and series["bars"][2]["volume"] is None
     )
     assert series["missing_volume_sessions"] == 1
+
+
+def today_payload(now):
+    raw = payload(count=2)
+    result = raw["chart"]["result"][0]
+    opening = now.astimezone(ph.NY).replace(hour=9, minute=30, second=0, microsecond=0)
+    result["timestamp"] = [int((opening - timedelta(days=1)).timestamp()), int(opening.timestamp())]
+    result["meta"].update(
+        regularMarketPrice="106.3456789", regularMarketTime=int(now.timestamp()),
+        exchangeDataDelayedBy=15,
+        currentTradingPeriod={"regular": {"start": int(opening.timestamp()), "end": int(opening.replace(hour=16, minute=0).timestamp())}},
+    )
+    return raw
+
+
+@pytest.mark.parametrize("hour,provisional", [(11, True), (17, False)])
+def test_latest_same_day_bar_and_quote_before_new_york_midnight(hour, provisional):
+    now = datetime(2026, 10, 8, hour, 15, tzinfo=ph.NY)
+    start, end = ph.window(now)
+    assert end == now
+    series = ph.normalize(today_payload(now), "MSFT", start, end)
+    assert series["bars"][-1]["date"] == "2026-10-08"
+    assert series["bars"][-1]["provisional"] is provisional
+    assert series["latest_quote"]["price"] == "106.3456789"
+    assert series["latest_quote"]["quoted_at"] == now.astimezone(timezone.utc).isoformat()
+    assert series["delay_minutes"] == 15
+
+
+def test_future_bars_and_future_quotes_are_not_latest_and_unknown_close_stays_provisional():
+    now = datetime(2026, 10, 8, 11, 15, tzinfo=ph.NY)
+    raw = today_payload(now)
+    result = raw["chart"]["result"][0]
+    result["timestamp"][-1] += 86400
+    result["meta"]["regularMarketTime"] += 60
+    series = ph.normalize(raw, "MSFT", *ph.window(now))
+    assert len(series["bars"]) == 1 and series["outside_window_sessions"] == 1
+    assert series["latest_quote"] is None
+    raw = today_payload(now.replace(hour=17))
+    del raw["chart"]["result"][0]["meta"]["currentTradingPeriod"]
+    assert ph.normalize(raw, "MSFT", *ph.window(now.replace(hour=17)))["bars"][-1]["provisional"]
+
+
+def test_new_york_dst_cutoff_keeps_current_day_in_both_seasons():
+    for month, utc_hour in [(1, 15), (7, 14)]:
+        now = datetime(2026, month, 8, utc_hour, tzinfo=timezone.utc)
+        start, end = ph.window(now)
+        assert end.hour == 10 and end.date() == now.date()
+        assert start.hour == 0
+
+
+def test_delayed_quote_before_bell_does_not_finalize_same_day_candle():
+    now = datetime(2026, 10, 8, 16, 5, tzinfo=ph.NY)
+    raw = today_payload(now)
+    raw["chart"]["result"][0]["meta"]["regularMarketTime"] = int(now.replace(hour=15, minute=59).timestamp())
+    assert ph.normalize(raw, "MSFT", *ph.window(now))["bars"][-1]["provisional"]
+
+
+def test_latest_after_hours_quote_is_separate_from_daily_candle():
+    now = datetime(2026, 10, 8, 18, tzinfo=ph.NY)
+    raw = today_payload(now.replace(hour=16))
+    raw["chart"]["result"][0]["meta"].update(postMarketPrice="111", postMarketTime=int(now.timestamp()))
+    series = ph.normalize(raw, "MSFT", *ph.window(now))
+    assert series["latest_quote"]["session"] == "after-hours"
+    assert series["latest_quote"]["price"] == "111"
+    assert series["bars"][-1]["close"] == "105.2"
+
+
+def test_quote_received_during_fetch_is_eligible_but_future_quotes_stay_unknown():
+    now = datetime(2026, 10, 8, 11, 15, tzinfo=ph.NY)
+    received = now + timedelta(seconds=3)
+    raw = today_payload(received)
+    series = ph.normalize(raw, "MSFT", *ph.window(now), observed_at=received)
+    assert series["latest_quote"]["quoted_at"] == received.astimezone(timezone.utc).isoformat()
+    raw["chart"]["result"][0]["meta"]["regularMarketTime"] += 60
+    assert ph.normalize(raw, "MSFT", *ph.window(now), observed_at=received)["latest_quote"] is None
+
+
+def test_refresh_allows_updates_after_one_minute_not_one_hour(owner, monkeypatch):
+    iid = setup(owner, monkeypatch)
+    ph.refresh(iid, fetcher=lambda *_: payload())
+    with pytest.raises(ValueError, match="one minute"):
+        ph.refresh(iid, fetcher=lambda *_: pytest.fail("too soon"))
+    with transaction(admin=True) as conn:
+        conn.execute("UPDATE price_history_state SET last_attempt_at=now()-interval '61 seconds' WHERE instrument_id=%s", (iid,))
+    ph.refresh(iid, fetcher=lambda *_: payload())
+    assert ph.present(iid)["refresh_interval_seconds"] == 60
 
 
 @pytest.mark.parametrize(

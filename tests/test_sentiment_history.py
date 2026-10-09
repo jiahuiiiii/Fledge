@@ -95,7 +95,7 @@ def test_new_report_and_changed_labels_are_separate(owner):
     )
 
 
-def test_selection_limit_removes_text_without_claiming_retraction(owner):
+def test_new_reports_do_not_push_older_eligible_text_out_of_the_reading(owner):
     iid, first = original(owner)
     commit(
         iid,
@@ -112,12 +112,8 @@ def test_selection_limit_removes_text_without_claiming_retraction(owner):
     )
     second = sentiment.generate(iid, transport=provider("neutral"))
     change = history.compare(iid, first["id"], second["id"])["channels"]["news"]
-    assert change["counts"]["removed"] == 1 and change["counts"]["added"] == 8
-    old = next(v for v in change["items"] if v["change"] == "removed")
-    assert (
-        old["after"] is None
-        and old["before"]["item"]["source_id"] == first["items"][0]["source_id"]
-    )
+    assert change["counts"]["removed"] == 0 and change["counts"]["added"] == 8
+    assert first['items'][0]['source_id'] in {item['source_id'] for item in second['items']}
 
 
 def test_method_change_and_same_text_reanalysis_are_explicit(owner):

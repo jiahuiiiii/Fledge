@@ -1,5 +1,7 @@
 # Reddit posts and comments through RSS
 
+**9 October analysis update:** [Full-corpus sentiment batching](sentiment-batching.md) now classifies every distinct eligible saved news/social text. It supersedes the eight-news/eight-social and two-items-per-thread analysis selection below. Acquisition, permissions and date windows remain bounded.
+
 Implemented 8 October 2026 for the owner's requested MVP integration. [Actual tests and remaining gaps](../reviews/2026-10-08/reddit-rss-integration.md).
 
 ## Workflow

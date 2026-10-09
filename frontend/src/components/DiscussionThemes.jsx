@@ -17,14 +17,16 @@ export default function DiscussionThemes({
   instrumentId,
   analysisId,
   scope,
-  enabled,
+  unavailableReason,
+  onRefresh,
   onSource,
 }) {
   const [open, setOpen] = useState(false),
     [data, setData] = useState(null),
     [selected, setSelected] = useState(null);
   const [busy, setBusy] = useState(""),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState("");
   const sequence = useRef(0);
   useEffect(() => {
     if (open) load();
@@ -36,6 +38,7 @@ export default function DiscussionThemes({
     const ticket = ++sequence.current;
     setBusy("read");
     setError("");
+    setNotice("");
     try {
       const next = await api.themeHistory(instrumentId, analysisId);
       if (ticket !== sequence.current) return;
@@ -51,20 +54,34 @@ export default function DiscussionThemes({
     const ticket = ++sequence.current;
     setBusy("generate");
     setError("");
+    setNotice("");
+    let next, failure;
     try {
-      const next = await api.generateThemes(instrumentId, analysisId);
-      if (ticket !== sequence.current) return;
+      next = await api.generateThemes(instrumentId, analysisId);
+    } catch (e) {
+      failure = e.message;
+    }
+    if (ticket !== sequence.current) return;
+    // Refresh the shared reservation state before showing the outcome and
+    // restoring the action. This read never retries generation.
+    try {
+      await onRefresh?.();
+    } catch {
+      /* The reading outcome remains visible if the status read fails. */
+    }
+    if (ticket !== sequence.current) return;
+    if (failure) {
+      setError(failure);
+    } else {
       setSelected(next);
       setData((d) => ({
         ...d,
         current: next,
         items: [next, ...(d?.items || []).filter((r) => r.id !== next.id)],
       }));
-    } catch (e) {
-      if (ticket === sequence.current) setError(e.message);
-    } finally {
-      if (ticket === sequence.current) setBusy("");
+      setNotice("Discussion summary ready below.");
     }
+    setBusy("");
   }
   async function more() {
     const ticket = ++sequence.current;
@@ -162,32 +179,41 @@ export default function DiscussionThemes({
     >
       <summary>What are people discussing?</summary>
       {open && (
-        <section aria-label="Discussion themes">
+        <section aria-label="Discussion themes" aria-busy={!!busy}>
           <div className="market-section-head">
             <div>
               <span className="section-label">DISCUSSION THEMES</span>
               <h3>{names[scope]}</h3>
             </div>
             <button
-              disabled={!!busy || !enabled || !analysisId}
+              disabled={!!busy || !!unavailableReason || !analysisId}
               onClick={generate}
             >
               {busy === "generate"
-                ? "Reading saved sources…"
-                : "Read themes from this sample"}
+                ? "Creating discussion summary…"
+                : "Summarise discussions"}
             </button>
           </div>
-          <p className="fine">
-            Optional AI reading · uses your existing budget. Reopening saved
-            readings makes no AI call. New readings use two AI steps: a draft
-            and an evidence check, both charged to the same budget.
+          <p>
+            Summarise recurring topics, differing views and open questions from
+            the relevant saved news and social posts, with links to the
+            evidence. Creates one reading for the whole sample.
           </p>
-          {!enabled && (
-            <p className="warning" role="status">
-              New AI readings are unavailable right now. You can still inspect
-              saved readings.
+          <p className="fine">
+            Uses your existing AI budget for two steps: drafting and an evidence
+            check. Reopening saved summaries makes no AI call.
+          </p>
+          {busy === "generate" ? (
+            <p className="fine" role="status">
+              Creating your summary and checking its evidence. This can take a
+              few minutes; the result will appear here.
             </p>
-          )}
+          ) : unavailableReason ? (
+            <p className="warning" role="status">
+              {unavailableReason}
+            </p>
+          ) : null}
+          {notice && !busy && <p role="status">{notice}</p>}
           {error && (
             <p className="warning" role="alert">
               {error}{" "}
@@ -230,12 +256,7 @@ export default function DiscussionThemes({
               Load earlier theme readings
             </button>
           )}
-          {!selected && !busy && (
-            <p>
-              No saved theme reading yet. Generate one after analysing a source
-              sample.
-            </p>
-          )}
+          {!selected && !busy && <p>No discussion summary saved yet.</p>}
           {selected && (
             <>
               <p className="fine">

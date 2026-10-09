@@ -1,6 +1,6 @@
 # Revenue and expense flow
 
-Implemented 9 October 2026 in Overview and Financials, inspired by the owner's reference. `sec-income-flow-1` reads retained SEC facts without new data/model requests or changes to monitoring, snapshots or previous financial methods.
+Implemented 9 October 2026 in Financials, inspired by the owner's reference. The flow moved into the Financials reading on the same day; Overview keeps the compact company summary. `sec-income-flow-1` reads retained SEC facts without new data/model requests or changes to monitoring, snapshots or previous financial methods.
 
 Up to five annual and five directly reported quarterly periods are available, plus the latest compatible trailing year using the existing annual + current YTD − prior comparable YTD bridge. Fiscal dates and filing vintages stay explicit; later amendments replace that period's display choice, including a gap if they omit figures.
 

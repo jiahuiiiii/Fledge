@@ -1,20 +1,48 @@
 import LoadingSkeleton from "./LoadingSkeleton";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import PriceChart from "./PriceChart";
 import { stamp } from "./MarketResearch";
 import { readableLoad } from "../lib/loading";
+import { preferPriceRead, priceRefreshDelay } from "../lib/priceRefresh";
 export default function HistoricalPrices({
   instrumentId,
   initialRead,
   loadStep,
+  visible = false,
+  onRead,
 }) {
   const [data, setData] = useState(initialRead?.data || null),
     [error, setError] = useState(initialRead?.error || "");
+  const [checking, setChecking] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [pageVisible, setPageVisible] = useState(!document.hidden);
+  const generation = useRef(0);
+  const inFlight = useRef(false);
+  useEffect(() => {
+    const token = ++generation.current;
+    const changed = () => setPageVisible(!document.hidden);
+    document.addEventListener("visibilitychange", changed);
+    return () => {
+      if (generation.current === token) generation.current++;
+      document.removeEventListener("visibilitychange", changed);
+    };
+  }, [instrumentId]);
   useEffect(() => {
     if (initialRead) {
-      setData(initialRead.data);
-      setError(initialRead.error);
+      if (!initialRead.data) {
+        if (initialRead.error) setError(initialRead.error);
+        return;
+      }
+      const newer =
+        Date.parse(initialRead.data.snapshot?.retrieved_at) >
+        (Date.parse(data?.snapshot?.retrieved_at) || 0);
+      setData((old) => preferPriceRead({ data: old }, initialRead)?.data);
+      if (initialRead.error) setError(initialRead.error);
+      else if (newer && !initialRead.data.error) {
+        setError("");
+        setPaused(false);
+      }
       return;
     }
     let active = true;
@@ -31,6 +59,45 @@ export default function HistoricalPrices({
       active = false;
     };
   }, [instrumentId, initialRead]);
+  const refreshPrices = useCallback(async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    const token = generation.current;
+    setChecking(true);
+    setError("");
+    try {
+      // Read shared state first: another tab or Refresh research may have
+      // checked recently. Reuse it instead of competing for the source lease.
+      let next = await api.priceHistory(instrumentId);
+      if (token !== generation.current) return;
+      if (
+        priceRefreshDelay({ ...next, error: null }) === 0 &&
+        !next.refreshing
+      ) {
+        await api.refreshPriceHistory(instrumentId);
+        next = await api.priceHistory(instrumentId);
+      }
+      if (token !== generation.current) return;
+      setData((old) => preferPriceRead({ data: old }, { data: next })?.data);
+      onRead?.({ data: next, error: "" });
+      setPaused(!!next.error);
+    } catch (failure) {
+      if (token === generation.current) {
+        setError(failure.message);
+        setPaused(true);
+      }
+    } finally {
+      inFlight.current = false;
+      if (token === generation.current) setChecking(false);
+    }
+  }, [instrumentId, onRead]);
+  useEffect(() => {
+    if (!visible || !pageVisible || paused || checking) return;
+    const delay = priceRefreshDelay(data);
+    if (delay == null) return;
+    const timer = setTimeout(refreshPrices, Math.max(1000, delay));
+    return () => clearTimeout(timer);
+  }, [data, visible, pageVisible, paused, checking, refreshPrices]);
   const snapshot = data?.snapshot,
     series = snapshot?.series;
   const bars =
@@ -49,7 +116,12 @@ export default function HistoricalPrices({
           <span className="section-label">DAILY PRICE CONTEXT</span>
           <span className="fine"> · Yahoo Finance</span>
         </div>
-        <span className="fine">Included in Refresh research</span>
+        <button
+          onClick={refreshPrices}
+          disabled={checking || !data?.available || !data?.configured}
+        >
+          {checking ? "Checking prices…" : "Refresh prices"}
+        </button>
       </div>
       {error && (
         <p className="warning" role="alert">
@@ -70,6 +142,20 @@ export default function HistoricalPrices({
       )}
       {data?.refreshing && (
         <p role="status">A daily-history check is in progress.</p>
+      )}
+      {series && (
+        <p className="fine" role="status">
+          Latest session {bars.at(-1)?.date} · checked{" "}
+          {stamp(snapshot.retrieved_at)}.
+          {paused || data?.error
+            ? " Updates paused after a failed check. Choose Refresh prices to try again."
+            : !data?.configured
+              ? " Price checks are unavailable while this source connection is disabled."
+              : " Updates every minute while this chart is open and visible."}
+          {series.delay_minutes > 0
+            ? ` Yahoo reports a ${series.delay_minutes}-minute data delay.`
+            : " Data may be delayed by the source."}
+        </p>
       )}
       {data?.available &&
         !snapshot &&
@@ -93,7 +179,7 @@ export default function HistoricalPrices({
         )}
       {series && (
         <>
-          <PriceChart key={snapshot.id} prices={bars} fictional={false} />
+          <PriceChart prices={bars} fictional={false} />
           {data.check_stale && (
             <p className="warning">
               Daily history was last checked more than 24 hours ago. Refresh it
@@ -124,11 +210,12 @@ export default function HistoricalPrices({
             <summary>Inspect daily prices and source</summary>
             <p className="fine">
               {bars.length} supplied sessions · through {bars.at(-1)?.date} (New
-              York dates) · retrieved {stamp(snapshot.retrieved_at)}.
-              Current-day bars are excluded; this is not a live chart.
+              York dates) · retrieved {stamp(snapshot.retrieved_at)}. Today's
+              supplied session is included. A provisional bar shows the latest
+              supplied session price, not a final daily close.
             </p>
             <p className="fine">
-              Manual refresh · at most once per hour · no AI call.{" "}
+              Price-only checks · at most once per minute · no AI call.{" "}
               {data?.next_refresh_at
                 ? `Next refresh available ${stamp(data.next_refresh_at)}.`
                 : ""}
@@ -146,8 +233,9 @@ export default function HistoricalPrices({
             </p>
             <p className="fine">
               Requested {series.requested_start} to{" "}
-              {series.requested_end_exclusive} (exclusive), America/New_York.
-              Reading this table makes no source request.
+              {series.requested_through ||
+                `${series.requested_end_exclusive} (exclusive)`}
+              , America/New_York. Reading this table makes no source request.
             </p>
             <a href={data.source_url} target="_blank" rel="noreferrer">
               Yahoo Finance history ↗

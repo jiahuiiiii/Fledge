@@ -4,6 +4,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 let browser;
 (async()=>{
+ const {sourceHeadline}=await import("../frontend/src/lib/sourceHeadline.js");
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH});
  const page=await browser.newPage({viewport:{width:1440,height:1050},reducedMotion:'reduce'});
  const errors=[],writes=[],external=[];
@@ -42,7 +43,7 @@ let browser;
  for(const scope of ['news','reddit','hackernews']){
   await panel.getByRole('group',{name:'Current source type',exact:true}).getByRole('button',{name:({news:'Company news',reddit:'Reddit discussion',hackernews:'Hacker News'})[scope],exact:true}).click();
   const expected=saved.sentiment_inputs.sources.filter(s=>(s.kind==='news'?'news':s.platform||'reddit')===scope);
-  assert.deepEqual(await panel.locator('article h3').allTextContents(),expected.map(s=>s.title));
+  assert.deepEqual(await panel.locator('article h3').allTextContents(),expected.map(sourceHeadline).filter(Boolean));
   assert.deepEqual(await panel.locator('.original-source-text').allTextContents(),expected.map(s=>s.body));
   assert.equal(await panel.locator('.sentiment-tag,.sentiment-counts').count(),0);
  }

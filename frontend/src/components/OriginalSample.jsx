@@ -2,6 +2,7 @@ import SentimentLimits from "./SentimentLimits";
 import { stamp } from "./MarketResearch";
 import { originalSample } from "../lib/originalSample";
 import { SourceLabel, sourceScope } from "./SourceFilters";
+import { sourceHeadline } from "../lib/sourceHeadline";
 
 export default function OriginalSample({
   analysis,
@@ -57,7 +58,7 @@ export default function OriginalSample({
                 {stamp(s.published_at)}
               </time>
             </div>
-            <h3>{s.title}</h3>
+            {sourceHeadline(s) && <h3>{sourceHeadline(s)}</h3>}
             <p className="original-source-text">{s.body}</p>
             <button className="source-link" onClick={() => onSource(s.id)}>
               Inspect original source ↗

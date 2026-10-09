@@ -1,7 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { readableLoad } from "../lib/loading";
 import LoadingSkeleton from "./LoadingSkeleton";
+import CompanyAvatar from "./CompanyAvatar";
+import PriceChange from "./PriceChange";
+import { companyName, companyMatches } from "../lib/companyIdentity";
+import { day, money, percent, trailing } from "../lib/companySnapshot";
+import { latestPriceQuote, quoteMovement } from "../lib/priceRefresh";
+import "./CompanyOverview.css";
 const stamp = (value) =>
   value
     ? new Date(value).toLocaleString("en-GB", {
@@ -14,37 +20,206 @@ const stamp = (value) =>
       }) + " UTC"
     : "Date unavailable";
 
-export default function CompanyOverview({ catalogue, onOpen }) {
+export default function CompanyOverview({
+  catalogue,
+  initialWorkspace,
+  onOpen,
+}) {
+  const [readings, setReadings] = useState({});
+  const [refresh, setRefresh] = useState(0);
+  const [query, setQuery] = useState("");
+  const current = useRef({ catalogue, initialWorkspace });
+  current.current = { catalogue, initialWorkspace };
+  const membership = catalogue.map((company) => company.id).join(",");
+  useEffect(() => {
+    let active = true;
+    const { catalogue: companies, initialWorkspace: initial } = current.current;
+    setReadings({});
+    let index = 0;
+    // Local, account-scoped reads only. Browsing does not refresh suppliers.
+    const worker = async () => {
+      while (active && index < companies.length) {
+        const company = companies[index++];
+        const [workspace, prices] = await Promise.allSettled([
+          !refresh && initial?.instrument?.id === company.id
+            ? Promise.resolve(initial)
+            : api.workspace(company.id),
+          company.mode === "sec"
+            ? api.priceHistory(company.id)
+            : Promise.resolve(null),
+        ]);
+        if (!active) return;
+        const data =
+          workspace.status === "fulfilled" &&
+          workspace.value?.instrument?.id === company.id
+            ? workspace.value
+            : null;
+        const history =
+          prices.status === "fulfilled" &&
+          prices.value?.symbol === company.symbol
+            ? prices.value
+            : null;
+        setReadings((previous) => ({
+          ...previous,
+          [company.id]: {
+            data,
+            history,
+            error: !data,
+            priceError: prices.status === "rejected",
+          },
+        }));
+      }
+    };
+    void Promise.all(
+      Array.from({ length: Math.min(3, companies.length) }, worker),
+    );
+    return () => {
+      active = false;
+    };
+  }, [membership, refresh]);
+  const loading = catalogue.some((company) => !readings[company.id]);
+  const companies = catalogue.filter((company) =>
+    companyMatches(company, query),
+  );
   return (
-    <section className="collection-page" aria-label="All company workspaces">
-      <span className="section-label">ALL COMPANIES</span>
-      <h1>Your research workspace</h1>
-      <p className="muted">
-        Choose a company to explore its news, fundamentals and your saved
-        reasoning.
-      </p>
-      <div className="idea-collection">
-        {catalogue.map((company) => (
-          <button
-            className="idea-summary"
-            key={company.id}
-            onClick={() => onOpen(company.id, "workspace")}
-          >
-            <div className="row">
-              <strong>
-                {company.symbol} · {company.name}
-              </strong>
-              <span className="status">
-                {company.mode === "recorded"
-                  ? "Fictional sample"
-                  : "Company research"}
-              </span>
-            </div>
-            <p>{company.question || "Start with a research question."}</p>
-            <span className="text-button">Open workspace ↗</span>
-          </button>
-        ))}
+    <section
+      className="collection-page company-overview"
+      aria-label="All company workspaces"
+    >
+      <div className="company-overview-heading">
+        <div>
+          <span className="section-label">YOUR RESEARCH</span>
+          <h1>
+            All companies <span>{catalogue.length}</span>
+          </h1>
+          <p className="muted">
+            Saved prices and financials, together. Open a company to explore its
+            evidence.
+          </p>
+        </div>
+        <button
+          onClick={() => setRefresh((value) => value + 1)}
+          disabled={loading}
+        >
+          Reload saved data
+        </button>
       </div>
+      <label className="company-overview-search">
+        <span>Find a company</span>
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Name or ticker"
+        />
+      </label>
+      <div className="company-overview-grid" aria-busy={loading}>
+        {companies.map((company) => {
+          const reading = readings[company.id],
+            data = reading?.data;
+          const quote =
+            latestPriceQuote(data?.market, reading?.history) ||
+            data?.market?.quote?.quote;
+          const yahoo = !!latestPriceQuote(data?.market, reading?.history);
+          const price =
+            quote?.price != null && Number.isFinite(Number(quote.price))
+              ? Number(quote.price).toFixed(2)
+              : null;
+          const revenue = trailing(data?.financial_depth, "revenue");
+          const margin = trailing(data?.financial_depth, "operating_margin");
+          return (
+            <button
+              className="company-overview-card"
+              key={company.id}
+              data-company={company.id}
+              aria-label={`Open ${company.symbol} · ${companyName(company)}`}
+              onClick={() => onOpen(company.id, "workspace")}
+            >
+              <span className="company-overview-identity">
+                <CompanyAvatar company={company} />
+                <span>
+                  <strong title={company.name}>{companyName(company)}</strong>
+                  <span className="company-overview-symbol">
+                    {company.symbol}
+                    {company.mode === "recorded" && " · Fictional sample"}
+                  </span>
+                </span>
+                <span className="company-overview-arrow" aria-hidden="true">
+                  ↗
+                </span>
+              </span>
+              {!reading ? (
+                <span className="company-overview-loading" role="status">
+                  Loading saved figures…
+                </span>
+              ) : reading.error ? (
+                <span className="company-overview-loading">
+                  Saved data unavailable. Reload to try again.
+                </span>
+              ) : (
+                <>
+                  <span className="company-overview-quote">
+                    <strong>
+                      {price ? (
+                        <>
+                          {price} <small>USD</small>
+                        </>
+                      ) : (
+                        "Price unavailable"
+                      )}
+                    </strong>
+                    {quote && (
+                      <PriceChange
+                        movement={quoteMovement(data.market, reading.history)}
+                      />
+                    )}
+                    <span className="company-overview-date">
+                      {quote
+                        ? `${yahoo ? "Yahoo Finance" : "Finnhub"} · ${stamp(quote.quoted_at)}`
+                        : "No saved quote"}
+                      {reading.priceError && " · Latest-price read unavailable"}
+                    </span>
+                  </span>
+                  <span className="company-overview-figures">
+                    <span>
+                      <span>Revenue · 12 months</span>
+                      <strong>
+                        {revenue ? money(revenue.value) : "Unavailable"}
+                      </strong>
+                      <small>
+                        {revenue
+                          ? `SEC · to ${day(revenue.end)}`
+                          : "No compatible saved figure"}
+                      </small>
+                    </span>
+                    <span>
+                      <span>Operating margin</span>
+                      <strong>
+                        {margin ? percent(margin.value) : "Unavailable"}
+                      </strong>
+                      <small>
+                        {margin
+                          ? `SEC · to ${day(margin.end)}`
+                          : "No compatible saved figure"}
+                      </small>
+                    </span>
+                  </span>
+                </>
+              )}
+              <span className="company-overview-footer">
+                <span>
+                  {company.status ? "Idea saved" : "No saved idea"}
+                  {company.unread > 0 && ` · ${company.unread} to review`}
+                </span>
+                <span>Open workspace →</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {!companies.length && (
+        <p className="company-overview-empty">No companies match “{query}”.</p>
+      )}
     </section>
   );
 }

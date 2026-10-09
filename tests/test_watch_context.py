@@ -27,6 +27,32 @@ def due(owner, iid, *, include_context=True, now=None):
     )
 
 
+def test_batch_progress_renews_only_the_live_claim_and_history_uses_current_lease(owner):
+    from thesis.monitoring import watch_history
+    iid = prepare(owner)
+    start = datetime.now(timezone.utc)
+    due(owner, iid, include_context=False, now=start)
+    token = uuid4()
+    with transaction(owner) as conn:
+        conn.execute('UPDATE news_watches SET claim_token=%s,lease_until=%s WHERE owner_id=%s AND instrument_id=%s',
+                     (token, start+timedelta(minutes=15), owner, iid))
+        watch = one(conn, 'SELECT * FROM news_watches WHERE owner_id=%s AND instrument_id=%s', (owner,iid))
+        watch_history.start(conn,owner,watch,token,start,start+timedelta(minutes=15))
+    watch_context.require_active(owner,iid,token,start+timedelta(minutes=14),renew=True)
+    with transaction(owner) as conn:
+        check = one(conn,'SELECT * FROM watch_checks WHERE id=%s',(token,))
+        assert check['lease_until'] == start+timedelta(minutes=15)
+        assert watch_history.present(conn,owner,check,None,start+timedelta(minutes=16))['status'] == 'running'
+    with pytest.raises(W.WatchStopped):
+        watch_context.require_active(owner,iid,uuid4(),start+timedelta(minutes=16),renew=True)
+    with pytest.raises(W.WatchStopped):
+        watch_context.require_active(owner,iid,token,start+timedelta(minutes=30),renew=True)
+    with transaction(owner) as conn:
+        conn.execute('UPDATE news_watches SET enabled=false WHERE owner_id=%s AND instrument_id=%s',(owner,iid))
+    with pytest.raises(W.WatchStopped):
+        watch_context.require_active(owner,iid,token,start+timedelta(minutes=16),renew=True)
+
+
 def run(owner, *, now=None, **kw):
     return W.run_once(
         owner,

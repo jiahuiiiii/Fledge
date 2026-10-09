@@ -12,7 +12,9 @@ import SentimentHistory from "./SentimentHistory";
 import SourceFilters, { SourceLabel, sourceScope } from "./SourceFilters";
 import AllSourceSummary from "./AllSourceSummary";
 import { originalSample } from "../lib/originalSample";
-import { useState } from "react";
+import { sourceHeadline } from "../lib/sourceHeadline";
+import "./NewsDiscussion.css";
+import { useEffect, useState } from "react";
 import Modal from "./Modal";
 import EvidenceButton from "./EvidenceButton";
 import { stamp } from "./MarketResearch";
@@ -35,6 +37,7 @@ export default function SentimentPanel({
   onSource,
   onThemeSource,
   onCoverage,
+  onThemesChange,
 }) {
   const [days, setDays] = useState(
     data.sentiment?.social_lookback_days || loadingRun?.lookback_days || 7,
@@ -43,6 +46,8 @@ export default function SentimentPanel({
   const analysisStep = loadingRun?.steps.find((s) => s.key === "analysis");
   const batchProgress = analysisStep?.batches;
   const [tab, setTab] = useState("news");
+  const [relevanceFilter, setRelevanceFilter] = useState("all");
+  const [page, setPage] = useState(1);
   const [checkPurpose, setCheckPurpose] = useState("reasoning");
   const channel = tab === "all" ? "all" : tab === "news" ? "news" : "social";
   const platform = tab === "all" || tab === "news" ? null : tab;
@@ -87,6 +92,16 @@ export default function SentimentPanel({
         : 0,
     );
   const coverageLinks = a?.coverage_links || [];
+  useEffect(() => setPage(1), [a?.id, tab, relevanceFilter]);
+  const filteredItems = items.filter(
+    (item) => relevanceFilter === "all" || item.relevance === relevanceFilter,
+  );
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / 12));
+  const currentPage = Math.min(page, totalPages);
+  const shownItems = filteredItems.slice(
+    (currentPage - 1) * 12,
+    currentPage * 12,
+  );
   const sampledFeeds = [
     ...new Set(
       (a?.sources || [])
@@ -100,7 +115,6 @@ export default function SentimentPanel({
     <section className="sentiment-panel" aria-label="News and social sentiment">
       <div className="market-section-head">
         <div>
-          <span className="section-label">NEWS + SOCIAL DISCUSSION</span>
           <h2>What’s the tone?</h2>
         </div>
         <button
@@ -120,7 +134,9 @@ export default function SentimentPanel({
         </button>
       </div>
       <p className="fine">
-        Selected news and social opinions — not a market-wide measure.
+        Analyse every eligible saved source in manageable batches, then combine
+        the results. Paid AI uses the existing allowance. News framing and
+        social opinions remain separate.
       </p>
       {batchProgress && analysisStep.status !== "ready" && (
         <div className="sentiment-batch-progress">
@@ -177,20 +193,16 @@ export default function SentimentPanel({
           Watch · {watch?.enabled ? "on" : "off"}
         </button>
       </div>
-      {a && (
-        <p className="fine">
-          Saved {stamp(a.created_at)} · news over 7 days · discussions over{" "}
-          {a.social_lookback_days || 7} days.{" "}
-          {a.social_lookback_days && a.social_lookback_days !== 7
-            ? "This exploratory window does not publish watch alerts."
+      {(a || watch?.enabled) && (
+        <p className="fine sentiment-meta" role="status">
+          {a &&
+            `AI reading saved ${stamp(a.created_at)} · news 7 days · discussion ${a.social_lookback_days || 7} days`}
+          {a && watch?.enabled && " · "}
+          {watch?.enabled &&
+            `watch on, next check ${stamp(watch.next_check_at)}`}
+          {a?.social_lookback_days && a.social_lookback_days !== 7
+            ? ". This exploratory window does not publish watch alerts."
             : ""}
-        </p>
-      )}
-      {watch?.enabled && (
-        <p className="fine" role="status">
-          Next check {stamp(watch.next_check_at)} · last check{" "}
-          {stamp(watch.last_check_at)}. The first analysis establishes a
-          baseline.
         </p>
       )}
       {(data.social_status?.some((item) => item.enabled && item.error) ||
@@ -280,13 +292,16 @@ export default function SentimentPanel({
             </p>
           )}
           {tab === "all" ? (
-            <AllSourceSummary analysis={a} count={items.length} />
+            <AllSourceSummary
+              analysis={a}
+              providerStatus={data.provider_status}
+            />
           ) : (
             <>
               <div className="sentiment-summary">
                 <strong>{sample.tone}</strong>
                 <span>
-                  {sample.relevant} relevant of {sample.selected} selected{" "}
+                  {sample.relevant} relevant of {sample.selected} analysed{" "}
                   {channel === "news"
                     ? "stories"
                     : platform === "hackernews"
@@ -305,9 +320,8 @@ export default function SentimentPanel({
                 <summary>Sample details &amp; method</summary>
                 {Number.isInteger(pool) && (
                   <p className="fine">
-                    Available pool: {pool} candidate texts on this source. Only{" "}
-                    {sample.selected} were selected; important material may be
-                    outside this sample.
+                    Available pool: {pool} candidate texts on this source.{" "}
+                    {sample.selected} analysed in this saved reading.
                   </p>
                 )}
                 <p className="fine">
@@ -331,9 +345,10 @@ export default function SentimentPanel({
                     </p>
                   )}
                 <p className="fine">
-                  Analysed {stamp(a.created_at)} · up to 8 news items and 8
-                  social texts in total within the saved discussion window;
-                  platforms alternate during social selection.{" "}
+                  Analysed {stamp(a.created_at)} ·{" "}
+                  {a.coverage?.selection?.policy === "sentiment-all-eligible-1"
+                    ? "every eligible saved source in the date window, split into batches."
+                    : "earlier limited sample. Refresh & analyse now covers every eligible saved source in batches."}{" "}
                   {sample.tone === "thin sample"
                     ? "Too few interpretable items for a directional summary."
                     : ""}{" "}
@@ -348,9 +363,30 @@ export default function SentimentPanel({
               </details>
             </>
           )}
-          {items.length ? (
+          <div className="sentiment-result-controls">
+            <label>
+              Show{" "}
+              <Select
+                aria-label="Source relevance"
+                value={relevanceFilter}
+                onChange={(event) => setRelevanceFilter(event.target.value)}
+              >
+                <option value="all">All analysed texts</option>
+                <option value="relevant">Relevant to company</option>
+                <option value="unrelated">Unrelated</option>
+                <option value="unclear">Relevance unclear</option>
+              </Select>
+            </label>
+            <span className="fine">
+              {filteredItems.length
+                ? `${(currentPage - 1) * 12 + 1}–${Math.min(currentPage * 12, filteredItems.length)} of ${filteredItems.length}`
+                : "0 matching texts"}{" "}
+              · newest first in All
+            </span>
+          </div>
+          {shownItems.length ? (
             <div className="sentiment-items">
-              {items.map((i) => {
+              {shownItems.map((i) => {
                 const s = a.sources.find((s) => s.id === i.source_id);
                 const comparison = coverageLinks.find(
                   (c) => c.source_id === i.source_id,
@@ -361,19 +397,11 @@ export default function SentimentPanel({
                     (s) => s.id === comparison.reference_source_id,
                   );
                 return (
-                  <article key={i.id}>
-                    <div className="row">
-                      <span className={`sentiment-tag tone-${i.sentiment}`}>
-                        {i.relevance === "relevant"
-                          ? names[i.sentiment]
-                          : i.relevance === "unrelated"
-                            ? "Not about this company"
-                            : "Unclear relevance"}
-                      </span>
-                      <span className="fine">
-                        {i.statement.replaceAll("_", " ")}
-                      </span>
-                    </div>
+                  <article
+                    key={i.id}
+                    className="source-story"
+                    data-source-id={i.source_id}
+                  >
                     {s && (
                       <div className="sentiment-source-meta fine">
                         <SourceLabel scope={sourceScope(s)}>
@@ -386,8 +414,16 @@ export default function SentimentPanel({
                         </time>
                       </div>
                     )}
-                    <h3>{s?.title || "Source unavailable"}</h3>
-                    <p className="story-reading">{i.explanation}</p>
+                    {sourceHeadline(s) && <h3>{sourceHeadline(s)}</h3>}
+                    {s?.body ? (
+                      <p
+                        className={`story-source-text${s.kind === "social" ? " discussion-text" : ""}`}
+                      >
+                        {s.body}
+                      </p>
+                    ) : (
+                      <p className="fine">Original text unavailable.</p>
+                    )}
                     {comparison && (
                       <p className="fine">
                         {comparison.relation === "repeats"
@@ -397,88 +433,139 @@ export default function SentimentPanel({
                             : "Reports conflict · inspect both sources"}
                       </p>
                     )}
-                    <EvidenceButton
-                      key={`${a.id}:${i.id}`}
-                      label="Inspect evidence"
-                      title="Story evidence"
-                    >
-                      <h3>{s?.title || "Source unavailable"}</h3>
-                      <SentimentBasis item={i} />
-                      {comparison && (
-                        <details className="coverage-comparison">
-                          <summary>
-                            {comparison.relation === "repeats"
-                              ? "Repeated coverage"
-                              : comparison.relation === "adds_detail"
-                                ? "New detail on an earlier report"
-                                : "Conflicting reports"}{" "}
-                            · compare reports
-                          </summary>
-                          <p>{comparison.explanation}</p>
-                          {!comparison.explanation_policy && (
-                            <p className="fine">
-                              Earlier AI-written summary. Check each report for
-                              the details it supports.
-                            </p>
-                          )}
+                    <div className="story-footer">
+                      <div className="story-labels">
+                        <span className="fine">AI label</span>
+                        <span className={`sentiment-tag tone-${i.sentiment}`}>
+                          {i.relevance === "relevant"
+                            ? names[i.sentiment]
+                            : i.relevance === "unrelated"
+                              ? "Not about this company"
+                              : "Unclear relevance"}
+                        </span>
+                        <span className="story-statement fine">
+                          {i.statement.replaceAll("_", " ")}
+                        </span>
+                      </div>
+                      <EvidenceButton
+                        key={`${a.id}:${i.id}`}
+                        label="Inspect evidence"
+                        title="Story evidence"
+                      >
+                        {sourceHeadline(s) && <h3>{sourceHeadline(s)}</h3>}
+                        {s && (
                           <p className="fine">
-                            AI comparison of supplied snippets; not independent
-                            confirmation.{" "}
-                            {comparison.review_note ||
-                              (comparison.repeat_suppression_allowed
-                                ? "Watches can keep this repeat quiet when the earlier report has already been seen."
-                                : "New detail and contradictions remain eligible for review.")}
+                            <SourceLabel scope={sourceScope(s)}>
+                              {s.source}
+                            </SourceLabel>{" "}
+                            · {stamp(s.published_at)}
                           </p>
-                          <strong>This report</strong>
-                          {comparison.citations.map((c, j) => (
-                            <blockquote key={j}>{c.quote}</blockquote>
-                          ))}
+                        )}
+                        <div className="story-full-text">
+                          <h3>Original text</h3>
+                          <p>{s?.body || "Original text unavailable."}</p>
+                        </div>
+                        <h3>AI classification</h3>
+                        <SentimentBasis item={i} />
+                        {comparison && (
+                          <details className="coverage-comparison">
+                            <summary>
+                              {comparison.relation === "repeats"
+                                ? "Repeated coverage"
+                                : comparison.relation === "adds_detail"
+                                  ? "New detail on an earlier report"
+                                  : "Conflicting reports"}{" "}
+                              · compare reports
+                            </summary>
+                            <p>{comparison.explanation}</p>
+                            {!comparison.explanation_policy && (
+                              <p className="fine">
+                                Earlier AI-written summary. Check each report
+                                for the details it supports.
+                              </p>
+                            )}
+                            <p className="fine">
+                              AI comparison of supplied snippets; not
+                              independent confirmation.{" "}
+                              {comparison.review_note ||
+                                (comparison.repeat_suppression_allowed
+                                  ? "Watches can keep this repeat quiet when the earlier report has already been seen."
+                                  : "New detail and contradictions remain eligible for review.")}
+                            </p>
+                            <strong>This report</strong>
+                            {comparison.citations.map((c, j) => (
+                              <blockquote key={j}>{c.quote}</blockquote>
+                            ))}
+                            <button
+                              className="source-link"
+                              onClick={() => onSource(i.source_id)}
+                            >
+                              Inspect this report ↗
+                            </button>
+                            <strong>
+                              {reference?.title || "Earlier report"}
+                            </strong>
+                            {comparison.reference_citations.map((c, j) => (
+                              <blockquote key={j}>{c.quote}</blockquote>
+                            ))}
+                            <button
+                              className="source-link"
+                              onClick={() =>
+                                onSource(comparison.reference_source_id)
+                              }
+                            >
+                              Inspect compared report ↗
+                            </button>
+                          </details>
+                        )}
+                        <details>
+                          <summary>Why this label · inspect evidence</summary>
+                          {!i.evidence_policy &&
+                            i.citations.map((c, j) => (
+                              <blockquote key={j}>{c.quote}</blockquote>
+                            ))}
+                          <SentimentContext value={i.conversation} />
                           <button
                             className="source-link"
                             onClick={() => onSource(i.source_id)}
                           >
-                            Inspect this report ↗
-                          </button>
-                          <strong>
-                            {reference?.title || "Earlier report"}
-                          </strong>
-                          {comparison.reference_citations.map((c, j) => (
-                            <blockquote key={j}>{c.quote}</blockquote>
-                          ))}
-                          <button
-                            className="source-link"
-                            onClick={() =>
-                              onSource(comparison.reference_source_id)
-                            }
-                          >
-                            Inspect compared report ↗
+                            Open original source ↗
                           </button>
                         </details>
-                      )}
-                      <details>
-                        <summary>Why this label · inspect evidence</summary>
-                        {!i.evidence_policy &&
-                          i.citations.map((c, j) => (
-                            <blockquote key={j}>{c.quote}</blockquote>
-                          ))}
-                        <SentimentContext value={i.conversation} />
-                        <button
-                          className="source-link"
-                          onClick={() => onSource(i.source_id)}
-                        >
-                          Open original source ↗
-                        </button>
-                      </details>
-                    </EvidenceButton>
+                      </EvidenceButton>
+                    </div>
                   </article>
                 );
               })}
             </div>
           ) : (
             <p className="muted">
-              No eligible {channel === "social" ? "social posts" : "news"} in
-              this sample. This is missing coverage, not neutral sentiment.
+              {items.length
+                ? "No analysed texts match this relevance filter."
+                : "No analysed texts for this source type. Missing coverage is not neutral sentiment."}
             </p>
+          )}
+          {totalPages > 1 && (
+            <nav
+              className="sentiment-pagination"
+              aria-label="Analysed source pages"
+            >
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setPage(currentPage - 1)}
+              >
+                Previous sources
+              </button>
+              <span className="fine">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setPage(currentPage + 1)}
+              >
+                Next sources
+              </button>
+            </nav>
           )}
         </>
       ) : (
@@ -492,31 +579,34 @@ export default function SentimentPanel({
         instrumentId={data.instrument.id}
         analysisId={a?.id}
         scope={tab}
-        enabled={
-          !busy &&
-          !!a &&
-          !a.withheld &&
-          modelStatus?.briefing_enabled &&
-          !modelStatus?.budget?.unresolved
+        unavailableReason={
+          !a
+            ? "Analyse a source sample first, then summarise its discussions."
+            : a.withheld
+              ? "Source access changed. A new summary cannot be created from this sample."
+              : busy
+                ? "Wait for the current workspace action to finish. Saved readings remain available."
+                : availability.state === "running"
+                  ? "Another AI request is running. Wait for it to finish before starting a discussion summary. Saved readings remain available."
+                  : availability.message
         }
+        onRefresh={onThemesChange}
         onSource={onThemeSource}
       />
-      <div className="evidence-summary-bar">
-        <p>
-          {data.sentiment_inputs?.status === "changed"
-            ? "New source selection available. Saved labels still describe the earlier sample."
-            : "Open the evidence to read the selected texts, limits and saved checks."}
-        </p>
-        <button
-          className="source-link"
-          onClick={() => setEvidenceView("current")}
-        >
-          Evidence & history
-        </button>
-        <button className="source-link" onClick={onCoverage}>
-          Data & sources
-        </button>
-      </div>
+      {data.sentiment_inputs?.status === "changed" && (
+        <div className="evidence-summary-bar">
+          <p>
+            New source selection available. Saved labels still describe the
+            earlier sample.
+          </p>
+          <button
+            className="source-link"
+            onClick={() => setEvidenceView("current")}
+          >
+            Compare current sources
+          </button>
+        </div>
+      )}
       <Modal
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}

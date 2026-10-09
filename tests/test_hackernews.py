@@ -212,12 +212,13 @@ def test_selection_balances_sources_and_platforms_count_independently(owner):
     with transaction() as c:
         packet = sentiment.prepare(c, iid)
     social_sources = [s for s in packet["sources"] if s["channel"] == "social"]
-    assert [s["platform"] for s in social_sources] == ["reddit", "hackernews"] * 4
+    assert len(social_sources) == 20
+    assert sum(s['platform']=='reddit' for s in social_sources) == 8
+    assert sum(s['platform']=='hackernews' for s in social_sources) == 12
     assert packet["available_social_platforms"] == dict(reddit=8, hackernews=12)
     result = sentiment.generate(iid, transport=provider())
-    assert all(
-        result["summary"]["social_platforms"][platform]["counted_groups"] == 4 for platform in ("reddit", "hackernews")
-    )
+    assert result['summary']['social_platforms']['reddit']['counted_groups'] == 8
+    assert result['summary']['social_platforms']['hackernews']['counted_groups'] == 12
     assert result["coverage"]["platform_authors"] == dict(reddit=1, hackernews=1, x=0)
 
 

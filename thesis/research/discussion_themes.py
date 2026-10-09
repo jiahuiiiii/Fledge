@@ -185,6 +185,16 @@ def render(call, packet):
         if p.get("type") == "output_text"
     ]
     if raw.get("status") != "completed" or len(texts) != 1:
+        if (
+            raw.get("status") == "incomplete"
+            and (raw.get("incomplete_details") or {}).get("reason")
+            == "max_output_tokens"
+        ):
+            raise ValueError(
+                "The AI reached its response limit before producing a discussion summary. "
+                "No theme reading was saved. This AI attempt still used budget; "
+                "no automatic retry was made."
+            )
         raise ValueError("Theme reading was incomplete. No automatic retry was made.")
     result = Reading.model_validate_json(texts[0])
     sources = {s["label"]: s for s in packet["sources"]}

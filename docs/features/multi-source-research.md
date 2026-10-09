@@ -1,5 +1,7 @@
 # Multi-source research and Devvit assessment
 
+**9 October analysis update:** [Full-corpus sentiment batching](sentiment-batching.md) now classifies every distinct eligible saved news/social text. It supersedes the eight-news/eight-social and two-items-per-thread analysis selection below. Acquisition, permissions and date windows remain bounded.
+
 Implemented 8 October 2026. This extends [Deus social collection](deus-social-research.md) with publisher feeds and optional Alpha Vantage/X adapters. It does not install the whole Deus application. [Verification](../reviews/2026-10-08/multi-source-research.md).
 
 ## Current connections

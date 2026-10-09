@@ -10,6 +10,12 @@ Counts cover the entire selected company scope, independently of the twenty-row 
 
 The source-coverage disclosure shows missing/failed/old checks and disabled watches, including when no update is awaiting review. A quiet inbox does not establish that nothing happened. Recorded companies remain labelled fictional. Withdrawn evidence cannot appear in previews or expanded derived interpretations.
 
+## Presentation follow-up — 9 October 2026
+
+Updates uses grouped company/status filters, compact whole-scope count badges and clearer company/type/date headings on the update cards. Company/private card disclosures own an explicit arrow beside **Inspect evidence**, which becomes **Hide evidence** when expanded. The shared disclosure pseudo-chevron is suppressed only on those card summaries, preventing a stray border line above the ticker; source coverage and nested disclosures keep their own arrows. The entire summary remains keyboard accessible, with a visible focus outline and reduced-motion support. The weekly-review banner retains its inner padding, including with the compact company rail.
+
+Opening evidence still does not acknowledge an alert. Exact source inspection, explicit review/unresolved actions, condition-history links, original recorded ordering, whole-scope counts, cutoff pagination, company/review filters, coverage warnings and withheld interpretations retain their existing behaviour. See the [UI correction and verification](../reviews/2026-10-09/updates-ui.md).
+
 ## Reuse and boundary
 
 This uses the existing owner-scoped periodic-review query, its whole-history counts, source-access checks and stable pagination. Existing company/private alert components are embedded without their separate headers and filters. No new backend, schema, prompt, model, source or dependency is introduced. No historical records are rewritten, and installation does not enable watches.

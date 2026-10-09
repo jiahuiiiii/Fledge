@@ -396,6 +396,31 @@ def test_failed_model_reading_never_publishes_or_retries(owner, fault):
     assert len(calls) == 1 and D.history(iid, aid)["current"] is None
 
 
+def test_response_limit_explains_charge_and_reuses_failure_without_retry(owner):
+    iid, aid = setup(owner)
+    calls = []
+    before = ledger.snapshot()
+
+    def capped(body):
+        calls.append(1)
+        return base_response() | dict(
+            model=body["model"],
+            status="incomplete",
+            incomplete_details={"reason": "max_output_tokens"},
+            output=[dict(type="reasoning")],
+        )
+
+    for _ in range(2):
+        with pytest.raises(ValueError, match="response limit.*still used budget"):
+            D.generate(iid, aid, transport=capped)
+    after = ledger.snapshot()
+    assert len(calls) == 1
+    assert after["calls"] == before["calls"] + 1
+    assert float(after["spent_usd"]) > float(before["spent_usd"])
+    assert after["unresolved"] == 0
+    assert D.history(iid, aid)["current"] is None
+
+
 def test_empty_reading_and_inert_export(owner):
     iid, aid = setup(owner)
     saved = D.generate(

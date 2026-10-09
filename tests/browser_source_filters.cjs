@@ -131,6 +131,9 @@ const themeReading = {
 };
 let browser;
 (async () => {
+  const { sourceHeadline } = await import(
+    "../frontend/src/lib/sourceHeadline.js"
+  );
   fs.mkdirSync(evidence, { recursive: true });
   browser = await chromium.launch({
     headless: true,
@@ -246,7 +249,8 @@ let browser;
     await panel.locator(".sentiment-items article h3").allTextContents(),
     actualSelected
       .filter((source) => actualIds.has(source.id))
-      .map((source) => source.title),
+      .map(sourceHeadline)
+      .filter(Boolean),
   );
   await filters.screenshot({
     path: path.join(evidence, "actual-icons-1440.png"),
@@ -287,10 +291,11 @@ let browser;
     assert.deepEqual(
       await panel.locator(".sentiment-items article h3").allTextContents(),
       scope === "all"
-        ? expected.map((source) => source.title)
+        ? expected.map(sourceHeadline).filter(Boolean)
         : fixtureSources
             .filter((source) => scopeOf(source) === scope)
-            .map((source) => source.title),
+            .map(sourceHeadline)
+            .filter(Boolean),
     );
   }
   await filters

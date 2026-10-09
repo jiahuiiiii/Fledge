@@ -75,6 +75,7 @@ def current(conn, iid, now=None):
         status=status,
         social_lookback_days=days,
         input_limits=packet.get("input_limits"),
+        selection=packet.get("selection"),
         as_of=now.isoformat(),
         saved_cutoff=visible["cutoff"] if visible else None,
         saved_reading_available=bool(baseline),

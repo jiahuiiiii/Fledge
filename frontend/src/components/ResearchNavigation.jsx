@@ -35,10 +35,10 @@ const sections = {
 
 export default function ResearchNavigation({ selected, onChange, recorded }) {
   const [vertical, setVertical] = useState(
-    () => window.matchMedia("(min-width: 1600px)").matches,
+    () => window.matchMedia("(min-width: 1100px)").matches,
   );
   useEffect(() => {
-    const media = window.matchMedia("(min-width: 1600px)");
+    const media = window.matchMedia("(min-width: 1100px)");
     const update = () => setVertical(media.matches);
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
@@ -48,9 +48,6 @@ export default function ResearchNavigation({ selected, onChange, recorded }) {
     : ["business", "fundamentals", "evidence", "expectations", "valuation"];
   return (
     <div className="research-navigation">
-      <span className="section-label research-navigation-label">
-        Explore company
-      </span>
       <div
         className="content-tabs"
         role="tablist"
@@ -114,7 +111,6 @@ export function ResearchSectionHeader({ selected }) {
   return (
     <header className="research-section-heading">
       <h2>{section.label}</h2>
-      <p>{section.description}</p>
     </header>
   );
 }

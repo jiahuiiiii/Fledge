@@ -38,7 +38,7 @@ The **What it owns and owes** section visualizes the saved balance-sheet values.
 
 ## Reported revenue breakdown
 
-The [revenue and expense flow](revenue-expense-flow.md) joins compatible statement totals and original categories in Overview and Financials. Its versioned calculation and period rules are separate from the category reader below.
+The [revenue and expense flow](revenue-expense-flow.md) joins compatible statement totals and original categories in Financials. The [financial reading](financial-reading.md) adds retained history and dated explanations. Its versioned calculation and period rules are separate from the category reader below.
 
 `sec-segment-revenue-1` reads retained original Inline XBRL, because the SEC companyfacts API covers whole-entity facts rather than these dimensional disclosures. **Where revenue comes from** in Fundamentals separates operating segments, products/services and reported geographies, with annual, fiscal-year-to-date and quarter periods. It makes no source or AI request and changes no stored filing, business brief, financial method, private research or watch rule. No schema migration is required.
 

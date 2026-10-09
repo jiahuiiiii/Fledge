@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import Select from "./Select";
+import EvidenceButton from "./EvidenceButton";
 import { day, amount } from "./FinancialOverview";
 import "./ManagementOutlook.css";
 
@@ -41,8 +42,11 @@ function Forecast({ forecast, release }) {
           " · currency unspecified"}
         {forecast.approximate && " · approximate"}
       </p>
-      <details>
-        <summary>Original guidance &amp; evidence</summary>
+      <EvidenceButton
+        title={`${forecast.label} · original guidance`}
+        label="Evidence"
+        className="guidance-evidence"
+      >
         <blockquote>{forecast.quote}</blockquote>
         {forecast.low != null && (
           <p>
@@ -55,10 +59,11 @@ function Forecast({ forecast, release }) {
           Passage {forecast.id} · SEC filing accepted{" "}
           {stamp(release.published_at)}.
         </p>
+        <p>First saved {stamp(release.available_at)}.</p>
         <a href={release.url} target="_blank" rel="noreferrer">
           Open original earnings release ↗
         </a>
-      </details>
+      </EvidenceButton>
       <div className="outlook-comparison">
         {compared.status === "compared" ? (
           <>
@@ -130,11 +135,9 @@ export default function ManagementOutlook({ data }) {
     <section className="management-outlook" aria-labelledby={id + "-title"}>
       <div className="outlook-heading">
         <div>
-          <span className="section-label">LOOKING AHEAD</span>
+          <span className="outlook-source-badge">Company guidance</span>
           <h2 id={id + "-title"}>Management outlook</h2>
-          <p>
-            The company’s own expectations, taken from its earnings release.
-          </p>
+          <p>What the company expects, from its original earnings release.</p>
         </div>
         {release && (
           <label htmlFor={id + "-release"}>
@@ -146,9 +149,8 @@ export default function ManagementOutlook({ data }) {
             >
               {releases.map((item) => (
                 <option key={item.id} value={item.id}>
-                  SEC accepted {day(item.published_at)} UTC ·{" "}
-                  {item.current ? "current source" : "history"} · saved{" "}
-                  {stamp(item.available_at)}
+                  SEC {day(item.published_at)} UTC ·{" "}
+                  {item.current ? "latest saved release" : "history"}
                 </option>
               ))}
             </Select>
@@ -156,25 +158,24 @@ export default function ManagementOutlook({ data }) {
         )}
       </div>
       {!release ? (
-        <p>
-          {data.status === "unavailable"
-            ? data.message
-            : "Collect original documents below to look for an earnings outlook."}
-        </p>
+        <div className="outlook-empty">
+          <h3>No saved company guidance</h3>
+          <p>
+            {data.status === "unavailable"
+              ? data.message
+              : "Use Refresh research in the company toolbar to collect original earnings releases."}
+          </p>
+        </div>
       ) : (
         <div className="outlook-reading" key={release.id}>
           {!release.current && (
-            <p className="financial-note">
+            <p className="outlook-data-note">
               Historical source version. This is not the current earnings
               release.
             </p>
           )}
-          <p className="outlook-meta">
-            First saved {stamp(release.available_at)}. SEC filing accepted{" "}
-            {stamp(release.published_at)}.
-          </p>
           {data.source_status?.last_error && (
-            <p className="financial-note">
+            <p className="outlook-data-note" role="status">
               Latest document check: {data.source_status.last_error}
             </p>
           )}
@@ -186,9 +187,16 @@ export default function ManagementOutlook({ data }) {
           )}
           {release.sections.map((section) => (
             <section className="outlook-period" key={section.id}>
-              <h3>{section.heading}</h3>
+              <div className="outlook-period-heading">
+                <h3>{section.heading}</h3>
+                <span className="outlook-status">
+                  {release.current
+                    ? "Latest saved guidance"
+                    : "Historical guidance"}
+                </span>
+              </div>
               {section.review_status && (
-                <p className="financial-note">
+                <p className="outlook-data-note">
                   This section refers to earlier or withdrawn guidance. Read the
                   context before treating a figure as a current expectation.
                 </p>
@@ -240,6 +248,20 @@ export default function ManagementOutlook({ data }) {
               </details>
             </section>
           ))}
+          <details className="outlook-source-details">
+            <summary>Release details</summary>
+            <p>
+              First saved {stamp(release.available_at)}. SEC filing accepted{" "}
+              {stamp(release.published_at)}.
+            </p>
+            <p>
+              The stated release date comes from the release’s own dateline. SEC
+              acceptance and the first saved time are separate dates.
+            </p>
+            <a href={release.url} target="_blank" rel="noreferrer">
+              Open original earnings release ↗
+            </a>
+          </details>
           <details className="outlook-limits">
             <summary>Coverage &amp; comparison rules</summary>
             {data.limitations.map((line) => (

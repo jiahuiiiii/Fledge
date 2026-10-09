@@ -17,16 +17,20 @@
 }
 .snapshot-card,
 .financial-chart-card {
-  background: linear-gradient(145deg, #21292c, #1b2023);
+  background: linear-gradient(
+    145deg,
+    var(--color-surface-2),
+    var(--color-surface)
+  );
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   padding: 20px;
   min-width: 0;
 }
 .snapshot-card > span {
   color: var(--muted);
   display: block;
-  font-size: 14px;
+  font-size: var(--text-base);
 }
 .snapshot-card > strong {
   display: block;
@@ -37,16 +41,16 @@
 .snapshot-card > small {
   color: var(--muted);
   display: block;
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.6;
 }
 .overview-evidence {
   margin-top: 14px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
 .overview-evidence summary {
-  color: #b0c7bd;
+  color: var(--color-text-2);
   cursor: pointer;
   padding: 8px 0;
   min-height: 36px;
@@ -61,12 +65,12 @@
   gap: 20px;
 }
 .financial-chart-card h3 {
-  font-size: 20px;
+  font-size: var(--text-lg);
   line-height: 1.4;
   margin: 10px 0;
 }
 .financial-chart-card > p {
-  font-size: 14px;
+  font-size: var(--text-base);
   color: var(--muted);
   line-height: 1.65;
 }
@@ -81,7 +85,7 @@
   justify-content: space-between;
   flex: 0 0 56px;
   padding: 36px 0 34px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 .revenue-columns {
@@ -100,7 +104,7 @@
   padding: 4px;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   color: var(--text);
   transition:
@@ -109,17 +113,21 @@
 }
 .revenue-column:hover,
 .revenue-column[aria-pressed="true"] {
-  background: #a5cfad0c;
-  border-color: #a5cfad55;
+  background: color-mix(in srgb, var(--color-positive-light) 5%, transparent);
+  border-color: color-mix(
+    in srgb,
+    var(--color-positive-light) 33%,
+    transparent
+  );
 }
 .revenue-column:focus-visible {
-  outline: 2px solid #b7dab8;
+  outline: 2px solid var(--color-positive-light);
   outline-offset: 2px;
 }
 .revenue-value,
 .revenue-year {
   text-align: center;
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.4;
 }
 .revenue-value {
@@ -137,19 +145,19 @@
   position: absolute;
   left: -7px;
   right: -7px;
-  border-top: 1px solid #75878066;
+  border-top: 1px solid color-mix(in srgb, var(--color-faint) 40%, transparent);
 }
 .revenue-bar {
   position: absolute;
   display: block;
   left: 15%;
   width: 70%;
-  background: #8db49c;
+  background: var(--color-positive-light);
   border-radius: 4px 4px 0 0;
   transition: background 200ms;
 }
 .revenue-column[aria-pressed="true"] .revenue-bar {
-  background: #c1dfc1;
+  background: var(--color-positive-light);
 }
 .revenue-missing {
   position: absolute;
@@ -170,15 +178,15 @@
   gap: 6px;
 }
 .revenue-reading strong {
-  font-size: 24px;
+  font-size: var(--text-xl);
   font-weight: 600;
 }
 .revenue-reading p span {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 .financial-chart-card .overview-footnote {
-  font-size: 12px;
+  font-size: var(--text-xs);
   margin: 20px 0 0;
 }
 .cash-comparison {
@@ -191,7 +199,7 @@
   justify-content: space-between;
   gap: 12px;
   align-items: baseline;
-  font-size: 14px;
+  font-size: var(--text-base);
 }
 .cash-measure strong {
   white-space: nowrap;
@@ -202,29 +210,29 @@
   position: relative;
   background: #ffffff07;
   height: 20px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 .cash-zero {
   position: absolute;
   top: -3px;
   bottom: -3px;
   width: 1px;
-  background: #9eaaa8;
+  background: var(--color-muted);
 }
 .cash-bar {
   position: absolute;
   top: 0;
   height: 100%;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 .cash-bar-0 {
-  background: #a6c9b2;
+  background: var(--color-positive-light);
 }
 .cash-bar-1 {
-  background: #a8a1bc;
+  background: var(--color-info-light);
 }
 .cash-bar-2 {
-  background: #83b6c2;
+  background: var(--color-info-light);
 }
 .cash-measure .overview-evidence {
   margin-top: 3px;

@@ -6,7 +6,7 @@ Since 9 October 2026, **All** is the default source filter in both saved-reading
 
 Since phase77, a manual 1/7/30-day discussion window is recorded with the saved reading and used by its current-source preview; news and automatic watches stay at seven days. Opening a company now separately starts its idempotent source-loading job. Opening the source-preview disclosure itself remains read-only.
 
-The preview is assembled from permitted locally stored sources, not a live supplier search. It uses the same eight-news/eight-social selection and byte limits as sentiment, with the same publication/availability cutoff and seven-day window. Provider/source failures remain visible in source coverage. Each selected text shows its original title/body, publisher, publication date, first local availability and source inspection action. Social authors and model labels are not added. A selected company-feed item can be irrelevant; selection does not establish target-company relevance or sentiment.
+The preview is assembled from permitted locally stored sources, not a live supplier search. Since 9 October it exposes every eligible candidate for full-corpus sentiment batching, with the same publication/availability cutoff, seven-day news window and saved 1/7/30-day discussion window. Exact duplicates, incomplete passages and unavailable required reply context are counted separately; relevance has not been assessed in this raw view. Provider/source failures remain visible in source coverage. Each selected text shows its original title/body, publisher, publication date, first local availability and source inspection action. Social authors and model labels are not added. A selected company-feed item can be irrelevant; selection does not establish target-company relevance or sentiment.
 
 ## What the comparison means
 
@@ -23,3 +23,10 @@ If a consumed source makes the earlier reading unavailable, its comparison count
 Tests cover first reads, exact membership/version differences, independent parent/comparison changes, expired windows, incomplete passages, complete-packet withdrawal, future availability, selection limits and unchanged saved labels. The browser checks exact displayed texts, source inspection, first-reading/empty-platform states and responsive layouts. Actual-case retrieval and results are recorded separately in the [phase review](../reviews/2026-10-03/current-sources-phase-review.md).
 
 This closes a visibility gap between collection and analysis. It does not classify the new texts or resolve the pending actual-model quality evaluation, wider source coverage or participant validation.
+
+The 9 October NVIDIA correction adds **Excluded before analysis** to the preview,
+showing platform counts for exact duplicates, missing complete passages, missing
+complete comment bodies and unavailable required reply context. Generic comment
+titles and parents do not replace the comment's own wording. These records receive
+no sentiment label; their original saved sources remain in Data & sources. See
+[the diagnosed failure and separate paid-run blockers](../reviews/2026-10-09/sentiment-own-wording.md).

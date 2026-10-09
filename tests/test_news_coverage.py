@@ -147,6 +147,20 @@ def test_conflicting_framing_is_mixed_not_two_votes_and_never_repeat_suppressed(
     assert coverage.keys(a, pair()[1]) == {"content:item_2"}
 
 
+@pytest.mark.parametrize('relevance', ['unrelated', 'unclear'])
+@pytest.mark.parametrize('which', [0, 1])
+def test_matching_reports_with_unusable_company_relevance_stay_unlinked(relevance, which):
+    sources = pair()
+    items = [dict(source_id=s['id'], relevance='relevant', statement='reported_development')
+             for s in sources]
+    items[which]['relevance'] = relevance
+    packet = dict(sources=sources)
+    # Exact matching event/citations cannot override either company's relevance.
+    with pytest.raises(ValueError, match='coverage group'):
+        coverage.render([coverage.Link(**relation())], packet, items)
+    assert coverage.render([], packet, items) == []
+
+
 @pytest.mark.parametrize(
     "body",
     [
@@ -254,17 +268,21 @@ def test_comparison_pool_is_bounded_cached_and_not_classified(owner):
     )
     with transaction() as c:
         packet = sentiment.prepare(c, iid)
-    assert len(packet["sources"]) == 8 and len(packet["comparison_sources"]) == 16
-    wire = json.loads(sentiment.request_for(packet)["input"][1]["content"])
-    assert len(wire["sources"]) == 8 and len(wire["comparison_sources"]) == 16
+    assert len(packet["sources"]) == 26 and not packet["comparison_sources"]
+    from thesis.research.sentiment_batching import plan, MAX_COMPARISONS
+    parts = plan(packet)
+    assert sum(len(p['sources']) for p in parts) == 26
+    for part in parts:
+        wire = json.loads(sentiment.request_for(part)["input"][1]["content"])
+        assert len(wire['sources']) <= 8 and len(wire['comparison_sources']) <= MAX_COMPARISONS
     first = sentiment.generate(iid, transport=provider())
     repeat = sentiment.generate(
         iid, transport=lambda _: pytest.fail("cached request dispatched")
     )
     assert (
         first["id"] == repeat["id"]
-        and len(first["items"]) == 8
-        and len(first["sources"]) == 24
+        and len(first["items"]) == 26
+        and len(first["sources"]) == 26
     )
 
 

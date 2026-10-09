@@ -1,0 +1,278 @@
+/* Overview summary: one sentence answer, recent activity and one card per
+   research section. Values come from styles/tokens.css. */
+.glance {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+.research-content .glance > h3 {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+.research-content .glance-summary {
+  margin: 0;
+  max-width: 72ch;
+  font-size: var(--text-md);
+  line-height: 1.6;
+  color: var(--color-text-2);
+}
+.research-content .glance-summary.muted {
+  color: var(--color-muted);
+  font-size: var(--text-base);
+}
+
+.glance-activity {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl);
+  padding: var(--space-3) var(--space-5);
+}
+.research-content .glance-activity h4 {
+  margin: var(--space-2) 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-muted);
+}
+.glance-activity ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.glance-activity li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  border-top: 1px solid var(--color-line);
+  font-size: var(--text-base);
+  color: var(--color-text);
+}
+.glance-activity li > span[aria-hidden] {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  background: var(--color-surface-2);
+}
+.glance-activity li.down > span[aria-hidden] {
+  color: var(--color-caution);
+  background: var(--color-caution-soft);
+}
+.glance-activity li.up > span[aria-hidden] {
+  color: var(--color-positive);
+  background: var(--color-positive-soft);
+}
+.glance-activity li.alert > span[aria-hidden] {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+.glance-activity li.watch > span[aria-hidden] {
+  color: var(--color-info);
+  background: var(--color-info-soft);
+}
+.glance-link {
+  margin-left: auto;
+  background: none;
+  border: 0;
+  padding: var(--space-2);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+.glance-link:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
+}
+
+.glance-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+.glance-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+  min-width: 0;
+}
+.research-content .glance-card h4 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--color-text);
+}
+.glance-number {
+  color: var(--color-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.glance-checks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.glance-score {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-muted);
+}
+.glance-checks ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.glance-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.4;
+}
+.glance-check.pass {
+  background: var(--color-positive-soft);
+  color: var(--color-positive-light);
+}
+.glance-check.fail {
+  background: var(--color-caution-soft);
+  color: var(--color-caution-light);
+}
+.glance-check.unknown {
+  background: var(--color-surface-2);
+  color: var(--color-muted);
+}
+
+.glance-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-5);
+}
+.glance-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: var(--space-3);
+  box-shadow: inset 3px 0 0 var(--color-line-strong);
+  min-width: 0;
+}
+.glance-figure.info {
+  box-shadow: inset 3px 0 0 var(--color-info);
+}
+.glance-figure.positive {
+  box-shadow: inset 3px 0 0 var(--color-positive);
+}
+.glance-figure.caution {
+  box-shadow: inset 3px 0 0 var(--color-caution);
+}
+.glance-figure strong {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.glance-figure strong.missing {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-muted);
+}
+.glance-figure span {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+
+.glance-tone-bar {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.glance-tone-bar .positive {
+  background: var(--color-positive);
+}
+.glance-tone-bar .neutral {
+  background: var(--color-line-strong);
+}
+.glance-tone-bar .negative {
+  background: var(--color-caution);
+}
+.research-content .glance-tone p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+.glance-tone p .positive strong {
+  color: var(--color-positive);
+}
+.glance-tone p .negative strong {
+  color: var(--color-caution);
+}
+
+.research-content .glance-note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+.glance-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+.glance-open {
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-accent);
+  font-weight: 600;
+}
+.glance-open:hover:not(:disabled) {
+  background: var(--color-surface-2);
+}
+.glance-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.glance-figures {
+  gap: var(--space-4) var(--space-6);
+}
+.glance-tone {
+  max-width: 520px;
+}
+
+@media (max-width: 600px) {
+  .glance-card {
+    padding: var(--space-4);
+  }
+  .glance-activity {
+    padding: var(--space-2) var(--space-4);
+  }
+  .research-content .glance-summary {
+    font-size: var(--text-base);
+  }
+}

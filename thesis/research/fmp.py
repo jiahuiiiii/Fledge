@@ -173,10 +173,14 @@ def save_peers(owner,iid,selections):
         target=company(conn,iid);suggested=present(conn,'peers',target['symbol'])['data']
         symbols={r['symbol'] for r in suggested['candidates']} if suggested else set()
         symbols.update(r['symbol'] for r in rows(conn,'SELECT symbol FROM instruments WHERE id<>%s',(iid,)))
-        if len(selections)>3 or len({r['symbol'] for r in selections})!=len(selections):raise ValueError('Choose up to three different comparison companies.')
+        directory=one(conn,'SELECT listings FROM company_directory WHERE singleton')
+        listings={r['symbol']:r for r in (directory['listings'] or [])}
+        symbols.update(s for s in listings if s.isalpha() and s.isupper() and len(s)<=5)
+        if len(selections)>8 or len({r['symbol'] for r in selections})!=len(selections):raise ValueError('Choose up to eight different comparison companies.')
         for item in selections:
             if item['symbol'] not in symbols or item['symbol']==target['symbol']:raise ValueError('Choose a saved suggestion or a registered comparison company.')
             profile=present(conn,'profile',item['symbol'])['data']
+            if item['symbol'] in listings and listings[item['symbol']]['cik']==target['cik']:raise ValueError('Another share class of the same issuer is not an independent peer.')
             if profile and profile['cik']==str(target['cik']):raise ValueError('Another share class of the same issuer is not an independent peer.')
         conn.execute('DELETE FROM peer_selections WHERE owner_id=%s AND instrument_id=%s',(owner,iid))
         for item in selections:conn.execute('INSERT INTO peer_selections(owner_id,instrument_id,symbol,rationale) VALUES(%s,%s,%s,%s)',(owner,iid,item['symbol'],item['rationale']))

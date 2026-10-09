@@ -1,0 +1,108 @@
+.app-shell .sentiment-panel .sentiment-items > .source-story {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-block: var(--space-5);
+}
+.app-shell
+  .sentiment-panel
+  .sentiment-items
+  .source-story
+  .sentiment-source-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+.app-shell .sentiment-panel .sentiment-items .source-story .source-icon {
+  width: 16px;
+  height: 16px;
+}
+.app-shell .sentiment-panel .sentiment-items > .source-story > h3 {
+  max-width: 75ch;
+  font-size: var(--text-md);
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.app-shell .sentiment-panel .sentiment-items .source-story .story-source-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  max-width: 85ch;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+  font-size: var(--text-base);
+  line-height: 1.7;
+  font-weight: 400;
+  color: var(--color-text-2);
+}
+.app-shell .sentiment-panel .sentiment-items .source-story .discussion-text {
+  color: var(--color-text);
+}
+.app-shell .sentiment-panel .sentiment-items .source-story .story-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+.app-shell .sentiment-panel .sentiment-items .source-story .story-labels {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--color-muted);
+}
+.app-shell .sentiment-panel .sentiment-items .source-story .sentiment-tag {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  font-size: var(--text-xs);
+}
+.app-shell .sentiment-panel .sentiment-items .source-story .story-statement {
+  text-transform: capitalize;
+}
+.app-shell .sentiment-panel .sentiment-items .source-story .evidence-button {
+  min-height: 44px;
+  color: var(--color-positive-light);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+.app-shell .sentiment-panel .original-sample article h3 {
+  font-size: var(--text-md);
+  line-height: 1.5;
+  font-weight: 600;
+}
+.app-shell .story-full-text {
+  padding: var(--space-4);
+  background: var(--color-surface-2);
+  border-radius: var(--radius-md);
+}
+.app-shell .story-full-text p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .app-shell
+    .sentiment-panel
+    .sentiment-items
+    .source-story
+    .sentiment-source-meta {
+    align-items: start;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  .app-shell .sentiment-panel .sentiment-items > .source-story > h3 {
+    font-size: var(--text-base);
+  }
+  .app-shell .sentiment-panel .sentiment-items .source-story .story-footer {
+    align-items: start;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+}

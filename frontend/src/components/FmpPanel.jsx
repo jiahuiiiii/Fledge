@@ -1,7 +1,8 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import Select from "./Select";
-import PublicForecasts from "./PublicForecasts";
+import AnalystForecasts from "./AnalystForecasts";
+const SectorPosition = lazy(() => import("./SectorPosition"));
 const PeerComparison = lazy(() => import("./PeerComparison"));
 const stamp = (value) =>
   value ? new Date(value).toLocaleString("en-GB") : "Not collected";
@@ -118,6 +119,22 @@ export default function FmpPanel({ instrumentId, visible, mode = "peers" }) {
     (item, i, all) =>
       all.findIndex((other) => other.symbol === item.symbol) === i,
   );
+  if (mode === "outlook")
+    return (
+      <>
+        <SectorPosition instrumentId={instrumentId} visible={visible} />
+        <details className="outlook-company-detail">
+          <summary>Analyst forecast values and data sources</summary>
+          <AnalystForecasts
+            data={data}
+            busy={busy}
+            error={error}
+            onCheck={() => act()}
+            onCheckPublic={checkPublic}
+          />
+        </details>
+      </>
+    );
   return (
     <section
       className="fmp-panel"
@@ -129,96 +146,20 @@ export default function FmpPanel({ instrumentId, visible, mode = "peers" }) {
           {busy ? "Checking…" : "Check FMP data"}
         </button>
       </div>
-      <p>
-        Data access depends on your FMP subscription. Checking data makes no AI
-        request.
-      </p>
       {error && <p role="alert">{error}</p>}
-      {data?.profile?.data && (
+      <details className="secondary-details source-details">
+        <summary>Data source details</summary>
         <p>
-          FMP classification: {data.profile.data.sector} ·{" "}
-          {data.profile.data.industry}. {data.profile.data.limitation}
+          Data access depends on your FMP subscription. Checking data makes no
+          AI request.
         </p>
-      )}
-      {mode === "outlook" && (
-        <>
-          <section className="business-topic">
-            <h3>FMP financial expectations</h3>
-            <SourceState source={data?.consensus} />
-            {!data?.consensus?.data &&
-              !data?.public_forecasts?.snapshot &&
-              data?.symbol && (
-                <p className="financial-note">
-                  <a
-                    href={`https://stockanalysis.com/stocks/${encodeURIComponent(data.symbol.toLowerCase())}/forecast/`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Inspect public financial forecasts on Stock Analysis ↗
-                  </a>{" "}
-                  This opens the source separately. Some years require
-                  membership; its EPS forecasts use adjusted earnings. Use the
-                  public forecast check below to save the available annual
-                  table.
-                </p>
-              )}
-            {data?.consensus?.data?.forecasts?.map((forecast) => (
-              <section key={forecast.period_end}>
-                <h4>Annual period ending {forecast.period_end}</h4>
-                <p>
-                  Currency: {forecast.currency || "not supplied by provider"}
-                </p>
-                {forecast.metrics.map((metric) => (
-                  <p key={metric.key}>
-                    {metric.key === "eps" ? "Earnings per share" : "Revenue"}:
-                    average {figure(metric.average)} · low {figure(metric.low)}{" "}
-                    · high {figure(metric.high)} ·{" "}
-                    {metric.analysts == null
-                      ? "analyst count unavailable"
-                      : `${metric.analysts} analysts`}
-                  </p>
-                ))}
-              </section>
-            ))}
-            <p className="financial-note">
-              {data?.consensus?.data?.limitation ||
-                "Consensus is separate from management guidance and price targets. Missing forecasts remain unknown."}
-            </p>
-            {data?.consensus_history?.length > 0 && (
-              <details>
-                <summary>Saved forecast vintages</summary>
-                {data.consensus_history.map((vintage) => (
-                  <section key={vintage.id}>
-                    <p>First observed {stamp(vintage.available_at)}</p>
-                    {vintage.data.forecasts.map((forecast) => (
-                      <p key={forecast.period_end}>
-                        Period ending {forecast.period_end} · revenue average{" "}
-                        {figure(
-                          forecast.metrics.find(
-                            (metric) => metric.key === "revenue",
-                          )?.average,
-                        )}{" "}
-                        · EPS average{" "}
-                        {figure(
-                          forecast.metrics.find(
-                            (metric) => metric.key === "eps",
-                          )?.average,
-                        )}{" "}
-                        · currency {forecast.currency || "unspecified"}
-                      </p>
-                    ))}
-                  </section>
-                ))}
-              </details>
-            )}
-          </section>
-          <PublicForecasts
-            source={data?.public_forecasts}
-            busy={busy}
-            onRefresh={checkPublic}
-          />
-        </>
-      )}
+        {data?.profile?.data && (
+          <p>
+            FMP classification: {data.profile.data.sector} ·{" "}
+            {data.profile.data.industry}. {data.profile.data.limitation}
+          </p>
+        )}
+      </details>
       {mode === "peers" && (
         <>
           <section className="business-topic">
@@ -284,7 +225,7 @@ export default function FmpPanel({ instrumentId, visible, mode = "peers" }) {
             ))}
             <div className="peer-actions">
               <button
-                disabled={busy || selections.length >= 3 || !candidates.length}
+                disabled={busy || selections.length >= 8 || !candidates.length}
                 onClick={() =>
                   editSelections((old) => [
                     ...old,
@@ -326,7 +267,7 @@ export default function FmpPanel({ instrumentId, visible, mode = "peers" }) {
               </p>
             )}
             <p>
-              Choose two or three useful peers and explain the overlap. Saving
+              Choose up to eight useful peers and explain the overlap. Saving
               does not collect data; use Check FMP data afterwards.
             </p>
           </section>
@@ -335,77 +276,89 @@ export default function FmpPanel({ instrumentId, visible, mode = "peers" }) {
               <PeerComparison members={data.members} symbol={data.symbol} />
             </Suspense>
           )}
-          <div className="peer-comparisons">
-            {data?.members?.map((member) => (
-              <section key={member.symbol} className="peer-card">
-                <h3>
-                  {member.symbol}
-                  {member.symbol === data.symbol ? " · selected company" : ""}
-                </h3>
-                {member.rationale && <p>{member.rationale}</p>}
-                <SourceState source={member.profile} />
-                {member.profile.data && (
-                  <p>
-                    {member.profile.data.name} ·{" "}
-                    {member.profile.data.currency || "currency unavailable"} ·{" "}
-                    {member.profile.data.industry}
-                  </p>
-                )}
-                <SourceState source={member.ratios} />
-                {member.ratios.data?.metrics?.map((metric) => (
-                  <p key={metric.key}>
-                    {metric.label}: {figure(metric.value)}
-                    {metric.reason && ` · ${metric.reason}`}
-                  </p>
-                ))}
-                {member.ratios.data && (
-                  <p className="financial-note">{member.ratios.data.basis}</p>
-                )}
-                {member.saved_finnhub && (
-                  <details>
-                    <summary>Saved Finnhub trailing references</summary>
-                    <p>
-                      Retrieved {stamp(member.saved_finnhub.retrieved_at)}.
-                      These use Finnhub’s own definitions; compare within this
-                      section rather than mixing vendors.
-                    </p>
-                    <p>
-                      P/E (TTM):{" "}
-                      {figure(member.saved_finnhub.metrics.earnings.value)}
-                    </p>
-                    <p>
-                      P/S (TTM):{" "}
-                      {figure(member.saved_finnhub.metrics.sales.value)}
-                    </p>
-                  </details>
-                )}
-                {member.financials?.status === "available" && (
-                  <details>
-                    <summary>Saved SEC financial measures</summary>
-                    <p>
-                      Period ended {member.financials.period_end}. Fiscal
-                      periods can differ between companies.
-                    </p>
-                    {member.financials.trailing
-                      .filter((metric) =>
-                        [
-                          "revenue",
-                          "operating_margin",
-                          "free_cash_flow",
-                        ].includes(metric.key),
-                      )
-                      .map((metric) => (
-                        <p key={metric.key}>
-                          {metric.label}: {figure(metric.value)} {metric.unit}.{" "}
-                          {metric.reason}
+          {!!data?.members?.length && (
+            <details className="peer-sources">
+              <summary>
+                Data behind the comparison · {data.members.length}{" "}
+                {data.members.length === 1 ? "company" : "companies"}
+              </summary>
+              <div className="peer-comparisons">
+                {data?.members?.map((member) => (
+                  <section key={member.symbol} className="peer-card">
+                    <h3>
+                      {member.symbol}
+                      {member.symbol === data.symbol
+                        ? " · selected company"
+                        : ""}
+                    </h3>
+                    {member.rationale && <p>{member.rationale}</p>}
+                    <SourceState source={member.profile} />
+                    {member.profile.data && (
+                      <p>
+                        {member.profile.data.name} ·{" "}
+                        {member.profile.data.currency || "currency unavailable"}{" "}
+                        · {member.profile.data.industry}
+                      </p>
+                    )}
+                    <SourceState source={member.ratios} />
+                    {member.ratios.data?.metrics?.map((metric) => (
+                      <p key={metric.key}>
+                        {metric.label}: {figure(metric.value)}
+                        {metric.reason && ` · ${metric.reason}`}
+                      </p>
+                    ))}
+                    {member.ratios.data && (
+                      <p className="financial-note">
+                        {member.ratios.data.basis}
+                      </p>
+                    )}
+                    {member.saved_finnhub && (
+                      <details>
+                        <summary>Saved Finnhub trailing references</summary>
+                        <p>
+                          Retrieved {stamp(member.saved_finnhub.retrieved_at)}.
+                          These use Finnhub’s own definitions; compare within
+                          this section rather than mixing vendors.
                         </p>
-                      ))}
-                  </details>
-                )}
-              </section>
-            ))}
-          </div>
-          {data && <p className="financial-note">{data.limitation}</p>}
+                        <p>
+                          P/E (TTM):{" "}
+                          {figure(member.saved_finnhub.metrics.earnings.value)}
+                        </p>
+                        <p>
+                          P/S (TTM):{" "}
+                          {figure(member.saved_finnhub.metrics.sales.value)}
+                        </p>
+                      </details>
+                    )}
+                    {member.financials?.status === "available" && (
+                      <details>
+                        <summary>Saved SEC financial measures</summary>
+                        <p>
+                          Period ended {member.financials.period_end}. Fiscal
+                          periods can differ between companies.
+                        </p>
+                        {member.financials.trailing
+                          .filter((metric) =>
+                            [
+                              "revenue",
+                              "operating_margin",
+                              "free_cash_flow",
+                            ].includes(metric.key),
+                          )
+                          .map((metric) => (
+                            <p key={metric.key}>
+                              {metric.label}: {figure(metric.value)}{" "}
+                              {metric.unit}. {metric.reason}
+                            </p>
+                          ))}
+                      </details>
+                    )}
+                  </section>
+                ))}
+              </div>
+              {data && <p className="financial-note">{data.limitation}</p>}
+            </details>
+          )}
         </>
       )}
     </section>

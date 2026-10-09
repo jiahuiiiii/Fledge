@@ -170,7 +170,7 @@ def test_candidate_count_survives_ineligible_fragments(owner):
             S.prepare(c, iid)
 
 
-def test_selection_limits_comparison_only_and_changed_comparison_pool(owner):
+def test_all_candidates_are_eligible_and_older_new_report_enters_analysis(owner):
     iid = add_company("MSFT")["instrument_id"]
     now = datetime.now(timezone.utc)
     reports = [
@@ -186,7 +186,7 @@ def test_selection_limits_comparison_only_and_changed_comparison_pool(owner):
     commit(iid, reports)
     S.generate(iid, transport=provider())
     data = preview(iid)
-    assert len(data["sources"]) == 8 and data["comparison_news"] == 12
+    assert len(data["sources"]) == 20 and data["comparison_news"] == 0
     assert data["scopes"]["news"]["available"] == 20
     commit(
         iid,
@@ -201,9 +201,9 @@ def test_selection_limits_comparison_only_and_changed_comparison_pool(owner):
         ],
     )
     changed = preview(iid)
-    assert changed["status"] == "changed" and changed["comparison_sources_changed"]
-    assert changed["scopes"]["news"]["added"] == 0
-    assert "only in the comparison pool" not in str(changed["sources"])
+    assert changed["status"] == "changed" and not changed["comparison_sources_changed"]
+    assert changed["scopes"]["news"]["added"] == 1
+    assert "only in the comparison pool" in str(changed["sources"])
 
 
 def test_future_available_source_cannot_enter_earlier_selection(owner):

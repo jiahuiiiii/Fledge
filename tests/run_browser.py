@@ -9,10 +9,14 @@ import urllib.request
 from pathlib import Path
 
 journeys = {
+    "--company-overview",
     "--business",
+    "--financials",
+    "--sector-position",
     "--watch-continuity",
     "--research-design",
     "--source-filters",
+    "--news-discussion",
     "--sentiment-limits",
     "--age",
     "--answer-evidence",
@@ -28,6 +32,7 @@ journeys = {
     "--expectations",
     "--filing-watch",
     "--idea",
+    "--ideas",
     "--idea-alert",
     "--inbox",
     "--market",
@@ -80,7 +85,9 @@ try:
             time.sleep(0.2)
     else:
         raise RuntimeError("Browser test server did not start")
-    if "--business" in sys.argv:
+    if "--financials" in sys.argv:
+        subprocess.run([sys.executable, "tests/seed_financials_browser.py"], cwd=root, env=env, check=True)
+    elif "--business" in sys.argv or "--sector-position" in sys.argv or "--company-overview" in sys.argv:
         subprocess.run([sys.executable, "tests/seed_business_browser.py"], cwd=root, env=env, check=True)
     elif "--watch-continuity" in sys.argv:
         subprocess.run([sys.executable, "tests/seed_retained_watch_browser.py"], cwd=root, env=env, check=True)
@@ -114,7 +121,7 @@ try:
             env=env,
             check=True,
         )
-    elif any(flag in sys.argv for flag in ("--sentiment-inputs", "--research-design", "--source-filters")):
+    elif any(flag in sys.argv for flag in ("--sentiment-inputs", "--research-design", "--source-filters", "--news-discussion")):
         subprocess.run(
             [sys.executable, "tests/seed_sentiment_inputs_browser.py"],
             cwd=root,
@@ -159,6 +166,13 @@ try:
     elif "--expectations" in sys.argv:
         subprocess.run(
             [sys.executable, "tests/seed_expectation_browser.py"],
+            cwd=root,
+            env=env,
+            check=True,
+        )
+    elif "--ideas" in sys.argv:
+        subprocess.run(
+            [sys.executable, "tests/seed_ideas_browser.py"],
             cwd=root,
             env=env,
             check=True,
@@ -284,7 +298,7 @@ try:
     result = subprocess.run(
         [
             os.environ.get("THESIS_NODE", "node"),
-            "tests/browser_business.cjs" if "--business" in sys.argv else "tests/browser_research_design.cjs" if "--research-design" in sys.argv else "tests/browser_source_filters.cjs" if "--source-filters" in sys.argv else "tests/browser_retained_watch.cjs" if "--watch-continuity" in sys.argv else "tests/browser_sentiment_limits.cjs" if "--sentiment-limits" in sys.argv else "tests/browser_report_expectations.cjs" if "--report-expectations" in sys.argv else (
+            "tests/browser_company_overview.cjs" if "--company-overview" in sys.argv else "tests/browser_news_discussion.cjs" if "--news-discussion" in sys.argv else "tests/browser_ideas.cjs" if "--ideas" in sys.argv else "tests/browser_sector_position.cjs" if "--sector-position" in sys.argv else "tests/browser_financials.cjs" if "--financials" in sys.argv else "tests/browser_business.cjs" if "--business" in sys.argv else "tests/browser_research_design.cjs" if "--research-design" in sys.argv else "tests/browser_source_filters.cjs" if "--source-filters" in sys.argv else "tests/browser_retained_watch.cjs" if "--watch-continuity" in sys.argv else "tests/browser_sentiment_limits.cjs" if "--sentiment-limits" in sys.argv else "tests/browser_report_expectations.cjs" if "--report-expectations" in sys.argv else (
                 (
                     "tests/browser_recurring_events.cjs"
                     if "--recurring-events" in sys.argv

@@ -3,17 +3,22 @@ import { api } from "../api/client";
 import { modelAvailability } from "../lib/modelAvailability";
 import Modal from "./Modal";
 import Select from "./Select";
-import EvidenceButton from "./EvidenceButton";
 
 const titles = {
-  business: "What the company does",
+  business: "What it does",
   revenue_model: "How it makes money",
-  customers: "Who pays it",
-  drivers: "What drives performance",
-  competition: "Where it competes",
-  financial_position: "Borrowing and obligations",
-  risks: "Risks to investigate",
+  customers: "Who its customers are",
+  drivers: "What drives results",
+  competition: "Who it competes with",
+  financial_position: "Cash and obligations",
+  risks: "Key risks",
 };
+const day = (value) =>
+  new Date(value).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 const stamp = (value) => new Date(value).toLocaleString("en-GB");
 const sourceStamp = (value) =>
   new Date(value).toLocaleString("en-GB", {
@@ -105,14 +110,25 @@ export default function BusinessPanel({
     (item, i, all) =>
       item && all.findIndex((other) => other?.id === item.id) === i,
   );
+  const forms = [
+    ...new Set((selected?.sources || []).map((s) => s.form).filter(Boolean)),
+  ];
+  const brief = selected?.result && !selected.withheld ? selected : null;
   return (
     <section className="business-panel" aria-label="Understand the business">
-      <div className="financial-heading">
+      <div className="brief-head">
         <div>
-          <span className="section-label">START WITH THE COMPANY</span>
           <h2>Understand the business</h2>
+          {brief && (
+            <p className="brief-meta">
+              AI summary of the company’s own filings
+              {forms.length ? ` (${forms.join(", ")})` : ""} · saved{" "}
+              {day(brief.created_at)}
+            </p>
+          )}
         </div>
         <button
+          title="Creating a brief is a paid AI action; reading a saved brief uses no AI credits."
           disabled={
             busy ||
             availability.blocked ||
@@ -120,140 +136,113 @@ export default function BusinessPanel({
           }
           onClick={() => action()}
         >
-          {busy ? "Working…" : "Create business brief"}
+          {busy ? "Working…" : brief ? "Update brief" : "Create business brief"}
         </button>
       </div>
-      <p>
-        A short explanation based on saved original filings. Creating a brief is
-        a paid AI action; reading a saved brief uses no AI credits.
-      </p>
-      {availability.blocked && (
+      {!brief && (
+        <p className="brief-meta">
+          A short explanation built from saved original filings. Creating a
+          brief is a paid AI action; reading a saved brief uses no AI credits.
+        </p>
+      )}
+      {availability.blocked && !brief && (
         <p className="financial-note">{availability.message}</p>
       )}
       {error && <p role="alert">{error}</p>}
-      <EvidenceButton label="Saved briefs" title="Saved business briefs">
-        {readings.length > 0 && (
-          <label>
-            Saved business briefs
-            <Select
-              aria-label="Saved business briefs"
-              value={selected?.id || ""}
-              onChange={(event) => {
-                setEvidence(null);
-                setSelected(
-                  readings.find((item) => item.id === event.target.value),
-                );
-              }}
-            >
-              {readings.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {stamp(item.created_at)}
-                </option>
-              ))}
-            </Select>
-          </label>
-        )}
-        {history?.next_cursor && (
-          <button disabled={busy} onClick={() => action(true)}>
-            Load older briefs
-          </button>
-        )}
-      </EvidenceButton>
       {history?.sample_changed && (
         <p className="financial-note">
-          The latest saved brief uses a different source selection. Create a
+          The latest saved brief uses a different source selection. Update the
           brief to read the current saved documents.
         </p>
       )}
       {selected?.withheld ? (
         <p>Source access changed. This saved explanation is withheld.</p>
-      ) : selected?.result ? (
+      ) : brief ? (
         <>
-          <p className="financial-coverage">
-            Saved {stamp(selected.created_at)} · source cutoff{" "}
-            {stamp(selected.cutoff)}
-          </p>
-          {Object.entries(titles).map(([category, title]) => (
-            <details
-              className="business-topic business-overview-topic"
-              key={category}
-              open={["business", "revenue_model", "risks"].includes(category)}
+          <div className="brief-grid">
+            {Object.entries(titles).map(([category, title]) => (
+              <BriefTopic
+                key={category}
+                title={title}
+                findings={brief.result.findings.filter(
+                  (finding) => finding.category === category,
+                )}
+                onEvidence={setEvidence}
+              />
+            ))}
+          </div>
+          {brief.result.questions.length > 0 && (
+            <section
+              className="brief-questions"
+              aria-label="Questions to research next"
             >
-              <summary>{title}</summary>
-              {selected.result.findings
-                .filter((finding) => finding.category === category)
-                .map((finding, i) => (
-                  <div key={i}>
-                    <small>
-                      {finding.kind === "interpretation"
-                        ? "AI interpretation"
-                        : "Company statement"}
-                    </small>
-                    <small>
-                      {[
-                        ...new Set(
-                          finding.citations.map((citation) => {
-                            const source = selected.sources.find(
-                              (item) => item.id === citation.source_id,
-                            );
-                            return source
-                              ? `${source.form} · SEC acceptance ${sourceStamp(source.published_at)}`
-                              : "";
-                          }),
-                        ),
-                      ]
-                        .filter(Boolean)
-                        .join("; ")}
-                    </small>
-                    <p>{finding.text}</p>
-                    <button
-                      className="source-link"
-                      onClick={() => setEvidence(finding)}
-                    >
-                      Inspect evidence ↗
-                    </button>
-                  </div>
+              <h3>Questions to research next</h3>
+              <div>
+                {brief.result.questions.map((question) => (
+                  <button key={question} onClick={() => onDraft(question)}>
+                    {question}
+                  </button>
                 ))}
-              {!selected.result.findings.some(
-                (finding) => finding.category === category,
-              ) && (
-                <p className="financial-note">
-                  Not established by the selected passages.
-                </p>
-              )}
-            </details>
-          ))}
-          <details className="business-topic">
-            <summary>Evidence gaps and limits</summary>
-            {selected.result.withheld_findings?.map((item, index) => (
-              <p key={index}>
-                {titles[item.category]}: {item.reason}
-              </p>
-            ))}
-            {selected.result.gaps.map((gap) => (
-              <p key={gap}>{gap}</p>
-            ))}
-            <p>{selected.result.limitation}</p>
-            <p>{selected.coverage.selection}</p>
-          </details>
-          {selected.result.questions.length > 0 && (
-            <section className="business-topic">
-              <h3>Questions to investigate</h3>
-              {selected.result.questions.map((question) => (
-                <button key={question} onClick={() => onDraft(question)}>
-                  {question} ↗
-                </button>
-              ))}
+              </div>
             </section>
           )}
-          <a
-            href={`/api/v1/companies/${instrumentId}/business/${selected.id}/export`}
-          >
-            Download saved brief ↗
-          </a>
+          <details className="secondary-details brief-about">
+            <summary>About this summary</summary>
+            <p className="fine">
+              Saved {stamp(brief.created_at)} · source cutoff{" "}
+              {stamp(brief.cutoff)}. Points are the company’s own statements
+              unless marked as AI interpretation.
+            </p>
+            <p className="fine">{brief.result.limitation}</p>
+            <p className="fine">{brief.coverage.selection}</p>
+            {brief.result.withheld_findings?.map((item, index) => (
+              <p className="fine" key={index}>
+                Withheld · {titles[item.category]}: {item.reason}
+              </p>
+            ))}
+            {brief.result.gaps.map((gap) => (
+              <p className="fine" key={gap}>
+                {gap}
+              </p>
+            ))}
+            {availability.blocked && (
+              <p className="fine">{availability.message}</p>
+            )}
+            {readings.length > 1 && (
+              <label className="brief-history">
+                Saved briefs
+                <Select
+                  aria-label="Saved business briefs"
+                  value={selected?.id || ""}
+                  onChange={(event) => {
+                    setEvidence(null);
+                    setSelected(
+                      readings.find((item) => item.id === event.target.value),
+                    );
+                  }}
+                >
+                  {readings.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {stamp(item.created_at)}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+            )}
+            {history?.next_cursor && (
+              <button disabled={busy} onClick={() => action(true)}>
+                Load older briefs
+              </button>
+            )}
+            <a
+              href={`/api/v1/companies/${instrumentId}/business/${brief.id}/export`}
+            >
+              Download saved brief ↗
+            </a>
+          </details>
         </>
       ) : (
-        <p>
+        <p className="brief-meta">
           No business brief is saved yet. Collect original company documents,
           then create one.
         </p>
@@ -286,6 +275,47 @@ export default function BusinessPanel({
         </div>
       </Modal>
     </section>
+  );
+}
+
+// One card per topic: the first point is visible, the rest on request.
+function BriefTopic({ title, findings, onEvidence }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  const shown = open ? findings : findings.slice(0, 1);
+  return (
+    <article className="brief-topic" aria-labelledby={id}>
+      <h3 id={id}>{title}</h3>
+      {findings.length ? (
+        <ul>
+          {shown.map((finding, i) => (
+            <li key={i}>
+              {finding.kind === "interpretation" && (
+                <span className="brief-tag">AI interpretation</span>
+              )}
+              <p>{finding.text}</p>
+              <button
+                className="brief-source"
+                onClick={() => onEvidence(finding)}
+              >
+                View source
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="brief-empty">Not covered by the selected passages.</p>
+      )}
+      {findings.length > 1 && (
+        <button
+          className="brief-more"
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+        >
+          {open ? "Show less" : `Show ${findings.length - 1} more`}
+        </button>
+      )}
+    </article>
   );
 }
 

@@ -8,6 +8,7 @@ import IdeaAlertChecks from "./IdeaAlertChecks";
 import { ResearchAlerts } from "./SentimentPanel";
 import { ConditionChange } from "./IdeasAndChanges";
 import { inboxSummary, recordKey } from "../lib/inbox";
+import "./UpdateInbox.css";
 
 const kindName = {
   idea: "Your saved idea",
@@ -149,17 +150,15 @@ export default function UpdateInbox({
     <section className="update-inbox" aria-label="Research update inbox">
       <div className="market-section-head">
         <div>
-          <span className="section-label">YOUR RESEARCH</span>
           <h2>Review inbox</h2>
+          <p className="inbox-intro">
+            Changes to your ideas, company reporting and monitored conditions.
+          </p>
         </div>
         <button onClick={reload} disabled={loading || busy}>
           Refresh inbox
         </button>
       </div>
-      <p className="muted">
-        Changes to your ideas, company reporting and monitored conditions,
-        together. Newest recorded updates first.
-      </p>
       <div className="inbox-filters">
         <label>
           Company
@@ -226,7 +225,9 @@ export default function UpdateInbox({
             <span>{data.totals.unresolved_count} left unresolved</span>
             <span>{data.totals.new_count} retained updates</span>
           </div>
-          <details className="inbox-coverage">
+          <details
+            className={`inbox-coverage${gaps.length ? " has-concerns" : ""}`}
+          >
             <summary>
               Source coverage ·{" "}
               {gaps.length
@@ -270,11 +271,12 @@ export default function UpdateInbox({
               </div>
             ))}
           </details>
-          <p className="fine">
+          <p className="fine inbox-list-meta">
             Showing {data.records.length ? page * data.page_size + 1 : 0}–
             {page * data.page_size + data.records.length} of {data.total}{" "}
-            matching updates · recorded through {stamp(data.cutoff)}. Review
-            status is current; source event dates may be earlier.
+            matching updates · newest recorded first · recorded through{" "}
+            {stamp(data.cutoff)}. Review status is current; source event dates
+            may be earlier.
           </p>
           {!data.records.length && (
             <div className="empty-history">
@@ -329,11 +331,29 @@ export default function UpdateInbox({
                     )}
                     <div className="inbox-record-footer">
                       <span
-                        className={record.review_action ? "fine" : "attention"}
+                        className={`inbox-review-status${record.review_action ? "" : " pending"}`}
                       >
                         {reviewName(record.review_action)}
                       </span>
-                      <span className="text-button">Inspect evidence</span>
+                      <span className="inbox-evidence-control">
+                        <span className="inbox-inspect-label">
+                          Inspect evidence
+                        </span>
+                        <span className="inbox-hide-label">Hide evidence</span>
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.7"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="m9 5 7 7-7 7" />
+                        </svg>
+                      </span>
                     </div>
                   </summary>
                   <div className="inbox-detail">

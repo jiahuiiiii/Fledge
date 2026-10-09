@@ -4,6 +4,8 @@ Workers execute source calls concurrently without holding a transaction. AI wait
 for acquisition and the existing cumulative ledger; uncertain calls never retry.
 """
 from datetime import datetime, timezone
+from copy import deepcopy
+import json
 from uuid import uuid4
 from psycopg.types.json import Jsonb
 from thesis.db import transaction, one, rows
@@ -29,7 +31,48 @@ def worker_lease():
 
 def latest(owner, iid):
     with transaction(owner) as conn:
-        return one(conn, 'SELECT * FROM research_loads WHERE instrument_id=%s ORDER BY created_at DESC,id DESC LIMIT 1', (iid,))
+        run = one(conn, 'SELECT * FROM research_loads WHERE instrument_id=%s ORDER BY created_at DESC,id DESC LIMIT 1', (iid,))
+        return explain_saved_failure(conn, run)
+
+
+def explain_saved_failure(conn, run):
+    """Explain the old generic message on read; preserve the original journal."""
+    if not run:
+        return run
+    from . import sentiment, sentiment_batching
+    company = one(conn, 'SELECT symbol FROM instruments WHERE id=%s', (run['instrument_id'],))
+    if not company:
+        return run
+    for index, step in enumerate(run['steps']):
+        batches = step.get('batches') or {}
+        failed, total = batches.get('failed'), batches.get('total')
+        if (step['key'] != 'analysis' or step['status'] != 'blocked' or batches.get('failure')
+                or not isinstance(failed, int) or not isinstance(total, int)
+                or not step.get('started_at') or not step.get('finished_at')
+                or not step.get('message', '').startswith(f'Batch {failed} of {total} did not pass validation.')):
+            continue
+        calls = rows(conn, """SELECT * FROM model_calls WHERE purpose=ANY(%s) AND status='settled'
+                       AND created_at>=%s AND finished_at<=%s ORDER BY finished_at DESC,id DESC LIMIT 32""",
+                     ([sentiment.PROMPT, 'thesis-source-sentiment-20', 'thesis-source-sentiment-21'], step['started_at'], step['finished_at']))
+        for call in calls:
+            try:
+                wire = json.loads(call['request_body']['input'][1]['content'])
+                if wire['company']['symbol'] != company['symbol']:
+                    continue
+                # Only attribute the final matching response, never an earlier failure.
+                if len(wire['sources']) != batches['source_counts'][failed - 1]:
+                    break
+                sentiment.response_text(call)
+            except sentiment.IncompleteResponse as exc:
+                details = sentiment_batching.failure_details(call, exc)
+                message = sentiment_batching.failure_message(failed, total, batches['completed'], details)
+                result = deepcopy(run)
+                result['steps'][index].update(message=message, batches=dict(batches, message=message, failure=details))
+                return result
+            except (ValueError, KeyError, TypeError, IndexError):
+                break
+            break
+    return run
 
 
 def start(owner, iid, *, initial=False, analyze=False, lookback_days=7):

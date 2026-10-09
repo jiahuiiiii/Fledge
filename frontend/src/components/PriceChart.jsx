@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 export default function PriceChart({ prices, fictional = true }) {
   const chartRef = useRef(null);
   const [width, setWidth] = useState(780);
@@ -19,6 +19,11 @@ export default function PriceChart({ prices, fictional = true }) {
     [mode, setMode] = useState("Candles"),
     [hover, setHover] = useState(null),
     [selected, setSelected] = useState(null);
+  const lastDate = prices.at(-1)?.date;
+  useEffect(() => {
+    setHover(null);
+    setSelected(null);
+  }, [lastDate]);
   if (!prices.length)
     return (
       <section className="price-unavailable">
@@ -76,8 +81,13 @@ export default function PriceChart({ prices, fictional = true }) {
             <span className="muted">over visible range</span>
           </span>
           <small>
-            USD · {fictional ? "fictional prices" : "daily close"} ·{" "}
-            {chosen.date}
+            USD ·{" "}
+            {fictional
+              ? "fictional prices"
+              : chosen.provisional
+                ? "latest session price · provisional"
+                : "daily close"}{" "}
+            · {chosen.date}
           </small>
         </div>
         <div className="segmented">
@@ -107,7 +117,7 @@ export default function PriceChart({ prices, fictional = true }) {
         className="price-chart"
         viewBox={`0 0 ${w} ${h}`}
         role="img"
-        aria-label={`${label} ${mode.toLowerCase()} chart, ${first.date} to ${last.date}. Last close ${last.close}.`}
+        aria-label={`${label} ${mode.toLowerCase()} chart, ${first.date} to ${last.date}. ${last.provisional ? "Provisional latest price" : "Last close"} ${last.close}.`}
         onPointerLeave={() => setHover(null)}
       >
         {[0, 1, 2, 3].map((i) => {
@@ -216,7 +226,8 @@ export default function PriceChart({ prices, fictional = true }) {
             <output aria-live="polite">
               {chosen.date} · O {chosen.open.toFixed(2)} · H{" "}
               {chosen.high.toFixed(2)} · L {chosen.low.toFixed(2)} · C{" "}
-              {chosen.close.toFixed(2)} · Vol{" "}
+              {chosen.close.toFixed(2)}
+              {chosen.provisional ? " (provisional)" : ""} · Vol{" "}
               {chosen.volume == null
                 ? "unknown"
                 : chosen.volume.toLocaleString("en-US")}

@@ -1,8 +1,10 @@
 import SourceFilters, { SourceLabel, sourceScope } from "./SourceFilters";
 import { originalSample } from "../lib/originalSample";
+import { sourceHeadline } from "../lib/sourceHeadline";
 import SentimentLimits from "./SentimentLimits";
 import { useState } from "react";
 import { stamp } from "./MarketResearch";
+import { sourceExclusionLabels } from "../lib/sourceCoverage";
 
 const states = {
   changed: "The inputs selected now differ from the saved sentiment reading.",
@@ -46,12 +48,17 @@ export default function CurrentSentimentSources({
           ]),
         )
       : data.scopes[selected];
+  const exclusions = Object.entries(data.selection?.scopes || {}).filter(
+    ([scope, sample]) =>
+      (selected === "all" || scope === selected) &&
+      Object.values(sample.excluded || {}).some((count) => count > 0),
+  );
   return (
     <section className="original-sample" aria-label="Current sentiment inputs">
       <p role="status">{states[data.status]}</p>
       <SentimentLimits value={data.input_limits} />
       <details open={expanded || undefined}>
-        <summary>Read current sources · {data.sources.length} selected</summary>
+        <summary>Read current sources · {data.sources.length} eligible</summary>
         <div className="source-preview-content">
           {data.status === "changed" && (
             <p className="fine">
@@ -76,9 +83,30 @@ export default function CurrentSentimentSources({
             label="Current source type"
           />
           <p className="fine">
-            {counts.selected} selected from {counts.available} available
-            candidate texts. Selection is bounded; other material may matter.
+            {counts.selected} eligible from {counts.available} available
+            candidate texts. Every eligible candidate will be analysed in
+            batches. Relevance has not been assessed in this preview.
           </p>
+          {exclusions.length > 0 && (
+            <details className="secondary-details">
+              <summary>Excluded before analysis</summary>
+              {exclusions.map(([scope, sample]) => (
+                <p key={scope}>
+                  <SourceLabel scope={scope} />:{" "}
+                  {Object.entries(sample.excluded)
+                    .map(
+                      ([reason, count]) =>
+                        `${sourceExclusionLabels[reason] || reason}: ${count}`,
+                    )
+                    .join(" · ")}
+                </p>
+              ))}
+              <p className="fine">
+                These texts receive no sentiment label. Original saved sources
+                remain available in Data &amp; sources.
+              </p>
+            </details>
+          )}
           {counts.added != null && (
             <p className="fine">
               Compared with the saved sample: {counts.added} not previously
@@ -123,7 +151,7 @@ export default function CurrentSentimentSources({
                   {stamp(s.published_at)}
                 </time>
               </div>
-              <h3>{s.title}</h3>
+              {sourceHeadline(s) && <h3>{sourceHeadline(s)}</h3>}
               <p className="fine">
                 First available here {stamp(s.available_at)}
                 {s.in_saved_sample === false

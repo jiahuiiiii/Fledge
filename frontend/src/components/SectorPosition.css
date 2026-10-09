@@ -1,0 +1,292 @@
+.sector-position {
+  min-width: 0;
+  padding-bottom: var(--space-5);
+}
+.position-group {
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.position-group > summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+.position-group > p,
+.position-group > a {
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--color-muted);
+}
+.position-search {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  max-width: 480px;
+  font-size: var(--text-sm);
+}
+.position-peer-editor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: var(--space-4) 0;
+}
+.position-peer-editor label {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+.position-peer-editor textarea {
+  font-size: var(--text-sm);
+  min-height: 72px;
+  width: 100%;
+}
+.position-group > button {
+  margin: var(--space-2) var(--space-2) var(--space-2) 0;
+}
+.position-view {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+.position-view button[aria-pressed="true"] {
+  color: var(--color-accent);
+  border-color: var(--color-accent-mid);
+  background: var(--color-accent-soft);
+}
+.position-map-wrap {
+  margin: var(--space-5) 0;
+  padding: var(--space-5);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+}
+.position-map-wrap h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-lg);
+}
+.position-map-wrap p {
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--color-muted);
+}
+.position-map-viewport {
+  overflow-x: auto;
+}
+.position-map-viewport svg {
+  width: 100%;
+  min-width: 540px;
+  display: block;
+  overflow: visible;
+}
+.position-grid line {
+  stroke: var(--color-line);
+  stroke-width: 1;
+}
+.position-grid text {
+  fill: var(--color-muted);
+  font-size: var(--text-xs);
+}
+.position-axis {
+  fill: var(--color-text-2);
+  font-size: var(--text-xs);
+}
+.position-dot circle {
+  fill: var(--color-info);
+  stroke: var(--color-surface);
+  stroke-width: 2;
+}
+.position-dot text {
+  fill: var(--color-info-light);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.position-dot.selected circle {
+  fill: var(--color-accent);
+  stroke: var(--color-accent-mid);
+  stroke-width: 3;
+}
+.position-dot.selected text {
+  fill: var(--color-accent);
+}
+.position-measure {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  align-items: start;
+  margin: var(--space-5) 0 var(--space-4);
+}
+.position-measure h3 {
+  font-size: var(--text-lg);
+  margin: 0;
+  line-height: 1.5;
+  max-width: 34ch;
+}
+.position-measure label {
+  display: grid;
+  gap: var(--space-2);
+  width: 260px;
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+.position-reading {
+  background: var(--color-accent-soft);
+  border-left: 3px solid var(--color-accent-mid);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+}
+.position-reading strong {
+  color: var(--color-accent-light);
+  font-size: var(--text-md);
+  font-weight: 500;
+  line-height: 1.6;
+}
+.position-reading p {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  margin: var(--space-2) 0 0;
+  line-height: 1.6;
+}
+.position-reading.has-gap {
+  background: var(--color-surface-2);
+  border-color: var(--color-line-strong);
+}
+.position-reading.has-gap strong {
+  color: var(--color-text-2);
+}
+.position-bars {
+  display: grid;
+  gap: var(--space-3);
+}
+.position-bar-row {
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  min-width: 0;
+}
+.position-bar-row.is-company {
+  border-color: var(--color-accent-mid);
+}
+.position-bar-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+.position-bar-heading > div {
+  min-width: 0;
+}
+.position-bar-heading small {
+  display: block;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  margin-top: var(--space-1);
+}
+.position-bar-heading > strong {
+  white-space: nowrap;
+  font-size: var(--text-lg);
+}
+.position-bar-row.is-company .position-bar-heading strong {
+  color: var(--color-accent);
+}
+.position-track {
+  position: relative;
+  height: 12px;
+  background: var(--color-surface-3);
+  margin: var(--space-3) 0;
+  border-radius: var(--radius-sm);
+}
+.position-track span {
+  position: absolute;
+  height: 100%;
+  background: var(--color-info);
+  border-radius: var(--radius-sm);
+}
+.is-company .position-track span {
+  background: var(--color-accent);
+}
+.position-track i {
+  position: absolute;
+  height: 18px;
+  top: -3px;
+  border-left: 1px solid var(--color-muted);
+  z-index: 1;
+}
+.position-bar-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+.position-bar-foot small {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+.app-shell .position-caption,
+.app-shell .position-gap {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+.position-check {
+  margin-top: var(--space-4);
+}
+.position-forward-details {
+  margin-top: var(--space-5);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+.position-table-wrap {
+  overflow-x: auto;
+}
+.position-forward-details table {
+  width: 100%;
+  min-width: 440px;
+  border-collapse: collapse;
+}
+.position-forward-details th,
+.position-forward-details td {
+  text-align: left;
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-line);
+}
+.outlook-company-detail {
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-line);
+}
+.outlook-company-detail > summary {
+  min-height: 44px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: var(--text-md);
+}
+.outlook-company-detail .management-outlook {
+  margin-top: var(--space-5);
+}
+@media (max-width: 760px) {
+  .position-measure {
+    flex-direction: column;
+  }
+  .position-measure label {
+    width: 100%;
+  }
+}
+@media (max-width: 600px) {
+  .position-peer-editor {
+    grid-template-columns: 1fr;
+  }
+  .position-map-wrap {
+    padding: var(--space-4);
+  }
+  .position-bar-heading {
+    align-items: start;
+  }
+}

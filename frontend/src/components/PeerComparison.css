@@ -2,8 +2,8 @@
   margin: 28px 0;
   padding: 24px;
   border: 1px solid var(--line);
-  border-radius: 12px;
-  background: #151b1f;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
   min-width: 0;
 }
 .peer-chart-heading {
@@ -15,16 +15,16 @@
 }
 .peer-chart-heading h3 {
   margin: 10px 0 0;
-  font-size: 23px;
+  font-size: var(--text-xl);
 }
 .peer-chart-heading label {
   display: grid;
   gap: 8px;
   min-width: 0;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .peer-chart-heading select {
-  font-size: 16px;
+  font-size: var(--text-md);
   min-height: 44px;
   width: 100%;
 }
@@ -35,7 +35,7 @@
 .peer-chart-note,
 .peer-chart-date {
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.7;
 }
 .peer-chart-reading {
@@ -47,7 +47,7 @@
   justify-content: space-between;
   margin-bottom: 16px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }
 .peer-chart-rows {
@@ -69,23 +69,23 @@
   gap: 6px;
 }
 .peer-chart-value-row > div > strong {
-  font-size: 16px;
+  font-size: var(--text-md);
 }
 .peer-chart-value-row > div > span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .peer-chart-value {
   max-width: 100%;
   overflow-wrap: anywhere;
-  font-size: 24px;
+  font-size: var(--text-xl);
   line-height: 1.3;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 .peer-chart-track {
   height: 18px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: #ffffff08;
   position: relative;
   margin: 14px 0 8px;
@@ -95,13 +95,13 @@
   top: -3px;
   bottom: -3px;
   width: 1px;
-  background: #9da6ad;
+  background: var(--color-muted);
 }
 .peer-chart-track > span {
   position: absolute;
   height: 100%;
-  border-radius: 3px;
-  background: #a7b9c7;
+  border-radius: var(--radius-sm);
+  background: var(--color-muted);
   transition:
     width 180ms ease-out,
     left 180ms ease-out;
@@ -110,7 +110,7 @@
   background: var(--lime);
 }
 .peer-chart-row details {
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.7;
   margin-top: 12px;
   padding-bottom: 20px;
@@ -144,7 +144,7 @@
     width: 100%;
   }
   .peer-chart-heading h3 {
-    font-size: 21px;
+    font-size: var(--text-lg);
   }
 }
 @media (prefers-reduced-motion: reduce) {

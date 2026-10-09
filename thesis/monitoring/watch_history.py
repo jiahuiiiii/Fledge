@@ -152,7 +152,8 @@ def present(conn, owner, check, result, now):
             if not w
             or not w["enabled"]
             or w["claim_token"] != check["id"]
-            or now >= check["lease_until"]
+            or not w["lease_until"]
+            or now >= w["lease_until"]
             else "running"
         )
     )

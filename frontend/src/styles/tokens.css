@@ -1,0 +1,63 @@
+/* Thesis design tokens. Every colour, type size and corner radius in the
+   app's CSS comes from this file; change the look here, not per component. */
+:root {
+  --color-bg: #0f141c;
+  --color-surface: #171e29;
+  --color-surface-2: #1d2532;
+  --color-surface-3: #263043;
+  --color-line: #273142;
+  --color-line-strong: #3a4659;
+  --color-faint: #7c889b;
+  --color-muted: #a3aebf;
+  --color-text-2: #c9d1dd;
+  --color-text: #eef2f7;
+  --color-on-accent: #10160a;
+  --color-accent: #c2ed88;
+  --color-accent-light: #e2faa6;
+  --color-accent-mid: #7f9c45;
+  --color-accent-soft: #222d1c;
+  --color-positive: #5fd3a6;
+  --color-positive-light: #a6ecd0;
+  --color-positive-mid: #3f8f72;
+  --color-positive-soft: #17302a;
+  --color-caution: #f5a35c;
+  --color-caution-light: #f9c899;
+  --color-caution-soft: #33241a;
+  --color-gold: #e9b872;
+  --color-gold-mid: #8a6a4a;
+  --color-gold-soft: #2e2718;
+  --color-negative: #f08a96;
+  --color-negative-light: #f6bcc4;
+  --color-negative-soft: #3a1f26;
+  --color-cashflow: #d58bca;
+  --color-cashflow-soft: #302338;
+  --color-info: #6ea8fe;
+  --color-info-light: #b5d2ff;
+  --color-info-mid: #3a4e78;
+  --color-info-soft: #1b2740;
+  --color-white: #ffffff;
+  --color-shadow: #05080c;
+
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 17px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --text-2xl: 30px;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --page-width: 1440px;
+}

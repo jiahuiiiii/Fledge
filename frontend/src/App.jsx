@@ -11,11 +11,12 @@ import CompanyAvatar from "./components/CompanyAvatar";
 import CompanySidebar, { CompanyAddButton } from "./components/CompanySidebar";
 import Checkbox from "./components/Checkbox";
 import CompanyDialog from "./components/CompanyDialog";
-import CompanyOverview, { AllHistory } from "./components/CompanyOverview";
+import { companyName } from "./lib/companyIdentity";
 import LoadingSkeleton from "./components/LoadingSkeleton";
 import RemovalNotice from "./components/RemovalNotice";
 import RetainedView from "./components/RetainedView";
 import { readableLoad } from "./lib/loading";
+import { preferPriceRead } from "./lib/priceRefresh";
 import {
   hiddenCompaniesKey,
   parseHiddenCompanies,
@@ -45,16 +46,18 @@ import IdeasAndChanges from "./components/IdeasAndChanges";
 import FilingDetails from "./components/FilingDetails";
 import FinancialPerformance from "./components/FinancialPerformance";
 import OriginalFilings from "./components/OriginalFilings";
-import FinancialDepth from "./components/FinancialDepth";
-import FinancialOverview from "./components/FinancialOverview";
-import RevenueBreakdown from "./components/RevenueBreakdown";
-const RevenueFlow = lazy(() => import("./components/RevenueFlow"));
-import FinancialPosition from "./components/FinancialPosition";
+const FinancialsPage = lazy(() => import("./components/FinancialsPage"));
+const CompanyOverview = lazy(() => import("./components/CompanyOverview"));
+const AllHistory = lazy(() =>
+  import("./components/CompanyOverview").then((module) => ({
+    default: module.AllHistory,
+  })),
+);
 import BusinessPanel from "./components/BusinessPanel";
+import CompanySnapshot from "./components/CompanySnapshot";
 import AccountGate from "./components/AccountGate";
 import FilingWatch from "./components/FilingWatch";
 import ValuationPanel from "./components/ValuationPanel";
-import ExpectationsPanel from "./components/ExpectationsPanel";
 import IdeaAlertChecks from "./components/IdeaAlertChecks";
 import ReviewDigest from "./components/ReviewDigest";
 import HistoryPanel from "./components/HistoryPanel";
@@ -72,7 +75,7 @@ import ReportExpectationEditor, {
 } from "./components/ReportExpectation";
 
 const FmpPanel = lazy(() => import("./components/FmpPanel"));
-const ManagementOutlook = lazy(() => import("./components/ManagementOutlook"));
+const OutlookPage = lazy(() => import("./components/OutlookPage"));
 
 const metrics = {
   revenue_growth: "Revenue growth",
@@ -319,6 +322,7 @@ function CompanyWorkspace({
   const ideaSidebarHidden = true;
   const [researchOpen, setResearchOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [priceChartOpen, setPriceChartOpen] = useState(false);
   useEffect(() => {
     mainPane.current?.scrollTo(0, 0);
   }, [view, initialEvaluation, scope]);
@@ -434,7 +438,7 @@ function CompanyWorkspace({
     );
     if (activeScope.current === scope) {
       setData(next);
-      setPriceRead(prices);
+      setPriceRead((old) => preferPriceRead(old, prices));
       setPanelRead(panel);
       setModelStatus(model);
       if (loadedScope !== scope)
@@ -464,6 +468,7 @@ function CompanyWorkspace({
     setSource(null);
     setResearchOpen(false);
     setSourcesOpen(false);
+    setPriceChartOpen(false);
     setEditor(null);
     setApproved(false);
     setFormError("");
@@ -553,7 +558,7 @@ function CompanyWorkspace({
       <div
         data-companies-hidden={!!layout.companiesHidden}
         data-idea-hidden={ideaSidebarHidden}
-        className={`app-shell${view === "updates" ? " inbox-view" : ""}${!selectedCompanyId ? " all-companies-view" : ""}`}
+        className={`app-shell${view === "updates" ? " inbox-view" : ""}${view === "ideas" ? " ideas-view" : ""}${!selectedCompanyId ? " all-companies-view" : ""}`}
       >
         <header className="topbar">
           <a className="brand" href="#workspace">
@@ -1040,7 +1045,7 @@ function CompanyWorkspace({
     <div
       data-companies-hidden={!!layout.companiesHidden}
       data-idea-hidden={ideaSidebarHidden}
-      className={`app-shell${view === "updates" ? " inbox-view" : ""}${!selectedCompanyId ? " all-companies-view" : ""}`}
+      className={`app-shell${view === "updates" ? " inbox-view" : ""}${view === "ideas" ? " ideas-view" : ""}${!selectedCompanyId ? " all-companies-view" : ""}`}
     >
       <header className="topbar">
         <a
@@ -1209,7 +1214,7 @@ function CompanyWorkspace({
           )}
           {visibleCompanies.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.symbol} · {c.name}
+              {c.symbol} · {companyName(c)}
             </option>
           ))}
         </Select>
@@ -1243,21 +1248,43 @@ function CompanyWorkspace({
             <CompanyAvatar company={displayInstrument} />
             <div>
               <div className="row">
-                <h1>{displayInstrument.name}</h1>
+                <h1 title={displayInstrument.name}>
+                  {companyName(displayInstrument)}
+                </h1>
                 <span className="ticker">{displayInstrument.symbol}</span>
               </div>
               <p>
-                {displayInstrument.sector} <span>·</span>{" "}
-                {isRecorded ? "Fictional company" : "Company research"}
+                {isRecorded
+                  ? "Fictional company"
+                  : displayInstrument.sector &&
+                      displayInstrument.sector !== "Not yet classified"
+                    ? displayInstrument.sector
+                    : "Company research"}
               </p>
             </div>
-            <button
-              className="quick-save"
-              disabled={companyLoading}
-              onClick={() => setSourcesOpen(true)}
-            >
-              Data &amp; sources
-            </button>
+            {!companyLoading && !isRecorded && (
+              <MarketQuote
+                market={data.market}
+                history={priceRead?.data}
+                compact
+              />
+            )}
+            <div className="company-actions">
+              <button
+                className="primary"
+                disabled={companyLoading}
+                onClick={() => setResearchOpen(true)}
+              >
+                Ask a question
+              </button>
+              <button
+                className="quick-save"
+                disabled={companyLoading}
+                onClick={() => setSourcesOpen(true)}
+              >
+                Data &amp; sources
+              </button>
+            </div>
           </header>
           {companyLoading ? (
             loadError ? (
@@ -1278,45 +1305,41 @@ function CompanyWorkspace({
                 active={!!selectedCompanyId && view === "workspace"}
               >
                 <>
-                  {isRecorded ? (
-                    <details className="company-chart-disclosure">
-                      <summary>Price chart · fictional sample</summary>
-                      <PriceChart prices={data.prices} />
-                    </details>
-                  ) : (
-                    <div className="company-price-context">
-                      <MarketQuote market={data.market} />
-                      <details className="company-chart-disclosure">
-                        <summary>Price chart</summary>
-                        <HistoricalPrices
-                          instrumentId={instrumentId}
-                          initialRead={priceRead}
-                          loadStep={loadingRun?.steps.find(
-                            (s) => s.key === "prices",
-                          )}
-                        />
-                      </details>
-                    </div>
-                  )}
-                  <div className="research-question-summary">
-                    <span>
-                      {data.question_library?.selected_question ||
-                        current?.question ||
-                        "What would you like to understand about this company?"}
-                    </span>
-                    <button
-                      className="source-link"
-                      onClick={() => setResearchOpen(true)}
-                    >
-                      Investigate a question
-                    </button>
-                  </div>
                   <div className="research-browser">
-                    <ResearchNavigation
-                      selected={tab}
-                      onChange={setTab}
-                      recorded={isRecorded}
-                    />
+                    <div className="research-rail">
+                      <ResearchNavigation
+                        selected={tab}
+                        onChange={setTab}
+                        recorded={isRecorded}
+                      />
+                      <section
+                        className="rail-research"
+                        aria-labelledby="rail-research-title"
+                      >
+                        <h2 id="rail-research-title">Your research</h2>
+                        <p className="rail-question">
+                          {data.question_library?.selected_question ||
+                            current?.question ||
+                            "What would you like to understand about this company?"}
+                        </p>
+                        {!isRecorded && (
+                          <p className="rail-watch">
+                            <span
+                              aria-hidden="true"
+                              className={
+                                data.news_watch?.enabled ? "on" : "off"
+                              }
+                            />
+                            {data.news_watch?.enabled
+                              ? "Watching news"
+                              : "Not watching news"}
+                          </p>
+                        )}
+                        <button onClick={() => setResearchOpen(true)}>
+                          Open my research
+                        </button>
+                      </section>
+                    </div>
                     <section
                       className="research-content"
                       role="tabpanel"
@@ -1342,43 +1365,47 @@ function CompanyWorkspace({
                             />
                           )}
 
-                          <details
-                            className="research-context"
-                            open={isRecorded || undefined}
-                          >
-                            <summary>Research context</summary>
-                            <div className="radar-intro">
-                              <span className="section-label">
-                                THE STORY SO FAR
-                              </span>
-                              <p>{brief.text}</p>
-                              <div className="brief-citations">
-                                {brief.evidence_ids.map((id, i) => (
-                                  <button
-                                    key={id}
-                                    className="source-link"
-                                    onClick={() => openSource(id)}
-                                  >
-                                    Source {i + 1} ↗
-                                  </button>
-                                ))}
-                              </div>
-                              <details className="brief-unknowns">
-                                <summary>
-                                  What these sources cannot establish
-                                </summary>
-                                <ul>
-                                  {brief.unknowns.map((text) => (
-                                    <li key={text}>{text}</li>
+                          {isRecorded && (
+                            <details className="research-context" open>
+                              <summary>Research context</summary>
+                              <div className="radar-intro">
+                                <span className="section-label">
+                                  THE STORY SO FAR
+                                </span>
+                                <p>{brief.text}</p>
+                                <div className="brief-citations">
+                                  {brief.evidence_ids.map((id, i) => (
+                                    <button
+                                      key={id}
+                                      className="source-link"
+                                      onClick={() => openSource(id)}
+                                    >
+                                      Source {i + 1} ↗
+                                    </button>
                                   ))}
-                                </ul>
-                              </details>
-                            </div>
-                          </details>
+                                </div>
+                                <details className="brief-unknowns">
+                                  <summary>
+                                    What these sources cannot establish
+                                  </summary>
+                                  <ul>
+                                    {brief.unknowns.map((text) => (
+                                      <li key={text}>{text}</li>
+                                    ))}
+                                  </ul>
+                                </details>
+                              </div>
+                            </details>
+                          )}
                           {!isRecorded && (
                             <SentimentPanel
                               key={instrumentId}
                               onThemeSource={setSource}
+                              onThemesChange={async () => {
+                                const status = await api.modelStatus();
+                                if (activeScope.current === scope)
+                                  setModelStatus(status);
+                              }}
                               onCoverage={() => setSourcesOpen(true)}
                               data={data}
                               busy={busy}
@@ -1605,44 +1632,22 @@ function CompanyWorkspace({
                         </>
                       </RetainedView>
                       <RetainedView active={tab === "expectations"}>
-                        <>
-                          {!isRecorded && (
-                            <Suspense
-                              fallback={
-                                <p role="status">Loading management outlook…</p>
-                              }
-                            >
-                              <ManagementOutlook
-                                key={`outlook-${data.instrument.id}`}
-                                data={data.management_outlook}
-                              />
-                            </Suspense>
-                          )}
-                          {!isRecorded && (
-                            <Suspense
-                              fallback={<p>Loading analyst forecasts…</p>}
-                            >
-                              <FmpPanel
-                                key={`forecasts-${instrumentId}`}
-                                instrumentId={instrumentId}
-                                visible={
-                                  view === "workspace" && tab === "expectations"
-                                }
-                                mode="outlook"
-                              />
-                            </Suspense>
-                          )}
-                          <ExpectationsPanel
+                        <Suspense
+                          fallback={<p role="status">Loading outlook…</p>}
+                        >
+                          <OutlookPage
+                            key={instrumentId}
+                            management={data.management_outlook}
+                            includeForecasts={!isRecorded}
+                            instrumentId={instrumentId}
+                            visible={
+                              view === "workspace" && tab === "expectations"
+                            }
                             initialRead={
                               panelRead?.tab === "expectations"
                                 ? panelRead
                                 : null
                             }
-                            visible={
-                              view === "workspace" && tab === "expectations"
-                            }
-                            key={instrumentId}
-                            instrumentId={instrumentId}
                             enabled={modelStatus?.briefing_enabled}
                             onSource={setSource}
                             onView={setTab}
@@ -1654,11 +1659,15 @@ function CompanyWorkspace({
                               });
                             }}
                           />
-                        </>
+                        </Suspense>
                       </RetainedView>
                       {isRecorded && (
                         <RetainedView active={tab === "business"}>
                           <div className="overview-welcome">
+                            <details className="company-chart-disclosure">
+                              <summary>Price chart · fictional sample</summary>
+                              <PriceChart prices={data.prices} />
+                            </details>
                             <h3>{data.instrument.name}</h3>
                             <p>{brief.text}</p>
                             <p>
@@ -1675,6 +1684,37 @@ function CompanyWorkspace({
                       {!isRecorded && (
                         <RetainedView active={tab === "business"}>
                           <>
+                            <CompanySnapshot
+                              key={`snapshot-${instrumentId}`}
+                              data={data}
+                              instrumentId={instrumentId}
+                              onView={setTab}
+                              onUpdates={() => setView("updates")}
+                              chart={
+                                <details
+                                  className="company-chart-disclosure"
+                                  onToggle={(event) =>
+                                    setPriceChartOpen(event.currentTarget.open)
+                                  }
+                                >
+                                  <summary>Price chart · past year</summary>
+                                  <HistoricalPrices
+                                    key={`prices-${instrumentId}`}
+                                    instrumentId={instrumentId}
+                                    initialRead={priceRead}
+                                    visible={
+                                      priceChartOpen &&
+                                      view === "workspace" &&
+                                      tab === "business"
+                                    }
+                                    onRead={setPriceRead}
+                                    loadStep={loadingRun?.steps.find(
+                                      (s) => s.key === "prices",
+                                    )}
+                                  />
+                                </details>
+                              }
+                            />
                             <BusinessPanel
                               key={`business-${instrumentId}`}
                               instrumentId={instrumentId}
@@ -1697,22 +1737,22 @@ function CompanyWorkspace({
                                 });
                               }}
                             />
-                            <FinancialOverview
-                              data={data.financial_depth}
-                              compact
-                            />
-                            <Suspense fallback={<p>Loading revenue flow…</p>}>
-                              <RevenueFlow
-                                key={`overview-flow-${instrumentId}`}
-                                data={data.income_flow}
-                                segments={data.segment_revenue}
-                              />
-                            </Suspense>
                           </>
                         </RetainedView>
                       )}
                       <RetainedView active={tab === "valuation"}>
                         <>
+                          <ValuationPanel
+                            initialRead={
+                              panelRead?.tab === "valuation" ? panelRead : null
+                            }
+                            visible={
+                              view === "workspace" && tab === "valuation"
+                            }
+                            key={data.instrument.id}
+                            instrument={data.instrument}
+                            quote={data.market?.quote?.quote}
+                          />
                           {!isRecorded && (
                             <Suspense fallback={<p>Loading comparisons…</p>}>
                               <FmpPanel
@@ -1724,49 +1764,35 @@ function CompanyWorkspace({
                               />
                             </Suspense>
                           )}
-                          <ValuationPanel
-                            initialRead={
-                              panelRead?.tab === "valuation" ? panelRead : null
-                            }
-                            visible={
-                              view === "workspace" && tab === "valuation"
-                            }
-                            key={data.instrument.id}
-                            instrument={data.instrument}
-                            performance={data.performance}
-                            quote={data.market?.quote?.quote}
-                          />
                         </>
                       </RetainedView>
                       <RetainedView active={tab === "fundamentals"}>
                         <>
                           {!isRecorded && (
-                            <FinancialOverview
-                              key={`overview-${data.instrument.id}`}
-                              data={data.financial_depth}
-                            />
-                          )}
-                          {!isRecorded && (
-                            <Suspense fallback={<p>Loading revenue flow…</p>}>
-                              <RevenueFlow
-                                key={`flow-${data.instrument.id}`}
-                                data={data.income_flow}
-                                segments={data.segment_revenue}
+                            <Suspense fallback={<p>Loading financials…</p>}>
+                              <FinancialsPage
+                                key={`financials-${instrumentId}`}
+                                instrumentId={instrumentId}
+                                workspace={data}
+                                visible={
+                                  view === "workspace" && tab === "fundamentals"
+                                }
                               />
                             </Suspense>
                           )}
                           {!isRecorded && (
-                            <RevenueBreakdown
-                              key={`mix-${data.instrument.id}`}
-                              data={data.segment_revenue}
-                            />
+                            <details className="financials-reported-details">
+                              <summary>All reported figures</summary>
+                              <FinancialPerformance
+                                key={data.instrument.id}
+                                data={data.performance}
+                              />
+                            </details>
                           )}
                           {!isRecorded && (
-                            <FinancialPosition
-                              key={`position-${data.instrument.id}`}
-                              performance={data.performance}
-                              debt={data.financial_depth?.debt}
-                            />
+                            <h3 className="financials-sources-heading">
+                              Filings &amp; checks
+                            </h3>
                           )}
                           {!isRecorded && (
                             <OriginalFilings
@@ -1803,15 +1829,6 @@ function CompanyWorkspace({
                                 )
                               }
                             />
-                          )}
-                          {!isRecorded && (
-                            <FinancialPerformance
-                              key={data.instrument.id}
-                              data={data.performance}
-                            />
-                          )}
-                          {!isRecorded && (
-                            <FinancialDepth data={data.financial_depth} />
                           )}
                           {!isRecorded && (
                             <h3 className="monitoring-inputs-heading">
@@ -1884,7 +1901,22 @@ function CompanyWorkspace({
                 hidden={view === "workspace" && !!selectedCompanyId}
               >
                 <RetainedView active={["ideas", "updates"].includes(view)}>
-                  <>
+                  <div className="collection-view">
+                    {view === "ideas" && (
+                      <IdeasAndChanges
+                        mode="ideas"
+                        catalogue={data.catalogue.filter(
+                          (c) =>
+                            !selectedCompanyId || c.id === selectedCompanyId,
+                        )}
+                        changes={data.changes}
+                        onOpen={onChoose}
+                        selectedCompany={data.catalogue.find(
+                          (c) => c.id === selectedCompanyId,
+                        )}
+                        onCreate={selectedCompanyId ? openEditor : undefined}
+                      />
+                    )}
                     <div className="periodic-review-entry">
                       <div>
                         <strong>Review the week across your ideas</strong>
@@ -1917,26 +1949,21 @@ function CompanyWorkspace({
                         onReviewed={refresh}
                       />
                     </RetainedView>
-                    {view === "ideas" && (
-                      <IdeasAndChanges
-                        mode="ideas"
-                        catalogue={data.catalogue.filter(
-                          (c) =>
-                            !selectedCompanyId || c.id === selectedCompanyId,
-                        )}
-                        changes={data.changes}
-                        onOpen={onChoose}
-                      />
-                    )}
-                  </>
+                  </div>
                 </RetainedView>
                 <RetainedView active={!selectedCompanyId && view === "history"}>
                   <>
-                    <AllHistory
-                      catalogue={data.catalogue}
-                      onOpen={onChoose}
-                      visible={view === "history"}
-                    />
+                    <Suspense
+                      fallback={
+                        <LoadingSkeleton label="Loading saved histories…" />
+                      }
+                    >
+                      <AllHistory
+                        catalogue={data.catalogue}
+                        onOpen={onChoose}
+                        visible={view === "history"}
+                      />
+                    </Suspense>
                     <IdeaAlertChecks
                       checks={data.idea_alerts}
                       history
@@ -1953,10 +1980,17 @@ function CompanyWorkspace({
                   </>
                 </RetainedView>
                 {!selectedCompanyId && ["workspace", "idea"].includes(view) ? (
-                  <CompanyOverview
-                    catalogue={data.catalogue}
-                    onOpen={onChoose}
-                  />
+                  <Suspense
+                    fallback={
+                      <LoadingSkeleton label="Loading your companies…" />
+                    }
+                  >
+                    <CompanyOverview
+                      catalogue={data.catalogue}
+                      initialWorkspace={data}
+                      onOpen={onChoose}
+                    />
+                  </Suspense>
                 ) : !selectedCompanyId && view === "history" ? null : view ===
                   "workspace" ? null : view === "review" ? (
                   <ReviewDigest
@@ -2229,112 +2263,119 @@ function CompanyWorkspace({
                 )
               ) : (
                 <>
-                  <div className="panel-title">
-                    <span className="section-label">CURRENT IDEA</span>
-                    <span
-                      className={`status ${current?.status === "monitoring" ? "met" : ""}`}
-                    >
-                      {current?.status || "Not saved"}
-                    </span>
-                  </div>
-                  <h2>
-                    {current?.question ||
-                      "Turn a question into a point of view."}
-                  </h2>
-                  <p className="reasoning">
-                    {current?.reasoning ||
-                      "What would need to stay true for this company to be worth a closer look?"}
-                  </p>
-                  <button
-                    className={current ? "secondary full" : "primary full"}
-                    onClick={openEditor}
+                  <section
+                    className="idea-card"
+                    aria-labelledby="idea-card-title"
                   >
-                    {current ? "Edit idea" : "Save my reasoning"}
-                    <Icon name={current ? "idea" : "plus"} />
-                  </button>
-                  <button
-                    className="text-button"
-                    onClick={() => setView("idea")}
-                  >
-                    Get help defining this idea ↗
-                  </button>
-                  <div className="divider" />
-                  {evaluation ? (
-                    <>
-                      <div className="row">
-                        <span className="section-label">
-                          {checkingCurrent
-                            ? "PREVIOUS ASSESSMENT"
-                            : newUpdates
-                              ? "WHAT CHANGED"
-                              : "LATEST ASSESSMENT"}
-                        </span>
-                        {newUpdates && <span className="new-pill">NEW</span>}
-                      </div>
-                      <small className="as-of">
-                        Assessed{" "}
-                        {date(
-                          evaluation.manifest.assessed_at ||
-                            evaluation.manifest.cutoff,
-                        )}{" "}
-                        · revision {current.revision}
-                      </small>
-                      {checkingCurrent && (
-                        <p className="checking" role="status">
-                          Checking the new evidence… This assessment uses the
-                          earlier cutoff above.
-                        </p>
-                      )}
-                      {latestChange && (
-                        <p className="change-context">
-                          {latestChange.summary}.{" "}
-                          {latestChange.kind === "evidence"
-                            ? "Review the source alongside your reasoning; numerical conditions may be unchanged."
-                            : ""}
-                        </p>
-                      )}
-                      {resultsPanel(evaluation, current, false, true)}
-                    </>
-                  ) : (
-                    <div className="empty-monitor">
-                      <span className="orbit">◎</span>
-                      <h3>
-                        {checkingCurrent
-                          ? "Checking the evidence"
-                          : "Follow the evidence"}
-                      </h3>
-                      <p>
-                        {current?.status === "draft"
-                          ? "Your draft is saved. Add a condition and approve it whenever you are ready."
-                          : "Choose the figures that matter to your idea. We’ll show what changes and keep your original reasoning beside it."}
-                      </p>
+                    <div className="idea-card-head">
+                      <h3 id="idea-card-title">Your idea</h3>
+                      <span
+                        className={`status ${current?.status === "monitoring" ? "met" : ""}`}
+                      >
+                        {current?.status || "Not saved"}
+                      </span>
                     </div>
-                  )}
-                  {data.jobs.some(
-                    (j) =>
-                      j.status === "failed" && j.version_id === current?.id,
-                  ) && (
-                    <p role="alert" className="warning">
-                      Assessment unavailable. Your saved idea is intact. Edit
-                      and save a new revision to check again.
+                    <p className="idea-card-question">
+                      {current?.question ||
+                        "Turn a question into a point of view."}
                     </p>
-                  )}
-                  <details className="secondary-details monitoring-details">
-                    <summary>Monitoring details</summary>
-                    <p className="fine">
-                      {isRecorded
-                        ? "Age is assessed at the recorded sample date."
-                        : "Reporting age is checked against the current UTC date. This does not fetch new filings."}
+                    <p className="reasoning">
+                      {current?.reasoning ||
+                        "What would need to stay true for this company to be worth a closer look?"}
                     </p>
-                    {!isRecorded && (
-                      <p className="fine">
-                        {data.filing_watch?.enabled
-                          ? "Daily filing checks are enabled while this app runs."
-                          : "Daily filing checks are off. Enable them in Financials or use Refresh research."}{" "}
-                        Annual figures cannot satisfy quarterly conditions.
+                    <div className="idea-card-actions">
+                      <button
+                        className={current ? "secondary" : "primary"}
+                        onClick={openEditor}
+                      >
+                        {current ? "Edit idea" : "Save my reasoning"}
+                        <Icon name={current ? "idea" : "plus"} />
+                      </button>
+                      <button
+                        className="text-button"
+                        onClick={() => setView("idea")}
+                      >
+                        Get help defining this idea ↗
+                      </button>
+                    </div>
+                  </section>
+                  <section className="monitor-card" aria-label="Monitoring">
+                    {evaluation ? (
+                      <>
+                        <div className="row">
+                          <span className="section-label">
+                            {checkingCurrent
+                              ? "PREVIOUS ASSESSMENT"
+                              : newUpdates
+                                ? "WHAT CHANGED"
+                                : "LATEST ASSESSMENT"}
+                          </span>
+                          {newUpdates && <span className="new-pill">NEW</span>}
+                        </div>
+                        <small className="as-of">
+                          Assessed{" "}
+                          {date(
+                            evaluation.manifest.assessed_at ||
+                              evaluation.manifest.cutoff,
+                          )}{" "}
+                          · revision {current.revision}
+                        </small>
+                        {checkingCurrent && (
+                          <p className="checking" role="status">
+                            Checking the new evidence… This assessment uses the
+                            earlier cutoff above.
+                          </p>
+                        )}
+                        {latestChange && (
+                          <p className="change-context">
+                            {latestChange.summary}.{" "}
+                            {latestChange.kind === "evidence"
+                              ? "Review the source alongside your reasoning; numerical conditions may be unchanged."
+                              : ""}
+                          </p>
+                        )}
+                        {resultsPanel(evaluation, current, false, true)}
+                      </>
+                    ) : (
+                      <div className="empty-monitor">
+                        <h3>
+                          {checkingCurrent
+                            ? "Checking the evidence"
+                            : "Follow the evidence"}
+                        </h3>
+                        <p>
+                          {current?.status === "draft"
+                            ? "Your draft is saved. Add a condition and approve it whenever you are ready."
+                            : "Choose the figures that matter to your idea. We’ll show what changes and keep your original reasoning beside it."}
+                        </p>
+                      </div>
+                    )}
+                    {data.jobs.some(
+                      (j) =>
+                        j.status === "failed" && j.version_id === current?.id,
+                    ) && (
+                      <p role="alert" className="warning">
+                        Assessment unavailable. Your saved idea is intact. Edit
+                        and save a new revision to check again.
                       </p>
                     )}
-                  </details>
+                    <details className="secondary-details monitoring-details">
+                      <summary>Monitoring details</summary>
+                      <p className="fine">
+                        {isRecorded
+                          ? "Age is assessed at the recorded sample date."
+                          : "Reporting age is checked against the current UTC date. This does not fetch new filings."}
+                      </p>
+                      {!isRecorded && (
+                        <p className="fine">
+                          {data.filing_watch?.enabled
+                            ? "Daily filing checks are enabled while this app runs."
+                            : "Daily filing checks are off. Enable them in Financials or use Refresh research."}{" "}
+                          Annual figures cannot satisfy quarterly conditions.
+                        </p>
+                      )}
+                    </details>
+                  </section>
                 </>
               )}
               <div className="research-decision">
@@ -2412,33 +2453,53 @@ function CompanyWorkspace({
           )}
 
           <div className="sources-list">
-            {data.source_checks.map((c) => (
-              <article key={c.source_id}>
-                <div className="row">
-                  <h3>{c.name}</h3>
-                  <span
-                    className={`status ${c.state !== "fresh" ? "not_met" : "met"}`}
-                  >
-                    {c.state !== "fresh"
-                      ? c.state === "denied"
+            {/* Problems stay individually visible; healthy checks are grouped
+                so a gap is never buried in a long list of identical rows. */}
+            {data.source_checks
+              .filter((c) => c.state !== "fresh")
+              .map((c) => (
+                <article key={c.source_id}>
+                  <div className="row">
+                    <h3>{c.name}</h3>
+                    <span className="status not_met">
+                      {c.state === "denied"
                         ? "Access denied"
                         : c.state === "unknown"
                           ? "Not checked"
-                          : "Unavailable"
-                      : isRecorded
-                        ? "Recorded check complete"
-                        : "Check complete"}
-                  </span>
-                </div>
-                <p>
-                  {c.state !== "fresh"
-                    ? c.state === "unknown"
+                          : "Unavailable"}
+                    </span>
+                  </div>
+                  <p>
+                    {c.state === "unknown"
                       ? "This source has not been checked yet. Refresh when the connection is configured."
-                      : "The supplier could not be checked. This is a coverage gap, not confirmation that nothing changed."
-                    : `Coverage checked through ${date(c.covered_through)}. A successful check can produce no new article.`}
+                      : "The supplier could not be checked. This is a coverage gap, not confirmation that nothing changed."}
+                  </p>
+                </article>
+              ))}
+            {data.source_checks.some((c) => c.state === "fresh") && (
+              <details className="source-checks-ok">
+                <summary>
+                  <span className="status met">
+                    {isRecorded ? "Recorded check complete" : "Check complete"}
+                  </span>
+                  {data.source_checks.filter((c) => c.state === "fresh").length}{" "}
+                  sources checked
+                </summary>
+                <p className="fine">
+                  A successful check can produce no new article.
                 </p>
-              </article>
-            ))}
+                <ul>
+                  {data.source_checks
+                    .filter((c) => c.state === "fresh")
+                    .map((c) => (
+                      <li key={c.source_id}>
+                        <span>{c.name}</span>
+                        <small>through {date(c.covered_through)}</small>
+                      </li>
+                    ))}
+                </ul>
+              </details>
+            )}
             <h3>Source library</h3>
             {data.documents.map((d) => (
               <button

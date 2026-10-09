@@ -104,7 +104,7 @@ let browser;
   for (const width of [1920, 1600, 1440, 1024, 768, 390, 320]) {
     await page.setViewportSize({ width, height: 1000 });
     await tabs.scrollIntoViewIfNeeded();
-    const orientation = width >= 1600 ? "vertical" : "horizontal";
+    const orientation = width >= 1100 ? "vertical" : "horizontal";
     await page.waitForFunction(
       (o) =>
         document
@@ -140,7 +140,7 @@ let browser;
     }
     await tabs.getByRole("tab", { name: "Overview", exact: true }).click();
     await tabs.getByRole("tab", { name: "Overview", exact: true }).focus();
-    await page.keyboard.press(width >= 1600 ? "ArrowDown" : "ArrowRight");
+    await page.keyboard.press(width >= 1100 ? "ArrowDown" : "ArrowRight");
     assert.equal(
       await tabs
         .getByRole("tab", { name: "Financials", exact: true })

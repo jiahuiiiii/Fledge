@@ -2,6 +2,23 @@
 
 Current installation contract, checked 8 October 2026: the user increased the entire building-period allowance to **US$30 on 5 October 2026**, recorded by migration 033. Thesis enforces that single cumulative limit, including every earlier call and held maximum. `THESIS_LIVE_TEST_BUDGET_USD=30` must match it. This is not a per-run or per-clone allowance and does not purchase credits. It does not use Fork's keys, ledger or approvals. Dated sections below preserve earlier decisions and price/profile checkpoints; their US$10/US$20 amounts are historical, not the current ceiling.
 
+## Sentiment classification tuning — 9 October 2026
+
+The owner authorized lower reasoning effort and a larger response ceiling after
+two eight-source requests exhausted their 9,000-token limits. Production source
+classification retains `gpt-5.4-2026-03-05`, now with low effort and exactly 12,000
+total output tokens under `openai-gpt-5.4-sentiment-low-12000-20261009`. Standard
+rates remain $2.50 input, $0.25 cached input and $15 output per million tokens.
+Only the `source_sentiment` format can use this new profile. Briefings, optional
+discussion synthesis and private evidence checks retain their existing settings.
+
+Old pricing versions remain unchanged for reservation and settlement. Requests
+still reserve their full maximum against the original cumulative US$30 cap and
+settle actual usage once. The prompt/cache and batching method versions advance;
+existing failed attempts remain immutable, and no automatic retry is introduced.
+The exact failed source packet is retained for the explicit changed-settings
+trial. See [the actual test and accounting](../reviews/2026-10-09/sentiment-low-reasoning.md).
+
 ## Cloning and relocation
 
 [`live_key()`](../../thesis/providers/settings.py) checks the resolved project root against the fixed `APPROVED_ROOT` and the resolved data directory against that root's `.local` directory. This is a path check, not hardware identification. A clone at another location or a separate `THESIS_DATA_DIR` cannot make paid model requests simply by adding an API key or enabling the live-model setting.

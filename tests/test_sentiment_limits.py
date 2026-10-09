@@ -127,15 +127,17 @@ def test_preflight_preview_generation_history_and_access_share_limits(
     with transaction() as c:
         p = S.prepare(c, iid)
         visible = sentiment_inputs.current(c, iid)
-    assert len(p["sources"]) == 1
-    assert visible["input_limits"] == p["input_limits"]
+    assert len(p["sources"]) == 2
+    from thesis.research.sentiment_batching import plan
+    assert sum(len(part['sources']) for part in plan(p)) == 2
+    assert visible["selection"] == p["selection"]
     assert [s["id"] for s in visible["sources"]] == [s["id"] for s in p["sources"]]
     assert ledger.snapshot() == before
     result = S.generate(iid, transport=provider())
-    assert result["coverage"]["input_limits"] == p["input_limits"]
+    assert result["coverage"]["selection"] == p["selection"]
     assert (
-        sentiment_history.history(iid)["items"][0]["coverage"]["input_limits"]
-        == p["input_limits"]
+        sentiment_history.history(iid)["items"][0]["coverage"]["selection"]
+        == p["selection"]
     )
     settled = ledger.snapshot()
     assert (
@@ -157,8 +159,8 @@ def test_unfittable_generation_stops_before_paid_reservation(owner, monkeypatch)
     before = ledger.snapshot()
     with transaction() as c:
         preview = sentiment_inputs.current(c, iid)
-    assert preview["status"] == "empty" and preview["input_limits"]
-    with pytest.raises(ValueError, match="No complete source fits"):
+    assert preview["status"] == "no_saved_reading" and preview["sources"]
+    with pytest.raises(ValueError, match="No batch was sent"):
         S.generate(iid, transport=lambda _: pytest.fail("paid request"))
     assert ledger.snapshot() == before
 
@@ -190,7 +192,9 @@ def test_alert_and_export_retain_limits_but_withdraw_them_with_evidence(
     earlier = S.generate(iid, transport=provider())
     with transaction() as c:
         p = S.prepare(c, iid)
-    monkeypatch.setattr(ledger, "MAX_REQUEST_BYTES", size(p) - 1)
+    # Historical limited packets and their notices remain readable/exportable.
+    limited = fit(p, S.request_for, max_bytes=size(p) - 1)
+    monkeypatch.setattr(S, "prepare", lambda *_a, **_k: limited)
     current = S.generate(iid, transport=provider())
     assert current["id"] != earlier["id"]
     expected = current["coverage"]["input_limits"]

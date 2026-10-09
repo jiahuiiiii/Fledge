@@ -1,0 +1,25 @@
+.app-shell .company-avatar.logo-on-dark.has-logo {
+  background: var(--color-surface-3);
+}
+.app-shell .price-change {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+.app-shell .price-change.positive {
+  color: var(--color-positive-light);
+}
+.app-shell .price-change.negative {
+  color: var(--color-negative-light);
+}
+.app-shell .price-change.unchanged {
+  color: var(--color-muted);
+}
+.app-shell .price-change .price-change-basis {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  font-weight: 400;
+}
