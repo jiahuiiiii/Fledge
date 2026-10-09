@@ -268,14 +268,6 @@
   padding: 8px 0;
   font-size: 13px;
 }
-.font-credit {
-  color: #99a8b1;
-  text-underline-offset: 3px;
-}
-.font-credit:hover {
-  text-decoration: underline;
-}
-
 /* Source details follow one vertical rhythm instead of inherited paragraph margins. */
 .app-shell .original-sample > p {
   margin: 0 0 16px;

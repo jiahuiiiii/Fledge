@@ -24,7 +24,9 @@ export default function PriceChart({ prices, fictional = true }) {
       <section className="price-unavailable">
         <span className="section-label">PRICE CONTEXT</span>
         <p>No price history available for this company.</p>
-        <small>Fundamentals and source evidence remain available below.</small>
+        <small>
+          Financials and source evidence are available in the company views.
+        </small>
       </section>
     );
   const points = prices.slice(-range),

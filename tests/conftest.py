@@ -5,6 +5,8 @@ from pathlib import Path
 from uuid import uuid4
 import pytest
 
+os.environ["THESIS_TEST_OFFLINE"] = "true"
+
 # A separate disposable PostgreSQL cluster, never the user's app database.
 os.environ["THESIS_DATA_DIR"] = tempfile.mkdtemp(
     prefix="thesis-test-", dir="/private/tmp"

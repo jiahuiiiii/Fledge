@@ -444,7 +444,9 @@ def test_social_denial_is_visible_and_cached_posts_remain(owner):
 
     assert social.refresh(fetcher=denied)["failures"] == 3
     with transaction() as c:
-        assert all("403" in s["error"] for s in social.status(c))
+        statuses = social.status(c)
+        assert all("403" in s["error"] for s in statuses if s['feed'] in social.LEGACY_FEEDS)
+        assert all(s['error'] is None for s in statuses if s['feed'] not in social.LEGACY_FEEDS)
         assert len(social.documents(c, iid, datetime.now(timezone.utc))) == 1
 
 

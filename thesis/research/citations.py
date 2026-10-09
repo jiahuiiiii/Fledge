@@ -82,6 +82,8 @@ def model_source(source, *, include_text=False):
             "publisher",
             "published_at",
             "available_at",
+            "timestamp_basis",
+            "source_note",
             "changed",
             "corrects",
             "kind",

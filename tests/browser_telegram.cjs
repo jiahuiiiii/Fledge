@@ -110,6 +110,13 @@ const assert = require("node:assert/strict");
       /^https:\/\/t.me\/ThesisTestBot\?start=/,
     );
     assert.equal(connections, 1);
+    // Inspect the three-action pairing state, not just setup and linked states.
+    for (const width of [320, 390, 600, 768, 1440, 1920]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.screenshot({
+        path: `/private/tmp/thesis-telegram-pairing-${width}.png`,
+      });
+    }
     await dialog
       .getByRole("button", { name: "Check connection", exact: true })
       .click();

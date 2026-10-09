@@ -1,0 +1,188 @@
+.management-outlook {
+  margin: 28px 0;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #171c20;
+}
+.outlook-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 24px;
+}
+.outlook-heading h2 {
+  margin: 8px 0 12px;
+}
+.outlook-heading p {
+  max-width: 58ch;
+  margin: 0;
+  line-height: 1.65;
+  color: var(--muted);
+}
+.outlook-heading label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  width: min(100%, 320px);
+  font-size: 13px;
+}
+.outlook-reading {
+  animation: outlook-enter 180ms ease-out;
+}
+.outlook-meta {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.65;
+  margin: 22px 0;
+}
+.outlook-period + .outlook-period {
+  margin-top: 32px;
+}
+.outlook-period h3 {
+  font-size: 18px;
+  margin: 24px 0 20px;
+  line-height: 1.4;
+}
+.outlook-dates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  border-top: 1px solid var(--line);
+  margin: 28px 0 24px;
+}
+.outlook-dates > div {
+  position: relative;
+  padding-top: 18px;
+  display: grid;
+  gap: 8px;
+}
+.outlook-dates > div::before {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border: 2px solid var(--lime);
+  border-radius: 50%;
+  background: #171c20;
+  top: -6px;
+}
+.outlook-dates span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.outlook-dates strong {
+  font-size: 16px;
+  font-weight: 500;
+}
+.outlook-forecasts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.outlook-forecast {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  min-width: 0;
+}
+.outlook-forecast h4 {
+  margin: 0 0 16px;
+  font-size: 15px;
+  font-weight: 500;
+}
+.app-shell .management-outlook .outlook-value {
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.3;
+  margin: 0 0 10px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.outlook-definition {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+  min-height: 2em;
+}
+.management-outlook details {
+  margin-top: 18px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.management-outlook summary {
+  cursor: pointer;
+}
+.management-outlook blockquote {
+  margin: 14px 0;
+  padding-left: 14px;
+  border-left: 2px solid var(--line);
+}
+.management-outlook a,
+.management-outlook p {
+  overflow-wrap: anywhere;
+}
+.outlook-comparison {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+.outlook-comparison > strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.outlook-comparison details {
+  margin-top: 8px;
+}
+.outlook-comparison ul {
+  padding-left: 18px;
+}
+.outlook-comparison li + li {
+  margin-top: 10px;
+}
+.outlook-context,
+.outlook-limits {
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+@keyframes outlook-enter {
+  from {
+    opacity: 0.6;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 760px) {
+  .outlook-heading {
+    flex-direction: column;
+  }
+  .outlook-heading label {
+    width: 100%;
+  }
+  .outlook-forecasts {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .management-outlook {
+    margin: 20px 0;
+    padding: 16px;
+  }
+  .outlook-forecast {
+    padding: 16px;
+  }
+  .outlook-dates {
+    gap: 12px;
+  }
+  .outlook-dates strong {
+    font-size: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .outlook-reading {
+    animation: none;
+  }
+}

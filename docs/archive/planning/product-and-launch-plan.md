@@ -103,3 +103,32 @@ Source: [Investment Companion — Product & Launch Plan](</Users/jiahuiwong/Down
 | Claims about competitors and retention proving trust | pp. 4–6 | Do not adopt as established facts; no fresh competitor assessment was performed |
 
 The original PDF remains unchanged. The current plan preserves its useful audience, usability and validation ideas while keeping investment research and monitoring as the product's continuing job.
+
+## Future business analysis
+
+Added 8 October 2026 at the owner's request. **9 October implementation checkpoint:** original filing collection, a sourced business brief, trailing calculations, managed local login and private reviewed peer choices are implemented. See the [feature contract](../../features/original-company-research.md) and [actual review](../../reviews/2026-10-09/original-research-and-managed-login.md). FMP Broadcom consensus/ratios require subscription access; general custom/multidimensional extraction, comparable consensus-versus-actual evaluation and beginner comprehension/usefulness testing remain future work. Supported original-filing segment/product/geography revenue now has a [verified breakdown view](../../reviews/2026-10-09/reported-revenue-breakdown.md); overlapping annual geography stays uncharted. Saved assets, liabilities, cash and borrowing now have a [dated financial-position view](../../reviews/2026-10-09/financial-position-and-forecast-access.md). A bounded [original management outlook](../../reviews/2026-10-09/management-outlook.md) now preserves dated release guidance and compares only explicitly compatible pre-period GAAP USD revenue; actual Broadcom remains uncompared. Saved peers now have a [visual comparison](../../reviews/2026-10-09/peer-comparison.md), with separate providers and preserved draft choices. The peer chart also reuses [annual reported revenue growth](../../reviews/2026-10-09/peer-revenue-growth.md), retaining both fiscal periods and original inputs. The original expansion requirements below remain the target, not a claim of full completion. A separate public annual forecast route is now implemented and live-checked for Qualcomm; it preserves missing currency and restricted years, and does not complete quarterly/pre-release consensus coverage. [Forecast review](../../reviews/2026-10-09/public-financial-forecasts.md).
+
+### First version Business brief
+
+Add a short **Understand the business** overview with expandable detail:
+
+- What the company does, its sector/industry, main products and services, and explanations of unfamiliar terms.
+- How it makes money: customers, revenue model and reported business-segment revenue where available, with the reporting period and source.
+- The main drivers of revenue, profitability and cash generation, separating reported facts from AI interpretation.
+- Relevant competitors and the products or markets in which they overlap.
+- Financial position: cash, borrowing and other liabilities or obligations. Explain their meaning rather than treating all liabilities as debt or automatically adverse.
+- Specific documented risks, dependencies and questions worth investigating.
+
+Use the latest available annual filing's business section, financial notes and risk disclosures, supplemented by relevant quarterly filings and company materials. Preserve exact source references, dates, missing information and the distinction between company statements and interpretation. Existing recent-news summaries alone are insufficient for a complete business profile; narrative and segment evidence need additional collection. Reuse eligible financial inputs and the existing citation, source-permission and history controls.
+
+AI explains the supplied evidence; code calculates financial values. Save and reuse briefs against their evidence versions, with visible source age and deliberate refresh. Retain the existing explicit paid-action and cumulative-budget controls. Suggested research questions require user selection and must not automatically save reasoning or enable monitoring.
+
+### Later version Competitor comparisons
+
+Start with two or three reviewed peers and explain the business overlap and why each comparison is useful. Distinguish competitors in one product from suitable peers for whole-company valuation; a shared sector label is insufficient.
+
+Compare a small set of suitable measures, such as revenue growth, operating margin, cash generation and P/E or P/S when meaningful. Keep metric definitions, currencies, reporting periods and retrieval dates explicit; separate trailing results from forward estimates and reported earnings from adjusted earnings. Missing or unsuitable ratios remain unavailable. A lower multiple must not become an automatic investment ranking or buy recommendation.
+
+### Acceptance before expansion
+
+Check the brief's claims, segment figures and peer rationale against original evidence. Ask beginner participants to explain what the company sells, who pays it, one important risk and one research question after reading the brief. Test comprehension and usefulness before expanding the comparison engine. This future-work item sets no implementation date and does not establish validated user demand.

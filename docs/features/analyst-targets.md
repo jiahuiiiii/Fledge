@@ -18,4 +18,6 @@ The HTML page is not a contractual API and may change. This is a bounded local p
 
 ## Verification
 
+The 9 October [public financial forecast extension](public-financial-forecasts.md) shares this exact page request, clock and company lease. One response can populate both independently permitted datasets; it does not change historical target snapshots or introduce an extra page allowance. The existing coordinated first-open target step also retains newly available financial forecasts. An explicit financial-forecast check observes the same 24-hour cooldown.
+
 See [the phase review](../reviews/2026-10-05/analyst-targets-phase-review.md) for actual retrieval, automated checks and limitations. Calculating, refreshing and reading these targets require no model spending.

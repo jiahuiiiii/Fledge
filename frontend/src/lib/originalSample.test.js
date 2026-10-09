@@ -29,7 +29,35 @@ test("original reading retains an unrelated selected item and excludes compariso
 test("withdrawn sample never exposes retained source text", () => {
   assert.deepEqual(originalSample({ sources, withheld: true }, "news"), []);
   assert.deepEqual(originalSample(null, "news"), []);
+  assert.deepEqual(originalSample({ sources, withheld: true }, "all"), []);
   assert.deepEqual(originalSample({ sources }, "unsupported"), []);
+});
+
+test("all selected sources retain news, legacy Reddit and newer platforms in date order without comparison context", () => {
+  const analysis = {
+    sources: [
+      ...sources,
+      {
+        id: "hn",
+        kind: "social",
+        platform: "hackernews",
+        published_at: "2026-10-02T03:00:00Z",
+      },
+      {
+        id: "x",
+        kind: "social",
+        platform: "x",
+        published_at: "2026-10-02T03:00:00Z",
+      },
+      { id: "filing", kind: "sec", published_at: "2026-10-02T04:00:00Z" },
+    ],
+    items: [{ source_id: "unrelated", relevance: "unrelated" }],
+  };
+  assert.deepEqual(
+    originalSample(analysis, "all").map((source) => source.id),
+    ["hn", "x", "social", "unrelated", "older"],
+  );
+  assert.equal(analysis.sources[0].id, "older");
 });
 
 test("platform filtering does not blend HN comments with historic Reddit posts", () => {

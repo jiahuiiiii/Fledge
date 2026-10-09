@@ -9,7 +9,7 @@ official files bundled as part of this application, not a standalone font offer.
   `d24091ccd409a4152ffcc12cd659c16df9cdcdb4c702d8ae355b321e711f0004`
 - Original license: `MiSans-license.pdf`, downloaded from Xiaomi's linked
   `/font-download/MiSans字体知识产权许可协议.pdf`.
-- The app footer identifies MiSans and links to the supplied license.
+- This bundled README credits MiSans by Xiaomi; the original license is supplied alongside the font files.
 - Fonts load locally; no runtime request to Xiaomi or third-party font CDN.
 
 | File | SHA-256 |

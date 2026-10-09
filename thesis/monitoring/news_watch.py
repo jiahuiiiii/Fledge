@@ -112,6 +112,12 @@ def remember(conn, owner, iid, analysis):
 
 def changes(previous, current, seen=None):
     """Count a sample shift, not a change in the market or a verified event."""
+    # Installing/changing the batch pipeline establishes a quiet baseline.
+    # Historical deterministic rendering-policy changes keep their old semantics.
+    if (
+        previous['result'].get('batching', {}).get('policy') != current['result'].get('batching', {}).get('policy')
+    ):
+        return []
     old_sources = {
         (s["channel"], key)
         for s in previous["packet"]["sources"]
@@ -554,7 +560,9 @@ def run_once(
                     raise WatchStopped()
             stage = "sentiment analysis"
             watch_context.require_active(owner, iid, token, supplied_clock)
-            record = (analyzer or sentiment.generate)(iid)
+            record = analyzer(iid) if analyzer else sentiment.generate(
+                iid, progress=lambda _: watch_context.require_active(owner, iid, token, supplied_clock)
+            )
             analysis_id = record["id"]
             details["analysis"] = "completed"
             stage = "company alert publication"

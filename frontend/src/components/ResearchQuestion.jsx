@@ -487,8 +487,17 @@ export default function ResearchQuestion({
             <span className="demo-tag">{source.kind}</span>
             <h3>{source.title}</h3>
             <p>
-              {source.publisher} · published {stamp(source.published_at)}
+              {source.publisher} ·{" "}
+              {source.timestamp_basis === "feed_updated"
+                ? "feed updated"
+                : "published"}{" "}
+              {stamp(source.published_at)}
             </p>
+            {source.timestamp_basis === "feed_updated" && (
+              <p className="fine">
+                Original publication time and reply-to context are unavailable.
+              </p>
+            )}
             <p className="fine">Available here {stamp(source.available_at)}</p>
             <blockquote>
               {source.text || "Only a headline was supplied."}

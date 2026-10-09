@@ -1,6 +1,7 @@
 // Adapted from Kestrel src/api/client.js; same cookie/error/result contract.
-// This local slice bootstraps an OS-local demo session, not a production login.
+// Managed identities are verified by the server; provider tokens stay there.
 const BASE = "/api/v1";
+let accountId = null;
 export class ApiError extends Error {
   constructor(status, message, body, code = null) {
     super(message);
@@ -17,9 +18,26 @@ async function request(path, { method = "GET", body } = {}) {
     headers: {
       "Content-Type": "application/json",
       "X-Thesis-Request": "local-ui",
+      ...(accountId && path !== "/session"
+        ? { "X-Thesis-Account": accountId }
+        : {}),
     },
     body: body != null ? JSON.stringify(body) : undefined,
   });
+  const responseAccount = res.headers.get("X-Thesis-Account");
+  if (
+    path !== "/session" &&
+    accountId &&
+    responseAccount &&
+    responseAccount !== accountId
+  ) {
+    accountId = null;
+    window.dispatchEvent(new Event("thesis:account-changed"));
+    throw new ApiError(
+      409,
+      "Your signed-in account changed. The previous action was not applied.",
+    );
+  }
   let parsed = null;
   try {
     parsed = await res.json();
@@ -27,20 +45,58 @@ async function request(path, { method = "GET", body } = {}) {
     /* Preserve a useful failure for non-JSON responses. */
   }
   if (!res.ok) {
+    if (
+      res.status === 401 &&
+      path !== "/session" &&
+      !path.startsWith("/auth/")
+    ) {
+      window.dispatchEvent(new Event("thesis:sign-in-required"));
+    }
     const first = parsed?.result?.errors?.[0];
-    throw new ApiError(
+    const failure = new ApiError(
       res.status,
       first?.error_message ||
         "The local app could not complete that request. Your input is preserved.",
       parsed,
       first?.error_code,
     );
+    const retry = res.headers.get("Retry-After");
+    failure.retryAfter = retry && /^\d+$/.test(retry) ? Number(retry) : null;
+    throw failure;
   }
-  return parsed && Object.prototype.hasOwnProperty.call(parsed, "result")
-    ? parsed.result
-    : parsed;
+  const result =
+    parsed && Object.prototype.hasOwnProperty.call(parsed, "result")
+      ? parsed.result
+      : parsed;
+  if (path === "/session")
+    accountId = result?.authenticated ? result.account_id : null;
+  if (path === "/auth/logout") accountId = null;
+  return result;
 }
 export const api = {
+  fmp: (id) => request(`/companies/${id}/fmp`),
+  refreshFmp: (id) =>
+    request(`/companies/${id}/fmp/refresh`, { method: "POST" }),
+  refreshPublicForecasts: (id) =>
+    request(`/companies/${id}/financial-forecasts/refresh`, { method: "POST" }),
+  savePeers: (id, selections) =>
+    request(`/companies/${id}/fmp/peers`, {
+      method: "PUT",
+      body: { selections },
+    }),
+  login: (email) => request("/auth/login", { method: "POST", body: { email } }),
+  logout: () => request("/auth/logout", { method: "POST" }),
+  businessHistory: (id, before = null) =>
+    request(
+      `/companies/${id}/business${before ? `?before=${encodeURIComponent(before)}` : ""}`,
+    ),
+  generateBusiness: (id) =>
+    request(`/companies/${id}/business`, { method: "POST" }),
+  disclosures: (id) => request(`/companies/${id}/disclosures`),
+  refreshDisclosures: (id) =>
+    request(`/companies/${id}/disclosures/refresh`, { method: "POST" }),
+  disclosure: (id, documentId) =>
+    request(`/companies/${id}/disclosures/${documentId}`),
   saveResearchQuestion: (id, question) =>
     request(`/companies/${id}/question-library`, {
       method: "PUT",

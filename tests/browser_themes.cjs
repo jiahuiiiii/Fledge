@@ -10,6 +10,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs');let browser;
  const base=process.env.THESIS_TEST_URL,iid='c767e09f-35ea-5eaf-a626-ff5d3aa4709b';
  await page.goto(base+'/?company='+iid+'&view=workspace');
  const sentiment=page.getByRole('region',{name:'News and social sentiment',exact:true});
+ await sentiment.getByRole('group',{name:'Sentiment source type',exact:true}).getByRole('button',{name:'Company news',exact:true}).click();
  await sentiment.getByText('What are people discussing?',{exact:true}).click();
  const panel=page.getByRole('region',{name:'Discussion themes',exact:true});
  await panel.getByLabel('Saved theme reading',{exact:true}).waitFor();

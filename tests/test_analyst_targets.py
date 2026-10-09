@@ -139,7 +139,7 @@ def test_transport_size_type_and_configuration(owner,monkeypatch):
 
 def test_api_reads_do_not_fetch_and_refresh_requires_local_session(owner,monkeypatch):
     iid=setup();called=[]
-    monkeypatch.setattr(targets,'fetch',lambda s:(called.append(s),page(s))[1])
+    monkeypatch.setattr(targets,'fetch',lambda s,**_:(called.append(s),page(s))[1])
     client=TestClient(app)
     path=f'/api/v1/companies/{iid}/analyst-targets/refresh'
     assert client.post(path).status_code in (401,403)

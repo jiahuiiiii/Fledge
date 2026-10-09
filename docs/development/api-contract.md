@@ -2,11 +2,11 @@
 
 The inspected Kestrel frontend uses `/api/v1`, cookie credentials, string UUIDs, a top-level `result`, and errors shaped as `result.errors[{error_code,error_message}]`. Thesis preserves those conventions while replacing multipart semantic mutations with one transaction. It does not emulate the old authentication, proposal, catalyst, Telegram, stock-list or notification endpoints.
 
-All account context comes from the server's local demo session. Client-supplied owner IDs are rejected as extra fields. Normal reads/writes use the `thesis_app` PostgreSQL login with transaction-local account context. This account is local-demo authentication, not a production account provider.
+With managed login configured, account context comes from a Supabase-verified identity and opaque server session. The existing owner email maps to the existing research account; other verified identities receive separate accounts. Client-supplied owner IDs are rejected as extra fields. Normal reads/writes use the `thesis_app` PostgreSQL login with transaction-local account context and forced row isolation. A fresh installation without auth settings retains the loopback-only local demo mode. [Managed login and recovery](../features/managed-login.md).
 
 | Method and route | Behaviour |
 | --- | --- |
-| `GET /api/v1/session` | Bootstrap the local HttpOnly SameSite=Strict demo cookie; same-origin only. |
+| `GET /api/v1/session` | Return managed sign-in status when Supabase is configured; otherwise bootstrap the local demo cookie. Same-origin only. [Managed identity contract](../features/managed-login.md). |
 | `GET /api/v1/workspace` | Current permitted research, recorded cutoff, source checks, private current idea, full revision/evaluation snapshots and pending/failure state. |
 | `POST /api/v1/idea` | Atomic whole-revision save. Requires `expected_revision`; returns 409 on a concurrent change. |
 | `POST /api/v1/research-actions` | Append question and `investigate`, `unresolved` or `reject`. |
@@ -72,6 +72,14 @@ Relations are `supports`, `challenges`, `risk`, `context`, `unclear` and `unrela
 ## Financial performance (migration 014)
 
 The workspace response adds `performance` for SEC companies, or null for recorded scenarios. Available data includes immutable `snapshot_id`, `payload_id`, method, first-recorded and latest checked timestamps, source status, limitations and independently selected `reports.annual` / `reports.quarter`. Each report has accession/form/publication/end/filing URL and fifteen metric rows with exact decimal strings, units, input dates, source inputs, optional same-filing comparison and missing reason. No request or mutation occurs during GET. Existing explicit SEC refresh transaction creates/reuses the financial snapshot. Source withdrawal returns `status=unavailable` and no reports. No private fields or model call is introduced.
+
+The company FMP context's `members[].annual_growth` is a read-only projection of that existing performance snapshot: status/reason, method, snapshot/payload IDs, first-recorded/checked timestamps and source status, plus annual report metadata and the exact `revenue_growth` metric. It never returns the quarterly metric in place of an absent annual report. Source withdrawal removes both report and metric. No new snapshot, calculation, collection request or private peer selection occurs.
+
+### Reported revenue breakdown (phase 89, no migration)
+
+SEC-company workspaces also return `segment_revenue` with `status`, `method`, `groups`, optional `gaps` and `limitations`; recorded scenarios return null. Each group keeps its exact period, standard axis/concept, reported members, exact decimal-string values, total and component sum, source fact/context IDs and immutable original-document link/hash/acceptance/availability. `chartable` requires a positive total, usable nonnegative members and exact reconciliation; otherwise `reason` explains withheld percentages. Different periods, concepts and dimensions are not pooled. Original-source permission is checked before reading cached calculations. This is a read-only projection with no new endpoint, source/model request, saved-brief rewrite or monitoring change. See [scope and supported inputs](../features/original-company-research.md#reported-revenue-breakdown).
+
+SEC-company workspaces return `management_outlook` (`sec-management-outlook-1`), or null for recorded scenarios. It contains source-scoped retained `releases`, current/history labels, explicit release dateline evidence, bounded exact `sections`/`forecasts`, and limitations. Typed decimals, unit, accounting basis and period stay nullable. Each forecast's `comparison` is either `uncompared` with reasons or `compared` with the identified first retained original result's snapshot/payload, exact reported input and range position/point difference. This is a read-only current projection, not a saved assessment or historical replay. No request or write occurs on GET. Original-release withdrawal empties current/history; structured-fact withdrawal removes actual-result comparisons. See [management outlook](../features/original-company-research.md#management-outlook-from-original-releases).
 
 ## Valuation scenarios (migration 015)
 

@@ -9,7 +9,7 @@
 .app-shell .topbar .telegram-launch {
   margin-left: auto;
 }
-.telegram-modal {
+.modal.telegram-modal {
   width: min(640px, calc(100vw - 32px));
 }
 .telegram-settings {
@@ -66,6 +66,14 @@
   line-height: 1.6;
   font-size: 14px;
 }
+.telegram-setup {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.telegram-setup :is(p, ol) {
+  margin: 0;
+}
 .telegram-settings a {
   color: #c3e8a0;
 }
@@ -80,20 +88,43 @@
   align-items: center;
   margin-top: 20px;
 }
-.telegram-actions button,
-.telegram-open {
-  min-height: 42px;
+.telegram-actions > :is(button, a),
+.telegram-setup > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 44px;
   padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  text-align: center;
+}
+.telegram-actions > .primary,
+.telegram-setup > .primary {
+  border-color: var(--lime);
+  font-weight: 600;
+}
+.telegram-pairing-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  margin: 0;
+}
+.telegram-pairing-actions.has-link {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 .telegram-open.primary {
   color: #172114;
   text-decoration: none;
-  border-radius: 8px;
-  background: #c5e895;
-  display: inline-flex;
-  align-items: center;
-  font-size: 14px;
-  font-weight: 600;
+  background: var(--lime);
+  transition: background 0.15s;
+}
+.telegram-open.primary:hover {
+  background: #d4f4ac;
 }
 .telegram-connection-heading {
   display: flex;
@@ -142,8 +173,8 @@
   margin-left: auto;
 }
 .telegram-new-link {
-  margin-top: 14px;
-  font-size: 13px;
+  background: transparent;
+  color: #b9c5cd;
 }
 .telegram-includes summary {
   cursor: pointer;
@@ -227,6 +258,12 @@
   .telegram-settings {
     padding: 18px;
     gap: 20px;
+  }
+  .modal.telegram-modal {
+    width: calc(100vw - 16px);
+  }
+  .telegram-pairing-actions.has-link {
+    grid-template-columns: minmax(0, 1fr);
   }
   .telegram-setup,
   .telegram-connection {

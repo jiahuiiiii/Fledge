@@ -1,0 +1,45 @@
+.account-menu {
+  position: relative;
+}
+.account-menu > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 9px 12px;
+  border: 1px solid #35454a;
+  border-radius: 7px;
+  font-size: 13px;
+}
+.account-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.account-menu > div {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  z-index: 250;
+  width: min(320px, calc(100vw - 30px));
+  padding: 20px;
+  border: 1px solid #4b5e63;
+  border-radius: 10px;
+  background: #182226;
+  box-shadow: 0 16px 50px #0006;
+}
+.account-menu p {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+  font-size: 13px;
+  margin: 12px 0;
+  color: #bacbce;
+}
+.account-menu .account-identity {
+  color: #e3eeef;
+  font-size: 14px;
+}
+.account-menu .account-signout {
+  margin-top: 12px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #536367;
+  border-radius: 6px;
+}

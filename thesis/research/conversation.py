@@ -16,7 +16,7 @@ COOLDOWN = timedelta(minutes=15)
 def post(conn, identity):
     value = one(
         conn,
-        "SELECT p.*,f.enabled FROM social_posts p JOIN social_feeds f ON f.feed=p.feed WHERE p.id=%s",
+        "SELECT p.*,f.enabled,d.method AS discovery_method FROM social_posts p JOIN social_feeds f ON f.feed=p.feed LEFT JOIN social_discovery d ON d.post_id=p.id WHERE p.id=%s",
         (identity,),
     )
     if (
@@ -60,6 +60,8 @@ def present(conn, identity, now=None):
         ),
         result=None,
     )
+    if original.get('discovery_method') == 'reddit-comment-rss-updated-1' and not result:
+        value['unavailable_reason'] = 'The Reddit feed does not identify the immediate reply parent. Open the original thread for context; refreshing this feed cannot reconstruct the reply tree.'
     if result:
         withheld = result["parent_key"] and one(
             conn,

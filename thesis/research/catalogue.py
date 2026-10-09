@@ -35,6 +35,7 @@ def mentions(text, symbol, company_name=None):
         "AAPL": r"\b(?:AAPL|Apple)\b",
         "GOOGL": r"\b(?:GOOGL|GOOG|Alphabet|Google)\b",
         "NVDA": r"\b(?:NVDA|NVIDIA)\b",
+        "AVGO": r"\b(?:AVGO|Broadcom)\b",
         "AMZN": r"\bAMZN\b|\bAmazon(?:\.com)?\b(?!\s+(?:rainforest|river|basin)\b)|\bAmazon Web Services\b",
         "META": r"\$META\b|\b(?:Meta Platforms|Facebook|Instagram|WhatsApp)\b|\bmeta\s+(?:stock|shares|earnings|revenue|CEO|profit)\b",
     }

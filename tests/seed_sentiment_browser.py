@@ -83,12 +83,12 @@ def grouped_provider(body):
     result = provider("negative")(body)
     wire = json.loads(body["input"][1]["content"])
     relevant = [s for s in wire["sources"] if "weaken" in (s["title"] or "")]
-    earlier, current = sorted(relevant, key=lambda s: (s["published_at"], s["id"]))
     output = json.loads(result["output"][0]["content"][0]["text"])
     for source in wire["sources"]:
         if any("I used to admire" in p["quote"] for p in source["passages"]):
             target = next(i for i in output["items"] if i["id"] == source["label"])
             target.update(passages=["p2"], previous_passages=["p1"])
+    earlier, current = sorted(relevant, key=lambda s: (s["published_at"], s["id"])) if len(relevant) == 2 else (None, None)
     output["coverage_links"] = [
         dict(
             item_id=current["label"],
@@ -98,7 +98,7 @@ def grouped_provider(body):
             item_passages=["p1"],
             reference_passages=["p1"],
         )
-    ]
+    ] if current else []
     result["output"][0]["content"][0]["text"] = json.dumps(output)
     return result
 

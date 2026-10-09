@@ -61,11 +61,13 @@ export default function SocialConversation({ sourceId, onRemoved }) {
       aria-label="Original conversation context"
     >
       <h4>What is this replying to?</h4>
-      <p className="fine">
-        One parent message or story, using no AI credits. Loading it does not
-        change a saved label. A new sentiment analysis can use recently checked
-        parents and shows the exact context beside each label.
-      </p>
+      {!data?.unavailable_reason && (
+        <p className="fine">
+          One parent message or story, using no AI credits. Loading it does not
+          change a saved label. A new sentiment analysis can use recently
+          checked parents and shows the exact context beside each label.
+        </p>
+      )}
       {data?.checking && (
         <p role="status">A source check was started and has not finished.</p>
       )}
@@ -127,8 +129,8 @@ export default function SocialConversation({ sourceId, onRemoved }) {
       )}
       {data?.can_refresh === false && (
         <p className="fine">
-          Collected with this discussion. Use Refresh research to check the
-          thread again.
+          {data.unavailable_reason ||
+            "Collected with this discussion. Use Refresh research to check the thread again."}
         </p>
       )}
       {cooling && data?.can_refresh !== false && (

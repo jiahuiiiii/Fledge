@@ -1,5 +1,6 @@
 """Bounded Deus-style news fan-in with independent, visible provider outcomes."""
 import json
+import re
 from threading import Lock
 from urllib.parse import urljoin, urlsplit
 from concurrent.futures import ThreadPoolExecutor
@@ -43,7 +44,7 @@ def configuration(provider):
     if values.get('THESIS_LIVE_DATA_ENABLED')!='true':
         return 'Source loading is switched off.'
     if provider=='alpha_vantage' and not values.get('ALPHA_VANTAGE_API_KEY'):
-        return 'Add an Alpha Vantage API key to connect company news.'
+        return 'Add an Alpha Vantage key with access to NEWS_SENTIMENT, a Premium news endpoint.'
     if provider=='x' and (not values.get('X_BEARER_TOKEN') or values.get('THESIS_X_ENABLED')!='true'):
         return 'Add an X API token and enable X source requests; X charges separately for data.'
     return None
@@ -165,9 +166,41 @@ def parse_feed(provider, body, company, now):
     return sorted(output.values(),key=lambda x:(x['published_at'],x['url']),reverse=True),len(entries),rejected
 
 
+def alpha_error(body):
+    """Translate known provider errors without persisting echoed keys or URLs.
+
+    Rate-limit notices often advertise premium plans. That advertisement alone
+    must not be mistaken for an endpoint-access rejection.
+    """
+    if not isinstance(body, dict):
+        return 'Alpha Vantage returned no readable response; saved news is unchanged.'
+    messages = [body[k] for k in ('Note', 'Information', 'Error Message') if k in body]
+    if not messages:
+        return None
+    text = ' '.join(m for m in messages if isinstance(m, str)).lower()
+    text = re.sub(r'\s+', ' ', text)
+    if re.search(r'(?:invalid|missing) (?:api ?key)|api ?key.{0,30}(?:invalid|missing)', text):
+        return 'Alpha Vantage rejected the API key as invalid or missing. Check ALPHA_VANTAGE_API_KEY in the private .env; saved news is unchanged.'
+    if re.search(r'rate limit|call frequency|request limit|(?:requests?|calls?) per (?:day|minute|second)', text):
+        return 'Alpha Vantage reported a request limit. Wait for the provider allowance to reset and check other apps using this key. A rate-limit notice alone does not establish a plan restriction; saved news is unchanged.'
+    if re.search(r'premium (?:api )?(?:endpoint|function)|(?:requires?|requiring).{0,30}premium|premium.{0,30}(?:required|only)', text):
+        return 'Alpha Vantage requires Premium access for NEWS_SENTIMENT. A free API key does not unlock this endpoint; waiting will not change the plan. Confirm endpoint access with Alpha Vantage or use the other news sources. Saved news is unchanged.'
+    if re.search(r'invalid (?:api call|request|parameter|function)', text):
+        return 'Alpha Vantage rejected the request parameters. The integration needs checking; replacing the key or buying a plan is not an established fix. Saved news is unchanged.'
+    return 'Alpha Vantage returned an unrecognised service message. Thesis could not determine whether it concerns the key, usage or endpoint access. NEWS_SENTIMENT is documented as Premium; check access with Alpha Vantage. Saved news is unchanged.'
+
+
+def alpha_pause(conn, now):
+    clock = one(conn, "SELECT blocked_until FROM provider_clocks WHERE provider='alpha_vantage'")
+    if clock and clock['blocked_until'] and clock['blocked_until'] > now:
+        until = clock['blocked_until'].astimezone(timezone.utc).strftime('%d %b %Y, %H:%M UTC')
+        return f'Thesis has paused requests until {until}. This is the app’s cooldown, not a confirmed provider reset time.'
+    return None
+
+
 def parse_alpha(body, company, now):
-    if not isinstance(body,dict) or any(k in body for k in ('Note','Information','Error Message')):
-        raise ValueError('Alpha Vantage returned an access or usage-limit message; no news was replaced.')
+    if message := alpha_error(body):
+        raise ValueError(message)
     if not isinstance(body.get('feed'),list):raise ValueError('Alpha Vantage returned no readable feed.')
     output={};rejected=0
     for item in body['feed'][:50]:
@@ -215,6 +248,11 @@ def refresh(iid,provider,*,transport=None,fetcher=None):
     if provider not in FEEDS and provider!='alpha_vantage':raise ValueError('Unsupported news provider.')
     if not fetcher and (message:=configuration(provider)):
         return dict(status='blocked',message=message)
+    if provider=='alpha_vantage' and not fetcher:
+        with transaction(source=True) as c:
+            if pause := alpha_pause(c, datetime.now(timezone.utc)):
+                # Keep the original diagnostic/check time while cooling down.
+                return dict(status='blocked',message=pause)
     company,token=begin(iid,provider);now=datetime.now(timezone.utc)
     try:
         cached=False
@@ -255,8 +293,14 @@ def status(conn,iid):
     for provider,label in LABELS.items():
         item=saved.get(provider,{})
         missing=configuration(provider)
+        message=missing or item.get('message') or 'Included in Refresh research.'
+        if provider=='alpha_vantage' and not missing:
+            if message == 'Alpha Vantage returned an access or usage-limit message; no news was replaced.':
+                message='The earlier check did not retain a specific failure reason. NEWS_SENTIMENT is documented as Premium; confirm that this key includes endpoint access. The old response does not prove a key, quota or plan problem.'
+            if pause := alpha_pause(conn, datetime.now(timezone.utc)):
+                message += ' ' + pause
         result.append(dict(provider=provider,label=label,channel='social' if provider=='x' else 'news',
                            status='blocked' if missing else item.get('outcome') or 'not_loaded',
-                           message=missing or item.get('message') or 'Included in Refresh research.',
+                           message=message,
                            checked_at=item.get('completed_at'),matched=item.get('matched',0)))
     return result

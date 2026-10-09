@@ -3,9 +3,12 @@ import ResearchLoading, {
 } from "./components/ResearchLoading";
 import WorkspaceControls, {
   useWorkspaceLayout,
+  WorkspaceSidebar,
 } from "./components/WorkspaceControls";
 import { modelAvailability } from "./lib/modelAvailability";
 import EmptyWorkspace from "./components/EmptyWorkspace";
+import CompanyAvatar from "./components/CompanyAvatar";
+import CompanySidebar, { CompanyAddButton } from "./components/CompanySidebar";
 import Checkbox from "./components/Checkbox";
 import CompanyDialog from "./components/CompanyDialog";
 import CompanyOverview, { AllHistory } from "./components/CompanyOverview";
@@ -18,11 +21,12 @@ import {
   parseHiddenCompanies,
 } from "./lib/companyVisibility";
 import Select from "./components/Select";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api/client";
 import { roleLabel, resultLabel } from "./lib/conditionRoles";
 import { revisionPayload } from "./lib/kestrelDiff";
 import Modal from "./components/Modal";
+import SourceConnections from "./components/SourceConnections";
 import PriceChart from "./components/PriceChart";
 import ResearchQuestion from "./components/ResearchQuestion";
 import QuestionSelector, {
@@ -31,12 +35,23 @@ import QuestionSelector, {
 import HistoricalPrices from "./components/HistoricalPrices";
 import MarketResearch, { MarketQuote } from "./components/MarketResearch";
 import SentimentPanel from "./components/SentimentPanel";
+import ResearchNavigation, {
+  ResearchSectionHeader,
+} from "./components/ResearchNavigation";
 import SocialConversation from "./components/SocialConversation";
 import UpdateInbox from "./components/UpdateInbox";
 import TelegramSettings from "./components/TelegramSettings";
 import IdeasAndChanges from "./components/IdeasAndChanges";
 import FilingDetails from "./components/FilingDetails";
 import FinancialPerformance from "./components/FinancialPerformance";
+import OriginalFilings from "./components/OriginalFilings";
+import FinancialDepth from "./components/FinancialDepth";
+import FinancialOverview from "./components/FinancialOverview";
+import RevenueBreakdown from "./components/RevenueBreakdown";
+const RevenueFlow = lazy(() => import("./components/RevenueFlow"));
+import FinancialPosition from "./components/FinancialPosition";
+import BusinessPanel from "./components/BusinessPanel";
+import AccountGate from "./components/AccountGate";
 import FilingWatch from "./components/FilingWatch";
 import ValuationPanel from "./components/ValuationPanel";
 import ExpectationsPanel from "./components/ExpectationsPanel";
@@ -55,6 +70,9 @@ import IdeaEvidenceReview from "./components/IdeaEvidenceReview";
 import ReportExpectationEditor, {
   ReportExpectationText,
 } from "./components/ReportExpectation";
+
+const FmpPanel = lazy(() => import("./components/FmpPanel"));
+const ManagementOutlook = lazy(() => import("./components/ManagementOutlook"));
 
 const metrics = {
   revenue_growth: "Revenue growth",
@@ -167,6 +185,20 @@ function readDestination() {
   };
 }
 export default function App() {
+  return (
+    <AccountGate>
+      {(session, signOut) => (
+        <ResearchApp
+          key={session.account_id}
+          session={session}
+          signOut={signOut}
+        />
+      )}
+    </AccountGate>
+  );
+}
+function ResearchApp({ signOut, session }) {
+  const companyVisibilityKey = `${hiddenCompaniesKey}:${session.account_id || "local"}`;
   const [destination, setDestination] = useState(readDestination);
   const [inboxState, setInboxState] = useState({
     review: "pending",
@@ -175,18 +207,26 @@ export default function App() {
   });
   const [hiddenCompanies, setHiddenCompanies] = useState(() => {
     try {
-      return parseHiddenCompanies(localStorage.getItem(hiddenCompaniesKey));
+      return parseHiddenCompanies(
+        localStorage.getItem(companyVisibilityKey) ??
+          (session.is_installation_owner
+            ? localStorage.getItem(hiddenCompaniesKey)
+            : null),
+      );
     } catch {
       return [];
     }
   });
   useEffect(() => {
     try {
-      localStorage.setItem(hiddenCompaniesKey, JSON.stringify(hiddenCompanies));
+      localStorage.setItem(
+        companyVisibilityKey,
+        JSON.stringify(hiddenCompanies),
+      );
     } catch {
       /* Keep in-memory controls usable when browser storage is unavailable. */
     }
-  }, [hiddenCompanies]);
+  }, [hiddenCompanies, companyVisibilityKey]);
   useEffect(() => {
     const restore = () => {
       setDestination(readDestination());
@@ -205,6 +245,7 @@ export default function App() {
   }
   return (
     <CompanyWorkspace
+      signOut={signOut}
       instrumentId={destination.id || defaultCompany}
       selectedCompanyId={destination.id}
       onWorkspaceReset={(resetSelection) => {
@@ -233,6 +274,7 @@ export default function App() {
   );
 }
 function CompanyWorkspace({
+  signOut,
   instrumentId,
   selectedCompanyId,
   onWorkspaceReset,
@@ -273,6 +315,10 @@ function CompanyWorkspace({
   const companyLoading = loadedScope !== scope;
   const [removedCompany, setRemovedCompany] = useState(null);
   const view = initialView;
+  const ideaSidebarAvailable = !!selectedCompanyId && view === "workspace";
+  const ideaSidebarHidden = true;
+  const [researchOpen, setResearchOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
   useEffect(() => {
     mainPane.current?.scrollTo(0, 0);
   }, [view, initialEvaluation, scope]);
@@ -283,7 +329,7 @@ function CompanyWorkspace({
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false),
-    [tab, setTab] = useState("evidence"),
+    [tab, setTab] = useState("business"),
     [question, setQuestion] = useState(questionDefault);
   const [source, setSource] = useState(null),
     [editor, setEditor] = useState(null),
@@ -416,6 +462,8 @@ function CompanyWorkspace({
     setNotice("");
     setBusy(false);
     setSource(null);
+    setResearchOpen(false);
+    setSourcesOpen(false);
     setEditor(null);
     setApproved(false);
     setFormError("");
@@ -504,7 +552,7 @@ function CompanyWorkspace({
     return (
       <div
         data-companies-hidden={!!layout.companiesHidden}
-        data-idea-hidden={!!layout.ideaHidden}
+        data-idea-hidden={ideaSidebarHidden}
         className={`app-shell${view === "updates" ? " inbox-view" : ""}${!selectedCompanyId ? " all-companies-view" : ""}`}
       >
         <header className="topbar">
@@ -531,23 +579,22 @@ function CompanyWorkspace({
           <div className="topbar-tools">
             <WorkspaceControls
               layout={layout}
-              onToggle={toggleLayout}
-              hasCompany={!!selectedCompanyId}
+              onOpen={() => setResearchOpen(true)}
+              ideaAvailable={ideaSidebarAvailable}
             />
             <TelegramSettings />
+            {signOut}
           </div>
         </header>
         <div className="demo-bar">
           <span>Loading saved company research…</span>
         </div>
         <div className="workspace-grid">
-          <aside
-            id="companies-sidebar"
-            className="watchlist"
-            aria-label="Companies"
-          >
-            <LoadingSkeleton rows={2} label="Loading companies…" />
-          </aside>
+          <CompanySidebar
+            loading
+            collapsed={!!layout.companiesHidden}
+            onToggle={() => toggleLayout("companiesHidden")}
+          />
           <main className="main-workspace" id="workspace">
             {loadError ? (
               <div className="workspace-load-error" role="alert">
@@ -562,25 +609,15 @@ function CompanyWorkspace({
               />
             )}
           </main>
-          <aside
+          <WorkspaceSidebar
             id="idea-sidebar"
             className="idea-panel"
             aria-label="Current idea"
+            hidden={ideaSidebarHidden}
           >
             <LoadingSkeleton rows={2} label="Loading saved idea…" />
-          </aside>
+          </WorkspaceSidebar>
         </div>
-        <footer className="workspace-footer">
-          <span>Saved on this Mac</span>
-          <a
-            className="font-credit"
-            href="/fonts/MiSans-license.pdf"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Typography · MiSans by Xiaomi
-          </a>
-        </footer>
       </div>
     );
   if (data.empty)
@@ -1002,7 +1039,7 @@ function CompanyWorkspace({
   return (
     <div
       data-companies-hidden={!!layout.companiesHidden}
-      data-idea-hidden={!!layout.ideaHidden}
+      data-idea-hidden={ideaSidebarHidden}
       className={`app-shell${view === "updates" ? " inbox-view" : ""}${!selectedCompanyId ? " all-companies-view" : ""}`}
     >
       <header className="topbar">
@@ -1047,10 +1084,11 @@ function CompanyWorkspace({
         <div className="topbar-tools">
           <WorkspaceControls
             layout={layout}
-            onToggle={toggleLayout}
-            hasCompany={!!selectedCompanyId}
+            onOpen={() => setResearchOpen(true)}
+            ideaAvailable={ideaSidebarAvailable}
           />
           <TelegramSettings />
+          {signOut}
         </div>
       </header>
       <RemovalNotice
@@ -1115,16 +1153,14 @@ function CompanyWorkspace({
         )}
       </div>
 
-      {!companyLoading &&
-        !isRecorded &&
-        selectedCompanyId &&
-        !layout.progressHidden && (
-          <ResearchLoading
-            run={loadingRun}
-            error={loadingError}
-            onCollapse={toggleProgress}
-          />
-        )}
+      {!companyLoading && !isRecorded && selectedCompanyId && (
+        <ResearchLoading
+          run={loadingRun}
+          error={loadingError}
+          onCollapse={toggleProgress}
+          hidden={!!layout.progressHidden}
+        />
+      )}
       {!companyLoading &&
         modelAvailability(modelStatus).state === "running" &&
         !loadingRun?.steps.some(
@@ -1177,87 +1213,24 @@ function CompanyWorkspace({
             </option>
           ))}
         </Select>
-        <button type="button" onClick={() => setAddingCompany(true)}>
-          Add company
-        </button>
+        <CompanyAddButton
+          className="mobile-add-company"
+          onClick={() => setAddingCompany(true)}
+        />
       </label>
       <div className="workspace-grid">
-        <aside
-          id="companies-sidebar"
-          className="watchlist"
-          aria-label="Companies"
-          tabIndex={0}
-        >
-          <div className="section-label">
-            COMPANIES <span>{visibleCompanies.length}</span>
-          </div>
-          <label className="company-search">
-            <span>Find a company</span>
-            <input
-              value={companySearch}
-              onChange={(e) => setCompanySearch(e.target.value)}
-              placeholder="Name or symbol"
-            />
-          </label>
-          <div className="company-list">
-            <button
-              className={`watch-item ${!selectedCompanyId ? "selected" : ""}`}
-              aria-pressed={!selectedCompanyId}
-              onClick={() => chooseCompany("")}
-            >
-              <strong>All companies</strong>
-            </button>
-            {visibleCompanies
-              .filter((c) =>
-                `${c.name} ${c.symbol}`
-                  .toLowerCase()
-                  .includes(companySearch.toLowerCase()),
-              )
-              .map((c) => (
-                <div className="company-row" key={c.id}>
-                  <button
-                    className={`watch-item ${c.id === selectedCompanyId ? "selected" : ""}`}
-                    aria-pressed={c.id === selectedCompanyId}
-                    disabled={busy}
-                    onClick={() => chooseCompany(c.id)}
-                  >
-                    <span className="company-avatar small">{c.name[0]}</span>
-                    <span>
-                      <strong>{c.symbol}</strong>
-                      <small>{c.name}</small>
-                    </span>
-                    {c.unread > 0 && <span className="watch-dot" />}
-                  </button>
-                  <button
-                    type="button"
-                    className="remove-company"
-                    aria-label={`Remove ${c.symbol} from sidebar`}
-                    title={`Remove ${c.symbol} from sidebar`}
-                    onClick={() => removeCompany(c)}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            {!visibleCompanies.some((c) =>
-              `${c.name} ${c.symbol}`
-                .toLowerCase()
-                .includes(companySearch.toLowerCase()),
-            ) && (
-              <p className="watch-caption">
-                {visibleCompanies.length
-                  ? "No matching company in your sidebar."
-                  : "Your sidebar is empty. Add or restore a company below."}
-              </p>
-            )}
-          </div>
-          <button
-            className="add-company"
-            onClick={() => setAddingCompany(true)}
-          >
-            + Add company
-          </button>
-        </aside>
+        <CompanySidebar
+          companies={visibleCompanies}
+          selectedCompanyId={selectedCompanyId}
+          collapsed={!!layout.companiesHidden}
+          onToggle={() => toggleLayout("companiesHidden")}
+          search={companySearch}
+          onSearch={setCompanySearch}
+          onChoose={chooseCompany}
+          onRemove={removeCompany}
+          onAdd={() => setAddingCompany(true)}
+          busy={busy}
+        />
         <main
           className="main-workspace"
           id="workspace"
@@ -1267,10 +1240,7 @@ function CompanyWorkspace({
           tabIndex={0}
         >
           <header className="company-header">
-            <div className="company-avatar">
-              {displayInstrument.name[0]}
-              <span>↗</span>
-            </div>
+            <CompanyAvatar company={displayInstrument} />
             <div>
               <div className="row">
                 <h1>{displayInstrument.name}</h1>
@@ -1284,9 +1254,9 @@ function CompanyWorkspace({
             <button
               className="quick-save"
               disabled={companyLoading}
-              onClick={openEditor}
+              onClick={() => setSourcesOpen(true)}
             >
-              {!companyLoading && current ? "Edit saved idea" : "Save idea"} +
+              Data &amp; sources
             </button>
           </header>
           {companyLoading ? (
@@ -1309,623 +1279,604 @@ function CompanyWorkspace({
               >
                 <>
                   {isRecorded ? (
-                    <PriceChart prices={data.prices} />
+                    <details className="company-chart-disclosure">
+                      <summary>Price chart · fictional sample</summary>
+                      <PriceChart prices={data.prices} />
+                    </details>
                   ) : (
-                    <>
+                    <div className="company-price-context">
                       <MarketQuote market={data.market} />
-                      <HistoricalPrices
-                        instrumentId={instrumentId}
-                        initialRead={priceRead}
-                        loadStep={loadingRun?.steps.find(
-                          (s) => s.key === "prices",
-                        )}
-                      />
-                    </>
+                      <details className="company-chart-disclosure">
+                        <summary>Price chart</summary>
+                        <HistoricalPrices
+                          instrumentId={instrumentId}
+                          initialRead={priceRead}
+                          loadStep={loadingRun?.steps.find(
+                            (s) => s.key === "prices",
+                          )}
+                        />
+                      </details>
+                    </div>
                   )}
-                  {isRecorded ? (
-                    <QuestionSelector
-                      key={scope}
-                      instrumentId={instrumentId}
-                      company={data.instrument.name}
-                      question={question}
-                      currentQuestion={current?.question}
-                      library={data.question_library}
-                      onSaved={(library) => {
-                        if (activeScope.current !== scope) return;
-                        setData((previous) => ({
-                          ...previous,
-                          question_library: library,
-                        }));
-                        setQuestion(library.selected_question);
-                      }}
-                    />
-                  ) : (
-                    <ResearchQuestion
-                      key={scope}
-                      instrumentId={instrumentId}
-                      company={data.instrument.name}
-                      question={question}
-                      currentQuestion={current?.question}
-                      library={data.question_library}
-                      onSaved={(library) => {
-                        if (activeScope.current !== scope) return;
-                        setData((previous) => ({
-                          ...previous,
-                          question_library: library,
-                        }));
-                        setQuestion(library.selected_question);
-                      }}
-                      onQuestion={setQuestion}
-                      modelStatus={modelStatus}
-                      onDone={() =>
-                        api
-                          .modelStatus()
-                          .then(
-                            (value) =>
-                              activeScope.current === scope &&
-                              setModelStatus(value),
-                          )
-                          .catch(() => {})
-                      }
-                      onDraft={(q) => {
-                        openEditor();
-                        setEditor({ ...formFor(current, q), question: q });
-                      }}
-                    />
-                  )}
-                  <div
-                    className="content-tabs"
-                    role="tablist"
-                    aria-label="Research views"
-                  >
-                    {[
-                      ["evidence", "Evidence radar"],
-                      ["fundamentals", "Fundamentals"],
-                      ...(!isRecorded
-                        ? [
-                            ["expectations", "Expectations"],
-                            ["valuation", "Valuation"],
-                          ]
-                        : []),
-                      ["sources", "Source coverage"],
-                    ].map(([key, label]) => (
-                      <button
-                        role="tab"
-                        id={`research-tab-${key}`}
-                        aria-controls="research-panel"
-                        tabIndex={tab === key ? 0 : -1}
-                        onKeyDown={(event) => {
-                          if (
-                            ![
-                              "ArrowRight",
-                              "ArrowLeft",
-                              "Home",
-                              "End",
-                            ].includes(event.key)
-                          )
-                            return;
-                          event.preventDefault();
-                          const tabs = [
-                            ...event.currentTarget.parentElement.querySelectorAll(
-                              '[role="tab"]',
-                            ),
-                          ];
-                          const index = tabs.indexOf(event.currentTarget);
-                          const next =
-                            event.key === "Home"
-                              ? 0
-                              : event.key === "End"
-                                ? tabs.length - 1
-                                : (index +
-                                    (event.key === "ArrowRight" ? 1 : -1) +
-                                    tabs.length) %
-                                  tabs.length;
-                          tabs[next].focus();
-                          tabs[next].click();
-                        }}
-                        aria-selected={tab === key}
-                        key={key}
-                        onClick={() => setTab(key)}
-                      >
-                        {label}
-                      </button>
-                    ))}
+                  <div className="research-question-summary">
+                    <span>
+                      {data.question_library?.selected_question ||
+                        current?.question ||
+                        "What would you like to understand about this company?"}
+                    </span>
+                    <button
+                      className="source-link"
+                      onClick={() => setResearchOpen(true)}
+                    >
+                      Investigate a question
+                    </button>
                   </div>
-                  <section
-                    className="research-content"
-                    role="tabpanel"
-                    id="research-panel"
-                    aria-labelledby={`research-tab-${tab}`}
-                  >
-                    <RetainedView active={tab === "evidence"}>
-                      <>
-                        <div className="radar-intro">
-                          <span className="section-label">
-                            THE STORY SO FAR
-                          </span>
-                          <p>{brief.text}</p>
-                          <div className="brief-citations">
-                            {brief.evidence_ids.map((id, i) => (
-                              <button
-                                key={id}
-                                className="source-link"
-                                onClick={() => openSource(id)}
-                              >
-                                Source {i + 1} ↗
-                              </button>
-                            ))}
-                          </div>
-                          <details className="brief-unknowns">
-                            <summary>
-                              What these sources cannot establish
-                            </summary>
-                            <ul>
-                              {brief.unknowns.map((text) => (
-                                <li key={text}>{text}</li>
-                              ))}
-                            </ul>
-                          </details>
-                        </div>
-                        {!isRecorded && (
-                          <SentimentPanel
-                            key={instrumentId}
-                            onThemeSource={setSource}
-                            data={data}
-                            busy={busy}
-                            modelStatus={modelStatus}
-                            onSource={openSource}
-                            onCheckIdea={(purpose) =>
-                              act(
-                                () =>
-                                  api.ideaAlertCheck(
-                                    instrumentId,
-                                    data.sentiment.id,
-                                    current.id,
-                                    purpose,
-                                  ),
-                                "Check saved in History. Potential connections also appear in Updates.",
-                              )
-                            }
-                            loadingRun={loadingRun}
-                            onAnalyze={(days) =>
-                              startLoading({
-                                analyze: true,
-                                lookback_days: days,
-                              })
-                            }
-                            onWatch={(
-                              enabled,
-                              interval,
-                              matchIdea,
-                              includeContext,
-                              ideaPurpose,
-                            ) =>
-                              act(
-                                () =>
-                                  api.newsWatch(
-                                    instrumentId,
-                                    enabled,
-                                    interval,
-                                    matchIdea,
-                                    includeContext,
-                                    ideaPurpose,
-                                  ),
-                                enabled
-                                  ? "Local news and social watch enabled."
-                                  : "Future scheduled checks stopped.",
-                              )
-                            }
-                            onEventWatch={(versionId) =>
-                              act(
-                                () => api.eventWatch(instrumentId, versionId),
-                                versionId
-                                  ? "Event checks enabled for this approved revision at scheduled news checks."
-                                  : "Automatic event checks stopped.",
-                              )
-                            }
-                          />
-                        )}
-                        {!isRecorded && (
-                          <MarketResearch
-                            question={question}
-                            data={data}
-                            busy={busy}
-                            modelStatus={modelStatus}
-                            onSource={openSource}
-                            onGenerate={() =>
-                              act(
-                                () => api.marketBrief(instrumentId),
-                                "Your source-linked briefing is ready.",
-                              )
-                            }
-                          />
-                        )}
-                        {isRecorded && (
-                          <section
-                            className="passage-selection"
-                            aria-label="Source passage brief"
+                  <div className="research-browser">
+                    <ResearchNavigation
+                      selected={tab}
+                      onChange={setTab}
+                      recorded={isRecorded}
+                    />
+                    <section
+                      className="research-content"
+                      role="tabpanel"
+                      id="research-panel"
+                      aria-labelledby={`research-tab-${tab}`}
+                    >
+                      <ResearchSectionHeader selected={tab} />
+                      <RetainedView active={tab === "evidence"}>
+                        <>
+                          {!isRecorded && (
+                            <MarketResearch
+                              question={question}
+                              data={data}
+                              busy={busy}
+                              modelStatus={modelStatus}
+                              onSource={openSource}
+                              onGenerate={() =>
+                                act(
+                                  () => api.marketBrief(instrumentId),
+                                  "Your source-linked briefing is ready.",
+                                )
+                              }
+                            />
+                          )}
+
+                          <details
+                            className="research-context"
+                            open={isRecorded || undefined}
                           >
-                            <div className="row">
+                            <summary>Research context</summary>
+                            <div className="radar-intro">
                               <span className="section-label">
-                                ACROSS THE SOURCES
+                                THE STORY SO FAR
                               </span>
-                              {!data.selected_passages &&
-                                data.documents.length > 0 &&
-                                modelStatus?.enabled &&
-                                isRecorded && (
+                              <p>{brief.text}</p>
+                              <div className="brief-citations">
+                                {brief.evidence_ids.map((id, i) => (
                                   <button
-                                    disabled={
-                                      busy || modelStatus.budget.unresolved > 0
-                                    }
-                                    onClick={() =>
-                                      act(
-                                        () =>
-                                          api.selectPassages(
-                                            data.demo.stage,
-                                            instrumentId,
-                                          ),
-                                        "Source passages are ready.",
-                                      )
-                                    }
+                                    key={id}
+                                    className="source-link"
+                                    onClick={() => openSource(id)}
                                   >
-                                    {busy
-                                      ? "Reading sources…"
-                                      : "Select key passages"}
+                                    Source {i + 1} ↗
                                   </button>
-                                )}
-                            </div>
-                            {data.selected_passages ? (
-                              <>
-                                <p className="fine">
-                                  {data.selected_passages.limitation}
-                                  {data.selected_passages
-                                    .omitted_passage_count > 0 &&
-                                    ` ${data.selected_passages.omitted_passage_count} source passages were not selected; review the full sources below.`}
-                                </p>
+                                ))}
+                              </div>
+                              <details className="brief-unknowns">
+                                <summary>
+                                  What these sources cannot establish
+                                </summary>
                                 <ul>
-                                  {data.selected_passages.passages.map((p) => (
-                                    <li key={p.id}>
-                                      <blockquote>{p.quote}</blockquote>
-                                      <button
-                                        className="source-link"
-                                        onClick={() =>
-                                          openSource(p.document_id)
-                                        }
-                                      >
-                                        {p.source} · {date(p.published_at)} ↗
-                                      </button>
-                                    </li>
+                                  {brief.unknowns.map((text) => (
+                                    <li key={text}>{text}</li>
                                   ))}
                                 </ul>
-                              </>
-                            ) : (
-                              <p className="fine">
-                                {data.documents.length === 0
-                                  ? "No permitted source passages available."
-                                  : modelStatus?.budget.unresolved > 0
-                                    ? modelAvailability(modelStatus).message
-                                    : isRecorded
-                                      ? "Read original evidence below. Optional AI selection highlights passages without changing your conditions or assessments."
-                                      : "This workspace contains structured financial data. Use the calculation trail to inspect inputs and open the original filing. News and management guidance are not connected yet."}
-                              </p>
-                            )}
-                          </section>
-                        )}
-                        <div className="evidence-grid">
-                          {data.claims
-                            .filter(
-                              (c) =>
-                                !data.documents.some(
-                                  (d) =>
-                                    d.supersedes_id === c.document_version_id,
-                                ),
-                            )
-                            .filter(
-                              (c) =>
-                                c.kind !== "reported" ||
-                                data.observations.some(
-                                  (o) =>
-                                    (
-                                      c.source_version_ids || [
-                                        c.document_version_id,
-                                      ]
-                                    ).includes(o.document_version_id) &&
-                                    o.period === data.demo.period,
-                                ),
-                            )
-                            .slice(0, 4)
-                            .map((c) => (
-                              <article
-                                className={`evidence-card ${c.stance}`}
-                                key={c.id}
-                              >
-                                <div className="row">
-                                  <span className="stance">
-                                    {c.stance === "support"
-                                      ? "↗ Supports"
-                                      : c.stance === "challenge"
-                                        ? "↘ Challenges"
-                                        : "◌ Open question"}
-                                  </span>
-                                  <small>{date(c.available_at)}</small>
-                                </div>
-                                <h3>{c.title}</h3>
-                                <p>{c.body}</p>
-                                <footer>
-                                  <span>
-                                    {c.kind === "guidance"
-                                      ? "Management guidance"
-                                      : c.kind === "reported"
-                                        ? "Reported fact"
-                                        : "Unconfirmed report"}
-                                  </span>
-                                  <button
-                                    className="text-button"
-                                    onClick={() =>
-                                      openSource(c.document_version_id)
-                                    }
-                                  >
-                                    Read source{" "}
-                                    <Icon name="source" width="12" />
-                                  </button>
-                                </footer>
-                                {c.source_version_ids?.length > 1 && (
-                                  <details className="source-provenance">
-                                    <summary>
-                                      {c.source_version_ids.length} source
-                                      versions · {c.origin_keys.length} declared
-                                      origin
-                                      {c.origin_keys.length === 1 ? "" : "s"}
-                                    </summary>
-                                    <p className="fine">
-                                      Copied coverage is grouped; it is not
-                                      independent confirmation.
-                                    </p>
-                                    {c.source_version_ids.map((id) => (
-                                      <button
-                                        key={id}
-                                        className="source-link"
-                                        onClick={() => openSource(id)}
-                                      >
-                                        {doc(id)?.source} · {doc(id)?.title} ↗
-                                      </button>
-                                    ))}
-                                  </details>
-                                )}
-                              </article>
-                            ))}
-                        </div>
-                        <div className="unknown-row">
-                          <span>?</span>
-                          <div>
-                            <strong>What we still don’t know</strong>
-                            <p>{brief.unknowns.join(" ")}</p>
-                          </div>
-                        </div>
-                      </>
-                    </RetainedView>
-                    <RetainedView active={tab === "expectations"}>
-                      <ExpectationsPanel
-                        initialRead={
-                          panelRead?.tab === "expectations" ? panelRead : null
-                        }
-                        visible={view === "workspace" && tab === "expectations"}
-                        key={instrumentId}
-                        instrumentId={instrumentId}
-                        enabled={modelStatus?.briefing_enabled}
-                        onSource={setSource}
-                        onView={setTab}
-                        onDraft={(q) => {
-                          openEditor();
-                          setEditor({ ...formFor(current, q), question: q });
-                        }}
-                      />
-                    </RetainedView>
-                    <RetainedView active={tab === "valuation"}>
-                      <ValuationPanel
-                        initialRead={
-                          panelRead?.tab === "valuation" ? panelRead : null
-                        }
-                        visible={view === "workspace" && tab === "valuation"}
-                        key={data.instrument.id}
-                        instrument={data.instrument}
-                        performance={data.performance}
-                        quote={data.market?.quote?.quote}
-                      />
-                    </RetainedView>
-                    <RetainedView active={tab === "fundamentals"}>
-                      <>
-                        {!isRecorded && (
-                          <FilingWatch
-                            key={`watch-${data.instrument.id}`}
-                            instrumentId={data.instrument.id}
-                            watch={data.filing_watch}
-                            configured={data.sec_status?.configured}
-                            busy={busy}
-                            onChange={(enabled) =>
-                              act(
-                                () =>
-                                  api.filingWatch(data.instrument.id, enabled),
-                                enabled
-                                  ? "Daily filing checks enabled. The first check is queued."
-                                  : "Future filing checks stopped. An active check may finish.",
-                              )
-                            }
-                          />
-                        )}
-                        {!isRecorded && (
-                          <FinancialPerformance
-                            key={data.instrument.id}
-                            data={data.performance}
-                          />
-                        )}
-                        {!isRecorded && (
-                          <h3 className="monitoring-inputs-heading">
-                            Current monitoring inputs
-                          </h3>
-                        )}
-                        <div className="metrics-table">
-                          <div className="table-heading">
-                            <span>REPORTED METRIC</span>
-                            <span>LATEST</span>
-                            <span>PERIOD</span>
-                          </div>
-                          {Object.keys(metrics).map((key) => {
-                            const f = latest(key);
-                            return (
-                              <button
-                                className="metric-row"
-                                key={key}
-                                disabled={!f.document_version_id}
-                                onClick={() =>
-                                  f.document_version_id &&
-                                  openSource(f.document_version_id)
-                                }
-                              >
-                                <span>
-                                  {metrics[key]}
-                                  {f.reason && <small>{f.reason}</small>}
-                                  <small>
-                                    {key === "revenue_growth"
-                                      ? "Revenue change versus the comparable period last year"
-                                      : "Operating income as a share of revenue"}
-                                  </small>
-                                </span>
-                                <strong>
-                                  {f.value == null
-                                    ? "—"
-                                    : `${displayNumber(f.value)}%`}
-                                </strong>
-                                <span>
-                                  {f.period}{" "}
-                                  {f.document_version_id && (
-                                    <Icon name="source" width="12" />
-                                  )}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                        <FilingDetails filing={filing} />
-                        <div className="unknown-row">
-                          <span>i</span>
-                          <p>
-                            {data.demo.period_type === "annual"
-                              ? "These metrics use an annual reporting period."
-                              : "These metrics use a quarterly reporting period."}{" "}
-                            Growth and margin use reported inputs; SEC ratios
-                            are calculated in the app. Guidance is an
-                            expectation, not an observed result. Consensus is
-                            unavailable.
-                          </p>
-                        </div>
-                      </>
-                    </RetainedView>
-                    <RetainedView active={tab === "sources"}>
-                      <div className="sources-list">
-                        {data.source_checks.map((c) => (
-                          <article key={c.source_id}>
-                            <div className="row">
-                              <h3>{c.name}</h3>
-                              <span
-                                className={`status ${c.state !== "fresh" ? "not_met" : "met"}`}
-                              >
-                                {c.state !== "fresh"
-                                  ? c.state === "denied"
-                                    ? "Access denied"
-                                    : c.state === "unknown"
-                                      ? "Not checked"
-                                      : "Unavailable"
-                                  : isRecorded
-                                    ? "Recorded check complete"
-                                    : "Check complete"}
-                              </span>
+                              </details>
                             </div>
+                          </details>
+                          {!isRecorded && (
+                            <SentimentPanel
+                              key={instrumentId}
+                              onThemeSource={setSource}
+                              onCoverage={() => setSourcesOpen(true)}
+                              data={data}
+                              busy={busy}
+                              modelStatus={modelStatus}
+                              onSource={openSource}
+                              onCheckIdea={(purpose) =>
+                                act(
+                                  () =>
+                                    api.ideaAlertCheck(
+                                      instrumentId,
+                                      data.sentiment.id,
+                                      current.id,
+                                      purpose,
+                                    ),
+                                  "Check saved in History. Potential connections also appear in Updates.",
+                                )
+                              }
+                              loadingRun={loadingRun}
+                              onAnalyze={(days) =>
+                                startLoading({
+                                  analyze: true,
+                                  lookback_days: days,
+                                })
+                              }
+                              onWatch={(
+                                enabled,
+                                interval,
+                                matchIdea,
+                                includeContext,
+                                ideaPurpose,
+                              ) =>
+                                act(
+                                  () =>
+                                    api.newsWatch(
+                                      instrumentId,
+                                      enabled,
+                                      interval,
+                                      matchIdea,
+                                      includeContext,
+                                      ideaPurpose,
+                                    ),
+                                  enabled
+                                    ? "Local news and social watch enabled."
+                                    : "Future scheduled checks stopped.",
+                                )
+                              }
+                              onEventWatch={(versionId) =>
+                                act(
+                                  () => api.eventWatch(instrumentId, versionId),
+                                  versionId
+                                    ? "Event checks enabled for this approved revision at scheduled news checks."
+                                    : "Automatic event checks stopped.",
+                                )
+                              }
+                            />
+                          )}
+                          {isRecorded && (
+                            <section
+                              className="passage-selection"
+                              aria-label="Source passage brief"
+                            >
+                              <div className="row">
+                                <span className="section-label">
+                                  ACROSS THE SOURCES
+                                </span>
+                                {!data.selected_passages &&
+                                  data.documents.length > 0 &&
+                                  modelStatus?.enabled &&
+                                  isRecorded && (
+                                    <button
+                                      disabled={
+                                        busy ||
+                                        modelStatus.budget.unresolved > 0
+                                      }
+                                      onClick={() =>
+                                        act(
+                                          () =>
+                                            api.selectPassages(
+                                              data.demo.stage,
+                                              instrumentId,
+                                            ),
+                                          "Source passages are ready.",
+                                        )
+                                      }
+                                    >
+                                      {busy
+                                        ? "Reading sources…"
+                                        : "Select key passages"}
+                                    </button>
+                                  )}
+                              </div>
+                              {data.selected_passages ? (
+                                <>
+                                  <p className="fine">
+                                    {data.selected_passages.limitation}
+                                    {data.selected_passages
+                                      .omitted_passage_count > 0 &&
+                                      ` ${data.selected_passages.omitted_passage_count} source passages were not selected; review the full sources below.`}
+                                  </p>
+                                  <ul>
+                                    {data.selected_passages.passages.map(
+                                      (p) => (
+                                        <li key={p.id}>
+                                          <blockquote>{p.quote}</blockquote>
+                                          <button
+                                            className="source-link"
+                                            onClick={() =>
+                                              openSource(p.document_id)
+                                            }
+                                          >
+                                            {p.source} · {date(p.published_at)}{" "}
+                                            ↗
+                                          </button>
+                                        </li>
+                                      ),
+                                    )}
+                                  </ul>
+                                </>
+                              ) : (
+                                <p className="fine">
+                                  {data.documents.length === 0
+                                    ? "No permitted source passages available."
+                                    : modelStatus?.budget.unresolved > 0
+                                      ? modelAvailability(modelStatus).message
+                                      : isRecorded
+                                        ? "Read original evidence below. Optional AI selection highlights passages without changing your conditions or assessments."
+                                        : "This workspace contains structured financial data. Use the calculation trail to inspect inputs and open the original filing. News and management guidance are not connected yet."}
+                                </p>
+                              )}
+                            </section>
+                          )}
+                          <div className="evidence-grid">
+                            {data.claims
+                              .filter(
+                                (c) =>
+                                  !data.documents.some(
+                                    (d) =>
+                                      d.supersedes_id === c.document_version_id,
+                                  ),
+                              )
+                              .filter(
+                                (c) =>
+                                  c.kind !== "reported" ||
+                                  data.observations.some(
+                                    (o) =>
+                                      (
+                                        c.source_version_ids || [
+                                          c.document_version_id,
+                                        ]
+                                      ).includes(o.document_version_id) &&
+                                      o.period === data.demo.period,
+                                  ),
+                              )
+                              .slice(0, 4)
+                              .map((c) => (
+                                <article
+                                  className={`evidence-card ${c.stance}`}
+                                  key={c.id}
+                                >
+                                  <div className="row">
+                                    <span className="stance">
+                                      {c.stance === "support"
+                                        ? "↗ Supports"
+                                        : c.stance === "challenge"
+                                          ? "↘ Challenges"
+                                          : "◌ Open question"}
+                                    </span>
+                                    <small>{date(c.available_at)}</small>
+                                  </div>
+                                  <h3>{c.title}</h3>
+                                  <p>{c.body}</p>
+                                  <footer>
+                                    <span>
+                                      {c.kind === "guidance"
+                                        ? "Management guidance"
+                                        : c.kind === "reported"
+                                          ? "Reported fact"
+                                          : "Unconfirmed report"}
+                                    </span>
+                                    <button
+                                      className="text-button"
+                                      onClick={() =>
+                                        openSource(c.document_version_id)
+                                      }
+                                    >
+                                      Read source{" "}
+                                      <Icon name="source" width="12" />
+                                    </button>
+                                  </footer>
+                                  {c.source_version_ids?.length > 1 && (
+                                    <details className="source-provenance">
+                                      <summary>
+                                        {c.source_version_ids.length} source
+                                        versions · {c.origin_keys.length}{" "}
+                                        declared origin
+                                        {c.origin_keys.length === 1 ? "" : "s"}
+                                      </summary>
+                                      <p className="fine">
+                                        Copied coverage is grouped; it is not
+                                        independent confirmation.
+                                      </p>
+                                      {c.source_version_ids.map((id) => (
+                                        <button
+                                          key={id}
+                                          className="source-link"
+                                          onClick={() => openSource(id)}
+                                        >
+                                          {doc(id)?.source} · {doc(id)?.title}{" "}
+                                          ↗
+                                        </button>
+                                      ))}
+                                    </details>
+                                  )}
+                                </article>
+                              ))}
+                          </div>
+                          <div className="unknown-row">
+                            <span>?</span>
+                            <div>
+                              <strong>What we still don’t know</strong>
+                              <p>{brief.unknowns.join(" ")}</p>
+                            </div>
+                          </div>
+                        </>
+                      </RetainedView>
+                      <RetainedView active={tab === "expectations"}>
+                        <>
+                          {!isRecorded && (
+                            <Suspense
+                              fallback={
+                                <p role="status">Loading management outlook…</p>
+                              }
+                            >
+                              <ManagementOutlook
+                                key={`outlook-${data.instrument.id}`}
+                                data={data.management_outlook}
+                              />
+                            </Suspense>
+                          )}
+                          {!isRecorded && (
+                            <Suspense
+                              fallback={<p>Loading analyst forecasts…</p>}
+                            >
+                              <FmpPanel
+                                key={`forecasts-${instrumentId}`}
+                                instrumentId={instrumentId}
+                                visible={
+                                  view === "workspace" && tab === "expectations"
+                                }
+                                mode="outlook"
+                              />
+                            </Suspense>
+                          )}
+                          <ExpectationsPanel
+                            initialRead={
+                              panelRead?.tab === "expectations"
+                                ? panelRead
+                                : null
+                            }
+                            visible={
+                              view === "workspace" && tab === "expectations"
+                            }
+                            key={instrumentId}
+                            instrumentId={instrumentId}
+                            enabled={modelStatus?.briefing_enabled}
+                            onSource={setSource}
+                            onView={setTab}
+                            onDraft={(q) => {
+                              openEditor();
+                              setEditor({
+                                ...formFor(current, q),
+                                question: q,
+                              });
+                            }}
+                          />
+                        </>
+                      </RetainedView>
+                      {isRecorded && (
+                        <RetainedView active={tab === "business"}>
+                          <div className="overview-welcome">
+                            <h3>{data.instrument.name}</h3>
+                            <p>{brief.text}</p>
                             <p>
-                              {c.state !== "fresh"
-                                ? c.state === "unknown"
-                                  ? "This source has not been checked yet. Refresh when the connection is configured."
-                                  : "The supplier could not be checked. This is a coverage gap, not confirmation that nothing changed."
-                                : `Coverage checked through ${date(c.covered_through)}. A successful check can produce no new article.`}
+                              This is a fictional research scenario. Explore its
+                              reported figures and recorded news before saving
+                              your view.
                             </p>
-                          </article>
-                        ))}
-                        <h3>Source library</h3>
-                        {data.documents.map((d) => (
-                          <button
-                            className="source-link"
-                            key={d.id}
-                            onClick={() => setSource(d)}
-                          >
-                            <span>
-                              {d.title}
-                              <small>
-                                {d.source} · {date(d.published_at)}
-                              </small>
-                            </span>
-                            <Icon name="source" />
-                          </button>
-                        ))}
-                      </div>
-                    </RetainedView>
-                    <div className="research-decision">
-                      <div>
-                        <strong>Where does this leave your research?</strong>
-                        <small>
-                          {data.research_action?.question === question
-                            ? `Saved: ${{ investigate: "investigate further", unresolved: "unresolved", reject: "idea rejected" }[data.research_action.action]}`
-                            : "You can leave it open. Monitoring is optional."}
-                        </small>
-                      </div>
-                      <div>
-                        <button
-                          onClick={() =>
-                            act(
-                              () =>
-                                api.research({
-                                  question,
-                                  action: "investigate",
-                                  instrument_id: instrumentId,
-                                }),
-                              "Research decision saved.",
-                            )
-                          }
-                        >
-                          Investigate
-                        </button>
-                        <button
-                          onClick={() =>
-                            act(
-                              () =>
-                                api.research({
-                                  question,
-                                  action: "unresolved",
-                                  instrument_id: instrumentId,
-                                }),
-                              "Question left unresolved.",
-                            )
-                          }
-                        >
-                          Unresolved
-                        </button>
-                        <button
-                          onClick={() =>
-                            act(
-                              () =>
-                                api.research({
-                                  question,
-                                  action: "reject",
-                                  instrument_id: instrumentId,
-                                }),
-                              "Idea rejected. You can revisit the research later.",
-                            )
-                          }
-                        >
-                          Reject idea
-                        </button>
-                      </div>
-                    </div>
-                  </section>
+                            <button onClick={() => setTab("evidence")}>
+                              Read news &amp; discussion
+                            </button>
+                          </div>
+                        </RetainedView>
+                      )}
+                      {!isRecorded && (
+                        <RetainedView active={tab === "business"}>
+                          <>
+                            <BusinessPanel
+                              key={`business-${instrumentId}`}
+                              instrumentId={instrumentId}
+                              visible={
+                                view === "workspace" && tab === "business"
+                              }
+                              disclosures={data.disclosures}
+                              modelStatus={modelStatus}
+                              onRefresh={() =>
+                                act(
+                                  () => api.refreshDisclosures(instrumentId),
+                                  "Original company documents checked.",
+                                )
+                              }
+                              onDraft={(q) => {
+                                openEditor();
+                                setEditor({
+                                  ...formFor(current, q),
+                                  question: q,
+                                });
+                              }}
+                            />
+                            <FinancialOverview
+                              data={data.financial_depth}
+                              compact
+                            />
+                            <Suspense fallback={<p>Loading revenue flow…</p>}>
+                              <RevenueFlow
+                                key={`overview-flow-${instrumentId}`}
+                                data={data.income_flow}
+                                segments={data.segment_revenue}
+                              />
+                            </Suspense>
+                          </>
+                        </RetainedView>
+                      )}
+                      <RetainedView active={tab === "valuation"}>
+                        <>
+                          {!isRecorded && (
+                            <Suspense fallback={<p>Loading comparisons…</p>}>
+                              <FmpPanel
+                                key={`peers-${instrumentId}`}
+                                instrumentId={instrumentId}
+                                visible={
+                                  view === "workspace" && tab === "valuation"
+                                }
+                              />
+                            </Suspense>
+                          )}
+                          <ValuationPanel
+                            initialRead={
+                              panelRead?.tab === "valuation" ? panelRead : null
+                            }
+                            visible={
+                              view === "workspace" && tab === "valuation"
+                            }
+                            key={data.instrument.id}
+                            instrument={data.instrument}
+                            performance={data.performance}
+                            quote={data.market?.quote?.quote}
+                          />
+                        </>
+                      </RetainedView>
+                      <RetainedView active={tab === "fundamentals"}>
+                        <>
+                          {!isRecorded && (
+                            <FinancialOverview
+                              key={`overview-${data.instrument.id}`}
+                              data={data.financial_depth}
+                            />
+                          )}
+                          {!isRecorded && (
+                            <Suspense fallback={<p>Loading revenue flow…</p>}>
+                              <RevenueFlow
+                                key={`flow-${data.instrument.id}`}
+                                data={data.income_flow}
+                                segments={data.segment_revenue}
+                              />
+                            </Suspense>
+                          )}
+                          {!isRecorded && (
+                            <RevenueBreakdown
+                              key={`mix-${data.instrument.id}`}
+                              data={data.segment_revenue}
+                            />
+                          )}
+                          {!isRecorded && (
+                            <FinancialPosition
+                              key={`position-${data.instrument.id}`}
+                              performance={data.performance}
+                              debt={data.financial_depth?.debt}
+                            />
+                          )}
+                          {!isRecorded && (
+                            <OriginalFilings
+                              key={`original-${data.instrument.id}`}
+                              instrumentId={data.instrument.id}
+                              data={data.disclosures}
+                              busy={busy}
+                              onRefresh={() =>
+                                act(
+                                  () =>
+                                    api.refreshDisclosures(data.instrument.id),
+                                  "Original company documents checked.",
+                                )
+                              }
+                            />
+                          )}
+                          {!isRecorded && (
+                            <FilingWatch
+                              key={`watch-${data.instrument.id}`}
+                              instrumentId={data.instrument.id}
+                              watch={data.filing_watch}
+                              configured={data.sec_status?.configured}
+                              busy={busy}
+                              onChange={(enabled) =>
+                                act(
+                                  () =>
+                                    api.filingWatch(
+                                      data.instrument.id,
+                                      enabled,
+                                    ),
+                                  enabled
+                                    ? "Daily filing checks enabled. The first check is queued."
+                                    : "Future filing checks stopped. An active check may finish.",
+                                )
+                              }
+                            />
+                          )}
+                          {!isRecorded && (
+                            <FinancialPerformance
+                              key={data.instrument.id}
+                              data={data.performance}
+                            />
+                          )}
+                          {!isRecorded && (
+                            <FinancialDepth data={data.financial_depth} />
+                          )}
+                          {!isRecorded && (
+                            <h3 className="monitoring-inputs-heading">
+                              Current monitoring inputs
+                            </h3>
+                          )}
+                          <div className="metrics-table">
+                            <div className="table-heading">
+                              <span>REPORTED METRIC</span>
+                              <span>LATEST</span>
+                              <span>PERIOD</span>
+                            </div>
+                            {Object.keys(metrics).map((key) => {
+                              const f = latest(key);
+                              return (
+                                <button
+                                  className="metric-row"
+                                  key={key}
+                                  disabled={!f.document_version_id}
+                                  onClick={() =>
+                                    f.document_version_id &&
+                                    openSource(f.document_version_id)
+                                  }
+                                >
+                                  <span>
+                                    {metrics[key]}
+                                    {f.reason && <small>{f.reason}</small>}
+                                    <small>
+                                      {key === "revenue_growth"
+                                        ? "Revenue change versus the comparable period last year"
+                                        : "Operating income as a share of revenue"}
+                                    </small>
+                                  </span>
+                                  <strong>
+                                    {f.value == null
+                                      ? "—"
+                                      : `${displayNumber(f.value)}%`}
+                                  </strong>
+                                  <span>
+                                    {f.period}{" "}
+                                    {f.document_version_id && (
+                                      <Icon name="source" width="12" />
+                                    )}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <FilingDetails filing={filing} />
+                          <div className="unknown-row">
+                            <span>i</span>
+                            <p>
+                              {data.demo.period_type === "annual"
+                                ? "These metrics use an annual reporting period."
+                                : "These metrics use a quarterly reporting period."}{" "}
+                              Growth and margin use reported inputs; SEC ratios
+                              are calculated in the app. Guidance is an
+                              expectation, not an observed result. Read
+                              forecasts separately in Outlook.
+                            </p>
+                          </div>
+                        </>
+                      </RetainedView>
+                    </section>
+                  </div>
                 </>
               </RetainedView>
               <div
@@ -2204,148 +2155,309 @@ function CompanyWorkspace({
             </>
           )}
         </main>
-        <aside
-          id="idea-sidebar"
-          className="idea-panel"
-          aria-label="Current idea"
-          aria-busy={companyLoading && !loadError}
-          tabIndex={0}
+        <Modal
+          open={researchOpen && ideaSidebarAvailable}
+          onClose={() => setResearchOpen(false)}
+          title="My research"
+          className="research-dialog"
+          keepMounted
         >
-          {companyLoading ? (
-            loadError ? (
-              <p className="muted">
-                Saved idea unavailable until research loads.
-              </p>
-            ) : (
-              <LoadingSkeleton variant="idea" label="Loading saved idea…" />
-            )
-          ) : (
-            <>
-              <div className="panel-title">
-                <span className="section-label">CURRENT IDEA</span>
-                <span
-                  className={`status ${current?.status === "monitoring" ? "met" : ""}`}
-                >
-                  {current?.status || "Not saved"}
-                </span>
-              </div>
-              <h2>
-                {current?.question || "Turn a question into a point of view."}
-              </h2>
-              <p className="reasoning">
-                {current?.reasoning ||
-                  "What would need to stay true for this company to be worth a closer look?"}
-              </p>
-              <button
-                className={current ? "secondary full" : "primary full"}
-                onClick={openEditor}
-              >
-                {current ? "Edit idea" : "Save my reasoning"}
-                <Icon name={current ? "idea" : "plus"} />
-              </button>
-              <button className="text-button" onClick={() => setView("idea")}>
-                Get help defining this idea ↗
-              </button>
-              <div className="divider" />
-              {evaluation ? (
-                <>
-                  <div className="row">
-                    <span className="section-label">
-                      {checkingCurrent
-                        ? "PREVIOUS ASSESSMENT"
-                        : newUpdates
-                          ? "WHAT CHANGED"
-                          : "LATEST ASSESSMENT"}
-                    </span>
-                    {newUpdates && <span className="new-pill">NEW</span>}
-                  </div>
-                  <small className="as-of">
-                    Assessed{" "}
-                    {date(
-                      evaluation.manifest.assessed_at ||
-                        evaluation.manifest.cutoff,
-                    )}{" "}
-                    · revision {current.revision}
-                  </small>
-                  {checkingCurrent && (
-                    <p className="checking" role="status">
-                      Checking the new evidence… This assessment uses the
-                      earlier cutoff above.
-                    </p>
-                  )}
-                  {latestChange && (
-                    <p className="change-context">
-                      {latestChange.summary}.{" "}
-                      {latestChange.kind === "evidence"
-                        ? "Review the source alongside your reasoning; numerical conditions may be unchanged."
-                        : ""}
-                    </p>
-                  )}
-                  {resultsPanel(evaluation, current, false, true)}
-                </>
+          {!companyLoading && (
+            <div className="my-research-content" key={instrumentId}>
+              {isRecorded ? (
+                <QuestionSelector
+                  key={scope}
+                  instrumentId={instrumentId}
+                  company={data.instrument.name}
+                  question={question}
+                  currentQuestion={current?.question}
+                  library={data.question_library}
+                  onSaved={(library) => {
+                    if (activeScope.current !== scope) return;
+                    setData((previous) => ({
+                      ...previous,
+                      question_library: library,
+                    }));
+                    setQuestion(library.selected_question);
+                  }}
+                />
               ) : (
-                <div className="empty-monitor">
-                  <span className="orbit">◎</span>
-                  <h3>
-                    {checkingCurrent
-                      ? "Checking the evidence"
-                      : "Follow the evidence"}
-                  </h3>
-                  <p>
-                    {current?.status === "draft"
-                      ? "Your draft is saved. Add a condition and approve it whenever you are ready."
-                      : "Choose the figures that matter to your idea. We’ll show what changes and keep your original reasoning beside it."}
+                <ResearchQuestion
+                  key={scope}
+                  instrumentId={instrumentId}
+                  company={data.instrument.name}
+                  question={question}
+                  currentQuestion={current?.question}
+                  library={data.question_library}
+                  onSaved={(library) => {
+                    if (activeScope.current !== scope) return;
+                    setData((previous) => ({
+                      ...previous,
+                      question_library: library,
+                    }));
+                    setQuestion(library.selected_question);
+                  }}
+                  onQuestion={setQuestion}
+                  modelStatus={modelStatus}
+                  onDone={() =>
+                    api
+                      .modelStatus()
+                      .then(
+                        (value) =>
+                          activeScope.current === scope &&
+                          setModelStatus(value),
+                      )
+                      .catch(() => {})
+                  }
+                  onDraft={(q) => {
+                    openEditor();
+                    setEditor({
+                      ...formFor(current, q),
+                      question: q,
+                    });
+                  }}
+                />
+              )}
+
+              {companyLoading ? (
+                loadError ? (
+                  <p className="muted">
+                    Saved idea unavailable until research loads.
                   </p>
+                ) : (
+                  <LoadingSkeleton variant="idea" label="Loading saved idea…" />
+                )
+              ) : (
+                <>
+                  <div className="panel-title">
+                    <span className="section-label">CURRENT IDEA</span>
+                    <span
+                      className={`status ${current?.status === "monitoring" ? "met" : ""}`}
+                    >
+                      {current?.status || "Not saved"}
+                    </span>
+                  </div>
+                  <h2>
+                    {current?.question ||
+                      "Turn a question into a point of view."}
+                  </h2>
+                  <p className="reasoning">
+                    {current?.reasoning ||
+                      "What would need to stay true for this company to be worth a closer look?"}
+                  </p>
+                  <button
+                    className={current ? "secondary full" : "primary full"}
+                    onClick={openEditor}
+                  >
+                    {current ? "Edit idea" : "Save my reasoning"}
+                    <Icon name={current ? "idea" : "plus"} />
+                  </button>
+                  <button
+                    className="text-button"
+                    onClick={() => setView("idea")}
+                  >
+                    Get help defining this idea ↗
+                  </button>
+                  <div className="divider" />
+                  {evaluation ? (
+                    <>
+                      <div className="row">
+                        <span className="section-label">
+                          {checkingCurrent
+                            ? "PREVIOUS ASSESSMENT"
+                            : newUpdates
+                              ? "WHAT CHANGED"
+                              : "LATEST ASSESSMENT"}
+                        </span>
+                        {newUpdates && <span className="new-pill">NEW</span>}
+                      </div>
+                      <small className="as-of">
+                        Assessed{" "}
+                        {date(
+                          evaluation.manifest.assessed_at ||
+                            evaluation.manifest.cutoff,
+                        )}{" "}
+                        · revision {current.revision}
+                      </small>
+                      {checkingCurrent && (
+                        <p className="checking" role="status">
+                          Checking the new evidence… This assessment uses the
+                          earlier cutoff above.
+                        </p>
+                      )}
+                      {latestChange && (
+                        <p className="change-context">
+                          {latestChange.summary}.{" "}
+                          {latestChange.kind === "evidence"
+                            ? "Review the source alongside your reasoning; numerical conditions may be unchanged."
+                            : ""}
+                        </p>
+                      )}
+                      {resultsPanel(evaluation, current, false, true)}
+                    </>
+                  ) : (
+                    <div className="empty-monitor">
+                      <span className="orbit">◎</span>
+                      <h3>
+                        {checkingCurrent
+                          ? "Checking the evidence"
+                          : "Follow the evidence"}
+                      </h3>
+                      <p>
+                        {current?.status === "draft"
+                          ? "Your draft is saved. Add a condition and approve it whenever you are ready."
+                          : "Choose the figures that matter to your idea. We’ll show what changes and keep your original reasoning beside it."}
+                      </p>
+                    </div>
+                  )}
+                  {data.jobs.some(
+                    (j) =>
+                      j.status === "failed" && j.version_id === current?.id,
+                  ) && (
+                    <p role="alert" className="warning">
+                      Assessment unavailable. Your saved idea is intact. Edit
+                      and save a new revision to check again.
+                    </p>
+                  )}
+                  <details className="secondary-details monitoring-details">
+                    <summary>Monitoring details</summary>
+                    <p className="fine">
+                      {isRecorded
+                        ? "Age is assessed at the recorded sample date."
+                        : "Reporting age is checked against the current UTC date. This does not fetch new filings."}
+                    </p>
+                    {!isRecorded && (
+                      <p className="fine">
+                        {data.filing_watch?.enabled
+                          ? "Daily filing checks are enabled while this app runs."
+                          : "Daily filing checks are off. Enable them in Financials or use Refresh research."}{" "}
+                        Annual figures cannot satisfy quarterly conditions.
+                      </p>
+                    )}
+                  </details>
+                </>
+              )}
+              <div className="research-decision">
+                <div>
+                  <strong>Where does this leave your research?</strong>
+                  <small>
+                    {data.research_action?.question === question
+                      ? `Saved: ${{ investigate: "investigate further", unresolved: "unresolved", reject: "idea rejected" }[data.research_action.action]}`
+                      : "You can leave it open. Monitoring is optional."}
+                  </small>
                 </div>
-              )}
-              {data.jobs.some(
-                (j) => j.status === "failed" && j.version_id === current?.id,
-              ) && (
-                <p role="alert" className="warning">
-                  Assessment unavailable. Your saved idea is intact. Edit and
-                  save a new revision to check again.
-                </p>
-              )}
-              <details className="secondary-details monitoring-details">
-                <summary>Monitoring details</summary>
-                <p className="fine">
-                  {isRecorded
-                    ? "Age is assessed at the recorded sample date."
-                    : "Reporting age is checked against the current UTC date. This does not fetch new filings."}
-                </p>
-                {!isRecorded && (
-                  <p className="fine">
-                    {data.filing_watch?.enabled
-                      ? "Daily filing checks are enabled while this app runs."
-                      : "Daily filing checks are off. Enable them in Fundamentals or use Refresh research."}{" "}
-                    Annual figures cannot satisfy quarterly conditions.
-                  </p>
-                )}
-              </details>
-            </>
+                <div>
+                  <button
+                    onClick={() =>
+                      act(
+                        () =>
+                          api.research({
+                            question,
+                            action: "investigate",
+                            instrument_id: instrumentId,
+                          }),
+                        "Research decision saved.",
+                      )
+                    }
+                  >
+                    Investigate
+                  </button>
+                  <button
+                    onClick={() =>
+                      act(
+                        () =>
+                          api.research({
+                            question,
+                            action: "unresolved",
+                            instrument_id: instrumentId,
+                          }),
+                        "Question left unresolved.",
+                      )
+                    }
+                  >
+                    Unresolved
+                  </button>
+                  <button
+                    onClick={() =>
+                      act(
+                        () =>
+                          api.research({
+                            question,
+                            action: "reject",
+                            instrument_id: instrumentId,
+                          }),
+                        "Idea rejected. You can revisit the research later.",
+                      )
+                    }
+                  >
+                    Reject idea
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
-        </aside>
-      </div>
-      <footer className="workspace-footer">
-        <span>
-          <span className="connection-dot" /> Saved on this Mac
-        </span>
-        <span>
-          {!selectedCompanyId
-            ? "Company research and labelled fictional samples"
-            : isRecorded
-              ? "Fictional evidence only"
-              : "Company research · Check source timestamps"}
-        </span>
-        <a
-          className="font-credit"
-          href="/fonts/MiSans-license.pdf"
-          target="_blank"
-          rel="noreferrer"
+        </Modal>
+        <Modal
+          open={sourcesOpen && !companyLoading}
+          onClose={() => setSourcesOpen(false)}
+          title="Data & sources"
+          className="evidence-dialog"
         >
-          Typography · MiSans by Xiaomi
-        </a>
-      </footer>
+          <p>
+            Check what was collected, when it was checked and where information
+            is missing. News and discussion stay in their own reading view.
+          </p>
+          {!isRecorded && (
+            <SourceConnections data={data} loadingRun={loadingRun} />
+          )}
+
+          <div className="sources-list">
+            {data.source_checks.map((c) => (
+              <article key={c.source_id}>
+                <div className="row">
+                  <h3>{c.name}</h3>
+                  <span
+                    className={`status ${c.state !== "fresh" ? "not_met" : "met"}`}
+                  >
+                    {c.state !== "fresh"
+                      ? c.state === "denied"
+                        ? "Access denied"
+                        : c.state === "unknown"
+                          ? "Not checked"
+                          : "Unavailable"
+                      : isRecorded
+                        ? "Recorded check complete"
+                        : "Check complete"}
+                  </span>
+                </div>
+                <p>
+                  {c.state !== "fresh"
+                    ? c.state === "unknown"
+                      ? "This source has not been checked yet. Refresh when the connection is configured."
+                      : "The supplier could not be checked. This is a coverage gap, not confirmation that nothing changed."
+                    : `Coverage checked through ${date(c.covered_through)}. A successful check can produce no new article.`}
+                </p>
+              </article>
+            ))}
+            <h3>Source library</h3>
+            {data.documents.map((d) => (
+              <button
+                className="source-link"
+                key={d.id}
+                onClick={() => setSource(d)}
+              >
+                <span>
+                  {d.title}
+                  <small>
+                    {d.source} · {date(d.published_at)}
+                  </small>
+                </span>
+                <Icon name="source" />
+              </button>
+            ))}
+          </div>
+        </Modal>
+      </div>
       <Modal
         open={!companyLoading && !!source}
         title="Source evidence"
@@ -2364,10 +2476,20 @@ function CompanyWorkspace({
             </span>
             <h3>{source.title}</h3>
             <p className="muted">
-              {source.source} · published {date(source.published_at)}
+              {source.source} ·{" "}
+              {source.timestamp_basis === "feed_updated"
+                ? "feed updated"
+                : "published"}{" "}
+              {date(source.published_at)}
               <br />
               First available here {date(source.available_at)}
             </p>
+            {source.timestamp_basis === "feed_updated" && (
+              <p className="fine">
+                The feed supplies an update time. Original publication time and
+                reply-to context are unavailable.
+              </p>
+            )}
             {source.kind !== "sec-calculation" ? (
               <>
                 <blockquote>

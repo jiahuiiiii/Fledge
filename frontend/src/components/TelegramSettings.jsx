@@ -263,7 +263,9 @@ export default function TelegramSettings() {
                         ? "Open the link, tap Start in Telegram, then check your connection here."
                         : "Create a connection link, then open it in Telegram. The link expires after ten minutes."}
                     </p>
-                    <div className="telegram-actions">
+                    <div
+                      className={`telegram-actions telegram-pairing-actions ${link ? "has-link" : ""}`}
+                    >
                       {link && (
                         <a
                           className="telegram-open primary"
@@ -292,16 +294,16 @@ export default function TelegramSettings() {
                               ? "Check connection"
                               : "Connect Telegram"}
                       </button>
+                      {link && (
+                        <button
+                          className="telegram-new-link"
+                          disabled={!!busy}
+                          onClick={() => act("connect", api.telegramConnect)}
+                        >
+                          Create a new link
+                        </button>
+                      )}
                     </div>
-                    {link && (
-                      <button
-                        className="telegram-new-link"
-                        disabled={!!busy}
-                        onClick={() => act("connect", api.telegramConnect)}
-                      >
-                        Create a new link
-                      </button>
-                    )}
                   </section>
                 )
               )}

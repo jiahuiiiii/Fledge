@@ -141,114 +141,9 @@ export default function MarketResearch({
           : "Compare each sourced development with your question and assumptions. A company-wide briefing does not automatically answer a custom research question.";
   return (
     <section className="market-research" aria-label="Company news and briefing">
-      <div className="market-section-head">
-        <div>
-          <span className="section-label">RESEARCH BRIEF</span>
-          <h2>What’s developing</h2>
-        </div>
-        {!brief && (
-          <button
-            disabled={
-              busy ||
-              !news.length ||
-              !modelStatus?.briefing_enabled ||
-              modelStatus?.budget.unresolved > 0
-            }
-            onClick={onGenerate}
-          >
-            {busy ? "Reading sources…" : "Summarise sources"}
-          </button>
-        )}
-      </div>
-      {question && (
-        <p className="fine">
-          <strong>Reading focus:</strong> {focus} The shared company briefing
-          stays the same when you change questions.
-        </p>
-      )}
-      {!brief &&
-        (!modelStatus?.briefing_enabled ||
-          modelStatus?.budget.unresolved > 0) && (
-          <p className="fine" role="status">
-            {modelAvailability(modelStatus, "briefing_enabled").message}
-          </p>
-        )}
-      {brief ? (
-        <>
-          <p className="fine">
-            AI summary · {brief.included_news_count} supplied headlines/snippets
-            · latest news {stamp(brief.latest_news_at)}. Interpretation may omit
-            context.
-          </p>
-          <label className="field" htmlFor={viewId}>
-            Briefing view
-            <Select
-              id={viewId}
-              aria-label="Briefing view"
-              value={pointKind}
-              onChange={(e) => setPointKind(e.target.value)}
-              aria-controls={`${viewId}-points`}
-            >
-              <option value="all">All points ({points.length})</option>
-              {Object.entries(kinds).map(([kind, label]) => (
-                <option key={kind} value={kind}>
-                  {label} ({points.filter((p) => p.kind === kind).length})
-                </option>
-              ))}
-            </Select>
-          </label>
-          <p className="fine" role="status">
-            {visiblePoints.length
-              ? `Showing ${visiblePoints.length} of ${points.length} briefing points. Labels describe the AI summary’s type, not whether a development is favourable.`
-              : `No points in this briefing are labelled ${kinds[pointKind]?.toLowerCase()}. This does not establish that no risks or uncertainty exist; inspect All points and the original sources.`}
-          </p>
-          <div className="market-brief-points" id={`${viewId}-points`}>
-            {visiblePoints.map((p, i) => (
-              <article key={i} className={`market-point ${p.kind}`}>
-                <span className="section-label">
-                  {p.kind === "reported"
-                    ? "REPORTED"
-                    : p.kind === "interpretation"
-                      ? "AI INTERPRETATION"
-                      : "UNCERTAINTY"}
-                </span>
-                <h3>{p.title}</h3>
-                <p>{p.text}</p>
-                <div className="brief-citations">
-                  {p.citations.map((c, j) => (
-                    <button
-                      key={j}
-                      className="source-link"
-                      onClick={() => onSource(c.source_id)}
-                      title={c.quote}
-                      aria-label={`Inspect source ${j + 1}: ${data.documents.find((d) => d.id === c.source_id)?.title || "Source unavailable"}`}
-                    >
-                      {data.documents.find((d) => d.id === c.source_id)
-                        ?.source || "Source"}{" "}
-                      {j + 1} ↗
-                    </button>
-                  ))}
-                </div>
-              </article>
-            ))}
-          </div>
-          <details className="brief-unknowns">
-            <summary>About this AI summary</summary>
-            <p className="fine">{brief.limitation}</p>
-          </details>
-        </>
-      ) : (
-        <p className="fine">
-          Read the news below, or request a concise AI briefing of the supplied
-          headlines and snippets. Your saved reasoning stays separate. No AI
-          call runs when you open or refresh this page.
-        </p>
-      )}
       <div className="market-section-head news-heading">
-        <h3>Recent company news</h3>
-        <span className="fine">
-          Via Finnhub · checked {stamp(status?.completed_at)}
-        </span>
+        <h2>Recent company news</h2>
+        <span className="fine">Saved headlines &amp; snippets</span>
       </div>
       <p className="fine">
         Company mentions first, then related market coverage. Newest within each
@@ -256,7 +151,7 @@ export default function MarketResearch({
       </p>
       {status?.news_error && (
         <p className="warning" role="status">
-          News check unavailable. {status.news_error}{" "}
+          Finnhub news check unavailable. {status.news_error}{" "}
           {news.length > 0 && "Previously retrieved stories remain below."}
         </p>
       )}
@@ -310,9 +205,115 @@ export default function MarketResearch({
         </button>
       )}
       <p className="fine">
-        Headlines and snippets supplied by Finnhub. Original reporting remains
-        with the named publishers.
+        Original reporting remains with the named publishers. Open a headline to
+        inspect the saved text and its dates.
       </p>
+      <details className="news-brief-details">
+        <summary>AI company briefing · {brief ? "saved" : "optional"}</summary>
+        <div className="market-section-head">
+          <div>
+            <span className="section-label">RESEARCH BRIEF</span>
+            <h2>What’s developing</h2>
+          </div>
+          {!brief && (
+            <button
+              disabled={
+                busy ||
+                !news.length ||
+                !modelStatus?.briefing_enabled ||
+                modelStatus?.budget.unresolved > 0
+              }
+              onClick={onGenerate}
+            >
+              {busy ? "Reading sources…" : "Summarise sources"}
+            </button>
+          )}
+        </div>
+        {question && (
+          <p className="fine">
+            <strong>Reading focus:</strong> {focus} The shared company briefing
+            stays the same when you change questions.
+          </p>
+        )}
+        {!brief &&
+          (!modelStatus?.briefing_enabled ||
+            modelStatus?.budget.unresolved > 0) && (
+            <p className="fine" role="status">
+              {modelAvailability(modelStatus, "briefing_enabled").message}
+            </p>
+          )}
+        {brief ? (
+          <>
+            <p className="fine">
+              AI summary · {brief.included_news_count} supplied
+              headlines/snippets · latest news {stamp(brief.latest_news_at)}.
+              Interpretation may omit context.
+            </p>
+            <label className="field" htmlFor={viewId}>
+              Briefing view
+              <Select
+                id={viewId}
+                aria-label="Briefing view"
+                value={pointKind}
+                onChange={(e) => setPointKind(e.target.value)}
+                aria-controls={`${viewId}-points`}
+              >
+                <option value="all">All points ({points.length})</option>
+                {Object.entries(kinds).map(([kind, label]) => (
+                  <option key={kind} value={kind}>
+                    {label} ({points.filter((p) => p.kind === kind).length})
+                  </option>
+                ))}
+              </Select>
+            </label>
+            <p className="fine" role="status">
+              {visiblePoints.length
+                ? `Showing ${visiblePoints.length} of ${points.length} briefing points. Labels describe the AI summary’s type, not whether a development is favourable.`
+                : `No points in this briefing are labelled ${kinds[pointKind]?.toLowerCase()}. This does not establish that no risks or uncertainty exist; inspect All points and the original sources.`}
+            </p>
+            <div className="market-brief-points" id={`${viewId}-points`}>
+              {visiblePoints.map((p, i) => (
+                <article key={i} className={`market-point ${p.kind}`}>
+                  <span className="section-label">
+                    {p.kind === "reported"
+                      ? "REPORTED"
+                      : p.kind === "interpretation"
+                        ? "AI INTERPRETATION"
+                        : "UNCERTAINTY"}
+                  </span>
+                  <h3>{p.title}</h3>
+                  <p>{p.text}</p>
+                  <div className="brief-citations">
+                    {p.citations.map((c, j) => (
+                      <button
+                        key={j}
+                        className="source-link"
+                        onClick={() => onSource(c.source_id)}
+                        title={c.quote}
+                        aria-label={`Inspect source ${j + 1}: ${data.documents.find((d) => d.id === c.source_id)?.title || "Source unavailable"}`}
+                      >
+                        {data.documents.find((d) => d.id === c.source_id)
+                          ?.source || "Source"}{" "}
+                        {j + 1} ↗
+                      </button>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+            <details className="brief-unknowns">
+              <summary>About this AI summary</summary>
+              <p className="fine">{brief.limitation}</p>
+            </details>
+          </>
+        ) : (
+          <p className="fine">
+            Read the news below, or request a concise AI briefing of the
+            supplied headlines and snippets. Your saved reasoning stays
+            separate. No AI call runs when you open or refresh this page.
+          </p>
+        )}
+      </details>
     </section>
   );
 }

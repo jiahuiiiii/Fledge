@@ -214,9 +214,6 @@
   .app-shell .ai-activity {
     padding: 12px var(--workspace-gutter);
   }
-  .app-shell .workspace-footer {
-    padding-inline: var(--workspace-gutter);
-  }
   .modal {
     width: calc(100vw - 16px);
     max-width: calc(100vw - 16px);

@@ -4,13 +4,16 @@ from pathlib import Path
 import secrets
 import threading
 import logging
+import os
 from uuid import UUID
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, RedirectResponse
+from starlette.concurrency import run_in_threadpool
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from . import service
+from . import auth
 from .config import ROOT, DATA, OWNER
 from .models import (
     SaveIdea,
@@ -37,7 +40,8 @@ async def lifespan(app):
     def loop():
         while not stop.wait(0.4):
             try:
-                service.work_once()
+                for owner in auth.background_owners():
+                    service.work_once(owner)
             except Exception:
                 logging.getLogger("thesis").exception("Recorded evaluation failed")
 
@@ -49,7 +53,8 @@ async def lifespan(app):
 
         while not stop.wait(5):
             try:
-                run_once(OWNER)
+                for owner in auth.background_owners():
+                    run_once(owner)
             except Exception:
                 logging.getLogger("thesis").exception("Local research watch failed")
 
@@ -61,7 +66,8 @@ async def lifespan(app):
 
         while not stop.wait(5):
             try:
-                run_once(OWNER)
+                for owner in auth.background_owners():
+                    run_once(owner)
             except Exception:
                 logging.getLogger("thesis").exception("Local filing watch failed")
 
@@ -73,7 +79,8 @@ async def lifespan(app):
 
         while not stop.wait(5):
             try:
-                run_once(OWNER)
+                for owner in auth.background_owners():
+                    run_once(owner)
             except Exception:
                 logging.getLogger("thesis").exception("Local weekly review failed")
 
@@ -85,7 +92,8 @@ async def lifespan(app):
 
         while not stop.wait(5):
             try:
-                run_once(OWNER)
+                for owner in auth.background_owners():
+                    run_once(owner)
             except Exception:
                 # Do not log external transport URLs, tokens or private messages.
                 logging.getLogger("thesis").warning("Telegram delivery check failed")
@@ -95,11 +103,13 @@ async def lifespan(app):
     from .research import loading
     load_lease = loading.worker_lease()
     if load_lease is not None:
-        loading.recover(OWNER)
+        for owner in auth.background_owners():
+            loading.recover(owner)
     def load_loop():
         while not stop.wait(0.5):
             try:
-                loading.work_once(OWNER)
+                for owner in auth.background_owners():
+                    loading.work_once(owner)
             except Exception:
                 logging.getLogger("thesis").warning("Research loading worker could not finish a step")
     load_threads = [threading.Thread(target=load_loop, daemon=True) for _ in range(4 if load_lease is not None else 0)]
@@ -139,29 +149,54 @@ def error(status, message):
 
 @app.middleware("http")
 async def local_session(request: Request, call_next):
+    owner = None
     if request.url.path.startswith("/api/"):
         origin = request.headers.get("origin")
         if origin and origin not in {f"http://{request.headers.get('host')}"}:
             return error(403, "Use this app from its local window.")
         if request.headers.get("sec-fetch-site") in {"cross-site", "same-site"}:
             return error(403, "Cross-origin requests are not accepted.")
-        if request.url.path != "/api/v1/session" and not secrets.compare_digest(
-            request.cookies.get("thesis_session", ""), session_token()
-        ):
-            return error(401, "Open the local app to start your demo session.")
+        public = request.url.path in {"/api/v1/session", "/api/v1/auth/login", "/api/v1/auth/logout"}
+        try:
+            managed = auth.configuration()
+            if managed:
+                cookie = request.cookies.get(auth.COOKIE, "")
+                if not public or (request.url.path == "/api/v1/session" and cookie) or (request.url.path == "/api/v1/auth/logout" and request.headers.get('x-thesis-account')):
+                    try:
+                        owner = await run_in_threadpool(auth.authenticate, cookie)
+                    except auth.AuthFailure as failure:
+                        if not public or failure.status != 401:
+                            return error(failure.status, str(failure))
+            else:
+                owner = OWNER
+                if not public and not secrets.compare_digest(request.cookies.get(auth.COOKIE, ""), session_token()):
+                    return error(401, "Open the local app to start your demo session.")
+            expected=request.headers.get('x-thesis-account')
+            if owner and expected and expected!=str(owner):
+                response=error(409,'The signed-in account changed. Reloading its private workspace; your last action was not submitted.')
+                response.headers['X-Thesis-Account']=str(owner)
+                return response
+        except auth.AuthFailure as failure:
+            return error(failure.status, str(failure))
         if (
             request.method not in {"GET", "HEAD", "OPTIONS"}
             and request.headers.get("x-thesis-request") != "local-ui"
         ):
             return error(403, "A local app request is required.")
-    response = await call_next(request)
+    context = auth.account_context.set(owner)
+    try:
+        response = await call_next(request)
+    finally:
+        auth.account_context.reset(context)
     response.headers["X-Content-Type-Options"] = "nosniff"
+    if owner:response.headers['X-Thesis-Account']=str(owner)
     response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"
+        "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data: https://financialmodelingprep.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"
     )
     response.headers["Cache-Control"] = (
-        "no-store" if request.url.path.startswith("/api/") else "no-cache"
+        "no-store" if request.url.path.startswith(("/api/", "/auth/")) else "no-cache"
     )
     return response
 
@@ -169,6 +204,13 @@ async def local_session(request: Request, call_next):
 @app.exception_handler(service.Conflict)
 async def conflict_handler(request, exc):
     return error(409, str(exc))
+
+
+@app.exception_handler(auth.AuthFailure)
+async def auth_handler(request, exc):
+    response=error(exc.status, str(exc))
+    if exc.retry_after is not None:response.headers['Retry-After']=str(exc.retry_after)
+    return response
 
 
 @app.exception_handler(service.Missing)
@@ -190,35 +232,82 @@ async def validation_handler(request, exc):
 def bootstrap():
     from .db import transaction, one
 
+    managed = auth.configuration()
+    owner = auth.account_context.get()
+    if managed and not owner:
+        response = JSONResponse({"result": {"mode": "managed", "authenticated": False}})
+        response.delete_cookie(auth.COOKIE)
+        return response
     with transaction() as conn:
         preferred = one(
             conn,
             "SELECT instrument_id FROM market_quotes ORDER BY retrieved_at DESC LIMIT 1",
         )
+    email=None
+    if managed:
+        with transaction(admin=True,consistent=True) as conn:
+            identity=one(conn,'SELECT verified_email FROM auth_identities WHERE account_id=%s AND project_url=%s',(owner,managed['url']))
+            email=identity['verified_email'] if identity else None
     response = JSONResponse(
         {
             "result": {
-                "mode": "local-pitch",
-                "account": "Local demo",
+                "mode": "managed" if managed else "local-pitch",
+                "authenticated": True,
+                "account": "Research account" if managed else "Local demo",
+                "account_id": owner,
+                "email": email,
+                "is_installation_owner": owner == OWNER,
                 "preferred_instrument": (
                     str(preferred["instrument_id"]) if preferred else None
                 ),
             }
         }
     )
-    response.set_cookie(
-        "thesis_session",
-        session_token(),
-        httponly=True,
-        samesite="strict",
-        max_age=86400,
-    )
+    if not managed:
+        response.set_cookie(auth.COOKIE,session_token(),httponly=True,samesite="strict",max_age=86400)
+    return response
+
+
+from pydantic import BaseModel, Field, ConfigDict
+
+
+class LoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    email: str = Field(min_length=3, max_length=254)
+
+
+@app.post("/api/v1/auth/login")
+def login(payload: LoginRequest):
+    token = auth.send_link(payload.email)
+    response = JSONResponse({"result": {"message": "Open the newest sign-in email in this browser. The link works once.", "retry_after": 60}})
+    response.set_cookie(auth.FLOW_COOKIE, token, httponly=True, samesite="lax", max_age=900, path="/auth/callback")
+    return response
+
+
+@app.get("/auth/callback")
+def login_callback(request: Request, code: str | None = None):
+    try:
+        token, lifetime = auth.complete(code, request.cookies.get(auth.FLOW_COOKIE))
+        response = RedirectResponse("/", status_code=303)
+        response.set_cookie(auth.COOKIE, token, httponly=True, samesite="strict", max_age=lifetime)
+    except auth.AuthFailure:
+        response = RedirectResponse("/?auth_error=link", status_code=303)
+    response.delete_cookie(auth.FLOW_COOKIE, path="/auth/callback")
+    return response
+
+
+@app.post("/api/v1/auth/logout")
+def logout(request: Request):
+    auth.logout(request.cookies.get(auth.COOKIE))
+    response = JSONResponse({"result": {"signed_out": True}})
+    response.delete_cookie(auth.COOKIE)
+    response.delete_cookie(auth.FLOW_COOKIE, path="/auth/callback")
     return response
 
 
 @app.get("/api/v1/workspace")
 def workspace(instrument_id: UUID = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")):
-    result = service.state(OWNER, str(instrument_id))
+    result = service.state(auth.current_owner(), str(instrument_id))
     from .db import transaction, one
     with transaction() as conn:
         result["workspace_reset_at"] = one(conn, "SELECT reset_at FROM workspace_settings WHERE singleton")["reset_at"]
@@ -237,7 +326,7 @@ def research_review(
 
     return {
         "result": prepare(
-            OWNER,
+            auth.current_owner(),
             days=days,
             cutoff=cutoff,
             instrument_id=instrument_id,
@@ -257,7 +346,7 @@ def research_review_export(
     from .review_digest import download
 
     name, html = download(
-        OWNER, days=days, cutoff=cutoff, instrument_id=instrument_id, review=review
+        auth.current_owner(), days=days, cutoff=cutoff, instrument_id=instrument_id, review=review
     )
     return HTMLResponse(
         html, headers={"Content-Disposition": f'attachment; filename="{name}"'}
@@ -329,12 +418,12 @@ def expectation_export(instrument_id: UUID, record_id: UUID):
 
 @app.post("/api/v1/companies/{instrument_id}/questions")
 def ask_research(instrument_id: UUID, payload: answers.Ask):
-    return {"result": answers.generate(OWNER, str(instrument_id), payload)}
+    return {"result": answers.generate(auth.current_owner(), str(instrument_id), payload)}
 
 
 @app.get("/api/v1/companies/{instrument_id}/questions")
 def research_questions(instrument_id: UUID, before: UUID | None = None):
-    return {"result": answers.history(OWNER, str(instrument_id), before)}
+    return {"result": answers.history(auth.current_owner(), str(instrument_id), before)}
 
 
 from .research import question_library
@@ -342,17 +431,17 @@ from .research import question_library
 
 @app.put("/api/v1/companies/{instrument_id}/question-library")
 def save_research_question(instrument_id: UUID, payload: question_library.SaveQuestion):
-    return {"result": question_library.save(OWNER, str(instrument_id), payload)}
+    return {"result": question_library.save(auth.current_owner(), str(instrument_id), payload)}
 
 
 @app.get("/api/v1/research-answers/{answer_id}")
 def research_answer(answer_id: UUID):
-    return {"result": answers.get(OWNER, str(answer_id))}
+    return {"result": answers.get(auth.current_owner(), str(answer_id))}
 
 
 @app.get("/api/v1/research-answers/{answer_id}/export")
 def research_answer_export(answer_id: UUID):
-    name, html = answers.download(OWNER, str(answer_id))
+    name, html = answers.download(auth.current_owner(), str(answer_id))
     return HTMLResponse(
         html, headers={"Content-Disposition": f'attachment; filename="{name}"'}
     )
@@ -365,7 +454,7 @@ from .valuation import ScenarioRequest, SaveScenario
 def valuation_context(instrument_id: UUID):
     from .valuation import context
 
-    return {"result": context(OWNER, str(instrument_id))}
+    return {"result": context(auth.current_owner(), str(instrument_id))}
 
 
 @app.post("/api/v1/companies/{instrument_id}/multiples/refresh")
@@ -375,11 +464,48 @@ def refresh_multiples(instrument_id: UUID):
     return {"result": refresh(str(instrument_id))}
 
 
+@app.get("/api/v1/companies/{instrument_id}/fmp")
+def fmp_research(instrument_id: UUID):
+    from .research.fmp import context
+    return {"result": context(auth.current_owner(), str(instrument_id))}
+
+
+@app.post("/api/v1/companies/{instrument_id}/fmp/refresh")
+def fmp_refresh(instrument_id: UUID):
+    from .research.fmp import refresh_company
+    return {"result": refresh_company(auth.current_owner(), str(instrument_id))}
+
+
+@app.post("/api/v1/companies/{instrument_id}/financial-forecasts/refresh")
+def public_financial_forecast_refresh(instrument_id: UUID):
+    from .research.analyst_targets import refresh
+    from .research.fmp import context
+    refresh(str(instrument_id), purpose='financials')
+    return {"result": context(auth.current_owner(), str(instrument_id))}
+
+
+class PeerSelection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    symbol: str = Field(min_length=1, max_length=15, pattern=r"^[A-Z][A-Z0-9.-]*$")
+    rationale: str = Field(min_length=8, max_length=600)
+
+
+class PeerSelections(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    selections: list[PeerSelection] = Field(max_length=3)
+
+
+@app.put("/api/v1/companies/{instrument_id}/fmp/peers")
+def fmp_peers(instrument_id: UUID, payload: PeerSelections):
+    from .research.fmp import save_peers
+    return {"result": save_peers(auth.current_owner(), str(instrument_id), [item.model_dump() for item in payload.selections])}
+
+
 @app.post("/api/v1/valuation/preview")
 def valuation_preview(payload: ScenarioRequest):
     from .valuation import preview
 
-    return {"result": preview(OWNER, payload)}
+    return {"result": preview(auth.current_owner(), payload)}
 
 
 @app.post("/api/v1/companies/{instrument_id}/analyst-targets/refresh")
@@ -393,21 +519,21 @@ def refresh_analyst_targets(instrument_id: UUID):
 def valuation_save(payload: SaveScenario):
     from .valuation import save
 
-    return {"result": save(OWNER, payload)}
+    return {"result": save(auth.current_owner(), payload)}
 
 
 @app.get("/api/v1/valuations/{scenario_id}")
 def valuation_record(scenario_id: UUID):
     from .valuation import get
 
-    return {"result": get(OWNER, str(scenario_id))}
+    return {"result": get(auth.current_owner(), str(scenario_id))}
 
 
 @app.get("/api/v1/valuations/{scenario_id}/export")
 def valuation_export(scenario_id: UUID):
     from .valuation import download
 
-    name, html = download(OWNER, str(scenario_id))
+    name, html = download(auth.current_owner(), str(scenario_id))
     return HTMLResponse(
         html, headers={"Content-Disposition": f'attachment; filename="{name}"'}
     )
@@ -415,25 +541,25 @@ def valuation_export(scenario_id: UUID):
 
 @app.post("/api/v1/idea")
 def save(payload: SaveIdea):
-    return {"result": service.save_idea(OWNER, payload)}
+    return {"result": service.save_idea(auth.current_owner(), payload)}
 
 
 @app.post("/api/v1/research-actions")
 def research(payload: ResearchAction):
-    service.research_action(OWNER, payload)
+    service.research_action(auth.current_owner(), payload)
     return {"result": {"saved": True}}
 
 
 @app.post("/api/v1/evaluations/{evaluation_id}/review")
 def review(evaluation_id: UUID, payload: ReviewAction):
-    return {"result": service.review(OWNER, evaluation_id, payload.action)}
+    return {"result": service.review(auth.current_owner(), evaluation_id, payload.action)}
 
 
 @app.post("/api/v1/demo/advance")
 def advance(payload: Advance):
     return {
         "result": service.advance(
-            OWNER, payload.expected_stage, str(payload.instrument_id)
+            auth.current_owner(), payload.expected_stage, str(payload.instrument_id)
         )
     }
 
@@ -463,28 +589,28 @@ class ReviewScheduleSettings(BaseModel):
 def saved_review_history(before: UUID | None = None):
     from .monitoring import review_schedule
 
-    return {"result": review_schedule.history(OWNER, before=before)}
+    return {"result": review_schedule.history(auth.current_owner(), before=before)}
 
 
 @app.post("/api/v1/review-schedule")
 def configure_review_schedule(payload: ReviewScheduleSettings):
     from .monitoring import review_schedule
 
-    return {"result": review_schedule.configure(OWNER, **payload.model_dump())}
+    return {"result": review_schedule.configure(auth.current_owner(), **payload.model_dump())}
 
 
 @app.get("/api/v1/scheduled-reviews/{review_id}")
 def saved_review(review_id: UUID, page: int = 0):
     from .monitoring import review_schedule
 
-    return {"result": review_schedule.read(OWNER, review_id, page=page)}
+    return {"result": review_schedule.read(auth.current_owner(), review_id, page=page)}
 
 
 @app.get("/api/v1/scheduled-reviews/{review_id}/export")
 def saved_review_export(review_id: UUID):
     from .monitoring import review_schedule
 
-    name, html = review_schedule.download(OWNER, review_id)
+    name, html = review_schedule.download(auth.current_owner(), review_id)
     return HTMLResponse(
         html, headers={"Content-Disposition": f'attachment; filename="{name}"'}
     )
@@ -494,7 +620,7 @@ def saved_review_export(review_id: UUID):
 def saved_review_seen(review_id: UUID):
     from .monitoring import review_schedule
 
-    return {"result": review_schedule.mark_seen(OWNER, review_id)}
+    return {"result": review_schedule.mark_seen(auth.current_owner(), review_id)}
 
 
 @app.post("/api/v1/social/refresh")
@@ -515,7 +641,7 @@ def refresh_company_social(instrument_id: UUID):
 def watch_checks(instrument_id: UUID, before: UUID | None = None):
     from .monitoring.watch_history import history
 
-    return {"result": history(OWNER, str(instrument_id), before)}
+    return {"result": history(auth.current_owner(), str(instrument_id), before)}
 
 
 @app.get("/api/v1/social-sources/{post_id}/conversation")
@@ -538,7 +664,7 @@ def analyze_sentiment(instrument_id: UUID):
     from .monitoring.news_watch import publish
 
     result = generate(str(instrument_id))
-    publish(OWNER, str(instrument_id), result["id"])
+    publish(auth.current_owner(), str(instrument_id), result["id"])
     return {"result": result}
 
 
@@ -562,7 +688,7 @@ def configure_watch(instrument_id: UUID, payload: WatchSettings):
 
     return {
         "result": configure(
-            OWNER,
+            auth.current_owner(),
             str(instrument_id),
             payload.enabled,
             payload.interval_minutes,
@@ -577,7 +703,7 @@ def configure_watch(instrument_id: UUID, payload: WatchSettings):
 def review_research_alert(alert_id: UUID, payload: ReviewAction):
     from .monitoring.news_watch import review
 
-    return {"result": review(OWNER, str(alert_id), payload.action)}
+    return {"result": review(auth.current_owner(), str(alert_id), payload.action)}
 
 
 class EventWatchSettings(BaseModel):
@@ -591,7 +717,7 @@ def configure_event_watch(instrument_id: UUID, payload: EventWatchSettings):
 
     return {
         "result": configure(
-            OWNER,
+            auth.current_owner(),
             str(instrument_id),
             str(payload.version_id) if payload.version_id else None,
         )
@@ -611,7 +737,7 @@ def check_idea_sources(instrument_id: UUID, payload: IdeaAlertRequest):
 
     return {
         "result": generate(
-            OWNER,
+            auth.current_owner(),
             str(instrument_id),
             str(payload.analysis_id),
             str(payload.version_id),
@@ -624,14 +750,14 @@ def check_idea_sources(instrument_id: UUID, payload: IdeaAlertRequest):
 def review_idea_alert(check_id: UUID, payload: ReviewAction):
     from .research.idea_alerts import review
 
-    return {"result": review(OWNER, str(check_id), payload.action)}
+    return {"result": review(auth.current_owner(), str(check_id), payload.action)}
 
 
 @app.get("/api/v1/idea-alerts/{check_id}/export")
 def export_idea_alert(check_id: UUID):
     from .research.idea_alerts import download
 
-    filename, content = download(OWNER, str(check_id))
+    filename, content = download(auth.current_owner(), str(check_id))
     return HTMLResponse(
         content, headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
@@ -714,8 +840,47 @@ def refresh_sec_company(instrument_id: UUID):
     from .research.sec.service import refresh
 
     result = refresh(str(instrument_id))
-    service.queue_current(OWNER)
+    service.queue_current(auth.current_owner())
     return {"result": result}
+
+
+@app.get('/api/v1/companies/{instrument_id}/disclosures')
+def original_filings(instrument_id: UUID):
+    from .research.sec.disclosures import present
+    from .db import transaction
+    with transaction() as conn:
+        return {'result':present(conn,str(instrument_id))}
+
+
+@app.get('/api/v1/companies/{instrument_id}/business')
+def business_briefs(instrument_id: UUID, before: UUID | None=None):
+    from .research.business import history
+    return {'result':history(str(instrument_id),str(before) if before else None)}
+
+
+@app.post('/api/v1/companies/{instrument_id}/business')
+def explain_business(instrument_id: UUID):
+    from .research.business import generate
+    return {'result':generate(str(instrument_id),owner=auth.current_owner())}
+
+
+@app.get('/api/v1/companies/{instrument_id}/business/{record_id}/export')
+def export_business(instrument_id: UUID, record_id: UUID):
+    from .research.business import download
+    name,html=download(str(instrument_id),str(record_id))
+    return HTMLResponse(html,headers={'Content-Disposition':f'attachment; filename="{name}"'})
+
+
+@app.post('/api/v1/companies/{instrument_id}/disclosures/refresh')
+def refresh_original_filings(instrument_id: UUID):
+    from .research.sec.disclosures import refresh
+    return {'result':refresh(str(instrument_id))}
+
+
+@app.get('/api/v1/companies/{instrument_id}/disclosures/{document_id}')
+def original_filing(instrument_id: UUID, document_id: UUID):
+    from .research.sec.disclosures import document
+    return {'result':document(str(instrument_id),str(document_id))}
 
 
 class FilingWatchSettings(BaseModel):
@@ -727,14 +892,14 @@ class FilingWatchSettings(BaseModel):
 def configure_filing_watch(instrument_id: UUID, payload: FilingWatchSettings):
     from .monitoring.filing_watch import configure
 
-    return {"result": configure(OWNER, str(instrument_id), payload.enabled)}
+    return {"result": configure(auth.current_owner(), str(instrument_id), payload.enabled)}
 
 
 @app.get("/api/v1/companies/{instrument_id}/filing-checks")
 def filing_checks(instrument_id: UUID, before: UUID | None = None):
     from .monitoring.filing_watch import history
 
-    return {"result": history(OWNER, str(instrument_id), before)}
+    return {"result": history(auth.current_owner(), str(instrument_id), before)}
 
 
 @app.get("/api/v1/companies/{instrument_id}/price-history")
@@ -756,7 +921,7 @@ def refresh_market(instrument_id: UUID):
     from .research.market import refresh
 
     result = refresh(str(instrument_id))
-    service.queue_current(OWNER)
+    service.queue_current(auth.current_owner())
     return {"result": result}
 
 
@@ -773,7 +938,7 @@ def idea_evidence_review(version_id: UUID, payload: EvidenceReviewRequest):
 
     return {
         "result": generate(
-            OWNER,
+            auth.current_owner(),
             str(version_id),
             payload.snapshot_id,
             str(payload.evaluation_id) if payload.evaluation_id else None,
@@ -789,7 +954,7 @@ def event_evidence_review(version_id: UUID, payload: EventReviewRequest):
 
     return {
         "result": generate(
-            OWNER,
+            auth.current_owner(),
             str(version_id),
             payload.snapshot_id,
             event_periods=payload.event_periods,
@@ -807,7 +972,7 @@ def review_export(
     from .review_export import download
 
     filename, content = download(
-        OWNER,
+        auth.current_owner(),
         str(version_id),
         evaluation_id=evaluation_id,
         comparison_id=comparison_id,
@@ -834,7 +999,7 @@ def approve_suggestions(payload: ApproveSuggestions):
 
     return {
         "result": decide_many(
-            OWNER, payload.proposal_ids, definition=payload.definition
+            auth.current_owner(), payload.proposal_ids, definition=payload.definition
         )
     }
 
@@ -843,21 +1008,21 @@ def approve_suggestions(payload: ApproveSuggestions):
 def generate_proposals(payload: GenerateRequest):
     from .research.proposals import generate
 
-    return {"result": generate(OWNER, payload)}
+    return {"result": generate(auth.current_owner(), payload)}
 
 
 @app.post("/api/v1/proposals/{proposal_id}/approve")
 def approve_proposal(proposal_id: UUID, payload: SaveIdea):
     from .research.proposals import decide
 
-    return {"result": decide(OWNER, str(proposal_id), definition=payload)}
+    return {"result": decide(auth.current_owner(), str(proposal_id), definition=payload)}
 
 
 @app.post("/api/v1/proposals/{proposal_id}/reject")
 def reject_proposal(proposal_id: UUID):
     from .research.proposals import decide
 
-    return {"result": decide(OWNER, str(proposal_id))}
+    return {"result": decide(auth.current_owner(), str(proposal_id))}
 
 
 class TelegramDeliverySetting(BaseModel):
@@ -868,40 +1033,42 @@ class TelegramDeliverySetting(BaseModel):
 @app.get("/api/v1/telegram")
 def telegram_status():
     from .monitoring import telegram
-    return {"result": telegram.status(OWNER)}
+    return {"result": telegram.status(auth.current_owner())}
 
 
 @app.post("/api/v1/telegram/connect")
 def telegram_connect():
     from .monitoring import telegram
-    return {"result": telegram.connect(OWNER)}
+    return {"result": telegram.connect(auth.current_owner())}
 
 
 @app.post("/api/v1/telegram/check")
 def telegram_check():
     from .monitoring import telegram
-    return {"result": telegram.check_connection(OWNER)}
+    return {"result": telegram.check_connection(auth.current_owner())}
 
 
 @app.post("/api/v1/telegram/delivery")
 def telegram_delivery(payload: TelegramDeliverySetting):
     from .monitoring import telegram
-    return {"result": telegram.configure(OWNER, payload.enabled)}
+    return {"result": telegram.configure(auth.current_owner(), payload.enabled)}
 
 
 @app.post("/api/v1/telegram/disconnect")
 def telegram_disconnect():
     from .monitoring import telegram
-    return {"result": telegram.disconnect(OWNER)}
+    return {"result": telegram.disconnect(auth.current_owner())}
 
 
 @app.post("/api/v1/telegram/test")
 def telegram_test():
     from .monitoring import telegram
-    return {"result": telegram.test_message(OWNER)}
+    return {"result": telegram.test_message(auth.current_owner())}
 
 
 dist = ROOT / "frontend" / "dist"
+if os.environ.get("THESIS_TEST_OFFLINE") == "true" and DATA.is_relative_to("/private/tmp"):
+    dist = Path(os.environ.get("THESIS_FRONTEND_DIST", str(dist)))
 if dist.exists():
     app.mount("/assets", StaticFiles(directory=dist / "assets"), name="assets")
     if (dist / "fonts").exists():
@@ -923,10 +1090,10 @@ class ResearchLoadSettings(BaseModel):
 @app.get("/api/v1/companies/{instrument_id}/loading")
 def research_loading(instrument_id: UUID):
     from .research.loading import latest
-    return {"result": latest(OWNER, str(instrument_id))}
+    return {"result": latest(auth.current_owner(), str(instrument_id))}
 
 
 @app.post("/api/v1/companies/{instrument_id}/loading")
 def start_research_loading(instrument_id: UUID, payload: ResearchLoadSettings):
     from .research.loading import start
-    return {"result": start(OWNER, str(instrument_id), **payload.model_dump())}
+    return {"result": start(auth.current_owner(), str(instrument_id), **payload.model_dump())}

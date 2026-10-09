@@ -3,11 +3,16 @@
 .app-shell {
   --workspace-gutter: clamp(20px, 2vw, 36px);
   --research-width: 1160px;
-  --company-rail: 212px;
-  --idea-rail: 336px;
+  --company-panel-width: 212px;
+  --company-compact-width: 64px;
+  --idea-panel-width: 336px;
+  --company-rail: var(--company-panel-width);
+  --idea-rail: var(--idea-panel-width);
+  --panel-duration: 300ms;
+  --panel-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 .app-shell[data-companies-hidden="true"] {
-  --company-rail: 0px;
+  --company-rail: var(--company-compact-width);
 }
 .app-shell[data-idea-hidden="true"],
 .app-shell.all-companies-view {
@@ -16,9 +21,11 @@
 .app-shell .workspace-grid,
 .app-shell.all-companies-view .workspace-grid {
   grid-template-columns: var(--company-rail) minmax(0, 1fr) var(--idea-rail);
+  transition: grid-template-columns var(--panel-duration) var(--panel-ease);
 }
 .app-shell .watchlist {
   grid-column: 1;
+  overflow-y: hidden;
 }
 .app-shell .main-workspace {
   grid-column: 2;
@@ -26,9 +33,142 @@
 .app-shell .idea-panel {
   grid-column: 3;
 }
-.app-shell[data-companies-hidden="true"] .watchlist,
-.app-shell[data-idea-hidden="true"] .idea-panel {
+.app-shell :is(.watchlist, .idea-panel) {
+  padding: 0;
+  min-width: 0;
+  overflow-x: hidden;
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity var(--panel-duration) var(--panel-ease),
+    visibility 0s;
+}
+.sidebar-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.sidebar-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  transition: transform var(--panel-duration) var(--panel-ease);
+}
+.sidebar-body > * {
+  flex-shrink: 0;
+}
+.watchlist .sidebar-body {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.watchlist .sidebar-clip {
+  flex: 1;
+  height: 100%;
+}
+.company-sidebar-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #414c51 transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px 12px 16px;
+  transition: padding var(--panel-duration) var(--panel-ease);
+}
+.company-sidebar-content > * {
+  flex-shrink: 0;
+}
+.company-sidebar-browse {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows var(--panel-duration) var(--panel-ease),
+    opacity var(--panel-duration) var(--panel-ease);
+}
+.company-sidebar-browse-clip {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.company-sidebar-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--line);
+  background: #131719;
+}
+.app-shell .company-sidebar-actions :is(.add-company, .panel-toggle) {
+  width: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  margin: 0;
+  padding: 8px;
+}
+.all-companies-icon {
   display: none;
+}
+.watchlist[data-collapsed="true"] .company-sidebar-content {
+  padding: 12px 8px;
+  gap: 0;
+}
+.watchlist[data-collapsed="true"] .company-sidebar-browse {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+.watchlist[data-collapsed="true"] .company-sidebar-actions {
+  flex-direction: column;
+  padding: 12px 8px;
+}
+.app-shell .watchlist[data-collapsed="true"] .company-row {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  padding-right: 0;
+}
+.app-shell .watchlist[data-collapsed="true"] .watch-item {
+  min-height: 46px;
+  padding: 0;
+  justify-content: center;
+}
+.watchlist[data-collapsed="true"]
+  :is(.company-row-label, .remove-company, .all-companies-label, .watch-dot) {
+  display: none;
+}
+.watchlist[data-collapsed="true"] .all-companies-icon {
+  display: block;
+}
+.app-shell .mobile-company-picker .mobile-add-company {
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 10px;
+}
+.idea-panel .sidebar-body {
+  width: calc(var(--idea-panel-width) - 1px);
+  padding: 24px;
+}
+.idea-panel .sidebar-body > .fine {
+  margin-top: 16px;
+}
+.app-shell :is(.watchlist, .idea-panel)[aria-hidden="true"] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--panel-duration) var(--panel-ease),
+    visibility 0s var(--panel-duration);
+}
+.idea-panel[aria-hidden="true"] .sidebar-body {
+  transform: translateX(12px);
 }
 .topbar-tools {
   display: flex;
@@ -60,7 +200,10 @@
 @media (max-width: 980px) {
   .app-shell {
     --company-rail: 0px;
-    --idea-rail: 280px;
+    --idea-panel-width: 280px;
+  }
+  .app-shell[data-companies-hidden="true"] {
+    --company-rail: 0px;
   }
   .panel-toggle-left {
     display: none;
@@ -149,24 +292,6 @@
 }
 .watch-bottom {
   padding: 20px 6px 0;
-}
-.workspace-footer {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px 24px;
-  min-height: 34px;
-  padding: 8px 24px;
-  border-top: 1px solid var(--line);
-  background: #131719;
-  color: var(--muted);
-  font-size: 10px;
-}
-.workspace-footer > span:first-child {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 .company-header,
 .main-workspace .company-header {
@@ -327,19 +452,19 @@
 }
 @media (min-width: 2000px) {
   .app-shell {
-    --company-rail: 232px;
-    --idea-rail: 380px;
+    --company-panel-width: 232px;
+    --idea-panel-width: 380px;
   }
-  .idea-panel {
+  .idea-panel .sidebar-body {
     padding: 28px;
   }
 }
 @media (min-width: 981px) and (max-width: 1279px) {
   .app-shell {
-    --company-rail: 180px;
-    --idea-rail: 280px;
+    --company-panel-width: 180px;
+    --idea-panel-width: 280px;
   }
-  .idea-panel {
+  .idea-panel .sidebar-body {
     padding: 20px;
   }
 }
@@ -348,9 +473,6 @@
     grid-template-columns: minmax(0, 1fr) 280px;
   }
   .watchlist {
-    display: none;
-  }
-  .workspace-footer > span:last-child {
     display: none;
   }
 }
@@ -366,6 +488,29 @@
   .main-workspace,
   .idea-panel {
     overflow: visible;
+  }
+  .app-shell .idea-panel {
+    display: grid;
+    grid-template-rows: 1fr;
+    transition:
+      grid-template-rows var(--panel-duration) var(--panel-ease),
+      opacity var(--panel-duration) var(--panel-ease),
+      visibility 0s;
+  }
+  .app-shell .idea-panel[aria-hidden="true"] {
+    grid-template-rows: 0fr;
+    border-color: transparent;
+    transition:
+      grid-template-rows var(--panel-duration) var(--panel-ease),
+      opacity var(--panel-duration) var(--panel-ease),
+      visibility 0s var(--panel-duration);
+  }
+  .idea-panel .sidebar-body {
+    width: 100%;
+    padding: 24px;
+  }
+  .idea-panel[aria-hidden="true"] .sidebar-body {
+    transform: translateY(12px);
   }
   .topbar {
     padding-inline: 18px;
@@ -396,12 +541,13 @@
     height: 52px;
     gap: 22px;
   }
-  .workspace-footer {
-    padding: 12px 18px;
-    flex-wrap: wrap;
-  }
   .main-workspace {
     scroll-margin-top: 108px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-shell {
+    --panel-duration: 0s;
   }
 }
 @media (max-width: 600px) {
@@ -409,5 +555,153 @@
     height: auto;
     gap: 0;
     padding: 10px 16px 0;
+  }
+}
+
+/* Company report frame and responsive section navigation — 9 October 2026. */
+.app-shell .company-price-context {
+  width: 100%;
+  max-width: var(--research-width);
+  margin: 0 auto 24px;
+  min-width: 0;
+  container-type: inline-size;
+  background: #172125;
+  border-bottom: 1px solid var(--report-border);
+}
+.company-price-context > * {
+  min-width: 0;
+}
+.app-shell .company-price-context .historical-prices {
+  border-bottom: 0;
+}
+.app-shell .research-content .question-research {
+  width: 100%;
+  max-width: none;
+  margin: 0 0 24px;
+}
+@container (min-width: 800px) {
+  .company-price-context > .market-quote {
+    float: left;
+    width: 250px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 18px;
+    padding: 24px;
+    border-right: 1px solid #354149;
+  }
+  .company-price-context > .historical-prices {
+    margin-left: 250px;
+    width: calc(100% - 250px);
+    padding-top: 24px;
+  }
+  .company-price-context .quote-range {
+    width: 100%;
+    min-width: 0;
+  }
+  .company-price-context .quote-value {
+    flex-wrap: wrap;
+  }
+  .company-price-context .quote-value strong {
+    font-size: 32px;
+  }
+  .company-price-context .quote-value > span:last-child {
+    flex-basis: 100%;
+    margin-top: 6px;
+  }
+  .company-price-context .quote-foot {
+    width: 100%;
+  }
+  .company-price-context .price-chart {
+    height: 200px;
+  }
+  .company-price-context .historical-prices > .market-section-head {
+    font-size: 12px;
+    align-items: flex-start;
+  }
+}
+.company-price-context::after {
+  content: "";
+  display: block;
+  clear: both;
+}
+.app-shell .research-browser {
+  width: 100%;
+  max-width: var(--research-width);
+  padding-inline: var(--workspace-gutter);
+  margin: 0 auto 40px;
+  min-width: 0;
+}
+.research-navigation {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  background: #101719f5;
+  backdrop-filter: blur(12px);
+  padding-block: 10px;
+  border-bottom: 1px solid var(--report-border);
+  min-width: 0;
+}
+.research-navigation-label {
+  display: none;
+}
+.app-shell .research-navigation .content-tabs {
+  width: 100%;
+  max-width: none;
+  height: auto;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  gap: 4px;
+  scrollbar-width: thin;
+}
+.app-shell .research-browser > .research-content {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 24px 0 0;
+  min-width: 0;
+}
+@media (min-width: 1600px) {
+  .app-shell .research-browser {
+    display: grid;
+    grid-template-columns: 198px minmax(0, 1fr);
+    gap: 28px;
+    align-items: start;
+  }
+  .research-navigation {
+    top: 24px;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    backdrop-filter: none;
+  }
+  .research-navigation-label {
+    display: block;
+    margin: 0 12px 16px;
+    font-size: 11px;
+  }
+  .app-shell .research-navigation .content-tabs {
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+    gap: 6px;
+  }
+  .app-shell .research-navigation .content-tabs button {
+    width: 100%;
+    min-height: 46px;
+    white-space: normal;
+    text-align: left;
+  }
+  .app-shell .research-browser > .research-content {
+    padding-top: 0;
+  }
+}
+@media (max-width: 740px) {
+  .research-navigation {
+    position: relative;
+    top: auto;
+    backdrop-filter: none;
   }
 }

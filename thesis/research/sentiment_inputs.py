@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 from thesis.db import one
-from . import sentiment
+from . import sentiment, social
 
 SCOPES = ("news", "reddit", "hackernews", "x")
 
@@ -92,6 +92,7 @@ def current(conn, iid, now=None):
                 kind=s["channel"],
                 platform=s.get("platform")
                 or ("reddit" if s["channel"] == "social" else None),
+                **social.source_metadata(s),
                 published_at=s["published_at"],
                 available_at=s["available_at"],
                 url=s["url"],

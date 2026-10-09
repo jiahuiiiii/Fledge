@@ -242,6 +242,7 @@ def commit_bundle(conn, iid, bundle, now):
     from .performance import persist
 
     persist(conn, iid, pid, bundle, company["cik"], now)
+    conn.execute('INSERT INTO sec_payload_current VALUES(%s,%s,%s) ON CONFLICT(instrument_id) DO UPDATE SET payload_id=excluded.payload_id,checked_at=excluded.checked_at',(iid,pid,now))
     return dict(
         instrument_id=str(iid),
         source_check_id=str(batch.checks[0].id),

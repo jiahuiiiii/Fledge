@@ -87,7 +87,7 @@ def test_rejection_suppresses_further_requests(clocks,status):
 
 def test_daily_caps_and_request_errors_do_not_disclose_keys(clocks):
     with transaction(admin=True) as c:
-        c.execute("INSERT INTO provider_clocks(provider,requests) VALUES('alpha_vantage',25)")
+        c.execute("INSERT INTO provider_clocks(provider,requests,usage_date) VALUES('alpha_vantage',25,%s)",(datetime.now(timezone.utc).date(),))
     with pytest.raises(Conflict,match='daily'):hub.reserve('alpha_vantage',daily_limit=25)
     def fail(req):raise httpx.ConnectError('request with SECRETKEY',request=req)
     with pytest.raises(ValueError) as exc:
@@ -206,3 +206,65 @@ def test_concurrent_company_reads_share_one_feed_request(clocks):
 def test_x_requires_verified_empty_result():
     with pytest.raises(ValueError):x_source.parse({},COMPANY,NOW)
     assert x_source.parse({"meta":{"result_count":0}},COMPANY,NOW)==([],0)
+
+
+@pytest.mark.parametrize('field,message,expected', [
+    ('Information', 'This is a premium endpoint. Subscribe to unlock it.', 'requires Premium access'),
+    ('Information', 'This is a premium API function.', 'requires Premium access'),
+    ('Information', 'A premium subscription is required.', 'requires Premium access'),
+    ('Note', 'API call frequency exceeded. Visit premium plans.', 'reported a request limit'),
+    ('Information', 'Our standard API rate limit is 25 requests per day. Upgrade to premium.', 'reported a request limit'),
+    ('Information', 'Please spread out requests: 1 request per second.', 'reported a request limit'),
+    ('Error Message', 'Invalid API key: SECRETKEY', 'rejected the API key'),
+    ('Information', 'The apikey parameter is invalid or missing: SECRETKEY', 'rejected the API key'),
+    ('Error Message', 'Invalid API call. Check function or parameters.', 'rejected the request parameters'),
+    ('Information', 'Unknown message SECRETKEY https://example.test/?apikey=SECRETKEY', 'unrecognised service message'),
+    ('Note', {'unexpected': 'SECRETKEY'}, 'unrecognised service message'),
+])
+def test_alpha_diagnostics_distinguish_plan_key_quota_and_request(field,message,expected):
+    with pytest.raises(ValueError) as exc:
+        hub.parse_alpha({field:message},COMPANY,NOW)
+    assert expected in str(exc.value)
+    assert 'SECRETKEY' not in str(exc.value) and 'https://' not in str(exc.value)
+
+
+def test_alpha_unreadable_response_is_not_a_quota_diagnosis():
+    with pytest.raises(ValueError,match='no readable response'):
+        hub.parse_alpha([],COMPANY,NOW)
+    with pytest.raises(ValueError,match='no readable feed'):
+        hub.parse_alpha({},COMPANY,NOW)
+
+
+def test_alpha_cooldown_keeps_original_failure_and_does_not_send_again(clocks,monkeypatch):
+    iid=prepare(clocks)
+    monkeypatch.setattr(hub,'configuration',lambda _:None)
+    monkeypatch.setattr(hub,'settings',lambda:{'ALPHA_VANTAGE_API_KEY':'SECRETKEY'})
+    calls=[]
+    transport=httpx.MockTransport(lambda req:calls.append(req) or httpx.Response(200,json={'Information':'This is a premium endpoint. SECRETKEY'}))
+    first=hub.refresh(iid,'alpha_vantage',transport=transport)
+    assert first['status']=='failed' and 'requires Premium access' in first['message']
+    with transaction() as c:
+        before=one(c,"SELECT * FROM provider_checks WHERE instrument_id=%s AND provider='alpha_vantage'",(iid,))
+        clock=one(c,"SELECT * FROM provider_clocks WHERE provider='alpha_vantage'")
+    second=hub.refresh(iid,'alpha_vantage',transport=transport)
+    assert second['status']=='blocked' and 'not a confirmed provider reset time' in second['message']
+    assert len(calls)==1
+    with transaction() as c:
+        assert one(c,"SELECT * FROM provider_checks WHERE instrument_id=%s AND provider='alpha_vantage'",(iid,))==before
+        assert one(c,"SELECT * FROM provider_clocks WHERE provider='alpha_vantage'")==clock
+        visible=next(s for s in hub.status(c,iid) if s['provider']=='alpha_vantage')
+    assert 'requires Premium access' in visible['message'] and 'paused requests until' in visible['message']
+    assert 'SECRETKEY' not in json.dumps(visible,default=str)
+
+
+def test_alpha_historical_generic_failure_is_not_relabelled_as_confirmed_premium(clocks,monkeypatch):
+    iid=prepare(clocks)
+    monkeypatch.setattr(hub,'configuration',lambda _:None)
+    _,token=hub.begin(iid,'alpha_vantage')
+    original='Alpha Vantage returned an access or usage-limit message; no news was replaced.'
+    hub.finish(iid,'alpha_vantage',token,'failed',original)
+    with transaction() as c:
+        visible=next(s for s in hub.status(c,iid) if s['provider']=='alpha_vantage')
+        saved=one(c,"SELECT message FROM provider_checks WHERE instrument_id=%s AND provider='alpha_vantage'",(iid,))
+    assert 'does not prove a key, quota or plan problem' in visible['message']
+    assert saved['message']==original

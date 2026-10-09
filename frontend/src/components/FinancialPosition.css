@@ -1,0 +1,109 @@
+.financial-position {
+  margin: 0 0 28px;
+  min-width: 0;
+}
+.position-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.position-heading h2 {
+  margin: 8px 0 0;
+  font-size: clamp(22px, 2.2vw, 28px);
+}
+.position-heading label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.position-heading select {
+  min-height: 44px;
+  font-size: 16px;
+  width: 100%;
+}
+.position-caption {
+  margin: 16px 0 20px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.position-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  gap: 20px;
+}
+.position-comparison h3 {
+  margin-top: 0;
+}
+.position-measures {
+  display: grid;
+  gap: 24px;
+  margin-top: 28px;
+}
+.position-measure-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 15px;
+  line-height: 1.7;
+}
+.position-measure-label strong {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+.position-track {
+  height: 20px;
+  background: #ffffff08;
+  margin-top: 12px;
+  position: relative;
+  border-radius: 4px;
+}
+.position-track > span {
+  position: absolute;
+  height: 100%;
+  border-radius: 3px;
+}
+.position-zero {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 1px;
+  background: #a7b5b1;
+}
+.position-missing,
+.position-comparison .position-scale {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.65;
+  margin: 12px 0 0;
+}
+.position-comparison .position-scale {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  margin-top: 24px;
+}
+.position-reading {
+  animation: financial-reading-in 180ms ease-out;
+}
+.position-comparison .overview-evidence {
+  margin-top: 4px;
+}
+@media (max-width: 600px) {
+  .position-heading label {
+    width: 100%;
+  }
+  .position-grid {
+    gap: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .position-reading {
+    animation: none;
+  }
+}

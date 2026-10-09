@@ -18,12 +18,12 @@ from thesis.providers.settings import MODEL, REASONING_MODEL, settings
 def clean_model_ledger(db):
     with transaction(admin=True) as conn:
         conn.execute(
-            "TRUNCATE discussion_theme_reviews,expectation_reviews,watch_check_results,watch_checks,research_answers,idea_alert_reviews,idea_alert_publications,idea_alert_checks,idea_watch_seen,idea_watch_state,research_alert_reviews,research_alerts,watch_seen_sources,news_watches,sentiment_analyses,proposal_decisions,idea_proposals,event_review_activations,event_results,event_evidence_reviews,model_accounting_decisions,idea_evidence_reviews,model_dispatches,model_calls"
+            "TRUNCATE discussion_theme_reviews,expectation_reviews,watch_check_results,watch_checks,research_answers,idea_alert_reviews,idea_alert_publications,idea_alert_checks,idea_watch_seen,idea_watch_state,research_alert_reviews,research_alerts,watch_seen_sources,news_watches,sentiment_analyses,proposal_decisions,idea_proposals,event_review_activations,event_results,event_evidence_reviews,model_accounting_decisions,idea_evidence_reviews,model_dispatches,business_briefs,model_calls"
         )
     yield
     with transaction(admin=True) as conn:
         conn.execute(
-            "TRUNCATE discussion_theme_reviews,expectation_reviews,watch_check_results,watch_checks,research_answers,idea_alert_reviews,idea_alert_publications,idea_alert_checks,idea_watch_seen,idea_watch_state,research_alert_reviews,research_alerts,watch_seen_sources,news_watches,sentiment_analyses,proposal_decisions,idea_proposals,event_review_activations,event_results,event_evidence_reviews,model_accounting_decisions,idea_evidence_reviews,model_dispatches,model_calls"
+            "TRUNCATE discussion_theme_reviews,expectation_reviews,watch_check_results,watch_checks,research_answers,idea_alert_reviews,idea_alert_publications,idea_alert_checks,idea_watch_seen,idea_watch_state,research_alert_reviews,research_alerts,watch_seen_sources,news_watches,sentiment_analyses,proposal_decisions,idea_proposals,event_review_activations,event_results,event_evidence_reviews,model_accounting_decisions,idea_evidence_reviews,model_dispatches,business_briefs,model_calls"
         )
 
 

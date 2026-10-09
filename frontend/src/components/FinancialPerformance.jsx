@@ -10,7 +10,9 @@ const day = (value) =>
       })
     : "Unavailable";
 const scope = (row) =>
-  row.start ? `${day(row.start)} – ${day(row.end)}` : `At ${day(row.end)}`;
+  row.start
+    ? `${day(row.start)} – ${day(row.end)}`
+    : `${row.group && row.group !== "Balance sheet" ? "Period ending" : "At"} ${day(row.end)}`;
 const amount = (value, unit = "USD") => {
   if (value == null) return "Unavailable";
   const n = Number(value);

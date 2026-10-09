@@ -8,7 +8,13 @@ import time
 from urllib.request import urlopen
 
 root = Path(__file__).resolve().parents[1]
-env = dict(os.environ, THESIS_DATA_DIR=tempfile.mkdtemp(prefix="thesis-telegram-browser-",dir="/private/tmp"),THESIS_TEST_URL="http://127.0.0.1:8844")
+env = dict(
+    os.environ,
+    THESIS_DATA_DIR=tempfile.mkdtemp(prefix="thesis-browser-telegram-", dir="/private/tmp"),
+    THESIS_TEST_URL="http://127.0.0.1:8844",
+    THESIS_TEST_OFFLINE="true",
+    PYTHONPATH=str(root / "tests/offline_runtime") + os.pathsep + str(root),
+)
 server = subprocess.Popen([sys.executable,"run.py","--port","8844"],cwd=root,env=env)
 try:
     for _ in range(80):

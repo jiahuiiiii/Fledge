@@ -9,7 +9,7 @@ from psycopg.types.json import Jsonb
 from thesis.db import transaction, one, rows
 from thesis.service import Conflict
 
-LABELS = dict(market='Quote & news', filings='Filings & fundamentals', prices='Price chart',
+LABELS = dict(market='Quote & news', filings='Filings & fundamentals', disclosures='Original filings & earnings releases', prices='Price chart',
               reddit='Reddit discussions', hackernews='Hacker News discussions',
               rss='Publisher RSS feeds', alpha_vantage='Alpha Vantage news', x='X / Twitter posts',
               targets='Analyst targets', multiples='Valuation ratios', analysis='Sentiment analysis')
@@ -79,6 +79,8 @@ def claim(owner):
             for index, step in enumerate(run['steps']):
                 if step['status']!='queued':
                     continue
+                if step['key']=='disclosures' and any(s['key']=='filings' and s['status'] not in TERMINAL for s in run['steps']):
+                    continue
                 if step['key']=='analysis':
                     if any(s['status'] not in TERMINAL for s in run['steps'] if s['key']!='analysis'):
                         _write(conn,run,index,message='Waiting for news and discussions')
@@ -98,19 +100,31 @@ def claim(owner):
     return None
 
 
+def analysis_progress(run, progress):
+    """Persist counts only, fenced to the current load's claimed analysis step."""
+    index = next(i for i, s in enumerate(run['steps']) if s['key']=='analysis')
+    with transaction(run['owner_id']) as conn:
+        current = one(conn, 'SELECT * FROM research_loads WHERE id=%s FOR UPDATE', (run['id'],))
+        if not current or not current['active'] or current['steps'][index]['status'] != 'running' or current['steps'][index].get('started_at') != run['steps'][index].get('started_at'):
+            raise Conflict('This analysis run is no longer active. Completed batches remain saved.')
+        _write(conn, current, index, batches=progress, message=progress['message'])
+
+
 def execute(run, key):
     from . import market, social, hackernews, price_history, analyst_targets, multiples, sentiment, reddit_research
-    from .sec import service as sec
+    from .sec import service as sec, disclosures
     from . import source_hub,x_source
     iid = str(run['instrument_id'])
     days = run['lookback_days']
     actions = dict(market=lambda: market.refresh(iid), filings=lambda: sec.refresh(iid),
+                   disclosures=lambda: disclosures.refresh(iid),
                    rss=lambda: source_hub.refresh_rss(iid),alpha_vantage=lambda: source_hub.refresh(iid,'alpha_vantage'),
                    x=lambda: x_source.refresh(iid,lookback_days=days),
                    prices=lambda: price_history.refresh(iid), reddit=lambda: reddit_research.refresh(iid,lookback_days=days),
                    hackernews=lambda: hackernews.refresh(iid,lookback_days=days,include_threads=True),
                    targets=lambda: analyst_targets.refresh(iid), multiples=lambda: multiples.refresh(iid),
-                   analysis=lambda: sentiment.generate(iid,lookback_days=days))
+                   analysis=lambda: sentiment.generate(iid,lookback_days=days,
+                       progress=lambda value: analysis_progress(run, value), retry_failed=True))
     result = actions[key]()
     if key=='filings':
         from thesis import service

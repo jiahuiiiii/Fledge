@@ -232,20 +232,25 @@ def test_sec_clock_deadline_restatement_archive_and_permissions(owner):
     iid = add_company("MSFT")["instrument_id"]
     apply(iid, bundle())
     today = datetime.now(timezone.utc).date()
+    # Put the deadline beyond the independent 24-hour source-freshness boundary.
+    # Using today made the +1h repeat cross that boundary before 01:00 UTC,
+    # correctly creating a new assessment unrelated to deadline deduplication.
+    due = today + timedelta(days=1)
     sv = service.save_idea(
-        owner, with_expectation("2025-12-31", today.isoformat(), iid=iid)
+        owner, with_expectation("2025-12-31", due.isoformat(), iid=iid)
     )
     drain(owner)
     baseline = service.state(owner, iid)
     first = baseline["versions"][0]["evaluations"][0]
     clock = datetime.combine(
-        today + timedelta(days=1), datetime.min.time(), timezone.utc
+        due + timedelta(days=1), datetime.min.time(), timezone.utc
     )
     before = ledger.snapshot()
     service.queue_current(owner, now=clock)
     finish_all(owner)
     after = service.state(owner, iid)
     last = after["versions"][0]["evaluations"][0]
+    assert last['freshness'] == 'stale'
     assert (
         last["outcome"] == "unknown"
         and last["manifest"]["report_expectations"][0]["state"] == "overdue"

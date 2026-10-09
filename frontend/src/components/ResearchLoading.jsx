@@ -42,7 +42,12 @@ export function ResearchProgressToggle({ run, error, onExpand }) {
     </button>
   );
 }
-export default function ResearchLoading({ run, error, onCollapse }) {
+export default function ResearchLoading({
+  run,
+  error,
+  onCollapse,
+  hidden = false,
+}) {
   const [expanded, setExpanded] = useState(false);
   if (!run && !error) return null;
   const steps = run?.steps || [];
@@ -55,98 +60,114 @@ export default function ResearchLoading({ run, error, onCollapse }) {
   const active = run?.active;
   const working = steps
     .filter((s) => s.status === "running")
-    .map((s) => s.label);
+    .map((s) => (s.batches ? `${s.label} · ${s.message}` : s.label));
   return (
-    <section
-      className={`research-loading ${active ? "is-active" : ""}`}
-      aria-label="Research loading progress"
+    <div
+      className="research-loading-collapse"
+      data-hidden={hidden}
+      aria-hidden={hidden || undefined}
+      inert={hidden ? "" : undefined}
     >
-      <div className="loading-overview">
-        <div>
-          <strong>
-            {active
-              ? "Updating your research"
-              : attention
-                ? "Research updated with gaps"
-                : "Research check complete"}
-          </strong>
-          <p role="status">
-            {error ||
-              (active
-                ? working.length
-                  ? working.join(" · ")
-                  : steps.find((s) => s.status === "queued")?.message ||
-                    "Waiting for the next step"
-                : `${finished} of ${steps.length} steps finished${attention ? ` · ${attention} need attention` : ""}`)}
-          </p>
-        </div>
-        <div className="loading-actions">
-          <span>
-            {finished}/{steps.length}
-          </span>
-          <button
-            className="text-button"
-            aria-expanded={expanded}
-            onClick={() => setExpanded(!expanded)}
-          >
-            {expanded ? "Hide details" : "View progress"}
-          </button>
-          <button
-            type="button"
-            className="collapse-progress"
-            onClick={onCollapse}
-            aria-label="Hide research progress"
-            title="Hide research progress"
-            aria-expanded={true}
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 20 20"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.7"
-              aria-hidden="true"
-            >
-              <path d="m5 12 5-5 5 5" />
-            </svg>
-          </button>
-        </div>
-      </div>
-      <div
-        className="research-progress"
-        role="progressbar"
-        aria-label="Research steps finished"
-        aria-valuemin={0}
-        aria-valuemax={steps.length || 1}
-        aria-valuenow={finished}
-      >
-        <span
-          style={{
-            width: `${steps.length ? (finished / steps.length) * 100 : 0}%`,
-          }}
-        />
-      </div>
-      {expanded && (
-        <ol className="loading-steps">
-          {steps.map((step) => (
-            <li key={step.key} data-status={step.status}>
-              <span className="step-indicator" aria-hidden="true">
-                {step.status === "ready"
-                  ? "✓"
-                  : step.status === "queued"
-                    ? "·"
-                    : ""}
+      <div className="research-loading-clip">
+        <section
+          className={`research-loading ${active ? "is-active" : ""}`}
+          aria-label="Research loading progress"
+        >
+          <div className="loading-overview">
+            <div>
+              <strong>
+                {active
+                  ? "Updating your research"
+                  : attention
+                    ? "Research updated with gaps"
+                    : "Research check complete"}
+              </strong>
+              <p role="status">
+                {error ||
+                  (active
+                    ? working.length
+                      ? working.join(" · ")
+                      : steps.find((s) => s.status === "queued")?.message ||
+                        "Waiting for the next step"
+                    : `${finished} of ${steps.length} steps finished${attention ? ` · ${attention} need attention` : ""}`)}
+              </p>
+            </div>
+            <div className="loading-actions">
+              <span>
+                {finished}/{steps.length}
               </span>
-              <div>
-                <strong>{step.label}</strong>
-                <span>{states[step.status]}</span>
-                <p>{step.message}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      )}
-    </section>
+              <button
+                className="text-button"
+                aria-expanded={expanded}
+                onClick={() => setExpanded(!expanded)}
+              >
+                {expanded ? "Hide details" : "View progress"}
+              </button>
+              <button
+                type="button"
+                className="collapse-progress"
+                onClick={onCollapse}
+                aria-label="Hide research progress"
+                title="Hide research progress"
+                aria-expanded={true}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  aria-hidden="true"
+                >
+                  <path d="m5 12 5-5 5 5" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div
+            className="research-progress"
+            role="progressbar"
+            aria-label="Research steps finished"
+            aria-valuemin={0}
+            aria-valuemax={steps.length || 1}
+            aria-valuenow={finished}
+          >
+            <span
+              style={{
+                width: `${steps.length ? (finished / steps.length) * 100 : 0}%`,
+              }}
+            />
+          </div>
+          <div
+            className="loading-details"
+            data-hidden={!expanded}
+            aria-hidden={!expanded || undefined}
+            inert={!expanded ? "" : undefined}
+          >
+            <div className="research-loading-clip">
+              <ol className="loading-steps">
+                {steps.map((step) => (
+                  <li key={step.key} data-status={step.status}>
+                    <span className="step-indicator" aria-hidden="true">
+                      {step.status === "ready"
+                        ? "✓"
+                        : step.status === "queued"
+                          ? "·"
+                          : ""}
+                    </span>
+                    <div>
+                      <strong>{step.label}</strong>
+                      <span>{states[step.status]}</span>
+                      <p>{step.message}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
   );
 }

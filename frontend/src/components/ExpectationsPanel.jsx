@@ -87,8 +87,8 @@ export default function ExpectationsPanel({
     <section className="expectations-panel" aria-label="Company expectations">
       <div className="market-section-head">
         <div>
-          <span className="section-label">PERFORMANCE + EXPECTATIONS</span>
-          <h2>What is expected next?</h2>
+          <span className="section-label">EXPECTATIONS REPORTED IN NEWS</span>
+          <h2>What the news says is expected</h2>
         </div>
         <button
           disabled={busy || !enabled || !data?.current_coverage.selected}

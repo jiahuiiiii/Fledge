@@ -161,7 +161,12 @@ def test_removal_during_analysis_withholds_response(owner):
             c.execute("INSERT INTO hn_withdrawals VALUES('hn:99',now())")
         return provider()(b)
 
-    assert S.generate(iid, transport=withdraw)["withheld"]
+    # The batched route now stops before publishing a combined analysis when
+    # access changes in flight. The response/charge remains in the ledger.
+    with pytest.raises(ValueError, match="source access changed"):
+        S.generate(iid, transport=withdraw)
+    with transaction() as c:
+        assert one(c, "SELECT count(*) n FROM sentiment_analyses WHERE instrument_id=%s", (iid,))["n"] == 0
 
 
 def test_context_change_is_not_alerted_as_a_new_opinion_even_with_new_text():

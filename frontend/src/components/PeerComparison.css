@@ -1,0 +1,157 @@
+.peer-chart {
+  margin: 28px 0;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #151b1f;
+  min-width: 0;
+}
+.peer-chart-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+.peer-chart-heading h3 {
+  margin: 10px 0 0;
+  font-size: 23px;
+}
+.peer-chart-heading label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+}
+.peer-chart-heading select {
+  font-size: 16px;
+  min-height: 44px;
+  width: 100%;
+}
+.peer-chart-intro {
+  line-height: 1.7;
+  margin: 24px 0 16px;
+}
+.peer-chart-note,
+.peer-chart-date {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.peer-chart-reading {
+  margin: 24px 0;
+  animation: peer-chart-enter 180ms ease-out;
+}
+.peer-chart-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.peer-chart-rows {
+  display: grid;
+  gap: 24px;
+}
+.peer-chart-row {
+  min-width: 0;
+}
+.peer-chart-value-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.peer-chart-value-row > div {
+  display: grid;
+  gap: 6px;
+}
+.peer-chart-value-row > div > strong {
+  font-size: 16px;
+}
+.peer-chart-value-row > div > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.peer-chart-value {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 24px;
+  line-height: 1.3;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.peer-chart-track {
+  height: 18px;
+  border-radius: 4px;
+  background: #ffffff08;
+  position: relative;
+  margin: 14px 0 8px;
+}
+.peer-chart-track > i {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 1px;
+  background: #9da6ad;
+}
+.peer-chart-track > span {
+  position: absolute;
+  height: 100%;
+  border-radius: 3px;
+  background: #a7b9c7;
+  transition:
+    width 180ms ease-out,
+    left 180ms ease-out;
+}
+.peer-chart-row:first-child .peer-chart-track > span {
+  background: var(--lime);
+}
+.peer-chart-row details {
+  font-size: 13px;
+  line-height: 1.7;
+  margin-top: 12px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.peer-chart-row summary {
+  cursor: pointer;
+}
+.peer-chart-row p {
+  overflow-wrap: anywhere;
+}
+.peer-chart-missing,
+.peer-evidence-id {
+  color: var(--muted);
+}
+@keyframes peer-chart-enter {
+  from {
+    opacity: 0.6;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 600px) {
+  .peer-chart {
+    padding: 16px;
+  }
+  .peer-chart-heading label {
+    width: 100%;
+  }
+  .peer-chart-heading h3 {
+    font-size: 21px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .peer-chart-reading {
+    animation: none;
+  }
+  .peer-chart-track > span {
+    transition: none;
+  }
+}

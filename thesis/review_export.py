@@ -417,8 +417,9 @@ def render(record):
         for source in sorted(
             sources.values(), key=lambda s: (s["published_at"], s["id"]), reverse=True
         ):
+            time_label = 'Feed updated (publication time unverified)' if source.get('timestamp_basis') == 'feed_updated' else 'Published'
             parts.append(
-                f"<article id='source-{text(source['id'])}'><h3>{text(source['title'])}</h3><p>{text(source['source'])} · {text(source['kind'])}</p><p>Published {text(stamp(source['published_at']))}<br>Available {text(stamp(source['available_at']))}</p>"
+                f"<article id='source-{text(source['id'])}'><h3>{text(source['title'])}</h3><p>{text(source['source'])} · {text(source['kind'])}</p><p>{time_label} {text(stamp(source['published_at']))}<br>Available {text(stamp(source['available_at']))}</p>"
             )
             url = source.get("url") or ""
             parsed = urlsplit(url)

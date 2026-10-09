@@ -12,6 +12,10 @@ The phase review records actual retrieval, model checks, browser evidence and li
 
 For offline replay, set `THESIS_EXPANDED_CORPUS` to the saved public directory containing `NVDA-bundle.json`, `AMZN-bundle.json`, `META-bundle.json` and `reconciliation.json`. The backend replay and `tests/run_browser.py --catalogue` consume those files without external requests. This is a replay of actual data; it is not a fresh supplier check at test time.
 
+## Company logos — 9 October 2026
+
+The company list and header share `CompanyAvatar.jsx`. Actual Broadcom, NVIDIA and Fabrinet images are bundled from Financial Modeling Prep's public company-image route; [source URLs and original file hashes](../../frontend/src/assets/company-logos/SOURCES.md) are retained. Other registered SEC companies use the same HTTPS route when displayed, without credentials or a referrer. Pending or unavailable logos retain initials, and fictional recorded companies make no image request. The content security policy allows the provider's image host while retaining same-origin script and application-request rules. Logo retrieval does not register a company, acquire research sources or initiate analysis. [UI verification and provider limitation](../reviews/2026-10-09/workspace-panels-and-company-logos.md).
+
 ## Distinct evidence inside a repeated story
 
 The first real NVIDIA private check exposed a selection problem: a newer short roundup and an older fuller buyback report were in one semantic-repeat group. In-request deduplication kept the teaser, omitting the actual authorisation and remaining-capacity passages. Private checks now retain distinct unseen full-content identities within a repeat group, up to the existing sixteen-source cap. Only previously seen semantic keys suppress repeat delivery; exact duplicate text identity is still deduplicated inside a request. One private check still creates one grouped publication. This preserves richer evidence without rewriting historical results, changing the model prompt or enabling a watch. The retest and original incomplete answer remain in the phase evidence.

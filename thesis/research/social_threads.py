@@ -9,10 +9,10 @@ from thesis.db import one
 METHOD = "deus-thread-discovery-1"
 
 
-def save(conn, post_id, thread_key, kind, match_basis, checked_at, parent=None):
+def save(conn, post_id, thread_key, kind, match_basis, checked_at, parent=None, *, method=None):
     conn.execute(
         "INSERT INTO social_discovery VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
-        (post_id, thread_key, kind, match_basis, METHOD),
+        (post_id, thread_key, kind, match_basis, method or METHOD),
     )
     if not parent:
         return
@@ -28,6 +28,7 @@ def save(conn, post_id, thread_key, kind, match_basis, checked_at, parent=None):
     conn.execute(
         "INSERT INTO social_conversation_results VALUES(%s,%s,%s,'available',%s,%s,%s,%s,%s,%s,%s,%s)",
         (rid,post_id,attempt,parent['parent_key'],parent['parent_type'],parent['title'],parent['body'],parent['url'],parent['published_at'],checked_at,
+         "Original parent read from the same public HTML thread. Its words remain separate from the reply and do not count as another opinion." if method == 'reddit-public-html-1' else
          "Original parent verified during company discussion research. Its words remain separate from the reply and do not count as another opinion."),
     )
     conn.execute("UPDATE social_conversation_state SET latest_result_id=%s,last_attempt_at=%s WHERE post_id=%s", (rid,checked_at,post_id))

@@ -1,14 +1,9 @@
-import Select from "./Select";
+import SourceFilters, { SourceLabel, sourceScope } from "./SourceFilters";
+import { originalSample } from "../lib/originalSample";
 import SentimentLimits from "./SentimentLimits";
 import { useState } from "react";
 import { stamp } from "./MarketResearch";
 
-const names = {
-  news: "Company news",
-  reddit: "Reddit discussion",
-  hackernews: "Hacker News",
-  x: "X / Twitter",
-};
 const states = {
   changed: "The inputs selected now differ from the saved sentiment reading.",
   same: "The selected sources and parent context match the saved reading. Its original labels are unchanged.",
@@ -20,18 +15,42 @@ const states = {
     "The saved reading is unavailable. You can separately inspect currently permitted sources.",
 };
 
-export default function CurrentSentimentSources({ data, onSource }) {
-  const [selected, setSelected] = useState("news");
+export default function CurrentSentimentSources({
+  data,
+  onSource,
+  expanded = false,
+}) {
+  const [selected, setSelected] = useState("all");
   if (!data) return null;
-  const sources = data.sources.filter(
-    (s) => (s.kind === "news" ? "news" : s.platform || "reddit") === selected,
-  );
-  const counts = data.scopes[selected];
+  const sources =
+    selected === "all"
+      ? originalSample({ sources: data.sources }, "all")
+      : data.sources.filter((source) => sourceScope(source) === selected);
+  const scopes = ["news", "reddit", "hackernews", "x"]
+    .map((scope) => data.scopes[scope])
+    .filter(Boolean);
+  const counts =
+    selected === "all"
+      ? Object.fromEntries(
+          [
+            "selected",
+            "available",
+            "added",
+            "no_longer_selected",
+            "retained",
+          ].map((key) => [
+            key,
+            scopes.every((scope) => Number.isInteger(scope[key]))
+              ? scopes.reduce((total, scope) => total + scope[key], 0)
+              : null,
+          ]),
+        )
+      : data.scopes[selected];
   return (
     <section className="original-sample" aria-label="Current sentiment inputs">
       <p role="status">{states[data.status]}</p>
       <SentimentLimits value={data.input_limits} />
-      <details>
+      <details open={expanded || undefined}>
         <summary>Read current sources · {data.sources.length} selected</summary>
         <div className="source-preview-content">
           {data.status === "changed" && (
@@ -51,20 +70,11 @@ export default function CurrentSentimentSources({ data, onSource }) {
               Saved sentiment source cutoff {stamp(data.saved_cutoff)}.
             </p>
           )}
-          <label>
-            Source type{" "}
-            <Select
-              aria-label="Current source type"
-              value={selected}
-              onChange={(e) => setSelected(e.target.value)}
-            >
-              {Object.entries(names).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          </label>
+          <SourceFilters
+            selected={selected}
+            onChange={setSelected}
+            label="Current source type"
+          />
           <p className="fine">
             {counts.selected} selected from {counts.available} available
             candidate texts. Selection is bounded; other material may matter.
@@ -105,8 +115,13 @@ export default function CurrentSentimentSources({ data, onSource }) {
           {sources.map((s) => (
             <article key={s.id}>
               <div className="row">
-                <span className="fine">{s.source}</span>
-                <time>{stamp(s.published_at)}</time>
+                <span className="fine">
+                  <SourceLabel scope={sourceScope(s)}>{s.source}</SourceLabel>
+                </span>
+                <time>
+                  {s.timestamp_basis === "feed_updated" && "Feed updated · "}
+                  {stamp(s.published_at)}
+                </time>
               </div>
               <h3>{s.title}</h3>
               <p className="fine">

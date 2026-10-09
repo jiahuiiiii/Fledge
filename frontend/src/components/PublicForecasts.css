@@ -1,0 +1,80 @@
+.forecast-ranges {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin: 20px 0;
+}
+.public-forecast-meta {
+  color: #a7b5b1;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+.forecast-range {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--line, #34433e);
+  border-radius: 14px;
+}
+.forecast-range h5 {
+  font-size: 1rem;
+  margin: 0 0 12px;
+}
+.fmp-panel .public-forecasts .forecast-average {
+  font-size: 1.8rem;
+  font-weight: 600;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  margin: 0 0 28px;
+}
+.forecast-average span {
+  display: block;
+  font-size: 0.85rem;
+  opacity: 0.75;
+  margin-top: 4px;
+}
+.forecast-track {
+  position: relative;
+  height: 6px;
+  margin: 0 8px 14px;
+  border-radius: 4px;
+  background: #749890;
+}
+.forecast-track > span {
+  position: absolute;
+  top: -5px;
+  width: 16px;
+  height: 16px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  border: 3px solid #a9d7c7;
+  background: #193d32;
+}
+.forecast-endpoints {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 20px;
+}
+.forecast-range details {
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+.forecast-range details p,
+.forecast-history section {
+  margin-top: 12px;
+}
+.forecast-history {
+  margin-top: 20px;
+}
+@media (max-width: 600px) {
+  .forecast-ranges {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .forecast-range {
+    padding: 16px;
+  }
+}

@@ -9,6 +9,7 @@ export default function Modal({
   children,
   className = "",
   initialFocus,
+  keepMounted = false,
 }) {
   const ref = useRef(null),
     id = useId();
@@ -25,6 +26,37 @@ export default function Modal({
       ref={ref}
       className={`modal ${className}`}
       aria-labelledby={id}
+      onKeyDown={(event) => {
+        if (
+          event.key !== "Tab" ||
+          event.target.closest("dialog") !== event.currentTarget
+        )
+          return;
+        const controls = [
+          ...event.currentTarget.querySelectorAll(
+            "button, a[href], input, select, textarea, [tabindex]",
+          ),
+        ].filter(
+          (element) =>
+            element.tabIndex >= 0 &&
+            !element.disabled &&
+            element.getClientRects().length &&
+            !element.closest("[inert]"),
+        );
+        const first = controls[0],
+          last = controls.at(-1);
+        if (!first) {
+          event.preventDefault();
+          return;
+        }
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }}
       onCancel={(e) => {
         e.preventDefault();
         onClose();
@@ -40,7 +72,7 @@ export default function Modal({
           ×
         </button>
       </header>
-      {open && children}
+      {(open || keepMounted) && children}
     </dialog>,
     document.body,
   );

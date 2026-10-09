@@ -9,7 +9,10 @@ import urllib.request
 from pathlib import Path
 
 journeys = {
+    "--business",
     "--watch-continuity",
+    "--research-design",
+    "--source-filters",
     "--sentiment-limits",
     "--age",
     "--answer-evidence",
@@ -57,6 +60,10 @@ env = dict(
     THESIS_TEST_OFFLINE="true",
     PYTHONPATH=str(root / "tests/offline_runtime") + os.pathsep + str(root),
 )
+if "--research-design" in sys.argv:
+    env["THESIS_DESIGN_SYMBOL"] = "MSFT"
+if "--source-filters" in sys.argv:
+    env["THESIS_FILTERS_SYMBOL"] = "MSFT"
 server = subprocess.Popen(
     [sys.executable, "run.py", "--port", "8843"], cwd=root, env=env
 )
@@ -73,7 +80,9 @@ try:
             time.sleep(0.2)
     else:
         raise RuntimeError("Browser test server did not start")
-    if "--watch-continuity" in sys.argv:
+    if "--business" in sys.argv:
+        subprocess.run([sys.executable, "tests/seed_business_browser.py"], cwd=root, env=env, check=True)
+    elif "--watch-continuity" in sys.argv:
         subprocess.run([sys.executable, "tests/seed_retained_watch_browser.py"], cwd=root, env=env, check=True)
     elif "--sentiment-limits" in sys.argv:
         subprocess.run([sys.executable, "tests/seed_sentiment_limits_browser.py"], cwd=root, env=env, check=True)
@@ -105,7 +114,7 @@ try:
             env=env,
             check=True,
         )
-    elif "--sentiment-inputs" in sys.argv:
+    elif any(flag in sys.argv for flag in ("--sentiment-inputs", "--research-design", "--source-filters")):
         subprocess.run(
             [sys.executable, "tests/seed_sentiment_inputs_browser.py"],
             cwd=root,
@@ -270,10 +279,12 @@ try:
         subprocess.run(
             [sys.executable, "tests/seed_sec_browser.py"], cwd=root, env=env, check=True
         )
+    if "--research-design" in sys.argv:
+        subprocess.run([sys.executable, "tests/seed_price_browser.py"], cwd=root, env=env, check=True)
     result = subprocess.run(
         [
             os.environ.get("THESIS_NODE", "node"),
-            "tests/browser_retained_watch.cjs" if "--watch-continuity" in sys.argv else "tests/browser_sentiment_limits.cjs" if "--sentiment-limits" in sys.argv else "tests/browser_report_expectations.cjs" if "--report-expectations" in sys.argv else (
+            "tests/browser_business.cjs" if "--business" in sys.argv else "tests/browser_research_design.cjs" if "--research-design" in sys.argv else "tests/browser_source_filters.cjs" if "--source-filters" in sys.argv else "tests/browser_retained_watch.cjs" if "--watch-continuity" in sys.argv else "tests/browser_sentiment_limits.cjs" if "--sentiment-limits" in sys.argv else "tests/browser_report_expectations.cjs" if "--report-expectations" in sys.argv else (
                 (
                     "tests/browser_recurring_events.cjs"
                     if "--recurring-events" in sys.argv

@@ -9,7 +9,12 @@ import OriginalSample from "./OriginalSample";
 import CurrentSentimentSources from "./CurrentSentimentSources";
 import WatchCheckHistory from "./WatchCheckHistory";
 import SentimentHistory from "./SentimentHistory";
+import SourceFilters, { SourceLabel, sourceScope } from "./SourceFilters";
+import AllSourceSummary from "./AllSourceSummary";
+import { originalSample } from "../lib/originalSample";
 import { useState } from "react";
+import Modal from "./Modal";
+import EvidenceButton from "./EvidenceButton";
 import { stamp } from "./MarketResearch";
 const names = {
   positive: "Positive",
@@ -29,16 +34,20 @@ export default function SentimentPanel({
   onEventWatch,
   onSource,
   onThemeSource,
+  onCoverage,
 }) {
   const [days, setDays] = useState(
     data.sentiment?.social_lookback_days || loadingRun?.lookback_days || 7,
   );
   const availability = modelAvailability(modelStatus, "briefing_enabled");
+  const analysisStep = loadingRun?.steps.find((s) => s.key === "analysis");
+  const batchProgress = analysisStep?.batches;
   const [tab, setTab] = useState("news");
   const [checkPurpose, setCheckPurpose] = useState("reasoning");
-  const channel = tab === "news" ? "news" : "social";
-  const platform = tab === "news" ? null : tab;
-  const [reading, setReading] = useState(false);
+  const channel = tab === "all" ? "all" : tab === "news" ? "news" : "social";
+  const platform = tab === "all" || tab === "news" ? null : tab;
+  const [evidenceView, setEvidenceView] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const a = data.sentiment,
     watch = data.news_watch;
   const activeQuestion =
@@ -59,13 +68,24 @@ export default function SentimentPanel({
     channel === "news"
       ? a?.coverage?.available_news
       : a?.coverage?.social_platforms?.[platform];
-  const items = (a?.items || []).filter(
-    (i) =>
-      i.channel === channel &&
-      (!platform ||
-        (a.sources.find((s) => s.id === i.source_id)?.platform || "reddit") ===
-          platform),
+  const sourceOrder = new Map(
+    originalSample(a, "all").map((source, index) => [source.id, index]),
   );
+  const items = (a?.items || [])
+    .filter(
+      (item) =>
+        tab === "all" ||
+        (item.channel === channel &&
+          (!platform ||
+            (a.sources.find((source) => source.id === item.source_id)
+              ?.platform || "reddit") === platform)),
+    )
+    .sort((left, right) =>
+      tab === "all"
+        ? (sourceOrder.get(left.source_id) ?? Infinity) -
+          (sourceOrder.get(right.source_id) ?? Infinity)
+        : 0,
+    );
   const coverageLinks = a?.coverage_links || [];
   const sampledFeeds = [
     ...new Set(
@@ -102,6 +122,33 @@ export default function SentimentPanel({
       <p className="fine">
         Selected news and social opinions — not a market-wide measure.
       </p>
+      {batchProgress && analysisStep.status !== "ready" && (
+        <div className="sentiment-batch-progress">
+          <p className="fine" role="status">
+            {batchProgress.message}
+          </p>
+          <div
+            className="research-progress"
+            role="progressbar"
+            aria-label="Sentiment batches complete"
+            aria-valuemin={0}
+            aria-valuemax={batchProgress.total}
+            aria-valuenow={batchProgress.completed}
+          >
+            <span
+              style={{
+                width: `${(batchProgress.completed / batchProgress.total) * 100}%`,
+              }}
+            />
+          </div>
+          {!loadingRun.active && (
+            <p className="fine">
+              Refresh &amp; analyse reuses completed batches when their sources
+              and context are unchanged.
+            </p>
+          )}
+        </div>
+      )}
       {availability.blocked && (
         <p className="fine" role="status">
           {availability.message}
@@ -121,278 +168,23 @@ export default function SentimentPanel({
             <option value={30}>Past 30 days</option>
           </Select>
         </label>
-        <label>
-          <Checkbox
-            disabled={busy}
-            checked={!!watch?.enabled}
-            onChange={(e) =>
-              onWatch(e.target.checked, watch?.interval_minutes || 60)
-            }
-          />{" "}
-          Watch news + social changes
-        </label>
-        {watch?.enabled && (
-          <label>
-            Check every{" "}
-            <Select
-              aria-label="Watch frequency"
-              disabled={busy}
-              value={watch.interval_minutes}
-              onChange={(e) => onWatch(true, Number(e.target.value))}
-            >
-              <option value={60}>hour</option>
-              <option value={240}>4 hours</option>
-            </Select>
-          </label>
-        )}
+        <button
+          type="button"
+          className="source-link"
+          aria-haspopup="dialog"
+          onClick={() => setSettingsOpen(true)}
+        >
+          Watch · {watch?.enabled ? "on" : "off"}
+        </button>
       </div>
-      <details className="secondary-details sentiment-window-info">
-        <summary>Source window &amp; limits</summary>
-        <p className="fine">
-          Refresh & analyse checks news and discussions, then analyses the
-          available passages. News covers 7 days. Discussion searches use your
-          selected window. Reddit searches for the company and ticker, with up
-          to 50 posts and replies from three threads, so a wider window does not
-          guarantee more posts. X recent search returns at most 20 original
-          posts and only covers the last 7 days, including when you select 30
-          days. Automatic watches keep their 7-day window.
-        </p>
-      </details>
       {a && (
         <p className="fine">
-          Saved analysis: news over 7 days · discussions over{" "}
+          Saved {stamp(a.created_at)} · news over 7 days · discussions over{" "}
           {a.social_lookback_days || 7} days.{" "}
           {a.social_lookback_days && a.social_lookback_days !== 7
             ? "This exploratory window does not publish watch alerts."
             : ""}
         </p>
-      )}
-      {watch?.enabled && (
-        <label className="watch-scope">
-          Alerts to receive{" "}
-          <Select
-            aria-label="Alert focus"
-            disabled={busy}
-            value={
-              watch.match_idea
-                ? watch.idea_purpose === "question"
-                  ? "question"
-                  : "idea"
-                : "company"
-            }
-            onChange={(e) =>
-              onWatch(
-                true,
-                watch.interval_minutes,
-                e.target.value !== "company",
-                undefined,
-                e.target.value === "question" ? "question" : "reasoning",
-              )
-            }
-          >
-            <option value="company">Company news and sentiment changes</option>
-            <option value="idea" disabled={!activeReasoning}>
-              Changes linked to my saved reasoning
-            </option>
-            <option value="question" disabled={!activeQuestion}>
-              Answers to my saved question
-            </option>
-          </Select>
-        </label>
-      )}
-      {watch?.enabled && watch.match_idea && (
-        <p className="fine">
-          {watch.idea_purpose === "question"
-            ? "Question-focused checks look for concrete answers to your saved question. They do not alert on inferred investment risks."
-            : "Reasoning checks look for support, challenges, specific risks and answers linked to your saved words."}{" "}
-          New eligible text uses another private AI request. Quiet results stay
-          in history. Changing focus or reasoning starts a quiet baseline for
-          future sources; numerical and event conditions stay unchanged.
-        </p>
-      )}
-      {watch?.enabled && (
-        <div className="watch-settings-group">
-          <details className="secondary-details watch-options">
-            <summary>Watch settings</summary>
-            <div className="watch-settings-body">
-              <details className="event-watch-control">
-                <summary>
-                  Original reply context ·{" "}
-                  {watch?.include_context
-                    ? watch.enabled
-                      ? "on"
-                      : "paused"
-                    : "off"}
-                </summary>
-                <div className="watch-option-body">
-                  <label>
-                    <Checkbox
-                      disabled={
-                        busy || (!watch?.enabled && !watch?.include_context)
-                      }
-                      checked={!!watch?.include_context}
-                      onChange={(e) =>
-                        onWatch(
-                          !!watch?.enabled,
-                          watch?.interval_minutes || 60,
-                          undefined,
-                          e.target.checked,
-                        )
-                      }
-                    />{" "}
-                    Check original reply context during watches
-                  </label>
-                  <p className="fine">
-                    Before sentiment analysis, check up to four selected Hacker
-                    News replies and their immediate parents. Recent eligible
-                    saved context is reused. This adds source requests, not a
-                    separate AI call. Parents remain separate evidence and add
-                    no sentiment votes. Partial or failed checks appear in Watch
-                    check history.
-                  </p>
-                  <p className="fine">
-                    Turning this off stops scheduled parent lookups. New
-                    analyses can still use eligible context already saved with a
-                    source.
-                  </p>
-                </div>
-              </details>
-              <details className="event-watch-control">
-                <summary>
-                  Automatic event checks ·{" "}
-                  {watch?.event_version_id
-                    ? watch.enabled && eventWatchCurrent
-                      ? "on"
-                      : "paused"
-                    : "off"}
-                </summary>
-                <div className="watch-option-body">
-                  <label>
-                    <Checkbox
-                      disabled={
-                        busy ||
-                        (!watch?.event_version_id &&
-                          (!watch?.enabled || !approvedEvents))
-                      }
-                      checked={!!watch?.event_version_id}
-                      onChange={(e) =>
-                        onEventWatch(
-                          e.target.checked ? data.versions[0].id : null,
-                        )
-                      }
-                    />{" "}
-                    Also check my approved event conditions
-                  </label>
-                  <p className="fine">
-                    At each scheduled news check, assess eligible company
-                    reports against the exact approved events. Changed inputs
-                    can use an additional private AI request. Identical inputs
-                    reuse a saved check. Social sentiment does not confirm an
-                    event.
-                  </p>
-                  {!approvedEvents && (
-                    <p className="fine">
-                      Save and approve event conditions in your idea to use this
-                      option.
-                    </p>
-                  )}
-                  {watch?.event_version_id && !eventWatchCurrent && (
-                    <div className="warning" role="status">
-                      <p>
-                        Event checks are paused because the approved revision
-                        changed. Review the current conditions before resuming.
-                      </p>
-                      {approvedEvents && (
-                        <button
-                          disabled={busy || !watch?.enabled}
-                          onClick={() => onEventWatch(data.versions[0].id)}
-                        >
-                          Use current approved events
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  {eventWatchCurrent && watch?.enabled && (
-                    <p className="fine">
-                      Watching approved event revision{" "}
-                      {data.versions[0].revision}. Matching reports update
-                      conditions in Updates; they remain AI interpretations, not
-                      verified events.
-                    </p>
-                  )}
-                </div>
-              </details>
-              <p className="fine watch-settings-note">
-                Watches run while this app is open and your Mac is awake. New
-                samples use your AI budget; unchanged samples reuse their
-                analysis. Alerts appear in Updates, with optional delivery
-                through your connected Telegram bot.
-              </p>
-            </div>
-          </details>
-          {data.idea_watch_state && watch?.match_idea && (
-            <p className="fine">
-              Idea watch:{" "}
-              {data.idea_watch_state.status === "baseline"
-                ? "baseline established; watching future sources"
-                : data.idea_watch_state.status === "quiet"
-                  ? "no new reviewable coverage in this sample; repeats remain in the source view"
-                  : "last private relevance check saved"}{" "}
-              · {stamp(data.idea_watch_state.last_check_at)}.
-            </p>
-          )}
-          <details className="secondary-details private-check-options">
-            <summary>Check against my idea</summary>
-            <div className="private-check-body">
-              <div className="sentiment-controls">
-                <label>
-                  Check focus{" "}
-                  <Select
-                    aria-label="Private check focus"
-                    disabled={busy}
-                    value={checkPurpose}
-                    onChange={(e) => setCheckPurpose(e.target.value)}
-                  >
-                    <option value="reasoning">
-                      Connections to my reasoning
-                    </option>
-                    <option value="question">
-                      Answers to my saved question
-                    </option>
-                  </Select>
-                </label>
-                <button
-                  disabled={
-                    busy ||
-                    !(checkPurpose === "question"
-                      ? activeQuestion
-                      : activeReasoning) ||
-                    !a ||
-                    a.withheld ||
-                    !modelStatus?.comparison_enabled ||
-                    modelStatus?.budget?.unresolved > 0
-                  }
-                  onClick={() => onCheckIdea(checkPurpose)}
-                >
-                  Check this sample against my idea
-                </button>
-              </div>
-              <p className="fine">
-                {checkPurpose === "question"
-                  ? "Looks for concrete answers to the saved question below. Related background stays quiet."
-                  : "Looks for support, challenges, specific risks and answers linked to your saved reasoning."}{" "}
-                Explicit private AI check · works with a saved draft.
-              </p>
-              {checkPurpose === "question" && activeQuestion && (
-                <blockquote>
-                  <span className="section-label">SAVED QUESTION</span>
-                  <br />
-                  {data.versions[0].question}
-                </blockquote>
-              )}
-            </div>
-          </details>
-        </div>
       )}
       {watch?.enabled && (
         <p className="fine" role="status">
@@ -418,7 +210,11 @@ export default function SentimentPanel({
           {data.social_status?.some((s) => s.enabled && s.error) && (
             <p className="warning" role="status">
               Some social feeds could not be checked. Displayed posts may be
-              older; open Social source coverage for details.
+              older.{" "}
+              <button className="source-link" onClick={onCoverage}>
+                Check Data &amp; sources
+              </button>{" "}
+              for details.
             </p>
           )}
           {a?.stale && (
@@ -437,87 +233,21 @@ export default function SentimentPanel({
           )}
         </details>
       )}
+      {data.provider_status?.some(
+        (s) => s.channel === "news" && ["failed", "blocked"].includes(s.status),
+      ) && (
+        <p className="fine coverage-inline-notice">
+          Some news connections are unavailable.{" "}
+          <button className="source-link" onClick={onCoverage}>
+            See coverage gaps
+          </button>
+        </p>
+      )}
       {watch?.error && (
         <p className="warning" role="status">
           {watch.error}
         </p>
       )}
-      <div
-        className="social-source-summary"
-        aria-label="Social collection status"
-      >
-        {["reddit", "hackernews"].map((platform) => {
-          const feeds = (data.social_status || []).filter(
-            (s) => s.platform === platform,
-          );
-          const step = loadingRun?.steps.find((s) => s.key === platform);
-          const count =
-            data.sentiment_inputs?.scopes?.[platform]?.available || 0;
-          const errors = feeds.filter((s) => s.enabled && s.error);
-          return (
-            <div key={platform}>
-              <strong>
-                {platform === "reddit" ? "Reddit" : "Hacker News"}
-              </strong>
-              <span>
-                {step && ["queued", "running"].includes(step.status)
-                  ? `${step.status === "queued" ? "Queued" : "Fetching discussions"}…`
-                  : `${count} saved candidate ${count === 1 ? "discussion item" : "discussion items"} in the current analysis window`}
-              </span>
-              {errors.length > 0 ? (
-                <p>
-                  {errors.length} {errors.length === 1 ? "feed" : "feeds"} could
-                  not be reached.{" "}
-                  {errors.some((s) => s.error?.includes("429"))
-                    ? "The provider is rate-limiting requests; retry after its cooldown."
-                    : "Open source coverage below for details."}
-                </p>
-              ) : (
-                count === 0 &&
-                !["queued", "running"].includes(step?.status) && (
-                  <p>
-                    No matching discussion was returned in this window. Try a
-                    longer window or another company. An empty sample does not
-                    mean neutral sentiment.
-                  </p>
-                )
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <details className="secondary-details provider-coverage">
-        <summary>Publisher feeds &amp; source connections</summary>
-        <p>
-          News feeds supply headlines and summaries. Social posts remain a
-          separate sample. An unavailable source is not neutral sentiment.
-        </p>
-        <div className="provider-list">
-          {(data.provider_status || []).map((source) => (
-            <div className="provider-row" key={source.provider}>
-              <div>
-                <strong>{source.label}</strong>
-                <span>
-                  {source.channel === "news" ? "News" : "Social discussion"} ·{" "}
-                  {source.checked_at ? stamp(source.checked_at) : "Not checked"}
-                </span>
-              </div>
-              <div>
-                <b className={`provider-state ${source.status}`}>
-                  {source.status === "ready"
-                    ? `${source.matched} matching ${source.matched === 1 ? "report" : "reports"}`
-                    : source.status === "blocked"
-                      ? "Connection needed"
-                      : source.status === "failed"
-                        ? "Unavailable"
-                        : "Waiting"}
-                </b>
-                <p>{source.message}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </details>
       {data.provider_status?.find(
         (s) => s.provider === "x" && s.status !== "ready",
       ) &&
@@ -526,130 +256,98 @@ export default function SentimentPanel({
             {data.provider_status.find((s) => s.provider === "x").message}
           </p>
         )}
-      <CurrentSentimentSources
-        data={data.sentiment_inputs}
-        onSource={onSource}
-      />
-      <div
-        className="sentiment-tabs"
-        role="group"
-        aria-label="Sentiment source type"
-      >
-        {["news", "reddit", "hackernews", "x"].map((c) => (
-          <button
-            key={c}
-            aria-pressed={tab === c}
-            className={tab === c ? "active" : ""}
-            onClick={() => setTab(c)}
-          >
-            {c === "news"
-              ? "Company news"
-              : c === "reddit"
-                ? "Reddit discussion"
-                : c === "x"
-                  ? "X / Twitter"
-                  : "Hacker News"}
-          </button>
-        ))}
-      </div>
-      {a && !a.withheld && (
-        <div
-          className="sentiment-tabs sample-reading-toggle"
-          role="group"
-          aria-label="Sample reading view"
+      <div className="sample-browse-controls">
+        <SourceFilters selected={tab} onChange={setTab} />
+        <button
+          className="evidence-button"
+          onClick={() =>
+            setEvidenceView(a && !a.withheld ? "saved" : "current")
+          }
+          aria-haspopup="dialog"
         >
-          <button
-            aria-pressed={!reading}
-            className={!reading ? "active" : ""}
-            onClick={() => setReading(false)}
-          >
-            AI interpretation
-          </button>
-          <button
-            aria-pressed={reading}
-            className={reading ? "active" : ""}
-            onClick={() => setReading(true)}
-          >
-            Original sources
-          </button>
-        </div>
-      )}
+          Evidence
+        </button>
+      </div>
       {a?.withheld ? (
         <p className="warning">
           This analysis is withheld because source access changed.
         </p>
-      ) : reading && a ? (
-        <OriginalSample
-          analysis={a}
-          channel={channel}
-          platform={platform}
-          onSource={onSource}
-        />
-      ) : sample ? (
+      ) : sample || (tab === "all" && a) ? (
         <>
-          <SentimentLimits value={a.coverage?.input_limits} />
-          <div className="sentiment-summary">
-            <strong>{sample.tone}</strong>
-            <span>
-              {sample.relevant} relevant of {sample.selected} selected{" "}
-              {channel === "news"
-                ? "stories"
-                : platform === "hackernews"
-                  ? "comments"
-                  : "posts and replies"}
-            </span>
-          </div>
-          <div className="sentiment-counts">
-            {Object.entries(names).map(([key, label]) => (
-              <span className={`tone-${key}`} key={key}>
-                {label} <b>{sample.counts[key]}</b>
-              </span>
-            ))}
-          </div>
-          <details className="secondary-details sample-method">
-            <summary>Sample details &amp; method</summary>
-            {Number.isInteger(pool) && (
-              <p className="fine">
-                Available pool: {pool} candidate texts on this source. Only{" "}
-                {sample.selected} were selected; important material may be
-                outside this sample.
-              </p>
-            )}
+          {a.coverage?.input_limits?.notice && (
             <p className="fine">
-              Counted relevant text groups:{" "}
-              {sample.counted_groups ?? sample.relevant}.{" "}
-              {channel === "social"
-                ? "Exact repeated text counts once within this platform. Different comments are not necessarily independent opinions."
-                : a.summary_policy?.startsWith("sentiment-coverage-")
-                  ? "Related news reports count once per compared development; each original report and its framing remain below. AI grouping can be wrong. Social opinions stay separate."
-                  : "Identical substantive news bodies count once even when headlines differ."}{" "}
-              A direction requires a majority of at least three interpretable
-              groups.
+              Some sources were omitted. Open Evidence to inspect the limits.
             </p>
-            {channel === "news" &&
-              a.summary_policy?.startsWith("sentiment-coverage-") && (
+          )}
+          {tab === "all" ? (
+            <AllSourceSummary analysis={a} count={items.length} />
+          ) : (
+            <>
+              <div className="sentiment-summary">
+                <strong>{sample.tone}</strong>
+                <span>
+                  {sample.relevant} relevant of {sample.selected} selected{" "}
+                  {channel === "news"
+                    ? "stories"
+                    : platform === "hackernews"
+                      ? "comments"
+                      : "posts and replies"}
+                </span>
+              </div>
+              <div className="sentiment-counts">
+                {Object.entries(names).map(([key, label]) => (
+                  <span className={`tone-${key}`} key={key}>
+                    {label} <b>{sample.counts[key]}</b>
+                  </span>
+                ))}
+              </div>
+              <details className="secondary-details sample-method">
+                <summary>Sample details &amp; method</summary>
+                {Number.isInteger(pool) && (
+                  <p className="fine">
+                    Available pool: {pool} candidate texts on this source. Only{" "}
+                    {sample.selected} were selected; important material may be
+                    outside this sample.
+                  </p>
+                )}
                 <p className="fine">
-                  Compared with {a.coverage?.comparison_news ?? 0} additional
-                  recent news reports, which are not counted in this sample.
-                  This is bounded coverage, not a search of every past report.
+                  Counted relevant text groups:{" "}
+                  {sample.counted_groups ?? sample.relevant}.{" "}
+                  {channel === "social"
+                    ? "Exact repeated text counts once within this platform. Different comments are not necessarily independent opinions."
+                    : a.summary_policy?.startsWith("sentiment-coverage-")
+                      ? "Related news reports count once per compared development; each original report and its framing remain below. AI grouping can be wrong. Social opinions stay separate."
+                      : "Identical substantive news bodies count once even when headlines differ."}{" "}
+                  A direction requires a majority of at least three
+                  interpretable groups.
                 </p>
-              )}
-            <p className="fine">
-              Analysed {stamp(a.created_at)} · up to 8 news items and 8 social
-              texts in total within the saved discussion window; platforms
-              alternate during social selection.{" "}
-              {sample.tone === "thin sample"
-                ? "Too few interpretable items for a directional summary."
-                : ""}{" "}
-              {channel === "social"
-                ? `${a.coverage.platform_authors?.[platform] ?? a.coverage.selected_social_authors} distinct ${(a.coverage.platform_authors?.[platform] ?? a.coverage.selected_social_authors) === 1 ? "author" : "authors"} represented. Selected sources: ${sampledFeeds || "none"}. ${platform === "hackernews" ? "Tech-community comments, not investor consensus." : platform === "x" ? "Original X posts, not investor consensus." : "Public Reddit posts and available replies, not investor consensus."} ${a.coverage.parent_contexts || 0} parent messages supplied across this saved analysis as context, not extra votes. Each author's words are classified separately; ambiguous replies may remain unclear.`
-                : "Provider headlines/snippets, not full articles."}
-            </p>
-            <p>
-              News framing and expressed social opinions are separate samples.
-              They do not measure all investors or predict returns.
-            </p>
-          </details>
+                {channel === "news" &&
+                  a.summary_policy?.startsWith("sentiment-coverage-") && (
+                    <p className="fine">
+                      Compared with {a.coverage?.comparison_news ?? 0}{" "}
+                      additional recent news reports, which are not counted in
+                      this sample. This is bounded coverage, not a search of
+                      every past report.
+                    </p>
+                  )}
+                <p className="fine">
+                  Analysed {stamp(a.created_at)} · up to 8 news items and 8
+                  social texts in total within the saved discussion window;
+                  platforms alternate during social selection.{" "}
+                  {sample.tone === "thin sample"
+                    ? "Too few interpretable items for a directional summary."
+                    : ""}{" "}
+                  {channel === "social"
+                    ? `${a.coverage.platform_authors?.[platform] ?? a.coverage.selected_social_authors} distinct ${(a.coverage.platform_authors?.[platform] ?? a.coverage.selected_social_authors) === 1 ? "author" : "authors"} represented. Selected sources: ${sampledFeeds || "none"}. ${platform === "hackernews" ? "Tech-community comments, not investor consensus." : platform === "x" ? "Original X posts, not investor consensus." : "Public Reddit posts and available replies, not investor consensus."} ${a.coverage.parent_contexts || 0} parent messages supplied across this saved analysis as context, not extra votes. Each author's words are classified separately; ambiguous replies may remain unclear.`
+                    : "Provider headlines/snippets, not full articles."}
+                </p>
+                <p>
+                  News framing and expressed social opinions are separate
+                  samples. They do not measure all investors or predict returns.
+                </p>
+              </details>
+            </>
+          )}
           {items.length ? (
             <div className="sentiment-items">
               {items.map((i) => {
@@ -676,71 +374,102 @@ export default function SentimentPanel({
                         {i.statement.replaceAll("_", " ")}
                       </span>
                     </div>
+                    {s && (
+                      <div className="sentiment-source-meta fine">
+                        <SourceLabel scope={sourceScope(s)}>
+                          {s.source}
+                        </SourceLabel>
+                        <time>
+                          {s.timestamp_basis === "feed_updated" &&
+                            "Feed updated · "}
+                          {stamp(s.published_at)}
+                        </time>
+                      </div>
+                    )}
                     <h3>{s?.title || "Source unavailable"}</h3>
-                    <SentimentBasis item={i} />
+                    <p className="story-reading">{i.explanation}</p>
                     {comparison && (
-                      <details className="coverage-comparison">
-                        <summary>
-                          {comparison.relation === "repeats"
-                            ? "Repeated coverage"
-                            : comparison.relation === "adds_detail"
-                              ? "New detail on an earlier report"
-                              : "Conflicting reports"}{" "}
-                          · compare reports
-                        </summary>
-                        <p>{comparison.explanation}</p>
-                        {!comparison.explanation_policy && (
+                      <p className="fine">
+                        {comparison.relation === "repeats"
+                          ? "Repeated coverage of an earlier development"
+                          : comparison.relation === "adds_detail"
+                            ? "Adds detail to an earlier report"
+                            : "Reports conflict · inspect both sources"}
+                      </p>
+                    )}
+                    <EvidenceButton
+                      key={`${a.id}:${i.id}`}
+                      label="Inspect evidence"
+                      title="Story evidence"
+                    >
+                      <h3>{s?.title || "Source unavailable"}</h3>
+                      <SentimentBasis item={i} />
+                      {comparison && (
+                        <details className="coverage-comparison">
+                          <summary>
+                            {comparison.relation === "repeats"
+                              ? "Repeated coverage"
+                              : comparison.relation === "adds_detail"
+                                ? "New detail on an earlier report"
+                                : "Conflicting reports"}{" "}
+                            · compare reports
+                          </summary>
+                          <p>{comparison.explanation}</p>
+                          {!comparison.explanation_policy && (
+                            <p className="fine">
+                              Earlier AI-written summary. Check each report for
+                              the details it supports.
+                            </p>
+                          )}
                           <p className="fine">
-                            Earlier AI-written summary. Check each report for
-                            the details it supports.
+                            AI comparison of supplied snippets; not independent
+                            confirmation.{" "}
+                            {comparison.review_note ||
+                              (comparison.repeat_suppression_allowed
+                                ? "Watches can keep this repeat quiet when the earlier report has already been seen."
+                                : "New detail and contradictions remain eligible for review.")}
                           </p>
-                        )}
-                        <p className="fine">
-                          AI comparison of supplied snippets; not independent
-                          confirmation.{" "}
-                          {comparison.review_note ||
-                            (comparison.repeat_suppression_allowed
-                              ? "Watches can keep this repeat quiet when the earlier report has already been seen."
-                              : "New detail and contradictions remain eligible for review.")}
-                        </p>
-                        <strong>This report</strong>
-                        {comparison.citations.map((c, j) => (
-                          <blockquote key={j}>{c.quote}</blockquote>
-                        ))}
+                          <strong>This report</strong>
+                          {comparison.citations.map((c, j) => (
+                            <blockquote key={j}>{c.quote}</blockquote>
+                          ))}
+                          <button
+                            className="source-link"
+                            onClick={() => onSource(i.source_id)}
+                          >
+                            Inspect this report ↗
+                          </button>
+                          <strong>
+                            {reference?.title || "Earlier report"}
+                          </strong>
+                          {comparison.reference_citations.map((c, j) => (
+                            <blockquote key={j}>{c.quote}</blockquote>
+                          ))}
+                          <button
+                            className="source-link"
+                            onClick={() =>
+                              onSource(comparison.reference_source_id)
+                            }
+                          >
+                            Inspect compared report ↗
+                          </button>
+                        </details>
+                      )}
+                      <details>
+                        <summary>Why this label · inspect evidence</summary>
+                        {!i.evidence_policy &&
+                          i.citations.map((c, j) => (
+                            <blockquote key={j}>{c.quote}</blockquote>
+                          ))}
+                        <SentimentContext value={i.conversation} />
                         <button
                           className="source-link"
                           onClick={() => onSource(i.source_id)}
                         >
-                          Inspect this report ↗
-                        </button>
-                        <strong>{reference?.title || "Earlier report"}</strong>
-                        {comparison.reference_citations.map((c, j) => (
-                          <blockquote key={j}>{c.quote}</blockquote>
-                        ))}
-                        <button
-                          className="source-link"
-                          onClick={() =>
-                            onSource(comparison.reference_source_id)
-                          }
-                        >
-                          Inspect compared report ↗
+                          Open original source ↗
                         </button>
                       </details>
-                    )}
-                    <details>
-                      <summary>Why this label · inspect evidence</summary>
-                      {!i.evidence_policy &&
-                        i.citations.map((c, j) => (
-                          <blockquote key={j}>{c.quote}</blockquote>
-                        ))}
-                      <SentimentContext value={i.conversation} />
-                      <button
-                        className="source-link"
-                        onClick={() => onSource(i.source_id)}
-                      >
-                        Open original source ↗
-                      </button>
-                    </details>
+                    </EvidenceButton>
                   </article>
                 );
               })}
@@ -772,35 +501,366 @@ export default function SentimentPanel({
         }
         onSource={onThemeSource}
       />
-      <WatchCheckHistory
-        instrumentId={data.instrument.id}
-        lastCheck={watch?.last_check_at}
-      />
-      <SentimentHistory
-        key={data.instrument.id}
-        instrumentId={data.instrument.id}
-        latestId={a?.id}
-      />
-      <details className="social-coverage">
-        <summary>Social source coverage</summary>
-        {data.social_status?.map((s) => (
-          <p className="fine" key={s.feed}>
-            {s.label || `Reddit · r/${s.feed}`} ·{" "}
-            {s.enabled ? "enabled" : "disabled"} · checked{" "}
-            {stamp(s.completed_at)} ·{" "}
-            {s.error ||
-              (s.post_count == null
-                ? "Not checked"
-                : `${s.post_count} candidates checked; ${s.matched_count} matching posts or comments retained; ${s.excluded_count} excluded.`)}
-            {s.notice && <> {s.notice}</>}
-          </p>
-        ))}
-        <p className="fine">
-          Repeated text is grouped for counts. Different posts are not
-          necessarily independent opinions. Author identities and popularity do
-          not determine the labels.
+      <div className="evidence-summary-bar">
+        <p>
+          {data.sentiment_inputs?.status === "changed"
+            ? "New source selection available. Saved labels still describe the earlier sample."
+            : "Open the evidence to read the selected texts, limits and saved checks."}
         </p>
-      </details>
+        <button
+          className="source-link"
+          onClick={() => setEvidenceView("current")}
+        >
+          Evidence & history
+        </button>
+        <button className="source-link" onClick={onCoverage}>
+          Data & sources
+        </button>
+      </div>
+      <Modal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        title="News & discussion · watch"
+        className="research-dialog"
+        keepMounted
+      >
+        <div className="watch-settings-dialog">
+          <label>
+            <Checkbox
+              disabled={busy}
+              checked={!!watch?.enabled}
+              onChange={(e) =>
+                onWatch(e.target.checked, watch?.interval_minutes || 60)
+              }
+            />{" "}
+            Watch news + social changes
+          </label>
+          {watch?.enabled && (
+            <label>
+              Check every{" "}
+              <Select
+                aria-label="Watch frequency"
+                disabled={busy}
+                value={watch.interval_minutes}
+                onChange={(e) => onWatch(true, Number(e.target.value))}
+              >
+                <option value={60}>hour</option>
+                <option value={240}>4 hours</option>
+              </Select>
+            </label>
+          )}
+          {watch?.enabled && (
+            <label className="watch-scope">
+              Alerts to receive{" "}
+              <Select
+                aria-label="Alert focus"
+                disabled={busy}
+                value={
+                  watch.match_idea
+                    ? watch.idea_purpose === "question"
+                      ? "question"
+                      : "idea"
+                    : "company"
+                }
+                onChange={(e) =>
+                  onWatch(
+                    true,
+                    watch.interval_minutes,
+                    e.target.value !== "company",
+                    undefined,
+                    e.target.value === "question" ? "question" : "reasoning",
+                  )
+                }
+              >
+                <option value="company">
+                  Company news and sentiment changes
+                </option>
+                <option value="idea" disabled={!activeReasoning}>
+                  Changes linked to my saved reasoning
+                </option>
+                <option value="question" disabled={!activeQuestion}>
+                  Answers to my saved question
+                </option>
+              </Select>
+            </label>
+          )}
+          {watch?.enabled && watch.match_idea && (
+            <p className="fine">
+              {watch.idea_purpose === "question"
+                ? "Question-focused checks look for concrete answers to your saved question. They do not alert on inferred investment risks."
+                : "Reasoning checks look for support, challenges, specific risks and answers linked to your saved words."}{" "}
+              New eligible text uses another private AI request. Quiet results
+              stay in history. Changing focus or reasoning starts a quiet
+              baseline for future sources; numerical and event conditions stay
+              unchanged.
+            </p>
+          )}
+          {watch?.enabled && (
+            <div className="watch-settings-group">
+              <details className="secondary-details watch-options">
+                <summary>Watch settings</summary>
+                <div className="watch-settings-body">
+                  <details className="event-watch-control">
+                    <summary>
+                      Original reply context ·{" "}
+                      {watch?.include_context
+                        ? watch.enabled
+                          ? "on"
+                          : "paused"
+                        : "off"}
+                    </summary>
+                    <div className="watch-option-body">
+                      <label>
+                        <Checkbox
+                          disabled={
+                            busy || (!watch?.enabled && !watch?.include_context)
+                          }
+                          checked={!!watch?.include_context}
+                          onChange={(e) =>
+                            onWatch(
+                              !!watch?.enabled,
+                              watch?.interval_minutes || 60,
+                              undefined,
+                              e.target.checked,
+                            )
+                          }
+                        />{" "}
+                        Check original reply context during watches
+                      </label>
+                      <p className="fine">
+                        Before sentiment analysis, check up to four selected
+                        Hacker News replies and their immediate parents. Recent
+                        eligible saved context is reused. This adds source
+                        requests, not a separate AI call. Parents remain
+                        separate evidence and add no sentiment votes. Partial or
+                        failed checks appear in Watch check history.
+                      </p>
+                      <p className="fine">
+                        Turning this off stops scheduled parent lookups. New
+                        analyses can still use eligible context already saved
+                        with a source.
+                      </p>
+                    </div>
+                  </details>
+                  <details className="event-watch-control">
+                    <summary>
+                      Automatic event checks ·{" "}
+                      {watch?.event_version_id
+                        ? watch.enabled && eventWatchCurrent
+                          ? "on"
+                          : "paused"
+                        : "off"}
+                    </summary>
+                    <div className="watch-option-body">
+                      <label>
+                        <Checkbox
+                          disabled={
+                            busy ||
+                            (!watch?.event_version_id &&
+                              (!watch?.enabled || !approvedEvents))
+                          }
+                          checked={!!watch?.event_version_id}
+                          onChange={(e) =>
+                            onEventWatch(
+                              e.target.checked ? data.versions[0].id : null,
+                            )
+                          }
+                        />{" "}
+                        Also check my approved event conditions
+                      </label>
+                      <p className="fine">
+                        At each scheduled news check, assess eligible company
+                        reports against the exact approved events. Changed
+                        inputs can use an additional private AI request.
+                        Identical inputs reuse a saved check. Social sentiment
+                        does not confirm an event.
+                      </p>
+                      {!approvedEvents && (
+                        <p className="fine">
+                          Save and approve event conditions in your idea to use
+                          this option.
+                        </p>
+                      )}
+                      {watch?.event_version_id && !eventWatchCurrent && (
+                        <div className="warning" role="status">
+                          <p>
+                            Event checks are paused because the approved
+                            revision changed. Review the current conditions
+                            before resuming.
+                          </p>
+                          {approvedEvents && (
+                            <button
+                              disabled={busy || !watch?.enabled}
+                              onClick={() => onEventWatch(data.versions[0].id)}
+                            >
+                              Use current approved events
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      {eventWatchCurrent && watch?.enabled && (
+                        <p className="fine">
+                          Watching approved event revision{" "}
+                          {data.versions[0].revision}. Matching reports update
+                          conditions in Updates; they remain AI interpretations,
+                          not verified events.
+                        </p>
+                      )}
+                    </div>
+                  </details>
+                  <p className="fine watch-settings-note">
+                    Watches run while this app is open and your Mac is awake.
+                    New samples use your AI budget; unchanged samples reuse
+                    their analysis. Alerts appear in Updates, with optional
+                    delivery through your connected Telegram bot.
+                  </p>
+                </div>
+              </details>
+              {data.idea_watch_state && watch?.match_idea && (
+                <p className="fine">
+                  Idea watch:{" "}
+                  {data.idea_watch_state.status === "baseline"
+                    ? "baseline established; watching future sources"
+                    : data.idea_watch_state.status === "quiet"
+                      ? "no new reviewable coverage in this sample; repeats remain in the source view"
+                      : "last private relevance check saved"}{" "}
+                  · {stamp(data.idea_watch_state.last_check_at)}.
+                </p>
+              )}
+              <details className="secondary-details private-check-options">
+                <summary>Check against my idea</summary>
+                <div className="private-check-body">
+                  <div className="sentiment-controls">
+                    <label>
+                      Check focus{" "}
+                      <Select
+                        aria-label="Private check focus"
+                        disabled={busy}
+                        value={checkPurpose}
+                        onChange={(e) => setCheckPurpose(e.target.value)}
+                      >
+                        <option value="reasoning">
+                          Connections to my reasoning
+                        </option>
+                        <option value="question">
+                          Answers to my saved question
+                        </option>
+                      </Select>
+                    </label>
+                    <button
+                      disabled={
+                        busy ||
+                        !(checkPurpose === "question"
+                          ? activeQuestion
+                          : activeReasoning) ||
+                        !a ||
+                        a.withheld ||
+                        !modelStatus?.comparison_enabled ||
+                        modelStatus?.budget?.unresolved > 0
+                      }
+                      onClick={() => onCheckIdea(checkPurpose)}
+                    >
+                      Check this sample against my idea
+                    </button>
+                  </div>
+                  <p className="fine">
+                    {checkPurpose === "question"
+                      ? "Looks for concrete answers to the saved question below. Related background stays quiet."
+                      : "Looks for support, challenges, specific risks and answers linked to your saved reasoning."}{" "}
+                    Explicit private AI check · works with a saved draft.
+                  </p>
+                  {checkPurpose === "question" && activeQuestion && (
+                    <blockquote>
+                      <span className="section-label">SAVED QUESTION</span>
+                      <br />
+                      {data.versions[0].question}
+                    </blockquote>
+                  )}
+                </div>
+              </details>
+            </div>
+          )}
+        </div>
+      </Modal>
+      <Modal
+        open={Boolean(evidenceView)}
+        onClose={() => setEvidenceView(null)}
+        title="News & discussion · evidence"
+        className="evidence-dialog"
+      >
+        <div
+          className="dialog-view-switch"
+          role="group"
+          aria-label="Evidence view"
+        >
+          {[
+            ["saved", "Analysed sample"],
+            ["current", "Current sources"],
+            ["history", "History"],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              aria-pressed={evidenceView === key}
+              onClick={() => setEvidenceView(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <details className="secondary-details sentiment-window-info">
+          <summary>Source window &amp; limits</summary>
+          <p className="fine">
+            Refresh & analyse checks news and discussions, then analyses the
+            available passages. News covers 7 days. Discussion searches use your
+            selected window. Reddit searches for the company and ticker, with up
+            to 50 posts and replies from three threads, so a wider window does
+            not guarantee more posts. X recent search returns at most 20
+            original posts and only covers the last 7 days, including when you
+            select 30 days. Automatic watches keep their 7-day window.
+          </p>
+        </details>
+        {evidenceView === "saved" &&
+          (a && !a.withheld ? (
+            <>
+              <SourceFilters
+                selected={tab}
+                onChange={setTab}
+                label="Evidence source type"
+              />
+              <OriginalSample
+                analysis={a}
+                channel={channel}
+                platform={platform}
+                onSource={onSource}
+              />
+            </>
+          ) : (
+            <p>
+              No permitted saved analysis is available. Current sources can be
+              read separately.
+            </p>
+          ))}
+        {evidenceView === "current" && (
+          <CurrentSentimentSources
+            data={data.sentiment_inputs}
+            onSource={onSource}
+            expanded
+          />
+        )}
+        {evidenceView === "history" && (
+          <>
+            <WatchCheckHistory
+              instrumentId={data.instrument.id}
+              lastCheck={watch?.last_check_at}
+            />
+            <SentimentHistory
+              key={data.instrument.id}
+              instrumentId={data.instrument.id}
+              latestId={a?.id}
+            />
+          </>
+        )}
+      </Modal>
     </section>
   );
 }

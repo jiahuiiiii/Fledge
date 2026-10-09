@@ -18,7 +18,7 @@ def test_first_open_is_idempotent_and_never_queues_paid_work(owner):
     with ThreadPoolExecutor(max_workers=3) as pool:
         runs=list(pool.map(lambda _: loading.start(owner,iid,initial=True),range(3)))
     assert len({r['id'] for r in runs})==1
-    assert len(runs[0]['steps'])==10
+    assert len(runs[0]['steps'])==11
     assert 'analysis' not in {s['key'] for s in runs[0]['steps']}
     seen=[]
     while loading.work_once(owner,lambda run,key: seen.append(key) or {}): pass

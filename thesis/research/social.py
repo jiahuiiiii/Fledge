@@ -14,13 +14,22 @@ from thesis.db import transaction, rows, one
 from .sec.service import COMPANIES
 from .catalogue import mentions as company_mentioned
 
-FEEDS = ("stocks", "investing", "wallstreetbets")
+LEGACY_FEEDS = ("stocks", "investing", "wallstreetbets")
+GENERAL_FEEDS = LEGACY_FEEDS + ("stockmarket", "valueinvesting", "securityanalysis")
+COMPANY_FEEDS = {"AVGO": ("broadcomstock",), "NVDA": ("nvda_stock",)}
+FEEDS = GENERAL_FEEDS + tuple(feed for feeds in COMPANY_FEEDS.values() for feed in feeds)
 ATOM = "{http://www.w3.org/2005/Atom}"
 _HTML_TAG = re.compile(r"<[^>]+>")
 _SUBMITTED_BY_FOOTER = re.compile(
     r"\s*submitted by\s+/u/[\w-]+(?:\s+to\s+r/[\w-]+)?\s*\[link\]\s*\[comments\]\s*$",
     re.I,
 )
+
+
+def company_feeds(symbol, enabled):
+    """Use general investor communities and the issuer's own known community."""
+    permitted = set(enabled)
+    return [feed for feed in GENERAL_FEEDS + COMPANY_FEEDS.get(symbol, ()) if feed in permitted]
 
 
 def plain_summary(raw):
@@ -140,7 +149,9 @@ def refresh(*, fetcher=None, now=None, lookback_days=7):
             r["feed"] for r in rows(c, "SELECT feed FROM social_feeds WHERE enabled")
         }
     gathered = {}
-    for feed in FEEDS:
+    # Preserve the historical generic collector's scope; company RSS search is
+    # the current acquisition path for the expanded communities.
+    for feed in LEGACY_FEEDS:
         if feed not in enabled:
             continue
         try:
@@ -222,10 +233,19 @@ def refresh(*, fetcher=None, now=None, lookback_days=7):
 def documents(conn, iid, cutoff, lookback_days=7):
     data = rows(
         conn,
-        "SELECT DISTINCT ON (p.post_key) p.*,d.thread_key,d.kind AS social_kind,d.match_basis FROM social_posts p JOIN social_feeds f ON f.feed=p.feed AND f.enabled LEFT JOIN social_discovery d ON d.post_id=p.id WHERE NOT EXISTS(SELECT 1 FROM hn_withdrawals w WHERE w.post_key IN (p.post_key,d.thread_key) AND p.platform='hackernews') AND NOT EXISTS(SELECT 1 FROM social_withdrawals w WHERE w.post_key IN (p.post_key,d.thread_key)) AND p.instrument_id=%s AND p.available_at<=%s AND p.published_at<=%s AND p.published_at>=%s ORDER BY p.post_key,p.available_at DESC,p.id DESC",
+        "SELECT DISTINCT ON (p.post_key) p.*,d.thread_key,d.kind AS social_kind,d.match_basis,d.method AS discovery_method FROM social_posts p JOIN social_feeds f ON f.feed=p.feed AND f.enabled LEFT JOIN social_discovery d ON d.post_id=p.id WHERE NOT EXISTS(SELECT 1 FROM hn_withdrawals w WHERE w.post_key IN (p.post_key,d.thread_key) AND p.platform='hackernews') AND NOT EXISTS(SELECT 1 FROM social_withdrawals w WHERE w.post_key IN (p.post_key,d.thread_key)) AND p.instrument_id=%s AND p.available_at<=%s AND p.published_at<=%s AND p.published_at>=%s ORDER BY p.post_key,p.available_at DESC,p.id DESC",
         (iid, cutoff, cutoff, cutoff - timedelta(days=lookback_days)),
     )
+    for value in data:
+        value.update(source_metadata(value))
     return sorted(data, key=lambda p: (p["published_at"], str(p["id"])), reverse=True)
+
+
+def source_metadata(record):
+    if record.get('discovery_method') != 'reddit-comment-rss-updated-1' and record.get('timestamp_basis') != 'feed_updated':
+        return {}
+    return dict(timestamp_basis='feed_updated',
+                source_note='The timestamp is the Reddit feed update time, not a verified original publication time. This comment names the company in its own text. Its immediate reply parent is unavailable; do not infer who it answers or an unstated referent.')
 
 
 def status(conn, iid=None):
@@ -241,11 +261,24 @@ def status(conn, iid=None):
             notice="Reddit has announced RSS retirement on 13 November 2026.",
         )
     if iid:
+        company = one(conn, 'SELECT symbol FROM instruments WHERE id=%s', (iid,))
+        communities = company_feeds(company['symbol'], [v['feed'] for v in result if v['enabled']]) if company else []
         directed = one(conn,'SELECT * FROM reddit_company_checks WHERE instrument_id=%s',(iid,))
         if directed:
             result=[dict(directed,feed='reddit-company',platform='reddit',label='Reddit company discussions',
                          enabled=any(v['enabled'] for v in result),
-                         notice='Company-name and ticker search across enabled investing communities; up to 50 posts and replies from three threads. This is a bounded sample, not a complete archive.')]
+                         notice='Company-name and ticker search across enabled investing communities, with replies from up to three threads. Only a small selection is read; coverage is incomplete.')]
+        rss = rows(conn,"SELECT * FROM provider_checks WHERE instrument_id=%s AND provider IN ('reddit_rss_posts','reddit_rss_comments') ORDER BY provider DESC",(iid,))
+        if rss:
+            enabled=any(v['enabled'] for v in result)
+            result=[dict(feed=r['provider'],platform='reddit',label='Reddit · '+('posts' if r['provider'].endswith('_posts') else 'comments'),
+                         kind='posts' if r['provider'].endswith('_posts') else 'comments',enabled=enabled,
+                         completed_at=r['completed_at'],post_count=r['fetched'],matched_count=r['matched'],excluded_count=0,
+                         outcome=r['outcome'],error=r['message'] if r['outcome'] in ('failed','partial','blocked') else None,
+                         notice=r['message'] if r['outcome']=='ready' else None,
+                         communities=communities,
+                         sample_notice=('Search communities: ' + ', '.join('r/' + f for f in communities) + '. ' if r['provider'].endswith('_posts') else '') +
+                         'Up to 50 ticker/name search results, supplemented by saved hot feeds, with replies from up to three matching threads. A bounded sample, not a full archive. Reddit RSS retirement: 13 November 2026.') for r in rss]
         value = one(
             conn,
             "SELECT f.feed,f.enabled,s.completed_at,s.post_count,s.matched_count,s.excluded_count,s.error FROM social_feeds f LEFT JOIN hn_refresh_state s ON s.instrument_id=%s WHERE f.feed='hackernews'",

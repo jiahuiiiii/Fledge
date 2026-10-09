@@ -43,4 +43,11 @@ The original Kestrel implementation can swallow a send failure and still mark it
 
 `tests/test_telegram.py` exercises the real database and actual alert publication paths with mocked Telegram/AI transport. `tests/run_telegram_browser.py` uses a disposable workspace and mocked channel responses for the connection screen. No tests send to a real chat or consume OpenAI credits. Actual Telegram delivery is only established after a configured bot and its owner complete the live connection/test above.
 
+The 8 October layout follow-up puts the three pairing actions in equal-width columns
+with matching height, type and padding, then stacks them below 600px. Setup text
+and actions use consistent gaps. The frontend's 27 checks/build and isolated
+Telegram journey pass; pairing screenshots cover 320–1920px. The browser runner
+loads the existing external-network guard only into its disposable server, never
+the owner's app. This is a presentation change, not a change to pairing or delivery.
+
 Protocol references: [Bot API: polling and webhook behavior](https://core.telegram.org/bots/api#getupdates), [sendMessage and acknowledgement contract](https://core.telegram.org/bots/api#sendmessage), [private-chat connection links](https://core.telegram.org/bots/features#deep-linking), and [Telegram message pacing](https://core.telegram.org/bots/faq#my-bot-is-hitting-limits-how-do-i-avoid-this). Reviewed 5 October 2026.

@@ -205,19 +205,16 @@
   border-top: 1px solid var(--line);
   padding-top: 16px;
 }
-.app-shell .workspace-footer {
-  font-size: 11px;
-}
 @media (min-width: 1440px) {
   .app-shell {
-    --company-rail: 224px;
-    --idea-rail: 360px;
+    --company-panel-width: 224px;
+    --idea-panel-width: 360px;
   }
 }
 @media (min-width: 2000px) {
   .app-shell {
-    --company-rail: 244px;
-    --idea-rail: 400px;
+    --company-panel-width: 244px;
+    --idea-panel-width: 400px;
   }
 }
 @media (max-width: 1180px) {

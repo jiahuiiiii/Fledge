@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { stamp } from "./MarketResearch";
 import SentimentContext from "./SentimentContext";
+import { SourceLabel } from "./SourceFilters";
 const names = {
+  all: "All sources",
   news: "Company news",
   reddit: "Reddit discussion",
   hackernews: "Hacker News",
@@ -93,7 +95,7 @@ export default function DiscussionThemes({
     (r, i, all) => r && all.findIndex((v) => v?.id === r.id) === i,
   );
   const themes = (selected?.result?.themes || []).filter(
-    (t) => t.scope === scope,
+    (t) => scope === "all" || t.scope === scope,
   );
   const sources = new Map((selected?.sources || []).map((s) => [s.id, s]));
   function claim(value, index) {
@@ -238,8 +240,13 @@ export default function DiscussionThemes({
             <>
               <p className="fine">
                 Captured {stamp(selected.cutoff)} ·{" "}
-                {selected.coverage.by_scope[scope] || 0} eligible {names[scope]}{" "}
-                texts · not market consensus.
+                {scope === "all"
+                  ? Object.values(selected.coverage.by_scope).reduce(
+                      (sum, count) => sum + count,
+                      0,
+                    )
+                  : selected.coverage.by_scope[scope] || 0}{" "}
+                eligible {names[scope]} texts · not market consensus.
                 {scope === "hackernews" &&
                   selected.result?.context_policy &&
                   ` ${selected.coverage.parent_contexts || 0} saved parent ${selected.coverage.parent_contexts === 1 ? "message" : "messages"} supplied as context, not additional sources.`}
@@ -308,6 +315,7 @@ export default function DiscussionThemes({
                   )}
                   {themes.map((t, i) => (
                     <article className="theme-card" key={i}>
+                      {scope === "all" && <SourceLabel scope={t.scope} />}
                       <header>
                         <h3>{t.title}</h3>
                         <span className="fine">

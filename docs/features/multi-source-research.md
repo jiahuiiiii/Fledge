@@ -8,13 +8,13 @@ Implemented 8 October 2026. This extends [Deus social collection](deus-social-re
 | --- | --- | --- |
 | Finnhub | Existing company news and market data | Existing key and integration retained; not separately revalidated in this phase |
 | Hacker News | Existing exact company search, original comment verification and bounded parent context | Phase80 retrieved nine Broadcom comments; retained unchanged |
-| Reddit | Existing company search and reply parser | Public reply request previously returned 403; remains paused, pending an approved connection |
+| Reddit | Company-matched hot-post and comment RSS | Later phase83 verified live posts and comments; [current route and limitations](reddit-rss-collection.md). The old JSON/HTML denial remains preserved. |
 | WSJ | Markets, Business and Technology public RSS headlines/summaries | All three feeds responded; Business and Technology exposed the same Broadcom report, selected once |
 | CNBC, MarketWatch, NYT Business, Federal Reserve, Korea Times Economy/Business | Public RSS; exact company/ticker matching | All six feeds responded; no Broadcom match in the examined recent items |
 | Yahoo Finance news RSS | Deus's configured public feed | Returned 404. Existing Yahoo price-history integration is separate |
 | Google News Business RSS | Public feed with bounded same-host HTTPS redirects | Initial request returned 302. After its normal cooldown, bounded redirect handling retrieved the feed successfully; no Broadcom match in 30 examined items |
-| Alpha Vantage | `NEWS_SENTIMENT`, company-filtered headlines/summaries | Adapter tested with controlled responses; a separate API key is still needed |
-| X / Twitter | Official recent-search API; original posts only | Adapter tested with controlled responses; token and explicit enable setting still needed |
+| Alpha Vantage | `NEWS_SENTIMENT`, company-filtered headlines/summaries | Key added; first live Broadcom request on 8 October returned an access/usage-limit message rather than news. Existing one-day cooldown retained; successful live access remains unverified |
+| X / Twitter | Official recent-search API; original posts only | Owner has deferred X; remains disabled. Adapter tested with controlled responses, not live access |
 | Nitter | Not activated | Upstream is archived and its issue tracker reports broken public instances; it is not a dependable substitute for X access |
 
 A feed responding successfully does not establish complete company coverage. This is a bounded selection of available material. News feeds are not social opinions; Alpha Vantage's own sentiment scores are not imported as Thesis labels.
@@ -37,7 +37,13 @@ X_BEARER_TOKEN=
 THESIS_X_ENABLED=false
 ```
 
-Public RSS needs no additional key. Existing `THESIS_LIVE_DATA_ENABLED=true` is required. Obtain an Alpha Vantage key from its [official site](https://www.alphavantage.co/support/#api-key), then put it in the private field. Provider access to the news endpoint must still be verified; an account key alone does not establish entitlement. Thesis caps this integration at 25 requests per UTC day and one per minute across companies.
+Public RSS needs no additional key. Existing `THESIS_LIVE_DATA_ENABLED=true` is required. Alpha Vantage's [current documentation](https://www.alphavantage.co/documentation/#news-sentiment), checked 8 October 2026, labels `NEWS_SENTIMENT` **Premium**. A free API key alone does not unlock it; verify that the account includes this endpoint before configuring it. Alpha Vantage is optional: Finnhub and public publisher RSS remain independent news sources. Thesis caps this integration at 25 requests per UTC day and one per minute across companies; those local caps do not imply free-tier endpoint access.
+
+The owner added the Alpha Vantage key on 8 October. A single actual Broadcom request at 05:00 UTC returned the adapter's access/usage-limit outcome and retrieved no news. The saved diagnostic combines provider access and quota messages, so it does not establish which specific account restriction caused the response. No retry or cooldown override was made, and no OpenAI call was used. The private outcome is retained in `.local/live-tests/alpha-vantage-20261008/verification.json`.
+
+The error handler now distinguishes recognised invalid-key, request-limit, Premium-access and invalid-request responses using code-written messages. A rate-limit message advertising premium plans remains a rate-limit diagnosis. Unknown messages stay explicitly unclassified; raw provider strings, which can echo credentials, are not displayed or persisted. The historical generic response cannot be recovered or retrospectively labelled as a confirmed plan rejection. Premium access is the documented requirement, not proof of the cause of that particular response.
+
+While the existing one-day pause is active, source status shows its expiry as a **Thesis cooldown**, not Alpha Vantage's confirmed quota-reset time. Refreshes during the pause make no request and preserve the original check and diagnostic. Waiting can allow a future check; it cannot grant missing Premium access. If already subscribed, confirm that the private key belongs to the entitled account or contact Alpha Vantage support. No subscription is necessary to keep using Thesis's other news sources.
 
 For X, use a token from the [X developer console](https://developer.x.com/) with recent-search access, then explicitly set `THESIS_X_ENABLED=true`. X data has [separate usage billing](https://docs.x.com/x-api/getting-started/pricing); this is not part of the US$30 OpenAI allowance. Thesis caps X at 20 requests per UTC day, one per minute, and 20 returned posts per request. No X data requests or charges were made during this phase.
 

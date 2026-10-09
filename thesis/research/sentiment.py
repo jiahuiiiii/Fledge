@@ -20,7 +20,7 @@ from . import sentiment_context, reporting_basis
 from .citations import source_passages, model_source, FINDING_GROUNDING
 from .sec.checkpoint import current_documents, active_document
 
-PROMPT = "thesis-source-sentiment-18"
+PROMPT = "thesis-source-sentiment-19"
 EVIDENCE_POLICY = "sentiment-source-extracts-1"
 POLICY = "sentiment-coverage-8"
 
@@ -108,6 +108,7 @@ def prepare(conn, iid, now=None, *, allow_empty=False, lookback_days=7):
                     available_at=d["available_at"].isoformat(),
                     url=d["url"],
                     content_hash=d["content_hash"],
+                    **social.source_metadata(d),
                     post_key=d.get("post_key"),
                     author_hash=d.get("author_hash"),
                     **({"social_kind":d['social_kind'],"thread_key":d['thread_key'],"discovery_match":d['match_basis']} if d.get('social_kind') else {}),
@@ -208,7 +209,11 @@ def request_for(packet):
         props = branch["properties"]
         props.pop("reporting")
         if packet.get("reporting_policy") == reporting_basis.POLICY and source["channel"] == "news":
-            props["reporting"] = {"$ref": "#/$defs/Evidence"}
+            evidence = deepcopy(schema["$defs"]["Evidence"])
+            evidence["properties"]["passages"]["items"] = {
+                "type": "string", "enum": [p["id"] for p in source["passages"]]
+            }
+            props["reporting"] = evidence
             branch["required"].append("reporting")
         props["id"]["enum"] = [source["label"]]
         own = [p["id"] for p in source["passages"]]
@@ -338,7 +343,8 @@ def model_identity(packet):
 
 
 def identity(packet):
-    return model_identity(packet) + ":" + POLICY + (f":social-days-{packet["social_lookback_days"]}" if packet.get("social_lookback_days", 7) != 7 else "")
+    from .sentiment_batching import plan_identity
+    return plan_identity(packet) + ":" + POLICY + (f":social-days-{packet["social_lookback_days"]}" if packet.get("social_lookback_days", 7) != 7 else "")
 
 
 def coverage_key(source):
@@ -572,6 +578,7 @@ def present(conn, record):
                 kind="social" if s["channel"] == "social" else "news",
                 platform=s.get("platform")
                 or ("reddit" if s["channel"] == "social" else None),
+                **social.source_metadata(s),
                 published_at=s["published_at"],
                 available_at=s["available_at"],
                 url=s["url"],
@@ -618,7 +625,17 @@ def present(conn, record):
     )
 
 
-def generate(iid, *, transport=None, now=None, lookback_days=7):
+def generate(iid, *, transport=None, now=None, lookback_days=7, progress=None, retry_failed=False):
+    from . import sentiment_batching
+    # A session lock spans external calls without holding a DB transaction.
+    # It also serializes explicit recovery with scheduled/company requests.
+    with sentiment_batching.company_lock(iid):
+        return _generate(iid, transport=transport, now=now, lookback_days=lookback_days,
+                         progress=progress, retry_failed=retry_failed)
+
+
+def _generate(iid, *, transport, now, lookback_days, progress, retry_failed):
+    from . import sentiment_batching
     with transaction() as c:
         packet = prepare(c, iid, now, lookback_days=lookback_days)
         key = identity(packet)
@@ -626,15 +643,16 @@ def generate(iid, *, transport=None, now=None, lookback_days=7):
     if old:
         with transaction() as c:
             return present(c, old)
-    call = ledger.execute(
-        model_identity(packet), PROMPT, request_for(packet), transport=transport
-    )
-    result = render(call, packet)
+    result, calls = sentiment_batching.run(packet, transport=transport, progress=progress,
+                                         retry_failed=retry_failed)
+    packet["batching"] = dict(policy=sentiment_batching.POLICY,
+                             call_ids=[str(call["id"]) for call in calls])
     with transaction() as c:
+        sentiment_batching.check_access(c, packet)
         row = one(
             c,
             "INSERT INTO sentiment_analyses VALUES(%s,%s,%s,%s,%s,%s,now()) ON CONFLICT(request_key) DO NOTHING RETURNING *",
-            (uuid4(), iid, key, call["id"], Jsonb(packet), Jsonb(result)),
+            (uuid4(), iid, key, calls[-1]["id"], Jsonb(packet), Jsonb(result)),
         )
         row = row or one(
             c, "SELECT * FROM sentiment_analyses WHERE request_key=%s", (key,)

@@ -1,6 +1,6 @@
 # Deus social research integration
 
-Implemented 8 October 2026. Follow-up: [broader publisher feeds, Alpha Vantage, X and Devvit assessment](multi-source-research.md). This replaces the old general-feed/short-search acquisition path for company research. [Verification and remaining gaps](../reviews/2026-10-08/deus-social-integration.md).
+Implemented 8 October 2026. **Latest follow-up:** [working hot-post and comment RSS](reddit-rss-collection.md) supersedes the old Reddit company-search acquisition described below; original denials remain preserved. Follow-up: [broader publisher feeds, Alpha Vantage, X and Devvit assessment](multi-source-research.md). This replaces the old general-feed/short-search acquisition path for company research. [Verification and remaining gaps](../reviews/2026-10-08/deus-social-integration.md).
 
 ## What happens when you refresh
 

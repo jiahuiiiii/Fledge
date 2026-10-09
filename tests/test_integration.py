@@ -242,7 +242,19 @@ def test_api_local_session_csrf_and_strict_owner_schema(owner):
             ).status_code
             == 403
         )
-        assert client.get("/api/v1/session").status_code == 200
+        response = client.get("/api/v1/session")
+        assert response.status_code == 200
+        policy = dict(
+            directive.strip().split(" ", 1)
+            for directive in response.headers["Content-Security-Policy"].split(";")
+        )
+        assert policy["img-src"].split() == [
+            "'self'",
+            "data:",
+            "https://financialmodelingprep.com",
+        ]
+        assert policy["script-src"] == "'self'"
+        assert policy["connect-src"] == "'self'"
         assert client.get("/api/v1/workspace").status_code == 200
         body = dict(question="Question", action="unresolved")
         assert client.post("/api/v1/research-actions", json=body).status_code == 403

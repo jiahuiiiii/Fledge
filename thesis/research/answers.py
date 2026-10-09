@@ -86,6 +86,7 @@ def _source(d, channel):
         url=d["url"],
         content_hash=d["content_hash"],
         kind="news snippet" if channel == "news" else "social opinion",
+        **social.source_metadata(d),
         **({"platform": platform} if platform else {}),
     )
 
@@ -720,6 +721,7 @@ def download(owner, answer_id):
                 + " · "
                 + text(s["publisher"])
                 + " · "
+                + ("Feed updated (publication time unverified) " if s.get('timestamp_basis') == 'feed_updated' else "")
                 + text(s["published_at"])
                 + "</p><pre>"
                 + text(s["text"])

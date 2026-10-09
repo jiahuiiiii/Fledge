@@ -567,6 +567,11 @@ def history(conn, owner, thesis_id):
 
 
 def state(owner, instrument_id=INSTRUMENT):
+    from .research.sec.disclosures import present as disclosures_present
+    from .research.sec.financial_depth import present as financial_depth_present
+    from .research.sec.income_flow import present as income_flow_present
+    from .research.sec.segment_revenue import present as segment_revenue_present
+    from .research.sec.guidance import present as guidance_present
     from .research.market import workspace as market_workspace
     from .research.market_brief import packet_for, cached_brief, ordered_news
     from .research.sec.checkpoint import current_documents
@@ -729,6 +734,11 @@ def state(owner, instrument_id=INSTRUMENT):
                 if info["mode"] == "sec"
                 else None
             ),
+            disclosures=disclosures_present(conn, instrument_id) if info['mode']=='sec' else None,
+            financial_depth=financial_depth_present(conn, instrument_id) if info['mode']=='sec' else None,
+            income_flow=income_flow_present(conn, instrument_id) if info['mode']=='sec' else None,
+            segment_revenue=segment_revenue_present(conn, instrument_id) if info['mode']=='sec' else None,
+            management_outlook=guidance_present(conn, instrument_id) if info['mode']=='sec' else None,
             filing_calculations=rows(
                 conn,
                 "SELECT * FROM filing_calculations WHERE document_version_id=ANY(%s::uuid[])",

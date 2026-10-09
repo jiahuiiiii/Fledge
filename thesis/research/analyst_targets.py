@@ -110,7 +110,7 @@ def allowed(conn):
     return bool(one(conn, "SELECT 1 FROM sources WHERE id=%s AND entitlement='local-stockanalysis-targets'", (SOURCE,)))
 
 
-def fetch(symbol, *, transport=None):
+def fetch(symbol, *, transport=None, dispatch_gate=None):
     address = url(symbol)
     if settings().get('THESIS_LIVE_DATA_ENABLED') != 'true':
         raise ValueError('Live valuation data is not connected.')
@@ -124,6 +124,8 @@ def fetch(symbol, *, transport=None):
         conn.execute('UPDATE analyst_target_clock SET next_at=%s WHERE singleton', (slot+timedelta(seconds=2),))
     if delay > 0:
         time.sleep(delay)
+    if dispatch_gate:
+        dispatch_gate()
     try:
         with httpx.Client(headers={'User-Agent':USER_AGENT}, timeout=25, follow_redirects=False, transport=transport) as client:
             with client.stream('GET', address) as response:
@@ -153,14 +155,21 @@ def current(conn, iid):
     return dict(available=permitted, snapshot=saved, refresh=state)
 
 
-def refresh(iid, fetcher=None):
+def refresh(iid, fetcher=None, *, purpose='targets'):
+    from . import public_forecasts
+    if purpose not in ('targets', 'financials'):
+        raise ValueError('Unknown public forecast scope.')
+    permission = allowed if purpose == 'targets' else public_forecasts.allowed
+    committed = False
     now = datetime.now(timezone.utc)
     attempt = uuid4()
     with transaction(source=True) as conn:
         collection_lock(conn)
         company = one(conn, 'SELECT i.symbol FROM instruments i JOIN sec_companies s ON s.instrument_id=i.id WHERE i.id=%s', (iid,))
-        if not company or not allowed(conn):
+        if not company or not permission(conn):
             raise ValueError('Analyst targets are unavailable for this company/source.')
+        collect_targets = allowed(conn)
+        collect_financials = public_forecasts.allowed(conn)
         conn.execute('INSERT INTO analyst_target_state(instrument_id) VALUES(%s) ON CONFLICT DO NOTHING', (iid,))
         state = one(conn, 'SELECT * FROM analyst_target_state WHERE instrument_id=%s FOR UPDATE', (iid,))
         if state['lease_until'] and state['lease_until'] > now:
@@ -169,19 +178,44 @@ def refresh(iid, fetcher=None):
             raise Conflict('Analyst targets can be checked once per company every 24 hours. Saved data remains available.')
         conn.execute('UPDATE analyst_target_state SET attempt_id=%s,last_attempt_at=%s,lease_until=%s,error=NULL WHERE instrument_id=%s', (attempt,now,now+timedelta(minutes=2),iid))
     try:
-        data = normalized((fetcher or fetch)(company['symbol']), company['symbol'])
+        def gate():
+            with transaction(source=True) as conn:
+                state = one(conn, 'SELECT attempt_id,lease_until FROM analyst_target_state WHERE instrument_id=%s', (iid,))
+                if (not permission(conn) or not state or state['attempt_id'] != attempt or
+                        not state['lease_until'] or state['lease_until'] <= datetime.now(timezone.utc)):
+                    raise ValueError('Public forecast access or request ownership changed.')
+        gate()
+        html = fetcher(company['symbol']) if fetcher else fetch(company['symbol'], dispatch_gate=gate)
+        data = financial = None
+        target_error = financial_error = None
+        try: data = normalized(html, company['symbol'])
+        except ValueError as exc: target_error = str(exc)
+        try: financial = public_forecasts.normalized(html, company['symbol'])
+        except ValueError as exc: financial_error = str(exc)
         with transaction(source=True) as conn:
             collection_lock(conn)
             now = datetime.now(timezone.utc)
             state = one(conn, 'SELECT attempt_id,lease_until FROM analyst_target_state WHERE instrument_id=%s FOR UPDATE', (iid,))
-            if state['attempt_id'] != attempt or not state['lease_until'] or state['lease_until'] <= now or not allowed(conn):
+            if state['attempt_id'] != attempt or not state['lease_until'] or state['lease_until'] <= now or not permission(conn):
                 raise ValueError('Target check expired or source access changed.')
-            sid = uuid4()
-            conn.execute('INSERT INTO analyst_target_snapshots VALUES(%s,%s,%s,%s)', (sid,iid,Jsonb(data),now))
-            conn.execute('UPDATE analyst_target_state SET completed_at=%s,lease_until=NULL WHERE instrument_id=%s', (now,iid))
+            sid = None
+            if data and collect_targets and allowed(conn):
+                sid = uuid4()
+                conn.execute('INSERT INTO analyst_target_snapshots VALUES(%s,%s,%s,%s)', (sid,iid,Jsonb(data),now))
+            if collect_financials and public_forecasts.allowed(conn):
+                fid = uuid4()
+                conn.execute('INSERT INTO public_financial_forecasts VALUES(%s,%s,%s,%s,%s,%s,%s)',
+                             (fid,iid,now,sha256(html.encode()).hexdigest(),html,Jsonb(financial) if financial else None,financial_error))
+                if purpose == 'financials': sid = fid if financial else None
+            requested_error = target_error if purpose == 'targets' else financial_error
+            conn.execute('UPDATE analyst_target_state SET completed_at=%s,lease_until=NULL,error=%s WHERE instrument_id=%s', (now,FAILURE if target_error and collect_targets else None,iid))
+        committed = True
+        if requested_error:
+            raise ValueError(requested_error)
         return dict(id=str(sid))
     except Exception:
-        with transaction(source=True) as conn:
-            collection_lock(conn)
-            conn.execute('UPDATE analyst_target_state SET lease_until=NULL,error=%s WHERE instrument_id=%s AND attempt_id=%s', (FAILURE,iid,attempt))
-        raise ValueError(FAILURE) from None
+        if not committed:
+            with transaction(source=True) as conn:
+                collection_lock(conn)
+                conn.execute('UPDATE analyst_target_state SET lease_until=NULL,error=%s WHERE instrument_id=%s AND attempt_id=%s', (FAILURE,iid,attempt))
+        raise ValueError(FAILURE if purpose == 'targets' else 'Public financial forecasts could not be refreshed. Earlier data is retained; no automatic retry.') from None

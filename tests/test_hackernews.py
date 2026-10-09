@@ -124,7 +124,7 @@ def test_persisted_cooldown_exact_source_and_disabled_access(owner):
         assert len(posts) == 1 and posts[0]["body"] == item()["text"]
         assert social.publisher(posts[0]) == "Hacker News · comments"
         assert social.status(c, iid)[-1]["matched_count"] == 1
-        assert len(social.status(c)) == 3
+        assert {row['feed'] for row in social.status(c)} == set(social.FEEDS)
     result = sentiment.generate(iid, transport=provider())
     assert result["summary"]["social_platforms"]["hackernews"]["selected"] == 1
     assert result["summary"]["social"]["tone"] == "separate platform samples"

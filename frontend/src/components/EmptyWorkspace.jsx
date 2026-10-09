@@ -73,10 +73,6 @@ export default function EmptyWorkspace({ view, onChoose }) {
           </div>
         </div>
       </main>
-      <footer className="workspace-footer">
-        <span>Saved on this Mac</span>
-        <span>Research first. Decide for yourself.</span>
-      </footer>
       <CompanyDialog
         open={adding}
         onClose={() => setAdding(false)}

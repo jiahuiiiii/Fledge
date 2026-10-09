@@ -46,6 +46,28 @@ An isolated React fixture used the real SentimentPanel and styles with authored 
 
 Updated the README, current private-check UI note and testing guide to match the conditional controls. Backup: `.local/backups/watch-mobile-20261008T023124Z/`. Evidence: `.local/live-tests/watch-mobile-20261008/` (screenshots and verification JSON). The isolated preview source is retained under `.local/ui-preview/watch-mobile/`; it is ignored by Git and excluded from the production build.
 
+## Follow-up: shared company-row highlight
+
+The owner's screenshot showed the selected company's cross outside the green outline with a red hover. The outline and green background now belong to the complete company row; the company and cross remain separate labelled buttons. Cross hover and keyboard focus use a darker green background and pale green icon. Existing selection, sidebar removal, notice and restore behavior are unchanged. The standalone All companies button retains its existing selection styling. No change was requested for the second supplied screenshot.
+
+Verification: all 27 existing frontend checks, production build and formatting pass. Read-only browser checks against the compiled local app confirm both buttons are inside the selected outline, the inner company button has no duplicate border, the cross hover is darker green, and Tab reaches its visible keyboard focus. Desktop and narrow desktop screenshots were visually inspected. Document and main pane have no horizontal overflow at 320/390/600/980/1024/1440/1920px; the sidebar retains its existing hidden state at 980px and below. The phone screenshot was also inspected. The browser blocked all non-GET and external requests, including one automatic company-loading POST; no removal, saved-research edit, watch change or paid action was performed. No backend suite was repeated for this presentation change.
+
+The initial sandboxed Chrome launch failed before navigation. Two initial hover observations sampled a moving control during asynchronous layout settlement; the final check waits for loading/font settlement and confirms the pointer is over the cross. Preserve these failures with the successful observations in `.local/live-tests/sidebar-highlight-20261008/`. The final browser has no page errors or external request attempts. This verifies sidebar presentation and keyboard access, not provider or model behavior.
+
+Review lenses: the full outline makes selection clearer; darker green hover matches the selected row; separate buttons preserve accessible actions; the change does not alter evidence interpretation; no demand or retention claim follows.
+
+## Follow-up: shared hover, truncation and panel motion
+
+The owner's follow-up exposed the company's inner hover background still splitting the highlighted row into two surfaces. Hover and focus now darken the whole row, with transparent inner buttons and 8px right padding beside the cross. Long symbols/company names have single-line ellipses and full-text titles. Separate labelled actions, removal/restore behavior and selected-row border remain. Visual review caught an initial `company-label` class collision with header styling; the final `company-row-label` preserves the original text appearance.
+
+Sidebars animate their grid columns over 300ms while their contents fade and slide slightly. Fixed-width inner bodies follow the existing responsive widths, keeping text from squeezing during collapse. The phone idea panel animates its height instead. Progress and its details use the same height/fade transition; hiding/reopening preserves expanded details. Hidden contents are immediately inert and excluded from accessibility navigation. The existing keyboard progress focus transfer and local preferences remain; reduced-motion settings disable these transitions.
+
+Verification: all 27 frontend checks, production build, formatting and browser-script syntax pass. `tests/browser_workspace_motion.cjs` checks identical whole-row hover from either button, cross inset, authored long-label overflow/ellipsis, intermediate sizes while both sidebars and progress open/close, rapid reversal, retained DOM/search input/detail state, keyboard focus, instant reduced-motion controls, both panels collapsed together, All companies and reload persistence. Document/main pane have no horizontal overflow at 320/390/600/740/768/980/1024/1440/1920/2048px; inner body widths match their fully open desktop rails. Final desktop, narrow sidebar and phone screenshots were inspected. No page errors, external requests or unmocked app writes were recorded.
+
+The browser reads the compiled local app and its saved data, but substitutes one authored long company label and three completed loading steps in intercepted responses. Loading GET/POST requests are mocked before reaching the server; this test does not acquire sources, enable watches, edit saved research, remove a company or request AI/Telegram delivery. It establishes UI behavior, not provider/model outcomes. Backend tests were not repeated. A later check found the progress wrapper absent after a separate file update; it was reintegrated with the existing batch status text preserved. The failure and final success are retained in `.local/live-tests/workspace-motion-20261008/`, along with screenshots and animation-size observations.
+
+Review lenses: one surface communicates one selected company; spacing/truncation keeps the cross readable; mounted controls and inert hidden content preserve state/accessibility; animation does not alter source interpretation; no commercial validation claim follows.
+
 ## Five-perspective review
 
 These are one implementer's review lenses, not independent reviewers.

@@ -1,6 +1,6 @@
 # Separate news and social discussion samples
 
-**Current, 8 October 2026:** company research uses the [Deus social discovery/enrichment flow](deus-social-research.md). It replaces the original twelve-result HN query and general Reddit-feed scan described below. The current action is **Refresh & analyse**, with 1/7/30-day discussion windows; Reddit collection is blocked after an actual HTTP 403 until an approved connection is available. The older sections retain the development history, not the current acquisition limits.
+**Current, 8 October 2026:** company research uses the [Deus social discovery/enrichment flow](deus-social-research.md). It replaces the original twelve-result HN query and general Reddit-feed scan described below. The current action is **Refresh & analyse**, with 1/7/30-day discussion windows; [Reddit hot-post and comment RSS](reddit-rss-collection.md) now provides a separately verified, bounded sample; the older JSON/HTML 403 remains preserved. The older sections retain the development history, not the current acquisition limits.
 
 The local pitch workflow now adds Hacker News comments alongside Finnhub company news and Deus-derived Reddit RSS. It reuses the existing structured classifier, citations, paid ledger, immutable samples and Kestrel-derived review/alert flow. No second model service, database or agent framework is introduced.
 
