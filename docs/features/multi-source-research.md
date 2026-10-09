@@ -75,3 +75,13 @@ The next concrete step is to explain the actual external research use case to Re
 - [Alpha Vantage documentation](https://www.alphavantage.co/documentation/): `NEWS_SENTIMENT` request/response contract.
 - [X recent search](https://docs.x.com/x-api/posts/search-recent-posts): authenticated post search.
 - [Nitter issue and archived repository](https://github.com/zedeus/nitter/issues/1442): current maintenance/access limitation.
+
+## Scheduled checks and connection failures — 9 October 2026
+
+A shared refresh interval is a deferred check, not a publisher outage. The exact older “This source was checked recently; saved data is retained.” diagnostic is projected as **deferred** without rewriting the original record or claiming a successful request. A new deferred attempt releases only its own current lease and preserves any previous actual success/failure, date and matched count. New companies remain unchecked/deferred until a real response is processed. A wholly deferred publisher step reports cached work, not a completed fetch.
+
+The shared RSS cache starts its fifteen-minute lifetime after response validation so it cannot expire before the request interval merely because collection started earlier. Publication dates, company matching, size/entry limits, original text, provider pacing/denials and access checks remain unchanged. Neither cache reuse nor waiting is proof of new company news.
+
+News status distinguishes successfully checked feeds, genuine failures, deferred checks and feeds not yet checked for the company. Successful checks can have zero company matches. Details group deferred checks and show the next permitted check time; a denied connection never promises permission after its timer expires. X with its explicit enablement flag off appears as an optional source that is off, separate from news failures. Source-only refresh remains available through Research updates; paid analysis keeps its independent restriction.
+
+The Apple and Qualcomm screenshot state had eleven exact timer diagnostics. A bounded normal RSS recovery checked ten responding publisher feeds for each company (Qualcomm reused the shared responses); Apple retained two matching reports. Yahoo's configured RSS still returned HTTP404. Alpha Vantage was not checked for those companies and X remains off. The saved Finnhub check brings each company to eleven of thirteen news feeds successfully checked. These counts describe checks, not eleven publishers contributing stories. [Verification](../reviews/2026-10-09/feed-availability.md).

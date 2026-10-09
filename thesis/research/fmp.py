@@ -190,11 +190,11 @@ def save_peers(owner,iid,selections):
 def annual_growth(conn, iid):
     """Project one existing annual calculation; never substitute quarterly/TTM data."""
     from .sec.performance import present as performance
-    source = performance(conn, iid)
+    source = performance(conn, iid, resolve_amendments=True)
     report = source.get('reports', {}).get('annual')
     result = {key: source.get(key) for key in (
         'status', 'reason', 'method', 'snapshot_id', 'payload_id',
-        'first_recorded_at', 'checked_at', 'source_status')}
+        'first_recorded_at', 'checked_at', 'source_status', 'projection_id', 'projection_method', 'based_on_snapshot_id')}
     result.update(report=None, metric=None)
     if source['status'] != 'available':
         return result
@@ -205,6 +205,8 @@ def annual_growth(conn, iid):
         'period_type', 'accession', 'form', 'period_end', 'published_at',
         'filed_on', 'filing_url')}
     result['metric'] = next((row for row in report['metrics'] if row['key'] == 'revenue_growth'), None)
+    if result['metric'] and result['metric'].get('source_report'):
+        result['report'] = result['metric']['source_report']
     return result
 
 

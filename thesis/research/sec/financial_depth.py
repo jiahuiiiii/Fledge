@@ -20,7 +20,13 @@ FLOW={
 }
 
 
-def trailing(bundle,filings,current,tags):
+def trailing(bundle,filings,current,tags, resolver=None):
+    if resolver and current['form'].endswith('/A'):
+        key=next((k for k,(_,concepts) in FLOW.items() if concepts==tags),tags[0])
+        raw=dict(key=key,**trailing(bundle,filings,current,tags))
+        resolved,_=resolver.resolve(current,[raw],lambda earlier:[dict(key=key,**trailing(bundle,filings,earlier,tags,resolver=None))])
+        result=resolved[0];result.pop('key',None)
+        return result
     facts=collect(bundle,current,tags)
     if current['form'].startswith('10-K'):
         value,error=select(facts,current,'annual','Business performance',tags)
@@ -36,6 +42,12 @@ def trailing(bundle,filings,current,tags):
     annuals=[f for f in filings if f['form'].startswith('10-K') and f['end']==annual_end and f['accepted_at']<=current['accepted_at']]
     annual=annuals[-1] if annuals else None
     base,error=select(collect(bundle,annual,tags),annual,'annual','Business performance',tags) if annual else (None,'The preceding fiscal-year filing is unavailable.')
+    base_resolution={}
+    if resolver and annual and annual['form'].endswith('/A'):
+        resolved=trailing(bundle,filings,annual,tags,resolver)
+        base=resolved['inputs'][0] if resolved['value'] is not None and len(resolved['inputs'])==1 else None
+        error=resolved['reason']
+        if resolved.get('filing_resolution'):base_resolution['filing_resolution']=resolved['filing_resolution']
     prior_candidates=[f for f in facts if base and f['start']==base['start'] and f['end']<ytd['end'] and
                       abs(duration(f)-duration(ytd))<=7 and 357<=(date.fromisoformat(ytd['end'])-date.fromisoformat(f['end'])).days<=373]
     prior,prior_error=unique(prior_candidates,tags)
@@ -55,7 +67,7 @@ def trailing(bundle,filings,current,tags):
                     ctx.prec=28
                     value=decimal_text(Decimal(base['value'])+Decimal(ytd['value'])-Decimal(prior['value']))
     return dict(value=value,inputs=inputs,reason=reason,start=start,end=current['end'].isoformat(),
-                formula='Previous fiscal year + current fiscal year to date − comparable prior fiscal year to date',calculated=True)
+                formula='Previous fiscal year + current fiscal year to date − comparable prior fiscal year to date',calculated=True,**base_resolution)
 
 
 def total_debt(bundle,current):
@@ -87,10 +99,10 @@ def total_debt(bundle,current):
                 explanation='Commercial paper is not added again to short-term borrowings. Debt including capital/finance leases is not silently substituted. Review issuer financial notes for obligations outside this definition.')
 
 
-def normalize_depth(bundle,cik,now):
+def normalize_depth(bundle,cik,now,resolver=None):
     if any(int(bundle[k].get('cik',0))!=int(cik) for k in ('companyfacts','submissions')):raise ValueError('SEC evidence belongs to another company.')
     filings=filing_rows(bundle['submissions'],now);current=filings[-1]
-    flows=[dict(key=key,label=label,unit='USD',**trailing(bundle,filings,current,tags)) for key,(label,tags) in FLOW.items()]
+    flows=[dict(key=key,label=label,unit='USD',**trailing(bundle,filings,current,tags,resolver)) for key,(label,tags) in FLOW.items()]
     indexed={row['key']:row for row in flows}
     cash,capex=indexed['operating_cash'],indexed['capital_spending']
     fcf=dict(key='free_cash_flow',label='Free cash flow (app calculation)',unit='USD',value=None,inputs=cash['inputs']+capex['inputs'],
@@ -106,15 +118,27 @@ def normalize_depth(bundle,cik,now):
         with localcontext() as ctx:
             ctx.prec=28;margin.update(value=decimal_text(Decimal(income['value'])/Decimal(revenue['value'])*100),reason=None)
     flows.append(margin)
+    from .amendments import combined_evidence
+    for derived,a,b in [(fcf,cash,capex),(margin,income,revenue)]:
+        evidence=combined_evidence(a,b)
+        if evidence and {f['accession'] for f in a['inputs']}!={f['accession'] for f in b['inputs']}:
+            derived.update(value=None,reason='Inputs use different amended filing vintages.')
+        elif derived['value'] is not None:derived.update(evidence)
     trend=[]
     for filing in filings:
         if not filing['form'].startswith('10-K'):continue
-        revenue,error=select(collect(bundle,filing,REVENUE),filing,'annual','Business performance',REVENUE)
+        projected=trailing(bundle,filings,filing,REVENUE,resolver)
+        revenue=projected['inputs'][0] if projected['value'] is not None and len(projected['inputs'])==1 else None
+        error=projected['reason']
         # Latest amendment for each period replaces the original, including a
         # gap when the amendment provides no compatible facts.
         row=dict(period_end=filing['end'].isoformat(),accession=filing['accessionNumber'],form=filing['form'],value=revenue['value'] if revenue else None,inputs=[revenue] if revenue else [],reason=error)
+        if projected.get('filing_resolution'):row['filing_resolution']=projected['filing_resolution']
         trend=[r for r in trend if r['period_end']!=row['period_end']]+[row]
     debt=total_debt(bundle,current)
+    if resolver:
+        resolved,_=resolver.resolve(current,[debt],lambda earlier:[total_debt(bundle,earlier)])
+        debt=resolved[0]
     urls={}
     for filing in filings:
         accession=filing['accessionNumber']
@@ -133,6 +157,9 @@ def present(conn,iid):
         return dict(status='unavailable',reason='Structured filing source access is unavailable.')
     saved=one(conn,'SELECT p.id,p.payload,p.retrieved_at,c.cik,k.checked_at FROM sec_payload_current k JOIN source_payloads p ON p.id=k.payload_id AND p.instrument_id=k.instrument_id JOIN sec_companies c ON c.instrument_id=k.instrument_id WHERE k.instrument_id=%s',(iid,))
     if not saved:return dict(status='empty',reason='Refresh filings to prepare trailing results and borrowing information.')
-    try:values=normalize_depth(saved['payload'],saved['cik'],saved['checked_at'])
+    from .amendments import retained_resolver
+    try:
+        resolver=retained_resolver(conn,iid,saved['payload'],saved['cik'],saved['checked_at'])
+        values=normalize_depth(saved['payload'],saved['cik'],saved['checked_at'],resolver)
     except ValueError:return dict(status='unavailable',reason='Retained SEC facts could not be normalized for these additional measures. The existing financial reports remain available.')
-    return dict(status='available',payload_id=str(saved['id']),first_recorded_at=saved['retrieved_at'],checked_at=saved['checked_at'],**values)
+    return dict(status='available',payload_id=str(saved['id']),amendment_basis=resolver.basis_id,first_recorded_at=saved['retrieved_at'],checked_at=saved['checked_at'],**values)

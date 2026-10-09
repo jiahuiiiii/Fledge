@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import Select from "./Select";
+import { FinancialEvidenceRow } from "./FinancialEvidence";
 import "./RevenueBreakdown.css";
 
 const day = (value) =>
@@ -9,11 +10,6 @@ const day = (value) =>
     year: "numeric",
     timeZone: "UTC",
   });
-const exact = (value) => {
-  if (value == null) return "Unavailable";
-  const [whole, fraction] = String(value).split(".");
-  return `US$${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}${fraction ? `.${fraction}` : ""}`;
-};
 const amount = (value) => {
   if (value == null) return "Unavailable";
   const n = Number(value),
@@ -40,22 +36,22 @@ function Evidence({ group, row, label = "Inspect figure" }) {
   return (
     <details className="mix-evidence">
       <summary>{label}</summary>
-      <p>
-        Exact value: {exact(row.value)}. {row.reason}
-      </p>
-      {row.member && <p>Filing category tag: {row.member}</p>}
-      {row.inputs.map((input, index) => (
-        <p key={index}>
-          <a href={sourceLink(group, input)} target="_blank" rel="noreferrer">
-            Original {group.form} figure ↗
-          </a>
-          <br />
-          Displayed {input.display || "missing"}; scale 10^{input.scale}; unit{" "}
-          {input.unit || "unknown"}.
-          <br />
-          {input.concept} · context {input.context_id}
-        </p>
-      ))}
+      <FinancialEvidenceRow
+        row={{
+          ...row,
+          label: row.label || "Reported revenue",
+          unit: "USD",
+          start: group.start,
+          end: group.end,
+          inputs: row.inputs.map((input) => ({
+            ...input,
+            start: group.start,
+            end: group.end,
+            form: group.form,
+            filing_url: sourceLink(group, input),
+          })),
+        }}
+      />
     </details>
   );
 }

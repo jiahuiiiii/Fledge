@@ -86,7 +86,7 @@ test("summary sentences use only saved figures", () => {
   const { sentences } = snapshot(workspace);
   assert.deepEqual(sentences, [
     "Revenue grew 23.9% in the fiscal year to 2 Nov 2025.",
-    "Management expects about US$34.8bn of revenue for the quarter ending 1 Nov 2026.",
+    "Management expects about $34.8bn of revenue for the quarter ending 1 Nov 2026.",
     "Its borrowing is about 2.5× the cash it holds.",
   ]);
 });

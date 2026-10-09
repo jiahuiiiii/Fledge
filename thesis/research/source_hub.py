@@ -35,6 +35,11 @@ FEEDS = {
 }
 FEED_LOCKS = {provider: Lock() for provider in FEEDS}
 LABELS = {key: val[0] for key,val in FEEDS.items()} | {'alpha_vantage':'Alpha Vantage', 'x':'X / Twitter'}
+RECENT_CHECK = 'This source was checked recently; saved data is retained.'
+
+
+class SourceDeferred(Conflict):
+    """No request was sent because the shared refresh interval has not elapsed."""
 
 
 def configuration(provider):
@@ -60,7 +65,7 @@ def reserve(provider, *, daily_limit=None):
         if row['blocked_until'] and row['blocked_until']>now:
             raise Conflict('This source is cooling down after a provider limit.')
         if row['requests'] and row['next_at']>now:
-            raise Conflict('This source was checked recently; saved data is retained.')
+            raise SourceDeferred(RECENT_CHECK)
         used=row['requests'] if row['usage_date']==now.date() else 0
         if daily_limit and used>=daily_limit:
             raise Conflict('The local daily request limit for this source has been reached.')
@@ -128,6 +133,9 @@ def _feed_bytes(provider, *, transport=None):
     body=get(provider,FEEDS[provider][1],transport=transport)
     # Validate XML before sharing a response between company jobs.
     xml_root(body)
+    # Start the cache lifetime after retrieval. Starting before reservation made
+    # it expire before the shared clock, causing an unnecessary deferred check.
+    now=datetime.now(timezone.utc)
     with transaction(source=True) as c:
         c.execute('INSERT INTO public_feed_cache VALUES(%s,%s,%s) ON CONFLICT(provider) DO UPDATE SET body=excluded.body,retrieved_at=excluded.retrieved_at',(provider,body,now))
     return body,False
@@ -270,6 +278,16 @@ def refresh(iid,provider,*,transport=None,fetcher=None):
         considered=min(total,FEEDS[provider][2] if provider in FEEDS else 50)
         message=f'{len(articles)} matching reports from {considered} of {total} feed items examined; {rejected} outside the window or unusable' + (' · reused recent feed cache.' if cached else '.')
         return finish(iid,provider,token,'ready',message,total,len(articles),articles,rejected)
+    except SourceDeferred as exc:
+        # A skipped request must not erase a previous real failure or success.
+        with transaction(source=True) as c:
+            state=one(c,'SELECT * FROM provider_checks WHERE instrument_id=%s AND provider=%s FOR UPDATE',(iid,provider))
+            if state['attempt_id']!=token or not state['lease_until'] or state['lease_until']<datetime.now(timezone.utc):
+                raise Conflict('A newer source check replaced this attempt.')
+            c.execute('UPDATE provider_checks SET lease_until=NULL WHERE instrument_id=%s AND provider=%s',(iid,provider))
+            if not state['outcome'] or state['outcome']=='deferred' or state['message']==RECENT_CHECK:
+                c.execute("UPDATE provider_checks SET outcome='deferred',message=%s WHERE instrument_id=%s AND provider=%s",(str(exc),iid,provider))
+        return dict(status='cached',message=str(exc),deferred=True)
     except (ValueError,Conflict) as exc:
         return finish(iid,provider,token,'failed',str(exc))
 
@@ -282,25 +300,46 @@ def refresh_rss(iid,*,fetcher=None):
         results=list(pool.map(run,FEEDS))
     matched=sum(r.get('matched',0) for r in results)
     failed=sum(r['status']=='failed' for r in results)
+    waiting=sum(r['status']=='cached' for r in results)
     blocked=all(r['status']=='blocked' for r in results)
-    return dict(status='blocked' if blocked else 'partial' if failed else 'ready',
-                message=results[0]['message'] if blocked else f'{matched} matching publisher reports; {failed} feeds unavailable. Open source coverage for details.')
+    return dict(status='blocked' if blocked else 'partial' if failed else 'cached' if waiting==len(results) else 'ready',
+                message=results[0]['message'] if blocked else f'{matched} matching publisher reports; {failed} failed checks; {waiting} checks deferred by the refresh schedule. Open source coverage for details.')
 
 
 def status(conn,iid):
     saved={r['provider']:r for r in rows(conn,'SELECT * FROM provider_checks WHERE instrument_id=%s',(iid,))}
+    clocks={r['provider']:r for r in rows(conn,'SELECT * FROM provider_clocks')}
+    now=datetime.now(timezone.utc)
     result=[]
     for provider,label in LABELS.items():
         item=saved.get(provider,{})
         missing=configuration(provider)
         message=missing or item.get('message') or 'Included in Refresh research.'
+        outcome='blocked' if missing else item.get('outcome') or 'not_loaded'
+        # Correct only the exact historical app-timer diagnostic at read time;
+        # do not rewrite records or imply an unperformed successful check.
+        if not missing and (outcome=='deferred' or (outcome=='failed' and item.get('message')==RECENT_CHECK)):
+            outcome='deferred'
+            message='The shared refresh interval deferred this company check; no request was sent. Saved news is unchanged.'
+        if provider=='x' and missing and settings().get('THESIS_X_ENABLED')!='true':
+            outcome='disabled'
+            message='Optional X / Twitter source is off.'
+        clock=clocks.get(provider,{})
+        dates=[clock.get('next_at'),clock.get('blocked_until')]
+        if item.get('last_attempt_at'):dates.append(item['last_attempt_at']+timedelta(minutes=15))
+        next_check=max((date for date in dates if date and date>now),default=None)
+        if clock.get('denied'):
+            # Elapsed pacing cannot grant a denied connection permission.
+            next_check=None
         if provider=='alpha_vantage' and not missing:
             if message == 'Alpha Vantage returned an access or usage-limit message; no news was replaced.':
                 message='The earlier check did not retain a specific failure reason. NEWS_SENTIMENT is documented as Premium; confirm that this key includes endpoint access. The old response does not prove a key, quota or plan problem.'
             if pause := alpha_pause(conn, datetime.now(timezone.utc)):
                 message += ' ' + pause
         result.append(dict(provider=provider,label=label,channel='social' if provider=='x' else 'news',
-                           status='blocked' if missing else item.get('outcome') or 'not_loaded',
+                           status=outcome,
                            message=message,
-                           checked_at=item.get('completed_at'),matched=item.get('matched',0)))
+                           checked_at=None if outcome=='deferred' else item.get('completed_at'),
+                           last_attempt_at=item.get('last_attempt_at'),next_check_at=next_check,
+                           matched=item.get('matched',0)))
     return result

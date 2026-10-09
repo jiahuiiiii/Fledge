@@ -84,8 +84,8 @@ let browser;
     await dialog.locator(".position-evidence-list > details").count(),
     2,
   );
-  assert.match(await dialog.innerText(), /Exact value: 23.076923/);
-  assert.match(await dialog.innerText(), /Revenues|RevenueFromContract/);
+  assert.match(await dialog.innerText(), /23.08%/);
+  assert.doesNotMatch(await dialog.innerText(), /RevenueFromContract|source snapshot|accession/i);
   await page.keyboard.press("Escape");
   assert.equal(
     await evidence.evaluate((e) => document.activeElement === e),

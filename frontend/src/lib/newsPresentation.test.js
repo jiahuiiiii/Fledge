@@ -76,3 +76,53 @@ test("news status counts news feeds only, adds saved Finnhub once, and uses actu
   });
   assert.equal(newsSourceStatus(data).feeds.length, 3);
 });
+
+test("scheduled waits, unchecked feeds, real failures and optional sources stay distinct", () => {
+  const result = newsSourceStatus({
+    provider_status: [
+      {
+        provider: "cnbc",
+        label: "CNBC",
+        channel: "news",
+        status: "ready",
+        matched: 0,
+      },
+      {
+        provider: "wsj",
+        channel: "news",
+        status: "deferred",
+        checked_at: null,
+      },
+      {
+        provider: "yahoo",
+        channel: "news",
+        status: "failed",
+        message: "HTTP 404",
+      },
+      { provider: "alpha", channel: "news", status: "not_loaded" },
+      { provider: "x", channel: "social", status: "disabled" },
+    ],
+  });
+  assert.equal(result.feeds.length, 4);
+  assert.deepEqual(
+    result.checked.map((r) => r.provider),
+    ["cnbc"],
+  );
+  assert.deepEqual(
+    result.waiting.map((r) => r.provider),
+    ["wsj"],
+  );
+  assert.deepEqual(
+    result.failed.map((r) => r.provider),
+    ["yahoo"],
+  );
+  assert.deepEqual(
+    result.unchecked.map((r) => r.provider),
+    ["alpha"],
+  );
+  assert.deepEqual(
+    result.optional.map((r) => r.provider),
+    ["x"],
+  );
+  assert.equal(result.latest, undefined);
+});

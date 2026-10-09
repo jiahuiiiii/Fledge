@@ -1,0 +1,31 @@
+# Five-section Overview — 9 October 2026
+
+The owner supplied a proposed company page and explicitly requested sections1–5, with no sidebar added. The prior Overview had five summary-only cards ordered growth/profit, health, news, outlook and value. The new view follows the requested business, growth/outlook, health, news and value order. Existing company rail, horizontal tabs, company header, activity, collapsed price chart and Workspace-only idea-panel rules remain.
+
+## Presentation and data
+
+1. Business: saved statement (including an older-source badge where appropriate), quarter business shares, quarter/annual/trailing revenue and operating margin, quarter and annual stacked business bars, the existing interactive revenue-flow chart, and an expandable original BusinessPanel. The chart uses the same category colors across periods, matches one disclosed business axis and does not replace quarterly data with YTD or geography. Unreconciled categories do not become percentage bars.
+2. Growth & outlook: reported fiscal-year growth, current management revenue guidance and its period, same-filing annual/prior revenue bars, original evidence and Outlook link. Guidance excludes historical, expired, review/withdrawal-context or truncated sections. Unknown currency is displayed as the original dollar sign with an explicit unknown-currency/basis note; it is not silently converted to USD. The existing introductory summary also stops inferring USD from an unqualified dollar sign. Analyst availability reads existing permitted FMP/public data only.
+3. Financial health: assets/liabilities and cash/borrowing ratios, underlying dated balances, FCF and two independent signed shared-scale bar comparisons. Zero/missing/nonpositive denominators do not create ratios. Borrowing needs the same balance date, USD unit and supported report/input accession. These literal checks are not financial-health ratings.
+4. News & discussion: saved source-type coverage, company-news-only tone and reconciled story/relevance/development counts, dated reading/watch status, and real current permitted headline/post previews. All/News/Social filters retain source inspection. A saved AI label appears only on the identical saved source ID/text/title/timestamp; changed/current-only sources are not relabelled from older versions. Complete-packet withdrawal removes saved labels while independently permitted current sources remain readable. Comparison-only sources are excluded. News/social tone is never pooled; the old-method notice remains.
+5. Value: symbol/access-checked saved Finnhub TTM P/E/P/S, original saved timestamp, price with cents, saved peers and real comparison/scenario navigation. No new reference refresh, peer save or valuation is triggered by viewing the page.
+
+Figures and charts open the shared compact evidence modal with original report/release/fact-anchor links. Underlying values, source identities and calculations remain unchanged. The overview performs only normal account-scoped GETs for existing business, valuation and FMP context, with cancellation fences on navigation/company changes. No backend, schema, paid stage, source collector or monitoring policy changed.
+
+## Verification
+
+101 frontend checks pass, including new data-boundary coverage for same-date/filing borrowing, business-axis/period selection, guidance validity/unknown currency, source-version label identity, reference symbol/permissions, zero/missing data and withdrawn data. Build, touched-file formatting and diff checks pass. No backend suite was rerun for this presentation phase.
+
+Candidate read-only saved-data browser passes at1440/980/390/320px: exact five-section order, horizontal navigation, AVGO's70/30 business split,23.9% annual growth,2.13×/0.39× balance ratios,46.61× P/E, original source/evidence links, news filters and source inspection, business-brief opening, scenario navigation, retained brief expansion and no horizontal overflow. A browser-only missing/withdrawn-data response fixture checks that all five sections remain usable without carrying old figures/tone. Writes/loading and external browser requests are blocked. These saved-data checks are separate from independent usability or financial validation. Desktop and phone screenshots, including the revenue flow, were inspected.
+
+The existing disposable Financials regression passes for the shared RevenueFlow component at1440/980/390/320px. Its original assertion that Overview has no revenue chart is intentionally replaced with an assertion for the new Overview chart and a still-hidden Financials chart; all original period retention, chart/evidence, missing/negative, withdrawal and phone assertions remain.
+
+Preserve the initial cookie-less401 reads (corrected through the normal local session), guessed-file inspections, first unit fixture's aliased source objects, first browser selector matching repeated values, and the outdated Financials assertion. Full-element screenshots initially included off-viewport blank regions/sticky chrome; final viewport captures were inspected instead. No product-source failure was hidden or reclassified as a provider outcome.
+
+Evidence `.local/live-tests/overview-sections-20261009/`; backup `.local/backups/overview-sections-20261009/`. Installation results and final running-app checks are recorded there separately. Previous evidence-polish/amendment/feed work and the original unresolved paid hold are retained.
+
+## Installation
+
+Source hashes/file set/prior-index guards passed. Atomic frontend index `5289a1cd8460d2deae9109f9a08e6b18dfdb45dc88e380e0ec765670845a046c` and all33candidate assets/fonts are verified served; prior assets remain. Entry384.60kB. No app/database restart: PID69431 and session200/local-pitch preserved. All114table fingerprints/schema47/`.env`/ledger exact across install. No AI, provider, email, Telegram, private peer/research or watch action by this task. Normal background activity outside the measured install interval is separate.
+
+Installed saved-data browser passes at1440/980/390/320px, including missing-data simulation and all interaction assertions, with zero browser errors and only blocked loading attempts. The installed financial-health section screenshot was visually inspected.

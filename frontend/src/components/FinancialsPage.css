@@ -209,7 +209,7 @@
   background: var(--color-surface);
   border-radius: var(--radius-sm);
 }
-.story-selected-values > article > span {
+.story-selected-values > article > .story-stat-label {
   color: var(--color-text-2);
   font-size: var(--text-sm);
 }
@@ -223,9 +223,28 @@
   line-height: 1.5;
   font-size: var(--text-xs);
 }
-.story-selected-values button {
-  margin-top: var(--space-3);
+.app-shell .story-selected-values .story-stat-label {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  gap: 2px;
 }
+.app-shell .story-selected-values .term-help-button {
+  margin: 0;
+  flex: 0 0 44px;
+}
+.app-shell .story-selected-values .financial-figure-link {
+  margin: 4px 0 8px;
+}
+.app-shell .story-selected-values .financial-figure-link .evidence-button {
+  font-size: var(--text-xl);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  min-height: 36px;
+  padding-block: 4px;
+  margin: 0;
+}
+
 .financial-insights {
   display: grid;
   gap: var(--space-4);
@@ -545,10 +564,13 @@
   .story-selected-values small {
     grid-column: 1 / -1;
   }
-  .story-selected-values button {
-    grid-column: 1 / -1;
-    margin-top: 0;
+  .app-shell .story-selected-values .financial-figure-link {
+    margin: 0;
   }
+  .app-shell .story-selected-values .financial-figure-link .evidence-button {
+    font-size: var(--text-lg);
+  }
+
   .story-balance-select {
     flex-direction: column;
     align-items: start;

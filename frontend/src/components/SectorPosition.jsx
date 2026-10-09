@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import Select from "./Select";
 import Modal from "./Modal";
+import FinancialEvidence, { FinancialEvidenceRow } from "./FinancialEvidence";
 import { companyName } from "../lib/companyIdentity";
 import LoadingSkeleton from "./LoadingSkeleton";
 import { money, percent, day } from "../lib/financialStory";
@@ -34,65 +35,66 @@ const rowPeriod = (row, expected) =>
       ? `Forecast year ends ${day(row.end)}`
       : `${day(row.start)} – ${day(row.end)}`;
 function EvidenceContents({ row, expected }) {
+  if (row.unit === "multiple")
+    return (
+      <>
+        <FinancialEvidenceRow
+          row={{
+            label: "Trailing P/E",
+            value: row.exact,
+            unit: "multiple",
+            explanation: row.basis,
+            reason: row.reason,
+            period_label: `Finnhub · saved ${stamp(row.observed)}`,
+          }}
+        />
+      </>
+    );
+  if (expected)
+    return (
+      <FinancialEvidence
+        rows={[
+          {
+            key: "forecast",
+            label: "Forecast revenue",
+            value: row.current?.average,
+            unit: "USD",
+            period_label: `Year ending ${day(row.end)}`,
+          },
+          {
+            key: "forecast",
+            label: "Forecast revenue",
+            value: row.baseline?.average,
+            unit: "USD",
+            period_label: `Year ending ${day(row.priorEnd)}`,
+          },
+        ]}
+      >
+        <p>Growth compares two annual forecasts from the same FMP response.</p>
+        <p>
+          Saved {stamp(row.observed)}. The underlying forecast date is unknown.
+        </p>
+        {row.reason && <p>{row.reason}</p>}
+      </FinancialEvidence>
+    );
   return (
-    <>
-      {row.unit === "multiple" ? (
-        <>
-          <p>{row.basis}</p>
-          <p>
-            Exact value: {row.exact ?? "Unavailable"} times. Source: Finnhub ·{" "}
-            {row.field || "peTTM"}.
-          </p>
-          <p>
-            First saved {stamp(row.observed)}. This is a saved trailing P/E, not
-            a forward estimate or live quote.
-          </p>
-          {row.identity && <p>Source snapshot: {row.identity}.</p>}
-        </>
-      ) : expected ? (
-        <>
-          <p>
-            FMP annual revenue averages: {row.current?.average ?? "Unavailable"}{" "}
-            USD for year ending {row.end || "unknown"}, versus{" "}
-            {row.baseline?.average ?? "Unavailable"} USD for year ending{" "}
-            {row.priorEnd || "unknown"}.
-          </p>
-          <p>
-            Calculation: (current forecast average / preceding forecast average
-            − 1) × 100. Both inputs are forecasts from the same saved response.
-          </p>
-          <p>
-            Source snapshot {row.sourceId || "unavailable"} · first observed{" "}
-            {stamp(row.observed)}. Underlying forecast vintage is unknown.
-          </p>
-        </>
-      ) : (
-        <>
-          <p>
-            {row.row?.formula || "Reported revenue, without a new calculation."}
-          </p>
-          <p>
-            Exact value: {row.exact ?? "Unavailable"} {row.unit}. Annual period{" "}
-            {day(row.start)} – {day(row.end)}.
-          </p>
-          {row.inputs.map((input, i) => (
-            <p key={i}>
-              {input.namespace}:{input.concept} · exact {input.value}{" "}
-              {input.unit} · {day(input.start)} – {day(input.end)} · filing{" "}
-              {input.accession}.
-            </p>
-          ))}
-          {row.report?.filing_url && (
-            <a href={row.report.filing_url} target="_blank" rel="noreferrer">
-              Original annual filing ↗
-            </a>
-          )}
-        </>
-      )}
-      {row.reason && <p>{row.reason}</p>}
-    </>
+    <FinancialEvidenceRow
+      row={{
+        ...row.row,
+        label: row.row?.label || "Annual result",
+        value: row.exact,
+        unit: row.unit,
+        start: row.start,
+        end: row.end,
+        inputs: row.inputs,
+        reason: row.reason,
+        filing_resolution: row.filingResolution,
+      }}
+      fallbackUrl={row.report?.filing_url}
+    />
   );
 }
+
 function Bars({ rows, symbol, expected, label }) {
   const [evidence, setEvidence] = useState(null);
   const range = scale(rows),
@@ -116,6 +118,9 @@ function Bars({ rows, symbol, expected, label }) {
       ? "annual forecasts"
       : "annual SEC figures";
   const averageExplanation = `Equal-weight mean of ${average.peers.length} of ${Math.max(0, rows.length - 1)} peers. Excludes ${symbol} and unavailable figures${multiple ? "; saved dates may differ." : "; only fiscal ends within 120 days are included."}`;
+  const reviewed = rows.filter(
+    (row) => row.filingResolution?.status === "retained",
+  );
   return (
     <div className="position-comparison">
       <div className="position-chart-toolbar">
@@ -237,6 +242,13 @@ function Bars({ rows, symbol, expected, label }) {
       <p className="position-chart-hint">
         {averageExplanation} Select a row for evidence.
       </p>
+      {reviewed.length > 0 && (
+        <p className="position-chart-note">
+          {reviewed.map((row) => row.symbol).join(", ")}: earlier figures
+          confirmed unchanged by amendments. See Evidence &amp; periods for the
+          supporting filings.
+        </p>
+      )}
       <Modal
         open={!!evidence}
         onClose={() => setEvidence(null)}
@@ -245,7 +257,8 @@ function Bars({ rows, symbol, expected, label }) {
         initialFocus={evidence?.symbol ? '[data-selected="true"]' : undefined}
       >
         <p className="position-evidence-intro">
-          {label} · {basis}. Expand a company for its exact figures and sources.
+          {label} · {basis}. Expand a company for its figures, calculation and
+          reports.
         </p>
         <section className="position-average-evidence">
           <h3>Peer average: {display(average.value, rows[0]?.unit)}</h3>
@@ -534,7 +547,27 @@ export default function SectorPosition({
         if (!mounted.current || token !== version.current) break;
         try {
           const company = await api.addSecCompany(member.symbol);
-          await api.refreshSec(company.instrument_id);
+          if (!mounted.current || token !== version.current) break;
+          try {
+            await api.refreshSec(company.instrument_id);
+          } catch (failure) {
+            failures.push(`${member.symbol}: ${failure.message}`);
+          }
+          if (!mounted.current || token !== version.current) break;
+          const saved = await api.sectorPosition(company.instrument_id, []);
+          if (
+            Object.values(saved.members[0]?.performance?.reports || {}).some(
+              (report) => report?.amendment_resolution?.needs_documents,
+            )
+          ) {
+            if (!mounted.current || token !== version.current) break;
+            const originals = await api.refreshDisclosures(
+              company.instrument_id,
+            );
+            if (originals.coverage?.some((item) => item.status === "failed")) {
+              failures.push(`${member.symbol}: ${originals.message}`);
+            }
+          }
         } catch (failure) {
           failures.push(`${member.symbol}: ${failure.message}`);
         }

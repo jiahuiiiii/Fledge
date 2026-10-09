@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import Modal from "./Modal";
+import FinancialEvidence from "./FinancialEvidence";
 import Select from "./Select";
 import { amount, day } from "./FinancialOverview";
 import { flowLayout, matchingMix, shortLabel } from "../lib/incomeFlow";
@@ -24,6 +25,7 @@ export default function RevenueFlow({
   data,
   segments,
   compactHeading = false,
+  compactOverview = false,
 }) {
   const id = useId();
   const [kind, setKind] = useState("");
@@ -75,7 +77,9 @@ export default function RevenueFlow({
       <div className="flow-heading">
         <div className={compactHeading ? "flow-heading-compact" : undefined}>
           <span className="section-label">FOLLOW THE REVENUE</span>
-          <h2 id={`${id}-heading`}>Revenue &amp; expenses</h2>
+          <h2 id={`${id}-heading`}>
+            {compactOverview ? "Follow the revenue" : "Revenue & expenses"}
+          </h2>
           <p>
             See what remains after the company’s costs. Select a figure to
             inspect its evidence.
@@ -97,7 +101,9 @@ export default function RevenueFlow({
                   setEvidence(null);
                 }}
               >
-                {names[name]}
+                {compactOverview && name === "trailing"
+                  ? "Past 12 months"
+                  : names[name]}
               </button>
             ))}
           </div>
@@ -107,28 +113,34 @@ export default function RevenueFlow({
         <p>{data.reason || "No saved income statement is available."}</p>
       ) : (
         <>
-          <div
-            className="flow-timeline"
-            ref={timeline}
-            role="group"
-            aria-label="Income statement reporting periods"
-          >
-            {choices.map((row) => (
-              <button
-                key={row.id}
-                aria-pressed={row.id === selected.id}
-                onClick={() => choose(row.id)}
-              >
-                <span>
-                  {row.kind === "quarter" ? day(row.end) : row.end.slice(0, 4)}
-                </span>
-                <small>
-                  {amount(row.metrics.find((m) => m.key === "revenue")?.value)}{" "}
-                  revenue
-                </small>
-              </button>
-            ))}
-          </div>
+          {(!compactOverview || choices.length > 1) && (
+            <div
+              className="flow-timeline"
+              ref={timeline}
+              role="group"
+              aria-label="Income statement reporting periods"
+            >
+              {choices.map((row) => (
+                <button
+                  key={row.id}
+                  aria-pressed={row.id === selected.id}
+                  onClick={() => choose(row.id)}
+                >
+                  <span>
+                    {row.kind === "quarter"
+                      ? day(row.end)
+                      : row.end.slice(0, 4)}
+                  </span>
+                  <small>
+                    {amount(
+                      row.metrics.find((m) => m.key === "revenue")?.value,
+                    )}{" "}
+                    revenue
+                  </small>
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flow-meta">
             <p>
               {names[selected.kind]} · {day(selected.start)} –{" "}
@@ -341,49 +353,27 @@ export default function RevenueFlow({
         className="evidence-dialog flow-evidence"
       >
         {evidence && (
-          <>
-            <p className="flow-exact">
-              {evidence.value == null ? "Unavailable" : `${evidence.value} USD`}
-            </p>
-            <p>
-              {day(selected.start)} – {day(selected.end)}
-            </p>
-            {evidence.reason && <p>{evidence.reason}</p>}
-            {evidence.formula && <p>{evidence.formula}</p>}
-            {evidence.explanation && <p>{evidence.explanation}</p>}
-            {evidence.group && (
-              <p>
-                Reported category: {evidence.member}. {evidence.group.kind}.
-                Category names come from the filing; read its definitions.
-              </p>
-            )}
-            {evidence.inputs.map((input, index) => (
-              <p key={index}>
-                {input.concept}: {input.value ?? "Unavailable"}{" "}
-                {input.unit || "USD"}
-                <br />
-                {input.start && `${day(input.start)} – `}
-                {input.end && day(input.end)}
-                {input.context_id && `Context: ${input.context_id}`}
-                <br />
-                {(input.filing_url || evidence.group?.url) && (
-                  <a
-                    href={
-                      input.filing_url ||
-                      `${evidence.group.url}${input.fact_id ? `#${encodeURIComponent(input.fact_id)}` : ""}`
-                    }
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Original {input.form || evidence.group.form} filing ↗
-                  </a>
-                )}
-              </p>
-            ))}
-            <p>
-              Method: {data.method} · saved source {data.payload_id}
-            </p>
-          </>
+          <FinancialEvidence
+            rows={[
+              {
+                ...evidence,
+                unit: "USD",
+                start: selected.start,
+                end: selected.end,
+                inputs: (evidence.inputs || []).map((input) => ({
+                  ...input,
+                  form: input.form || evidence.group?.form,
+                  start: input.start || evidence.group?.start,
+                  end: input.end || evidence.group?.end,
+                  filing_url:
+                    input.filing_url ||
+                    (evidence.group?.url
+                      ? `${evidence.group.url}${input.fact_id ? `#${encodeURIComponent(input.fact_id)}` : ""}`
+                      : null),
+                })),
+              },
+            ]}
+          />
         )}
       </Modal>
     </section>

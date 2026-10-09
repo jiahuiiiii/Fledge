@@ -49,7 +49,7 @@ def context(owner, iid, peers=None):
             company_id = str(company['id']) if company else None
             members.append(dict(
                 symbol=symbol, name=company['name'] if company else listings.get(symbol, {}).get('name', symbol),
-                performance=performance(conn, company_id) if company_id else None,
+                performance=performance(conn, company_id, resolve_amendments=True) if company_id else None,
                 consensus=fmp.present(conn, 'estimates', symbol),
                 public_forecasts=public_forecasts(conn, company_id) if company_id else None,
                 management=guidance(conn, company_id) if company_id else None,

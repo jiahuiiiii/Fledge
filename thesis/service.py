@@ -730,7 +730,7 @@ def state(owner, instrument_id=INSTRUMENT):
             source_checks=checks,
             sec_status=sec_capabilities(),
             performance=(
-                performance_present(conn, instrument_id)
+                performance_present(conn, instrument_id, resolve_amendments=True)
                 if info["mode"] == "sec"
                 else None
             ),

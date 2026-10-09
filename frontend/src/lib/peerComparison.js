@@ -159,6 +159,10 @@ export function peerRows(members, metric) {
     }
     if (metric.key === "revenue_growth") {
       const source = member.annual_growth;
+      const projected =
+        source?.projection_method === "sec-amendment-resolution-1" &&
+        source.based_on_snapshot_id;
+      const identity = projected ? source.projection_id : source?.snapshot_id;
       const report = source?.report;
       const row = source?.metric;
       const inputs = row?.inputs || [];
@@ -166,7 +170,7 @@ export function peerRows(members, metric) {
       const valid =
         source?.status === "available" &&
         source.method === "sec-performance-1" &&
-        source.snapshot_id &&
+        identity &&
         report?.period_type === "annual" &&
         /^10-K(?:\/A)?$/.test(report.form) &&
         row?.key === "revenue_growth" &&
@@ -200,8 +204,11 @@ export function peerRows(members, metric) {
         priorEnd: valid ? inputs[1].end : null,
         observed: source?.first_recorded_at,
         checked: source?.checked_at,
-        identity: source?.snapshot_id,
+        identity,
+        projected: !!projected,
+        baseIdentity: source?.based_on_snapshot_id,
         payloadIdentity: source?.payload_id,
+        filingResolution: row?.filing_resolution,
         inputs: inputs.map((input) => ({
           ...input,
           filing_url: input.filing_url || report?.filing_url,
@@ -245,6 +252,7 @@ export function peerRows(members, metric) {
       inputs: row?.inputs || [],
       formula: row?.formula,
       basis: row?.explanation,
+      filingResolution: row?.filing_resolution,
       sourceError: source?.reason,
     };
   });

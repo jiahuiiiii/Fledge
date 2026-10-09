@@ -45,7 +45,17 @@ def plan(submissions, cik, now):
                                filed_on=recent['filingDate'][i]))
     selected={}
     for item in sorted(candidates,key=lambda x:(x['period_end'],x['published_at'],x['accession'])):selected[item['slot']]=item
-    return [selected[slot] for slot in ('annual','quarter','earnings_filing') if slot in selected]
+    result = [selected[slot] for slot in ('annual','quarter','earnings_filing') if slot in selected]
+    # Retain earlier amendments in the same current period so resolution can
+    # inspect every intervening change. Reuse the normal lease/clock/denial path.
+    for slot in ('annual', 'quarter'):
+        latest = selected.get(slot)
+        if not latest or not latest['form'].endswith('/A'):
+            continue
+        earlier = [item for item in candidates if item['slot'] == slot and item['period_end'] == latest['period_end'] and item['form'] == latest['form'] and item['accession'] != latest['accession']]
+        for item in sorted(earlier, key=lambda x: (x['published_at'], x['accession']))[-7:]:
+            result.append(dict(item, slot=f'{slot}_amendment_{item["accession"]}'))
+    return result
 
 
 def commit(conn, iid, item, raw, data, now, name):
@@ -92,6 +102,11 @@ def refresh(iid, *, fetcher=None, submissions=None):
         read=fetcher or client.fetch_document
         for item in items:
             fence(iid,attempt)
+            if '_amendment_' in item['slot']:
+                with transaction(source=True, consistent=True) as conn:
+                    retained = one(conn, 'SELECT id FROM disclosure_documents WHERE instrument_id=%s AND accession=%s AND url=%s ORDER BY available_at DESC LIMIT 1', (iid,item['accession'],item['url']))
+                if retained:
+                    coverage.append(dict(slot=item['slot'],status='available',document_id=str(retained['id'])));continue
             raw=read(item['url']);data=parse(raw,form=item['form'],cik=company['cik'])
             documents=[(item,raw,data)]
             if item['slot']=='earnings_filing':
@@ -133,7 +148,7 @@ def present(conn, iid, *, include_text=False):
     state=one(conn,'SELECT * FROM disclosure_refresh_state WHERE instrument_id=%s',(iid,))
     documents=rows(conn,'SELECT d.id,d.slot,d.form,d.accession,d.url,d.headline,d.published_at,d.available_at,d.data,c.checked_at FROM disclosure_current c JOIN disclosure_documents d ON d.id=c.document_id AND d.instrument_id=c.instrument_id WHERE c.instrument_id=%s ORDER BY d.slot',(iid,))
     earnings=next((d['accession'] for d in documents if d['slot']=='earnings_filing'),None)
-    documents=[d for d in documents if not d['slot'].startswith('earnings_release') or d['accession']==earnings]
+    documents=[d for d in documents if '_amendment_' not in d['slot'] and (not d['slot'].startswith('earnings_release') or d['accession']==earnings)]
     for item in documents:
         data=item.pop('data')
         item.update(method=data['method'],sections=data['sections'],limitations=data['limitations'],passage_count=len(data['passages']))

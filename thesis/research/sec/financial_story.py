@@ -28,8 +28,11 @@ BALANCES = {
 }
 
 def calculation(key, label, left, right, operator, formula, *, percent=False, nonnegative=False):
+    from .amendments import combined_evidence
+    evidence = combined_evidence(left,right)
     valid = (left['value'] is not None and right['value'] is not None
-             and (left['start'], left['end']) == (right['start'], right['end']))
+             and (left['start'], left['end']) == (right['start'], right['end'])
+             and (not evidence or {f['accession'] for f in left['inputs']} == {f['accession'] for f in right['inputs']}))
     value = None
     reason = 'Matching, compatible inputs are unavailable.'
     if valid:
@@ -47,10 +50,10 @@ def calculation(key, label, left, right, operator, formula, *, percent=False, no
                     except ValueError: reason = 'The calculated amount exceeds supported decimal precision.'
     return dict(key=key, label=label, value=value, unit='percent' if percent else 'times' if operator == 'ratio' else 'USD',
                 start=left['start'], end=left['end'], inputs=left['inputs'] + right['inputs'],
-                formula=formula, calculated=True, reason=reason)
+                formula=formula, calculated=True, reason=reason,**(evidence if value is not None else {}))
 
 
-def income_period(bundle, filings, filing, kind):
+def income_period(bundle, filings, filing, kind, resolver=None):
     rows = {}
     for key, label, tags in [
         ('revenue', 'Revenue', REVENUE),
@@ -61,7 +64,7 @@ def income_period(bundle, filings, filing, kind):
         ('net_parent', 'Net income attributable to parent', ('NetIncomeLoss',)),
         ('interest', 'Reported non-operating interest expense', ('InterestExpenseNonOperating',)),
     ]:
-        rows[key] = dict(key=key, label=label, unit='USD', **trailing(bundle, filings, filing, tags))
+        rows[key] = dict(key=key, label=label, unit='USD', **trailing(bundle, filings, filing, tags,resolver))
     revenue = rows['revenue']
     for key, row in rows.items():
         if key != 'revenue' and row['value'] is not None and (row['start'], row['end']) != (revenue['start'], revenue['end']):
@@ -116,7 +119,7 @@ def balance_period(bundle, filing):
                 form=filing['form'], filed=filing['filingDate'], accepted_at=filing['accepted_at'], metrics=list(metrics.values()))
 
 
-def normalize_story(bundle, cik, now):
+def normalize_story(bundle, cik, now,resolver=None):
     if any(int(bundle[key].get('cik', 0)) != int(cik) for key in ('companyfacts', 'submissions')):
         raise ValueError('SEC evidence belongs to another company.')
     filings = filing_rows(bundle['submissions'], now)
@@ -129,9 +132,13 @@ def normalize_story(bundle, cik, now):
         if filing['form'].startswith('10-K'):
             annual_by_end[filing['end']] = filing
     annual = list(annual_by_end.values())[-12:]
-    annual_rows = [income_period(bundle, filings, filing, 'annual') for filing in annual]
-    trailing_rows = [income_period(bundle, filings, filing, 'trailing') for filing in chosen]
+    annual_rows = [income_period(bundle, filings, filing, 'annual',resolver) for filing in annual]
+    trailing_rows = [income_period(bundle, filings, filing, 'trailing',resolver) for filing in chosen]
     balances = [balance_period(bundle, filing) for filing in chosen]
+    if resolver:
+        for period,filing in zip(balances,chosen):
+            period['metrics'],resolution=resolver.resolve(filing,period['metrics'],lambda earlier:balance_period(bundle,earlier)['metrics'])
+            if resolution:period['amendment_resolution']=resolution
     urls = {}
     for filing in filings:
         accession = filing['accessionNumber']
@@ -156,7 +163,10 @@ def present(conn, iid):
     saved = one(conn, 'SELECT p.id,p.payload,p.retrieved_at,c.cik,k.checked_at FROM sec_payload_current k JOIN source_payloads p ON p.id=k.payload_id AND p.instrument_id=k.instrument_id JOIN sec_companies c ON c.instrument_id=k.instrument_id WHERE k.instrument_id=%s', (iid,))
     if not saved:
         return dict(status='empty', reason='Collect company filings to see financial history.', method=METHOD)
-    try: result = normalize_story(saved['payload'], saved['cik'], saved['checked_at'])
+    from .amendments import retained_resolver
+    try:
+        resolver=retained_resolver(conn,iid,saved['payload'],saved['cik'],saved['checked_at'])
+        result = normalize_story(saved['payload'], saved['cik'], saved['checked_at'],resolver)
     except (ValueError, KeyError, TypeError, OverflowError):
         return dict(status='unavailable', reason='The saved filing facts are unsupported for this financial view.', method=METHOD)
-    return dict(status='available', payload_id=str(saved['id']), first_recorded_at=saved['retrieved_at'], checked_at=saved['checked_at'], **result)
+    return dict(status='available', payload_id=str(saved['id']), amendment_basis=resolver.basis_id, first_recorded_at=saved['retrieved_at'], checked_at=saved['checked_at'], **result)

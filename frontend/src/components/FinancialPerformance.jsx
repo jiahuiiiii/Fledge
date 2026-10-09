@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FinancialEvidenceRow } from "./FinancialEvidence";
 
 const day = (value) =>
   value
@@ -141,55 +142,12 @@ export default function FinancialPerformance({ data }) {
                       </span>
                       <strong>{amount(m.value, m.unit)}</strong>
                     </summary>
-                    <div className="financial-evidence">
-                      <p>{m.explanation}</p>
-                      {m.reason && <p className="financial-note">{m.reason}</p>}
-                      {m.formula && (
-                        <p>
-                          <strong>Calculation:</strong> {m.formula}
-                        </p>
-                      )}
-                      {m.value != null && (
-                        <p>
-                          Exact {m.calculated ? "calculated" : "reported"}{" "}
-                          value:{" "}
-                          <strong>
-                            {m.value} {m.unit === "percent" ? "%" : "USD"}
-                          </strong>
-                        </p>
-                      )}
-                      {m.prior && (
-                        <p>
-                          Comparison reported in this filing:{" "}
-                          <strong>{amount(m.prior.value)}</strong> ·{" "}
-                          {scope(m.prior)}.{" "}
-                          {m.prior.start
-                            ? "Comparable prior-year period."
-                            : "Previous reported balance date; not necessarily one year earlier."}
-                        </p>
-                      )}
-                      {m.inputs.length > 0 && (
-                        <>
-                          <h5>Reported inputs</h5>
-                          <ul>
-                            {m.inputs.map((f, i) => (
-                              <li key={i}>
-                                <strong>{f.concept}</strong>: USD {f.value}
-                                <br />
-                                {scope(f)} · accession {f.accession}
-                              </li>
-                            ))}
-                          </ul>
-                        </>
-                      )}
-                      <a
-                        href={chosen.filing_url}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Inspect original filing ↗
-                      </a>
-                    </div>
+                    <FinancialEvidenceRow
+                      row={m}
+                      fallbackUrl={
+                        m.source_report?.filing_url || chosen.filing_url
+                      }
+                    />
                   </details>
                 ))}
             </section>

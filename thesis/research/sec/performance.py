@@ -399,7 +399,7 @@ def persist(conn, iid, pid, bundle, cik, now):
     return sid
 
 
-def present(conn, iid):
+def present(conn, iid, *, resolve_amendments=False):
     if not one(
         conn,
         "SELECT id FROM sources WHERE id='sec-companyfacts' AND entitlement='sec-public'",
@@ -425,7 +425,7 @@ def present(conn, iid):
         "SELECT last_attempt_at,last_error FROM sec_refresh_state WHERE instrument_id=%s",
         (iid,),
     )
-    return dict(
+    result = dict(
         status="available",
         snapshot_id=record["id"],
         payload_id=record["payload_id"],
@@ -434,3 +434,7 @@ def present(conn, iid):
         source_status=health,
         **record["data"]
     )
+    if resolve_amendments:
+        from .amendments import present as resolved
+        return resolved(conn, iid, result)
+    return result

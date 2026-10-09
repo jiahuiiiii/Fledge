@@ -1,0 +1,192 @@
+.financial-evidence-view {
+  display: grid;
+  gap: 20px;
+}
+.financial-evidence-summary {
+  padding: 0 0 18px;
+  border-bottom: 1px solid var(--color-line);
+}
+.financial-evidence-summary > p {
+  margin: 0;
+}
+.financial-evidence-summary > p:first-child {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+.financial-evidence-summary > p + p {
+  margin-top: 8px;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.financial-evidence-grid {
+  display: grid;
+  gap: 16px;
+}
+.financial-evidence-grid.is-comparison {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.financial-evidence-card {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+.financial-evidence-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+}
+.financial-evidence-card .financial-evidence-heading h3 {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--color-text-2);
+}
+.financial-evidence-caption {
+  display: block;
+  margin-bottom: 6px;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+.financial-evidence-heading .financial-evidence-value {
+  font-size: var(--text-xl);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+.is-comparison .financial-evidence-heading {
+  flex-direction: column;
+}
+.financial-evidence-card .financial-evidence-period {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  line-height: 1.5;
+  margin: 8px 0 0;
+}
+.financial-evidence-card .financial-evidence-note {
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  margin: 12px 0;
+  color: var(--color-text-2);
+}
+.financial-evidence-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+.financial-evidence-sources a {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-positive-light);
+  text-decoration: none;
+  font-size: var(--text-sm);
+}
+.financial-evidence-sources a:hover {
+  border-color: var(--color-positive);
+  background: var(--color-positive-soft);
+}
+.financial-evidence-sources small {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+.financial-evidence-calculation {
+  margin-top: 16px;
+  border-top: 1px solid var(--color-line);
+  padding-top: 8px;
+}
+.financial-evidence-calculation > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  color: var(--color-text-2);
+  font-size: var(--text-sm);
+}
+.financial-evidence-calculation > p {
+  margin: 8px 0 16px;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.financial-evidence-calculation dl {
+  margin: 0;
+}
+.financial-evidence-calculation dl > div {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--color-line);
+  font-size: var(--text-sm);
+}
+.financial-evidence-calculation dt {
+  min-width: 0;
+  color: var(--color-text-2);
+}
+.financial-evidence-calculation dt small {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  margin-top: 4px;
+}
+.financial-evidence-calculation dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--color-text);
+}
+.financial-evidence-view .financial-evidence-rounding {
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--color-muted);
+  margin: 0;
+}
+.filing-resolution {
+  margin-top: 16px;
+  border-top: 1px solid var(--color-line);
+  padding-top: 12px;
+}
+.filing-resolution > p {
+  margin: 0 0 8px;
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+.filing-resolution a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-right: 12px;
+  color: var(--color-positive-light);
+  font-size: var(--text-sm);
+}
+@media (max-width: 650px) {
+  .financial-evidence-grid.is-comparison {
+    grid-template-columns: 1fr;
+  }
+  .financial-evidence-card {
+    padding: 16px;
+  }
+  .financial-evidence-calculation dl > div {
+    flex-wrap: wrap;
+  }
+  .financial-evidence-heading .financial-evidence-value {
+    font-size: var(--text-lg);
+  }
+}

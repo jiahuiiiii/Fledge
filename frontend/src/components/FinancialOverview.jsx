@@ -1,5 +1,6 @@
 import { useState } from "react";
 import EvidenceButton from "./EvidenceButton";
+import FinancialEvidence from "./FinancialEvidence";
 import TermHelp from "./TermHelp";
 import "../financial-overview.css";
 
@@ -47,27 +48,7 @@ function Evidence({ row }) {
       title={`${row.label || "Figure"} · evidence`}
       className="overview-evidence"
     >
-      {row.reason && <p>{row.reason}</p>}
-      {row.formula && <p>{row.formula}</p>}
-      {row.explanation && <p>{row.explanation}</p>}
-      {row.value != null && (
-        <p>
-          Exact value: {row.value} {row.unit === "percent" ? "%" : "USD"}
-        </p>
-      )}
-      {row.inputs?.map((input, index) => (
-        <p key={index}>
-          {input.concept}: {amount(input.value, true)} · {period(input)}
-          {input.filing_url && (
-            <>
-              {" · "}
-              <a href={input.filing_url} target="_blank" rel="noreferrer">
-                Original {input.form} filing ↗
-              </a>
-            </>
-          )}
-        </p>
-      ))}
+      <FinancialEvidence rows={[row]} />
     </EvidenceButton>
   );
 }

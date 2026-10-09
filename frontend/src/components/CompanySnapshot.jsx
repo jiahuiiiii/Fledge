@@ -1,75 +1,7 @@
 import { day, snapshot } from "../lib/companySnapshot";
 import "./CompanySnapshot.css";
 import TermHelp from "./TermHelp";
-
-const marks = {
-  pass: ["✓", "Met"],
-  fail: ["✗", "Not met"],
-  unknown: ["–", "Unknown"],
-};
-
-function Checks({ checks }) {
-  if (!checks.length) return null;
-  const met = checks.filter((c) => c.state === "pass").length;
-  return (
-    <div className="glance-checks">
-      <span className="glance-score">
-        Checks {met}/{checks.length}
-      </span>
-      <ul>
-        {checks.map((c) => (
-          <li key={c.label} className={`glance-check ${c.state}`}>
-            <span aria-hidden="true">{marks[c.state][0]}</span>
-            <span className="sr-only">{marks[c.state][1]}: </span>
-            {c.label}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function ToneBar({ tone }) {
-  if (!tone?.total) return null;
-  const {
-    positive = 0,
-    neutral = 0,
-    mixed = 0,
-    negative = 0,
-    unclear = 0,
-  } = tone.counts;
-  const parts = [
-    ["positive", positive, "positive"],
-    ["neutral", neutral + mixed, "neutral or mixed"],
-    ["negative", negative, "negative"],
-    ...(unclear ? [["unclear", unclear, "unclear"]] : []),
-  ];
-  return (
-    <div className="glance-tone">
-      <p className="glance-count-explanation">
-        {tone.relevant != null &&
-          `${tone.relevant} relevant stories; ${tone.selected - tone.relevant} unrelated or relevance-unclear. `}
-        Repeated coverage counts once in these totals.
-      </p>
-      <div
-        className="glance-tone-bar"
-        role="img"
-        aria-label={parts.map(([, n, label]) => `${n} ${label}`).join(", ")}
-      >
-        {parts.map(([key, n]) =>
-          n ? <span key={key} className={key} style={{ flexGrow: n }} /> : null,
-        )}
-      </div>
-      <p>
-        {parts.map(([key, n, label]) => (
-          <span key={key} className={key}>
-            <strong>{n}</strong> {label}
-          </span>
-        ))}
-      </p>
-    </div>
-  );
-}
+import OverviewSections from "./OverviewSections";
 
 function Activity({ data, instrumentId, onUpdates, onView }) {
   const quote = data?.market?.quote?.quote;
@@ -141,19 +73,25 @@ export default function CompanySnapshot({
   onView,
   onUpdates,
   chart = null,
+  visible,
+  onSource,
+  businessPanel,
+  focusTopic,
 }) {
-  const { sentences, sections, growth } = snapshot(data);
+  const { sentences, growth } = snapshot(data);
   return (
     <section className="glance" aria-label="Company summary">
       {sentences.length ? (
         <p className="glance-summary">
           {growth && (
             <span className="glance-growth">
-              <strong>
-                Revenue {growth.growth >= 0 ? "grew" : "fell"}{" "}
-                {Math.abs(growth.growth).toFixed(1)}% · last fiscal year
-              </strong>
-              <TermHelp term="revenue_growth" />
+              <span className="glance-growth-title">
+                <strong>
+                  Revenue {growth.growth >= 0 ? "grew" : "fell"}{" "}
+                  {Math.abs(growth.growth).toFixed(1)}% · last fiscal year
+                </strong>
+                <TermHelp term="revenue_growth" />
+              </span>
               <small>
                 Year ended {day(growth.periodEnd)} vs year ended{" "}
                 {day(growth.previousEnd)}
@@ -175,44 +113,15 @@ export default function CompanySnapshot({
         onView={onView}
       />
       {chart}
-      <div className="glance-grid">
-        {sections.map((section) => (
-          <article
-            key={section.title}
-            className="glance-card"
-            aria-labelledby={`glance-${section.number}`}
-          >
-            <div className="glance-card-head">
-              <h4 id={`glance-${section.number}`}>{section.title}</h4>
-              <button
-                className="glance-open"
-                onClick={() => onView(section.tab)}
-              >
-                {section.action} <span aria-hidden="true">→</span>
-              </button>
-            </div>
-            <Checks checks={section.checks} />
-            <div className="glance-figures">
-              {section.figures.map((figure) => (
-                <div
-                  key={figure.label}
-                  className={`glance-figure ${figure.tone}`}
-                >
-                  <strong className={figure.value ? "" : "missing"}>
-                    {figure.value || "Not available"}
-                  </strong>
-                  <span>
-                    {figure.label}
-                    {figure.term && <TermHelp term={figure.term} />}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <ToneBar tone={section.tone} />
-            {section.note && <p className="glance-note">{section.note}</p>}
-          </article>
-        ))}
-      </div>
+      <OverviewSections
+        data={data}
+        instrumentId={instrumentId}
+        visible={visible}
+        onView={onView}
+        onSource={onSource}
+        businessPanel={businessPanel}
+        focusTopic={focusTopic}
+      />
     </section>
   );
 }

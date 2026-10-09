@@ -39,6 +39,14 @@ export function newsSourceStatus(data) {
   const failed = feeds.filter((row) =>
     ["failed", "blocked"].includes(row.status),
   );
+  const checked = feeds.filter((row) => row.status === "ready");
+  const waiting = feeds.filter((row) => row.status === "deferred");
+  const unchecked = feeds.filter((row) =>
+    ["not_loaded", "not_checked"].includes(row.status),
+  );
+  const optional = (data.provider_status || []).filter(
+    (row) => row.status === "disabled",
+  );
   const social = (data.social_status || []).filter(
     (row) => row.enabled && row.error,
   );
@@ -46,5 +54,14 @@ export function newsSourceStatus(data) {
     .map((row) => row.checked_at)
     .filter((value) => value && Number.isFinite(Date.parse(value)))
     .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
-  return { feeds, failed, social, latest };
+  return {
+    feeds,
+    checked,
+    failed,
+    waiting,
+    unchecked,
+    optional,
+    social,
+    latest,
+  };
 }

@@ -3,6 +3,7 @@ import Select from "./Select";
 import { amount, day } from "./FinancialOverview";
 import { peerMetrics, peerRows, peerScale } from "../lib/peerComparison";
 import TermHelp from "./TermHelp";
+import { FinancialEvidenceRow } from "./FinancialEvidence";
 import "./PeerComparison.css";
 
 const stamp = (date) =>
@@ -153,55 +154,24 @@ export default function PeerComparison({ members, symbol }) {
                   </p>
                 )}
                 <p>{row.basis || metric.explanation}</p>
-                {row.formula && <p>{row.formula}</p>}
-                {row.exact != null && (
-                  <p>
-                    Exact value: {row.exact}{" "}
-                    {metric.unit === "multiple"
-                      ? "times"
-                      : metric.unit === "percent"
-                        ? "%"
-                        : "USD"}
-                    .
-                  </p>
-                )}
+                <FinancialEvidenceRow
+                  row={{
+                    key: metric.key,
+                    label: metric.label,
+                    value: row.exact,
+                    unit: metric.unit,
+                    start: row.start,
+                    end: row.end,
+                    inputs: row.inputs,
+                    formula: row.formula,
+                    filing_resolution: row.filingResolution,
+                    reason: row.reason || row.sourceError,
+                  }}
+                />
                 <p>
-                  {metric.source} · first observed {stamp(row.observed)}
+                  {metric.source} · saved {stamp(row.observed)}
                   {row.checked && " · checked " + stamp(row.checked)}.
                 </p>
-                {row.field && <p>Source field: {row.field}.</p>}
-                {row.identity && (
-                  <p className="peer-evidence-id">
-                    Saved source: {row.identity}.
-                  </p>
-                )}
-                {row.sourceError && <p>{row.sourceError}</p>}
-                {row.payloadIdentity && (
-                  <p className="peer-evidence-id">
-                    Original source payload: {row.payloadIdentity}.
-                  </p>
-                )}
-                {row.inputs.map((input, index) => (
-                  <p key={index}>
-                    {input.namespace}:{input.concept} · exact {input.value}{" "}
-                    {input.unit} ·{" "}
-                    {input.start ? day(input.start) + " – " : "at "}
-                    {day(input.end)} · filing {input.accession}
-                    {input.filing_url && (
-                      <>
-                        {" "}
-                        ·{" "}
-                        <a
-                          href={input.filing_url}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Original filing ↗
-                        </a>
-                      </>
-                    )}
-                  </p>
-                ))}
               </details>
             </article>
           ))}

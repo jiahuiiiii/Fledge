@@ -113,6 +113,26 @@ test("wrong fiscal kind, missing inputs, units, namespace and accession withhold
     assert.equal(reportedRow(m, "revenue_growth").value, null);
   }
 });
+test("retained figures validate against their original filing and keep amendment evidence", () => {
+  const m = member();
+  const annual = m.performance.reports.annual,
+    row = annual.metrics[0];
+  row.source_report = { ...annual, metrics: undefined };
+  row.filing_resolution = {
+    status: "retained",
+    amendments: [{ document_id: "proof" }],
+  };
+  annual.accession = "amendment";
+  annual.form = "10-K/A";
+  assert.equal(reportedRow(m, "revenue_growth").value, 20);
+  assert.equal(reportedRow(m, "revenue_growth").report.accession, "annual");
+  assert.equal(
+    reportedRow(m, "revenue_growth").filingResolution.amendments[0].document_id,
+    "proof",
+  );
+  row.inputs[0].accession = "amendment";
+  assert.equal(reportedRow(m, "revenue_growth").value, null);
+});
 test("position gives direct peer relationships with coverage, ties and percentage-point difference", () => {
   const rows = [
     { symbol: "AVGO", value: 20, end: "2025-12-31" },

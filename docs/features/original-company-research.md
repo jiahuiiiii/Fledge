@@ -26,6 +26,8 @@ Migration 043 retains immutable brief history. History, source inspection and in
 
 ## Financial depth
 
+Current display values also use the [general amendment resolver](competitor-position.md#reviewed-annual-amendments). Original snapshots, model evidence and persisted valuation bases remain unchanged; confirmed inherited inputs retain their original filing and supporting amendment evidence.
+
 `sec-financial-depth-1` uses retained whole-company US-GAAP USD facts. Existing monitoring and performance methods are unchanged. New views include annual revenue trends, trailing revenue/operating income/net income/cash flow/capital spending, calculated free cash flow and operating margin, and borrowing.
 
 A quarter's trailing value uses identified prior annual + current YTD − comparable prior YTD, with compatible fiscal dates and the same financial concept. Missing/conflicting values, incompatible fiscal years and unsupported units remain unknown. Every input has its exact filing, concept, period and value. Restatement/accounting-policy consistency still needs review of notes. A 52/53-week fiscal year is not converted into a calendar estimate.

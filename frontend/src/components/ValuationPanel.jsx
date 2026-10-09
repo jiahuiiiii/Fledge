@@ -268,11 +268,12 @@ function Results({ record }) {
 
 export default function ValuationPanel({
   instrument,
-  performance,
+  performance: currentPerformance,
   quote,
   visible = true,
   initialRead,
 }) {
+  const performance = currentPerformance?.recorded_basis || currentPerformance;
   const [context, setContext] = useState(initialRead?.data || null);
   const [base, setBase] = useState(null);
   const [title, setTitle] = useState("");

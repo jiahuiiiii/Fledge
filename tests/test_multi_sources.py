@@ -268,3 +268,103 @@ def test_alpha_historical_generic_failure_is_not_relabelled_as_confirmed_premium
         saved=one(c,"SELECT message FROM provider_checks WHERE instrument_id=%s AND provider='alpha_vantage'",(iid,))
     assert 'does not prove a key, quota or plan problem' in visible['message']
     assert saved['message']==original
+
+
+def test_cache_lifetime_starts_after_response_validation(clocks, monkeypatch):
+    start = datetime.now(timezone.utc)
+    completed = start + timedelta(seconds=3)
+    class Clock:
+        calls = 0
+        @classmethod
+        def now(cls, tz):
+            cls.calls += 1
+            return start if cls.calls == 1 else completed
+    monkeypatch.setattr(hub, 'datetime', Clock)
+    monkeypatch.setattr(hub, 'get', lambda *args, **kwargs: rss())
+    hub.feed_bytes('cnbc')
+    with transaction(source=True) as c:
+        assert one(c, "SELECT retrieved_at FROM public_feed_cache WHERE provider='cnbc'")['retrieved_at'] == completed
+
+
+@pytest.mark.parametrize('previous', [None, 'ready', 'failed'])
+def test_shared_timer_defers_without_request_or_erasing_result(clocks, monkeypatch, previous):
+    iid = prepare(clocks)
+    monkeypatch.setattr(hub, 'configuration', lambda _: None)
+    if previous:
+        _, token = hub.begin(iid, 'cnbc')
+        hub.finish(iid, 'cnbc', token, previous, 'Actual previous result', fetched=7, matched=2)
+        with transaction(source=True) as c:
+            c.execute("UPDATE provider_checks SET last_attempt_at=now()-interval '16 minutes' WHERE instrument_id=%s", (iid,))
+    with transaction(source=True) as c:
+        c.execute("INSERT INTO provider_clocks(provider,requests,next_at) VALUES('cnbc',1,now()+interval '5 minutes')")
+        before = one(c, "SELECT * FROM provider_checks WHERE instrument_id=%s AND provider='cnbc'", (iid,))
+    calls = []
+    result = hub.refresh(iid, 'cnbc', transport=httpx.MockTransport(lambda req: calls.append(req) or httpx.Response(200, content=rss())))
+    assert result['status'] == 'cached' and result['deferred'] and not calls
+    with transaction() as c:
+        saved = one(c, "SELECT * FROM provider_checks WHERE instrument_id=%s AND provider='cnbc'", (iid,))
+        visible = next(s for s in hub.status(c, iid) if s['provider'] == 'cnbc')
+    assert saved['lease_until'] is None
+    if previous:
+        for field in ['completed_at', 'outcome', 'message', 'fetched', 'matched']:
+            assert saved[field] == before[field]
+        assert visible['status'] == previous
+    else:
+        assert visible['status'] == 'deferred' and visible['checked_at'] is None
+    assert visible['next_check_at'] > datetime.now(timezone.utc)
+
+
+def test_historical_timer_failure_is_read_only_deferred_not_success(clocks, monkeypatch):
+    iid = prepare(clocks)
+    monkeypatch.setattr(hub, 'configuration', lambda _: None)
+    _, token = hub.begin(iid, 'cnbc')
+    hub.finish(iid, 'cnbc', token, 'failed', hub.RECENT_CHECK)
+    with transaction() as c:
+        before = one(c, "SELECT * FROM provider_checks WHERE instrument_id=%s", (iid,))
+        visible = next(s for s in hub.status(c, iid) if s['provider'] == 'cnbc')
+        after = one(c, "SELECT * FROM provider_checks WHERE instrument_id=%s", (iid,))
+    assert before == after
+    assert visible['status'] == 'deferred' and visible['checked_at'] is None
+    assert 'no request was sent' in visible['message']
+
+
+def test_real_failure_does_not_become_deferred_or_ready(clocks, monkeypatch):
+    iid = prepare(clocks)
+    monkeypatch.setattr(hub, 'configuration', lambda _: None)
+    _, token = hub.begin(iid, 'cnbc')
+    hub.finish(iid, 'cnbc', token, 'failed', 'CNBC returned HTTP 403; no retry was made.')
+    with transaction(source=True) as c:
+        c.execute("INSERT INTO provider_clocks(provider,denied,blocked_until) VALUES('cnbc',true,now()+interval '1 hour')")
+    with transaction() as c:
+        visible = next(s for s in hub.status(c, iid) if s['provider'] == 'cnbc')
+    assert visible['status'] == 'failed' and '403' in visible['message']
+    assert visible['next_check_at'] is None
+
+
+def test_deferred_attempt_cannot_clear_newer_lease(clocks, monkeypatch):
+    iid = prepare(clocks)
+    monkeypatch.setattr(hub, 'configuration', lambda _: None)
+    def replaced(*args, **kwargs):
+        with transaction(source=True) as c:
+            c.execute("UPDATE provider_checks SET attempt_id=%s WHERE instrument_id=%s", (uuid4(), iid))
+        raise hub.SourceDeferred(hub.RECENT_CHECK)
+    monkeypatch.setattr(hub, 'feed_bytes', replaced)
+    with pytest.raises(Conflict, match='newer source check'):
+        hub.refresh(iid, 'cnbc')
+    with transaction() as c:
+        assert one(c, 'SELECT lease_until FROM provider_checks WHERE instrument_id=%s', (iid,))['lease_until'] is not None
+
+
+def test_all_deferred_feeds_are_not_reported_as_success(monkeypatch):
+    monkeypatch.setattr(hub, 'refresh', lambda *args, **kwargs: dict(status='cached', message=hub.RECENT_CHECK, deferred=True))
+    result = hub.refresh_rss('unused')
+    assert result['status'] == 'cached'
+    assert '0 failed checks; 11 checks deferred' in result['message']
+
+
+def test_disabled_x_is_optional_not_a_news_outage(owner, monkeypatch):
+    iid = prepare(owner)
+    monkeypatch.setattr(hub, 'settings', lambda: {'THESIS_X_ENABLED': 'false'})
+    with transaction() as c:
+        visible = next(s for s in hub.status(c, iid) if s['provider'] == 'x')
+    assert visible['status'] == 'disabled' and visible['channel'] == 'social'

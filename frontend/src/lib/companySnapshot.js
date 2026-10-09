@@ -99,6 +99,7 @@ export function revenueOutlook(outlook) {
       );
       if (forecast)
         return {
+          unit: forecast.unit,
           low: num(forecast.low),
           high: num(forecast.high ?? forecast.low),
           approximate: !!forecast.approximate,
@@ -165,10 +166,12 @@ export function snapshot(data) {
       `Revenue ${growth.growth >= 0 ? "grew" : "fell"} ${Math.abs(growth.growth).toFixed(1)}% in the fiscal year to ${day(growth.periodEnd)}.`,
     );
   if (outlook) {
+    const outlookMoney = (value) =>
+      outlook.unit === "USD" ? money(value) : money(value)?.replace("US$", "$");
     const range =
       outlook.low === outlook.high
-        ? `${outlook.approximate ? "about " : ""}${money(outlook.low)}`
-        : `${money(outlook.low)} to ${money(outlook.high)}`;
+        ? `${outlook.approximate ? "about " : ""}${outlookMoney(outlook.low)}`
+        : `${outlookMoney(outlook.low)} to ${outlookMoney(outlook.high)}`;
     sentences.push(
       `Management expects ${range} of revenue for the ${outlook.periodType || "period"} ending ${day(outlook.periodEnd)}.`,
     );
@@ -299,7 +302,7 @@ export function snapshot(data) {
       figures: [
         {
           value: outlook
-            ? `${outlook.approximate ? "≈ " : ""}${money(outlook.low)}`
+            ? `${outlook.approximate ? "≈ " : ""}${outlook.unit === "USD" ? money(outlook.low) : money(outlook.low)?.replace("US$", "$")}`
             : null,
           label: outlook
             ? `Revenue expected, ${outlook.periodType || "period"} to ${day(outlook.periodEnd)}`

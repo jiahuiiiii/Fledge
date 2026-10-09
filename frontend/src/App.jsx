@@ -1847,9 +1847,59 @@ function CompanyWorkspace({
                           <>
                             <CompanySnapshot
                               key={`snapshot-${instrumentId}`}
+                              visible={
+                                view === "workspace" && tab === "business"
+                              }
+                              onSource={setSource}
+                              focusTopic={
+                                exploration?.topic ? exploration : null
+                              }
+                              businessPanel={
+                                <BusinessPanel
+                                  key={`business-${instrumentId}`}
+                                  instrumentId={instrumentId}
+                                  focusTopic={
+                                    exploration?.topic ? exploration : null
+                                  }
+                                  visible={
+                                    view === "workspace" && tab === "business"
+                                  }
+                                  disclosures={data.disclosures}
+                                  modelStatus={modelStatus}
+                                  onRefresh={() =>
+                                    act(
+                                      () =>
+                                        api.refreshDisclosures(instrumentId),
+                                      "Original company documents checked.",
+                                    )
+                                  }
+                                  onDraft={(q) => {
+                                    openEditor();
+                                    setEditor({
+                                      ...formFor(current, q),
+                                      question: q,
+                                    });
+                                  }}
+                                />
+                              }
                               data={data}
                               instrumentId={instrumentId}
-                              onView={setTab}
+                              onView={(next, destination) => {
+                                setTab(next);
+                                if (destination === "scenario")
+                                  requestAnimationFrame(() => {
+                                    const panel =
+                                      document.querySelector(
+                                        ".valuation-panel",
+                                      );
+                                    panel?.setAttribute("tabindex", "-1");
+                                    panel?.focus({ preventScroll: true });
+                                    panel?.scrollIntoView({
+                                      block: "start",
+                                      behavior: "instant",
+                                    });
+                                  });
+                              }}
                               onUpdates={() => setView("updates")}
                               chart={
                                 <details
@@ -1875,31 +1925,6 @@ function CompanyWorkspace({
                                   />
                                 </details>
                               }
-                            />
-                            <BusinessPanel
-                              key={`business-${instrumentId}`}
-                              instrumentId={instrumentId}
-                              focusTopic={
-                                exploration?.topic ? exploration : null
-                              }
-                              visible={
-                                view === "workspace" && tab === "business"
-                              }
-                              disclosures={data.disclosures}
-                              modelStatus={modelStatus}
-                              onRefresh={() =>
-                                act(
-                                  () => api.refreshDisclosures(instrumentId),
-                                  "Original company documents checked.",
-                                )
-                              }
-                              onDraft={(q) => {
-                                openEditor();
-                                setEditor({
-                                  ...formFor(current, q),
-                                  question: q,
-                                });
-                              }}
                             />
                           </>
                         </RetainedView>

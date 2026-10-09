@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { api } from "../api/client";
 import EvidenceButton from "./EvidenceButton";
+import FinancialEvidence from "./FinancialEvidence";
 import RevenueFlow from "./RevenueFlow";
 import RevenueBreakdown from "./RevenueBreakdown";
 import Select from "./Select";
@@ -35,40 +36,7 @@ function Evidence({
       label={label}
       className="financial-figure-link"
     >
-      {children}
-      {[...new Set((rows || []).filter(Boolean))].map((row, index) => (
-        <section className="story-evidence-row" key={`${row.key}-${index}`}>
-          <h3>{row.label}</h3>
-          <p>
-            {row.start ? `${day(row.start)} – ` : "At "}
-            {day(row.end)}
-          </p>
-          <p>
-            {row.value == null
-              ? "Unavailable"
-              : `Exact value: ${row.value} ${row.unit || "USD"}`}
-          </p>
-          {row.formula && <p>Calculation: {row.formula}</p>}
-          {row.reason && <p>{row.reason}</p>}
-          {row.explanation && <p>{row.explanation}</p>}
-          {row.inputs?.map((input, i) => (
-            <p key={i}>
-              {input.concept} · {input.value} {input.unit} ·{" "}
-              {input.start ? `${day(input.start)} – ` : "At "}
-              {day(input.end)} · {input.accession}
-              {input.filing_url && (
-                <>
-                  {" "}
-                  ·{" "}
-                  <a href={input.filing_url} target="_blank" rel="noreferrer">
-                    Original {input.form} filing ↗
-                  </a>
-                </>
-              )}
-            </p>
-          ))}
-        </section>
-      ))}
+      <FinancialEvidence rows={rows}>{children}</FinancialEvidence>
     </EvidenceButton>
   );
 }
@@ -297,7 +265,7 @@ function HistoryChart({ rows, series, active, onSelect, label }) {
                     className={`story-series series-${s.tone}`}
                     key={s.key}
                   >
-                    <span>
+                    <span className="story-stat-label">
                       {s.label}
                       <TermHelp term={s.key} />
                     </span>
@@ -323,9 +291,7 @@ function HistoryChart({ rows, series, active, onSelect, label }) {
         <p>No compatible saved history is available.</p>
       )}
       <p className="story-footnote">
-        Every line uses the same scale, including zero and negative values. Gaps
-        stay visible. Dates are fiscal report dates; a line between reports does
-        not imply results were measured in between.
+        Shared scale · Fiscal reporting dates · Gaps mean unavailable data.
       </p>
     </div>
   );
@@ -492,6 +458,7 @@ export default function FinancialsPage({
     visible,
     workspace.financial_depth?.payload_id,
     workspace.financial_depth?.status,
+    workspace.financial_depth?.amendment_basis,
     attempt,
   ]);
   const depth = workspace.financial_depth;
@@ -500,7 +467,8 @@ export default function FinancialsPage({
       ? { status: "unavailable", reason: depth.reason }
       : story?.status === "available" &&
           depth?.payload_id &&
-          depth.payload_id !== story.payload_id
+          (depth.payload_id !== story.payload_id ||
+            depth.amendment_basis !== story.amendment_basis)
         ? null
         : story;
   const incomeRows = safe?.status === "available" ? safe[mode] || [] : [];
@@ -626,8 +594,10 @@ export default function FinancialsPage({
                 >
                   {item.detail && (
                     <>
-                      <p>{item.detail.text}</p>
-                      <p>{item.detail.period}</p>
+                      <p>
+                        {item.detail.title}
+                        {item.value !== "Unavailable" && ` · ${item.value}`}
+                      </p>
                       <p>{item.detail.detail}</p>
                     </>
                   )}

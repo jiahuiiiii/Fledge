@@ -76,9 +76,10 @@ export function peerAverage(rows, symbol) {
 }
 export function reportedRow(member, key) {
   const source = member.performance,
-    report = source?.reports?.annual;
-  const row = metric(report, key),
+    latest = source?.reports?.annual;
+  const row = metric(latest, key),
     inputs = row?.inputs || [];
+  const report = row?.source_report || latest;
   const value = numeric(row?.value),
     duration = days(row?.end, row?.start) + 1;
   const valid =
@@ -124,6 +125,7 @@ export function reportedRow(member, key) {
     row,
     inputs: valid ? inputs : [],
     report,
+    filingResolution: row?.filing_resolution,
     reason: valid
       ? null
       : row?.reason ||

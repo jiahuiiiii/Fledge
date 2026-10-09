@@ -169,6 +169,30 @@ const growth = (value = "-12.5000") => ({
     },
   },
 });
+test("annual amendment projections keep their own identity and original source evidence", () => {
+  const item = growth("34.3"),
+    source = item.annual_growth;
+  Object.assign(source, {
+    snapshot_id: null,
+    projection_method: "sec-amendment-resolution-1",
+    projection_id: "current-proof",
+    based_on_snapshot_id: "performance-original",
+  });
+  source.metric.filing_resolution = {
+    status: "retained",
+    amendments: [{ document_id: "amended-filing" }],
+  };
+  const [row] = peerRows([item], metric("growth_sec"));
+  assert.equal(row.value, 34.3);
+  assert.equal(row.identity, "current-proof");
+  assert.equal(row.baseIdentity, "performance-original");
+  assert.equal(
+    row.filingResolution.amendments[0].document_id,
+    "amended-filing",
+  );
+  source.based_on_snapshot_id = null;
+  assert.equal(peerRows([item], metric("growth_sec"))[0].value, null);
+});
 
 test("annual growth retains negative/zero values, exact decimals, both periods and original identities", () => {
   const rows = peerRows([growth(), growth("0")], metric("growth_sec"));

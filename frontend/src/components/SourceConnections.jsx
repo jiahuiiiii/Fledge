@@ -74,9 +74,16 @@ export default function SourceConnections({ data, loadingRun }) {
                         ? "Connection needed"
                         : source.status === "failed"
                           ? "Unavailable"
-                          : "Waiting"}
+                          : source.status === "disabled"
+                            ? "Optional · off"
+                            : source.status === "deferred"
+                              ? "Check deferred"
+                              : "Waiting"}
                   </b>
                   <p>{source.message}</p>
+                  {source.next_check_at && (
+                    <p>Next check allowed {stamp(source.next_check_at)}.</p>
+                  )}
                 </div>
               </div>
             ))}
