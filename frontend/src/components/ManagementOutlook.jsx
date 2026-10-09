@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import TermHelp from "./TermHelp";
 import Select from "./Select";
 import EvidenceButton from "./EvidenceButton";
 import { day, amount } from "./FinancialOverview";
@@ -136,6 +137,7 @@ export default function ManagementOutlook({ data }) {
       <div className="outlook-heading">
         <div>
           <span className="outlook-source-badge">Company guidance</span>
+          <TermHelp term="guidance" />
           <h2 id={id + "-title"}>Management outlook</h2>
           <p>What the company expects, from its original earnings release.</p>
         </div>

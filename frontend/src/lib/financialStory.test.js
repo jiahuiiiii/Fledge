@@ -43,6 +43,22 @@ test("year comparison requires the preceding fiscal year and same revenue concep
   prior.metrics[0].value = "0";
   assert.equal(incomeInsights(current, prior)[0].tone, "unknown");
 });
+
+test("growth carries its selected fiscal basis and both original comparison windows", () => {
+  const current = period("2025-09-30", { revenue: "120" }),
+    prior = period("2024-09-30", { revenue: "100" });
+  prior.metrics[0].start = "2023-10-01";
+  const trailing = incomeInsights(current, prior, "trailing")[0],
+    annual = incomeInsights(current, prior, "annual")[0];
+  assert.equal(trailing.basis, "Trailing 12 months");
+  assert.equal(annual.basis, "Fiscal year");
+  assert.match(
+    trailing.period,
+    /1 Oct 2024 – 30 Sept? 2025 vs 1 Oct 2023 – 30 Sept? 2024/,
+  );
+  assert.equal(annual.text, trailing.text);
+  assert.deepEqual(trailing.rows, [current.metrics[0], prior.metrics[0]]);
+});
 test("loss and negative cash remaining are explained without ratings", () => {
   const current = period("2025-09-30", {
     revenue: "100",

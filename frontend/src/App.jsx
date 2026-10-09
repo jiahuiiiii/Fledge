@@ -1,7 +1,7 @@
 import ResearchLoading, {
   ResearchProgressToggle,
 } from "./components/ResearchLoading";
-import WorkspaceControls, {
+import {
   useWorkspaceLayout,
   WorkspaceSidebar,
 } from "./components/WorkspaceControls";
@@ -47,6 +47,7 @@ import FilingDetails from "./components/FilingDetails";
 import FinancialPerformance from "./components/FinancialPerformance";
 import OriginalFilings from "./components/OriginalFilings";
 const FinancialsPage = lazy(() => import("./components/FinancialsPage"));
+const SectorPosition = lazy(() => import("./components/SectorPosition"));
 const CompanyOverview = lazy(() => import("./components/CompanyOverview"));
 const AllHistory = lazy(() =>
   import("./components/CompanyOverview").then((module) => ({
@@ -55,11 +56,12 @@ const AllHistory = lazy(() =>
 );
 import BusinessPanel from "./components/BusinessPanel";
 import CompanySnapshot from "./components/CompanySnapshot";
+import CompanionGuide, { ExplorationPrompt } from "./components/CompanionGuide";
 import AccountGate from "./components/AccountGate";
 import FilingWatch from "./components/FilingWatch";
 import ValuationPanel from "./components/ValuationPanel";
 import IdeaAlertChecks from "./components/IdeaAlertChecks";
-import ReviewDigest from "./components/ReviewDigest";
+const ReviewDigest = lazy(() => import("./components/ReviewDigest"));
 import HistoryPanel from "./components/HistoryPanel";
 import EventAssessment, {
   EventEditor,
@@ -182,9 +184,14 @@ function readDestination() {
       "history",
       "review",
     ].includes(view)
-      ? view
+      ? view === "history"
+        ? params.get("company")
+          ? "idea"
+          : "ideas"
+        : view
       : "workspace",
-    evaluation: params.get("evaluation"),
+    evaluation:
+      params.get("evaluation") || (view === "history" ? "history" : null),
   };
 }
 export default function App() {
@@ -239,6 +246,10 @@ function ResearchApp({ signOut, session }) {
     return () => removeEventListener("popstate", restore);
   }, []);
   function choose(id, view = "workspace", evaluation = null) {
+    if (view === "history") {
+      view = id ? "idea" : "ideas";
+      evaluation ||= "history";
+    }
     const params = new URLSearchParams({ company: id, view });
     if (evaluation) params.set("evaluation", evaluation);
     history.replaceState(null, "", `?${params}`);
@@ -321,7 +332,19 @@ function CompanyWorkspace({
   const ideaSidebarAvailable = !!selectedCompanyId && view === "workspace";
   const ideaSidebarHidden = true;
   const [researchOpen, setResearchOpen] = useState(false);
+  const [exploration, setExploration] = useState(null);
+  useEffect(() => setExploration(null), [scope]);
+  useEffect(() => {
+    if (!exploration) return;
+    if (exploration.topic && !exploration.recorded) return;
+    const frame = requestAnimationFrame(() => {
+      document.getElementById(`research-tab-${exploration.section}`)?.focus();
+      mainPane.current?.scrollTo(0, 0);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [exploration]);
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [updatesOpen, setUpdatesOpen] = useState(false);
   const [priceChartOpen, setPriceChartOpen] = useState(false);
   useEffect(() => {
     mainPane.current?.scrollTo(0, 0);
@@ -406,7 +429,7 @@ function CompanyWorkspace({
     };
   }, [scope, companyLoading, !!data?.instrument, selectedCompanyId]);
   function chooseCompany(id) {
-    onChoose(id, view);
+    onChoose(id, !id && view === "idea" ? "workspace" : view);
   }
   async function readCompany() {
     const [next, model] = await Promise.all([
@@ -468,6 +491,7 @@ function CompanyWorkspace({
     setSource(null);
     setResearchOpen(false);
     setSourcesOpen(false);
+    setUpdatesOpen(false);
     setPriceChartOpen(false);
     setEditor(null);
     setApproved(false);
@@ -556,6 +580,7 @@ function CompanyWorkspace({
   if (!data)
     return (
       <div
+        data-view={view}
         data-companies-hidden={!!layout.companiesHidden}
         data-idea-hidden={ideaSidebarHidden}
         className={`app-shell${view === "updates" ? " inbox-view" : ""}${view === "ideas" ? " ideas-view" : ""}${!selectedCompanyId ? " all-companies-view" : ""}`}
@@ -569,12 +594,15 @@ function CompanyWorkspace({
               ["workspace", "Workspace"],
               ["ideas", "My ideas"],
               ["updates", "Updates"],
-              ["history", "History"],
             ].map(([key, label]) => (
               <button
                 key={key}
                 className={view === key ? "active" : ""}
-                aria-current={view === key ? "page" : undefined}
+                aria-current={
+                  view === key || (view === "idea" && key === "ideas")
+                    ? "page"
+                    : undefined
+                }
                 onClick={() => setView(key)}
               >
                 {label}
@@ -582,20 +610,20 @@ function CompanyWorkspace({
             ))}
           </nav>
           <div className="topbar-tools">
-            <WorkspaceControls
-              layout={layout}
-              onOpen={() => setResearchOpen(true)}
-              ideaAvailable={ideaSidebarAvailable}
-            />
             <TelegramSettings />
             {signOut}
           </div>
         </header>
-        <div className="demo-bar">
-          <span>Loading saved company research…</span>
-        </div>
         <div className="workspace-grid">
           <CompanySidebar
+            research={
+              ideaSidebarAvailable
+                ? {
+                    onOpen: () => setResearchOpen(true),
+                    question: null,
+                  }
+                : null
+            }
             loading
             collapsed={!!layout.companiesHidden}
             onToggle={() => toggleLayout("companiesHidden")}
@@ -1041,8 +1069,169 @@ function CompanyWorkspace({
       </>
     );
   }
+  function renderFinancialReports() {
+    return (
+      <div className="financial-reports-panel">
+        {" "}
+        {!isRecorded && (
+          <details className="financials-reported-details">
+            <summary>All reported figures</summary>
+            <FinancialPerformance
+              key={data.instrument.id}
+              data={data.performance}
+            />
+          </details>
+        )}
+        {!isRecorded && (
+          <h3 className="financials-sources-heading">Filings &amp; checks</h3>
+        )}
+        {!isRecorded && (
+          <OriginalFilings
+            key={`original-${data.instrument.id}`}
+            instrumentId={data.instrument.id}
+            data={data.disclosures}
+            busy={busy}
+            onRefresh={() =>
+              act(
+                () => api.refreshDisclosures(data.instrument.id),
+                "Original company documents checked.",
+              )
+            }
+          />
+        )}
+        {!isRecorded && (
+          <FilingWatch
+            key={`watch-${data.instrument.id}`}
+            instrumentId={data.instrument.id}
+            watch={data.filing_watch}
+            configured={data.sec_status?.configured}
+            busy={busy}
+            onChange={(enabled) =>
+              act(
+                () => api.filingWatch(data.instrument.id, enabled),
+                enabled
+                  ? "Daily filing checks enabled. The first check is queued."
+                  : "Future filing checks stopped. An active check may finish.",
+              )
+            }
+          />
+        )}
+        {!isRecorded && (
+          <h3 className="monitoring-inputs-heading">
+            Current monitoring inputs
+          </h3>
+        )}
+        <div className="metrics-table">
+          <div className="table-heading">
+            <span>REPORTED METRIC</span>
+            <span>LATEST</span>
+            <span>PERIOD</span>
+          </div>
+          {Object.keys(metrics).map((key) => {
+            const f = latest(key);
+            return (
+              <button
+                className="metric-row"
+                key={key}
+                disabled={!f.document_version_id}
+                onClick={() =>
+                  f.document_version_id && openSource(f.document_version_id)
+                }
+              >
+                <span>
+                  {metrics[key]}
+                  {f.reason && <small>{f.reason}</small>}
+                  <small>
+                    {key === "revenue_growth"
+                      ? "Revenue change versus the comparable period last year"
+                      : "Operating income as a share of revenue"}
+                  </small>
+                </span>
+                <strong>
+                  {f.value == null ? "—" : `${displayNumber(f.value)}%`}
+                </strong>
+                <span>
+                  {f.period}{" "}
+                  {f.document_version_id && <Icon name="source" width="12" />}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <FilingDetails filing={filing} />
+        <div className="unknown-row">
+          <span>i</span>
+          <p>
+            {data.demo.period_type === "annual"
+              ? "These metrics use an annual reporting period."
+              : "These metrics use a quarterly reporting period."}{" "}
+            Growth and margin use reported inputs; SEC ratios are calculated in
+            the app. Guidance is an expectation, not an observed result. Read
+            forecasts separately in Outlook.
+          </p>
+        </div>
+      </div>
+    );
+  }
+  function renderIdeaHistory() {
+    return (
+      <>
+        <HistoryPanel
+          key={initialEvaluation || "history"}
+          onIdeas={() => setView("ideas")}
+          hasChecks={
+            !!data.idea_alerts?.some(
+              (check) => check.instrument_id === instrumentId,
+            )
+          }
+          versions={data.versions}
+          initialRecord={
+            initialEvaluation === "history" ? null : initialEvaluation
+          }
+          renderEvaluation={resultsPanel}
+          renderEventReview={(review, version) =>
+            eventPanel(version, null, review, true)
+          }
+          renderComparison={(review, version) => (
+            <IdeaEvidenceReview
+              evaluation={{
+                id: review.evaluation_id,
+                manifest: {
+                  snapshot_id: review.snapshot_id,
+                  document_ids: review.source_ids,
+                  cutoff: review.cutoff,
+                },
+              }}
+              version={version}
+              documents={data.documents}
+              onSource={openSource}
+              review={review}
+              savedComparison
+              showReasoning={false}
+            />
+          )}
+        />
+        <IdeaAlertChecks
+          checks={data.idea_alerts}
+          instrumentId={instrumentId}
+          hideEmpty
+          history
+          busy={busy}
+          onSource={setSource}
+          onOpen={onChoose}
+          onReview={(id, action) =>
+            act(
+              () => api.reviewIdeaAlert(id, action),
+              "Private alert review recorded.",
+            )
+          }
+        />
+      </>
+    );
+  }
   return (
     <div
+      data-view={view}
       data-companies-hidden={!!layout.companiesHidden}
       data-idea-hidden={ideaSidebarHidden}
       className={`app-shell${view === "updates" ? " inbox-view" : ""}${view === "ideas" ? " ideas-view" : ""}${!selectedCompanyId ? " all-companies-view" : ""}`}
@@ -1063,16 +1252,21 @@ function CompanyWorkspace({
             ["workspace", "Workspace"],
             ["ideas", "My ideas"],
             ["updates", "Updates"],
-            ["history", "History"],
           ].map(([key, label]) => (
             <button
               key={key}
               className={
-                view === key || (view === "review" && key === "updates")
+                view === key ||
+                (view === "idea" && key === "ideas") ||
+                (view === "review" && key === "updates")
                   ? "active"
                   : ""
               }
-              aria-current={view === key ? "page" : undefined}
+              aria-current={
+                view === key || (view === "idea" && key === "ideas")
+                  ? "page"
+                  : undefined
+              }
               onClick={() => setView(key)}
             >
               {label}
@@ -1087,11 +1281,6 @@ function CompanyWorkspace({
           ))}
         </nav>
         <div className="topbar-tools">
-          <WorkspaceControls
-            layout={layout}
-            onOpen={() => setResearchOpen(true)}
-            ideaAvailable={ideaSidebarAvailable}
-          />
           <TelegramSettings />
           {signOut}
         </div>
@@ -1105,83 +1294,28 @@ function CompanyWorkspace({
         }}
         onDismiss={() => setRemovedCompany(null)}
       />
-      <div className="demo-bar">
-        {companyLoading ? (
-          <span role="status">
-            {loadError
-              ? "Research unavailable"
-              : `Opening ${displayInstrument.symbol || "company"} research…`}
-          </span>
-        ) : (
-          <>
-            <div>
-              <span className="demo-tag">
-                {isRecorded ? "FICTIONAL DEMO" : "COMPANY RESEARCH"}
-              </span>
-              <span>{data.demo.label}</span>
-              <span className="muted">{date(data.demo.as_of)}</span>
-            </div>
-            {isRecorded ? (
-              <button
-                disabled={busy || data.demo.complete}
-                onClick={() =>
-                  act(
-                    () => api.advance(data.demo.stage, instrumentId),
-                    "Recorded development loaded.",
-                  )
-                }
-                aria-label="Load next recorded development"
-              >
-                {data.demo.complete ? "Scenario complete" : "Next development"}{" "}
-                <Icon name="arrow" width="16" />
-              </button>
-            ) : (
-              <div className="market-actions">
-                {layout.progressHidden && (
-                  <ResearchProgressToggle
-                    run={loadingRun}
-                    error={loadingError}
-                    onExpand={toggleProgress}
-                  />
-                )}
-                <button
-                  disabled={!!loadingRun?.active}
-                  onClick={() => startLoading()}
-                >
-                  {loadingRun?.active
-                    ? "Updating research…"
-                    : "Refresh research"}
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {!companyLoading && !isRecorded && selectedCompanyId && (
-        <ResearchLoading
-          run={loadingRun}
-          error={loadingError}
-          onCollapse={toggleProgress}
-          hidden={!!layout.progressHidden}
-        />
+      {!companyLoading && isRecorded && selectedCompanyId && (
+        <div className="demo-bar">
+          <div>
+            <span className="demo-tag">FICTIONAL DEMO</span>
+            <span>{data.demo.label}</span>
+            <span className="muted">{date(data.demo.as_of)}</span>
+          </div>
+          <button
+            disabled={busy || data.demo.complete}
+            onClick={() =>
+              act(
+                () => api.advance(data.demo.stage, instrumentId),
+                "Recorded development loaded.",
+              )
+            }
+            aria-label="Load next recorded development"
+          >
+            {data.demo.complete ? "Scenario complete" : "Next development"}{" "}
+            <Icon name="arrow" width="16" />
+          </button>
+        </div>
       )}
-      {!companyLoading &&
-        modelAvailability(modelStatus).state === "running" &&
-        !loadingRun?.steps.some(
-          (s) => s.key === "analysis" && s.status === "running",
-        ) && (
-          <div className="ai-activity" role="status">
-            <span className="activity-spinner" aria-hidden="true" />
-            AI is analysing your request. You can keep browsing.
-          </div>
-        )}
-      {!companyLoading &&
-        modelAvailability(modelStatus).state === "attention" && (
-          <div className="ai-activity attention" role="status">
-            {modelAvailability(modelStatus).message}
-          </div>
-        )}
       {error && !companyLoading && (
         <div className="global-message error" role="alert">
           {error}
@@ -1225,6 +1359,14 @@ function CompanyWorkspace({
       </label>
       <div className="workspace-grid">
         <CompanySidebar
+          research={
+            ideaSidebarAvailable
+              ? {
+                  onOpen: () => setResearchOpen(true),
+                  question: current?.question,
+                }
+              : null
+          }
           companies={visibleCompanies}
           selectedCompanyId={selectedCompanyId}
           collapsed={!!layout.companiesHidden}
@@ -1270,20 +1412,51 @@ function CompanyWorkspace({
               />
             )}
             <div className="company-actions">
-              <button
-                className="primary"
-                disabled={companyLoading}
-                onClick={() => setResearchOpen(true)}
-              >
-                Ask a question
-              </button>
+              {view === "workspace" && (
+                <button
+                  className="primary"
+                  disabled={companyLoading}
+                  onClick={() => setResearchOpen(true)}
+                  aria-label="Ask a question"
+                  title="Ask a question"
+                >
+                  <span className="company-action-icon">
+                    <Icon name="idea" />
+                  </span>
+                  <span className="company-action-label">Ask a question</span>
+                </button>
+              )}
               <button
                 className="quick-save"
                 disabled={companyLoading}
                 onClick={() => setSourcesOpen(true)}
+                aria-label="Data & sources"
+                title="Data & sources"
               >
-                Data &amp; sources
+                <span className="company-action-icon">
+                  <Icon name="source" />
+                </span>
+                <span className="company-action-label">Data &amp; sources</span>
               </button>
+              {!isRecorded && (
+                <button
+                  className="research-updates-trigger"
+                  disabled={companyLoading}
+                  onClick={() => setUpdatesOpen(true)}
+                  aria-label="Research updates"
+                  title={
+                    loadingRun?.active
+                      ? "Research updates · working"
+                      : "Research updates"
+                  }
+                  aria-haspopup="dialog"
+                >
+                  <Icon name="pulse" />
+                  {loadingRun?.active && (
+                    <span className="research-updates-dot" aria-hidden="true" />
+                  )}
+                </button>
+              )}
             </div>
           </header>
           {companyLoading ? (
@@ -1306,47 +1479,35 @@ function CompanyWorkspace({
               >
                 <>
                   <div className="research-browser">
-                    <div className="research-rail">
-                      <ResearchNavigation
-                        selected={tab}
-                        onChange={setTab}
-                        recorded={isRecorded}
-                      />
-                      <section
-                        className="rail-research"
-                        aria-labelledby="rail-research-title"
-                      >
-                        <h2 id="rail-research-title">Your research</h2>
-                        <p className="rail-question">
-                          {data.question_library?.selected_question ||
-                            current?.question ||
-                            "What would you like to understand about this company?"}
-                        </p>
-                        {!isRecorded && (
-                          <p className="rail-watch">
-                            <span
-                              aria-hidden="true"
-                              className={
-                                data.news_watch?.enabled ? "on" : "off"
-                              }
-                            />
-                            {data.news_watch?.enabled
-                              ? "Watching news"
-                              : "Not watching news"}
-                          </p>
-                        )}
-                        <button onClick={() => setResearchOpen(true)}>
-                          Open my research
-                        </button>
-                      </section>
-                    </div>
+                    <ResearchNavigation
+                      selected={tab}
+                      onChange={setTab}
+                      recorded={isRecorded}
+                    />
                     <section
                       className="research-content"
                       role="tabpanel"
                       id="research-panel"
                       aria-labelledby={`research-tab-${tab}`}
                     >
-                      <ResearchSectionHeader selected={tab} />
+                      <ResearchSectionHeader
+                        selected={tab}
+                      ></ResearchSectionHeader>
+                      <ExplorationPrompt
+                        question={
+                          exploration?.section === tab ? exploration : null
+                        }
+                        recorded={isRecorded}
+                        onDone={() => setExploration(null)}
+                        onReasoning={() => {
+                          openEditor();
+                          if (!current)
+                            setEditor({
+                              ...formFor(null, exploration.question),
+                              question: exploration.question,
+                            });
+                        }}
+                      />
                       <RetainedView active={tab === "evidence"}>
                         <>
                           {!isRecorded && (
@@ -1718,6 +1879,9 @@ function CompanyWorkspace({
                             <BusinessPanel
                               key={`business-${instrumentId}`}
                               instrumentId={instrumentId}
+                              focusTopic={
+                                exploration?.topic ? exploration : null
+                              }
                               visible={
                                 view === "workspace" && tab === "business"
                               }
@@ -1742,6 +1906,18 @@ function CompanyWorkspace({
                       )}
                       <RetainedView active={tab === "valuation"}>
                         <>
+                          {!isRecorded && (
+                            <Suspense
+                              fallback={<p>Loading competitor comparison…</p>}
+                            >
+                              <SectorPosition
+                                instrumentId={instrumentId}
+                                visible={
+                                  view === "workspace" && tab === "valuation"
+                                }
+                              />
+                            </Suspense>
+                          )}
                           <ValuationPanel
                             initialRead={
                               panelRead?.tab === "valuation" ? panelRead : null
@@ -1757,6 +1933,7 @@ function CompanyWorkspace({
                             <Suspense fallback={<p>Loading comparisons…</p>}>
                               <FmpPanel
                                 key={`peers-${instrumentId}`}
+                                mode="ratios"
                                 instrumentId={instrumentId}
                                 visible={
                                   view === "workspace" && tab === "valuation"
@@ -1768,7 +1945,9 @@ function CompanyWorkspace({
                       </RetainedView>
                       <RetainedView active={tab === "fundamentals"}>
                         <>
-                          {!isRecorded && (
+                          {isRecorded ? (
+                            renderFinancialReports()
+                          ) : (
                             <Suspense fallback={<p>Loading financials…</p>}>
                               <FinancialsPage
                                 key={`financials-${instrumentId}`}
@@ -1777,119 +1956,12 @@ function CompanyWorkspace({
                                 visible={
                                   view === "workspace" && tab === "fundamentals"
                                 }
-                              />
+                                onCompare={() => setTab("valuation")}
+                              >
+                                {renderFinancialReports()}
+                              </FinancialsPage>
                             </Suspense>
                           )}
-                          {!isRecorded && (
-                            <details className="financials-reported-details">
-                              <summary>All reported figures</summary>
-                              <FinancialPerformance
-                                key={data.instrument.id}
-                                data={data.performance}
-                              />
-                            </details>
-                          )}
-                          {!isRecorded && (
-                            <h3 className="financials-sources-heading">
-                              Filings &amp; checks
-                            </h3>
-                          )}
-                          {!isRecorded && (
-                            <OriginalFilings
-                              key={`original-${data.instrument.id}`}
-                              instrumentId={data.instrument.id}
-                              data={data.disclosures}
-                              busy={busy}
-                              onRefresh={() =>
-                                act(
-                                  () =>
-                                    api.refreshDisclosures(data.instrument.id),
-                                  "Original company documents checked.",
-                                )
-                              }
-                            />
-                          )}
-                          {!isRecorded && (
-                            <FilingWatch
-                              key={`watch-${data.instrument.id}`}
-                              instrumentId={data.instrument.id}
-                              watch={data.filing_watch}
-                              configured={data.sec_status?.configured}
-                              busy={busy}
-                              onChange={(enabled) =>
-                                act(
-                                  () =>
-                                    api.filingWatch(
-                                      data.instrument.id,
-                                      enabled,
-                                    ),
-                                  enabled
-                                    ? "Daily filing checks enabled. The first check is queued."
-                                    : "Future filing checks stopped. An active check may finish.",
-                                )
-                              }
-                            />
-                          )}
-                          {!isRecorded && (
-                            <h3 className="monitoring-inputs-heading">
-                              Current monitoring inputs
-                            </h3>
-                          )}
-                          <div className="metrics-table">
-                            <div className="table-heading">
-                              <span>REPORTED METRIC</span>
-                              <span>LATEST</span>
-                              <span>PERIOD</span>
-                            </div>
-                            {Object.keys(metrics).map((key) => {
-                              const f = latest(key);
-                              return (
-                                <button
-                                  className="metric-row"
-                                  key={key}
-                                  disabled={!f.document_version_id}
-                                  onClick={() =>
-                                    f.document_version_id &&
-                                    openSource(f.document_version_id)
-                                  }
-                                >
-                                  <span>
-                                    {metrics[key]}
-                                    {f.reason && <small>{f.reason}</small>}
-                                    <small>
-                                      {key === "revenue_growth"
-                                        ? "Revenue change versus the comparable period last year"
-                                        : "Operating income as a share of revenue"}
-                                    </small>
-                                  </span>
-                                  <strong>
-                                    {f.value == null
-                                      ? "—"
-                                      : `${displayNumber(f.value)}%`}
-                                  </strong>
-                                  <span>
-                                    {f.period}{" "}
-                                    {f.document_version_id && (
-                                      <Icon name="source" width="12" />
-                                    )}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                          <FilingDetails filing={filing} />
-                          <div className="unknown-row">
-                            <span>i</span>
-                            <p>
-                              {data.demo.period_type === "annual"
-                                ? "These metrics use an annual reporting period."
-                                : "These metrics use a quarterly reporting period."}{" "}
-                              Growth and margin use reported inputs; SEC ratios
-                              are calculated in the app. Guidance is an
-                              expectation, not an observed result. Read
-                              forecasts separately in Outlook.
-                            </p>
-                          </div>
                         </>
                       </RetainedView>
                     </section>
@@ -1917,29 +1989,10 @@ function CompanyWorkspace({
                         onCreate={selectedCompanyId ? openEditor : undefined}
                       />
                     )}
-                    <div className="periodic-review-entry">
-                      <div>
-                        <strong>Review the week across your ideas</strong>
-                        <p className="fine">
-                          New evidence, unresolved items and source coverage in
-                          one view.
-                        </p>
-                        {data.review_schedule?.unseen_count > 0 && (
-                          <p role="status">
-                            {data.review_schedule.unseen_count} saved weekly{" "}
-                            {data.review_schedule.unseen_count === 1
-                              ? "review is"
-                              : "reviews are"}{" "}
-                            ready.
-                          </p>
-                        )}
-                      </div>
-                      <button onClick={() => setView("review")}>
-                        Open weekly review ↗
-                      </button>
-                    </div>
                     <RetainedView active={view === "updates"}>
                       <UpdateInbox
+                        onWeeklyReview={() => setView("review")}
+                        unseenReviews={data.review_schedule?.unseen_count || 0}
                         active={view === "updates"}
                         filters={inboxFilters}
                         onFiltersChange={onInboxFiltersChange}
@@ -1962,10 +2015,12 @@ function CompanyWorkspace({
                         catalogue={data.catalogue}
                         onOpen={onChoose}
                         visible={view === "history"}
+                        hasChecks={!!data.idea_alerts?.length}
                       />
                     </Suspense>
                     <IdeaAlertChecks
                       checks={data.idea_alerts}
+                      hideEmpty
                       history
                       busy={busy}
                       onSource={setSource}
@@ -1993,12 +2048,19 @@ function CompanyWorkspace({
                   </Suspense>
                 ) : !selectedCompanyId && view === "history" ? null : view ===
                   "workspace" ? null : view === "review" ? (
-                  <ReviewDigest
-                    onOpen={onChoose}
-                    onSource={setSource}
-                    selectedCompanyId={selectedCompanyId}
-                    onCompanyChange={chooseCompany}
-                  />
+                  <Suspense
+                    fallback={
+                      <LoadingSkeleton label="Reading weekly review…" />
+                    }
+                  >
+                    {" "}
+                    <ReviewDigest
+                      onOpen={onChoose}
+                      onSource={setSource}
+                      selectedCompanyId={selectedCompanyId}
+                      onCompanyChange={chooseCompany}
+                    />
+                  </Suspense>
                 ) : ["ideas", "updates"].includes(view) ? null : view ===
                   "idea" ? (
                   <section className="focus-page reasoning-page">
@@ -2139,51 +2201,17 @@ function CompanyWorkspace({
                         )}
                       </>
                     )}
+                    <details
+                      className="idea-history"
+                      open={!!initialEvaluation}
+                      key={initialEvaluation || "idea-history"}
+                    >
+                      <summary>History · versions and evidence checks</summary>
+                      {renderIdeaHistory()}
+                    </details>
                   </section>
                 ) : (
-                  <>
-                    <IdeaAlertChecks
-                      checks={data.idea_alerts}
-                      instrumentId={instrumentId}
-                      history
-                      busy={busy}
-                      onSource={setSource}
-                      onOpen={onChoose}
-                      onReview={(id, action) =>
-                        act(
-                          () => api.reviewIdeaAlert(id, action),
-                          "Private alert review recorded.",
-                        )
-                      }
-                    />
-                    <HistoryPanel
-                      key={initialEvaluation || "history"}
-                      versions={data.versions}
-                      initialRecord={initialEvaluation}
-                      renderEvaluation={resultsPanel}
-                      renderEventReview={(review, version) =>
-                        eventPanel(version, null, review, true)
-                      }
-                      renderComparison={(review, version) => (
-                        <IdeaEvidenceReview
-                          evaluation={{
-                            id: review.evaluation_id,
-                            manifest: {
-                              snapshot_id: review.snapshot_id,
-                              document_ids: review.source_ids,
-                              cutoff: review.cutoff,
-                            },
-                          }}
-                          version={version}
-                          documents={data.documents}
-                          onSource={openSource}
-                          review={review}
-                          savedComparison
-                          showReasoning={false}
-                        />
-                      )}
-                    />
-                  </>
+                  renderIdeaHistory()
                 )}
               </div>
             </>
@@ -2192,12 +2220,27 @@ function CompanyWorkspace({
         <Modal
           open={researchOpen && ideaSidebarAvailable}
           onClose={() => setResearchOpen(false)}
-          title="My research"
+          title="Your research"
           className="research-dialog"
           keepMounted
         >
           {!companyLoading && (
             <div className="my-research-content" key={instrumentId}>
+              <p className="notebook-intro">
+                Questions help you explore {data.instrument.symbol}. Your idea
+                is the point of view you choose to save, in your own words.
+              </p>
+              <CompanionGuide
+                key={`${instrumentId}:${selectedCompanyId}:${view}`}
+                recorded={isRecorded}
+                onExplore={(item) => {
+                  setExploration({ ...item, recorded: isRecorded });
+                  setTab(item.section);
+                  setResearchOpen(false);
+                }}
+                onNotebook={() => setResearchOpen(true)}
+                onReasoning={openEditor}
+              />
               {isRecorded ? (
                 <QuestionSelector
                   key={scope}
@@ -2439,11 +2482,73 @@ function CompanyWorkspace({
           )}
         </Modal>
         <Modal
+          open={updatesOpen && !companyLoading}
+          onClose={() => setUpdatesOpen(false)}
+          title="Research updates"
+          className="research-updates-dialog"
+        >
+          <div className="research-updates-content">
+            <p className="fine">
+              {data.demo.label} · {date(data.demo.as_of)}
+            </p>
+            <div className="research-updates-actions">
+              <button
+                disabled={!!loadingRun?.active}
+                onClick={() => startLoading()}
+              >
+                {loadingRun?.active ? "Updating research…" : "Refresh research"}
+              </button>
+              {layout.progressHidden && (
+                <ResearchProgressToggle
+                  run={loadingRun}
+                  error={loadingError}
+                  onExpand={toggleProgress}
+                />
+              )}
+            </div>
+            <ResearchLoading
+              run={loadingRun}
+              error={loadingError}
+              onCollapse={toggleProgress}
+              hidden={!!layout.progressHidden}
+            />
+            {modelAvailability(modelStatus).blocked && (
+              <div className="research-ai-status">
+                <p className="fine">{modelAvailability(modelStatus).message}</p>
+                {modelAvailability(modelStatus).detail && (
+                  <details>
+                    <summary>AI request details</summary>
+                    <p className="fine">
+                      {modelAvailability(modelStatus).detail}
+                    </p>
+                  </details>
+                )}
+              </div>
+            )}
+          </div>
+        </Modal>
+        <Modal
           open={sourcesOpen && !companyLoading}
           onClose={() => setSourcesOpen(false)}
           title="Data & sources"
           className="evidence-dialog"
         >
+          <p className="fine saved-report-context">
+            {data.demo.label} · {date(data.demo.as_of)}
+          </p>
+          {data.market?.status?.quote_error && (
+            <p className="fine" role="status">
+              Finnhub quote check unavailable. {data.market.status.quote_error}{" "}
+              Showing saved prices with their original source and timestamp.
+            </p>
+          )}
+          {data.market?.status?.lease_until &&
+            new Date(data.market.status.lease_until) < new Date() && (
+              <p className="fine" role="status">
+                The previous price check was interrupted. Displayed data may be
+                older.
+              </p>
+            )}
           <p>
             Check what was collected, when it was checked and where information
             is missing. News and discussion stay in their own reading view.
@@ -2674,12 +2779,18 @@ function CompanyWorkspace({
                   value={editor.reasoning}
                   maxLength={3000}
                   rows={3}
-                  placeholder="Why am I interested? What needs to happen? What would change my mind?"
+                  placeholder="I think… because… I’m unsure about… I would reconsider if…"
+                  aria-describedby="reasoning-starter"
                   onChange={(e) => {
                     setApproved(false);
                     setEditor({ ...editor, reasoning: e.target.value });
                   }}
                 />
+                <p id="reasoning-starter" className="reasoning-prompt">
+                  Use your own words. One reason and one uncertainty are enough
+                  to start. You can save a draft without a monitoring rule,
+                  including why you decided not to invest.
+                </p>
               </div>
             </section>
             <details

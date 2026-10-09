@@ -1,3 +1,4 @@
+import { countedTone } from "./newsPresentation.js";
 // The Overview summary is built only from figures the workspace already saved.
 // A missing or mismatched input makes its sentence disappear and its check
 // "unknown"; nothing is estimated or carried over from another date.
@@ -118,10 +119,12 @@ const toneLabel = (tone) => {
 };
 
 export function newsTone(sentiment) {
+  if (sentiment?.withheld) return null;
   const news = sentiment?.summary?.news;
   if (!news) return null;
+  const counted = countedTone(news);
   const counts = news.counts || {};
-  const total = ["positive", "neutral", "mixed", "negative"].reduce(
+  const total = ["positive", "neutral", "mixed", "negative", "unclear"].reduce(
     (sum, key) => sum + (counts[key] || 0),
     0,
   );
@@ -130,6 +133,9 @@ export function newsTone(sentiment) {
     counts,
     total,
     selected: news.selected || 0,
+    relevant: news.relevant ?? null,
+    grouped: sentiment.summary_policy?.startsWith("sentiment-coverage-"),
+    reconciled: counted.reconciled,
     savedAt: sentiment.created_at,
     stale: !!sentiment.stale,
     social: sentiment.summary.social_platforms || {},
@@ -197,11 +203,13 @@ export function snapshot(data) {
         {
           value: revenue ? money(revenue.value) : null,
           label: "Revenue, past 12 months",
+          term: "revenue",
           tone: "info",
         },
         {
           value: margin ? percent(margin.value) : null,
           label: "Operating margin",
+          term: "operating_margin",
           tone: "positive",
         },
       ],
@@ -234,6 +242,7 @@ export function snapshot(data) {
         {
           value: freeCash ? money(freeCash.value) : null,
           label: "Free cash flow, past 12 months",
+          term: "free_cash_flow",
           tone: "positive",
         },
         {
@@ -258,8 +267,10 @@ export function snapshot(data) {
           tone: "neutral",
         },
         {
-          value: tone ? String(tone.selected) : null,
-          label: "Stories analysed",
+          value: tone ? `${tone.selected} → ${tone.total}` : null,
+          label: tone?.grouped
+            ? "Stories → distinct developments"
+            : "Stories → counted text groups",
           tone: "info",
         },
       ],
@@ -320,5 +331,5 @@ export function snapshot(data) {
       action: "Open Compare & value",
     },
   ];
-  return { sentences, sections, quote };
+  return { sentences, sections, quote, growth };
 }

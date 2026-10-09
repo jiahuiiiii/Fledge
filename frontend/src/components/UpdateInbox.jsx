@@ -12,7 +12,7 @@ import "./UpdateInbox.css";
 
 const kindName = {
   idea: "Your saved idea",
-  company: "Company news + sentiment",
+  company: "Company news",
   condition: "Monitored condition",
 };
 const reviewName = (action) =>
@@ -27,6 +27,8 @@ export default function UpdateInbox({
   onOpen,
   onSource,
   onReviewed,
+  onWeeklyReview,
+  unseenReviews = 0,
 }) {
   const { company, review, page, cutoff } = filters;
   const [refresh, setRefresh] = useState(0);
@@ -150,51 +152,70 @@ export default function UpdateInbox({
     <section className="update-inbox" aria-label="Research update inbox">
       <div className="market-section-head">
         <div>
-          <h2>Review inbox</h2>
+          <h2>Updates</h2>
           <p className="inbox-intro">
             Changes to your ideas, company reporting and monitored conditions.
           </p>
         </div>
-        <button onClick={reload} disabled={loading || busy}>
-          Refresh inbox
-        </button>
+        <div className="inbox-heading-actions">
+          {onWeeklyReview && (
+            <button onClick={onWeeklyReview}>
+              Weekly review{unseenReviews > 0 ? ` · ${unseenReviews} new` : ""}
+            </button>
+          )}
+          <button onClick={reload} disabled={loading || busy}>
+            Refresh inbox
+          </button>
+        </div>
       </div>
-      <div className="inbox-filters">
-        <label>
-          Company
-          <Select
-            aria-label="Inbox company"
-            value={company}
-            disabled={busy}
-            onChange={(e) => {
-              reset({ company: e.target.value });
-            }}
-          >
-            <option value="">All my ideas and watches</option>
-            {companies.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.symbol} · {c.name}
-              </option>
-            ))}
-          </Select>
-        </label>
-        <label>
-          Show updates
-          <Select
-            aria-label="Show updates"
-            value={review}
-            disabled={busy}
-            onChange={(e) => {
-              reset({ review: e.target.value });
-            }}
-          >
-            <option value="pending">Awaiting review</option>
-            <option value="unresolved">Left unresolved</option>
-            <option value="reviewed">Reviewed</option>
-            <option value="all">All updates</option>
-          </Select>
-        </label>
-      </div>
+      <details className="inbox-filter-disclosure">
+        <summary>
+          Filter updates{" "}
+          <span>
+            {companies.find((c) => c.id === company)?.symbol || "All companies"}{" "}
+            ·{" "}
+            {review === "all"
+              ? "All updates"
+              : reviewName(review === "pending" ? null : review)}
+          </span>
+        </summary>
+        <div className="inbox-filters">
+          <label>
+            Company
+            <Select
+              aria-label="Inbox company"
+              value={company}
+              disabled={busy}
+              onChange={(e) => {
+                reset({ company: e.target.value });
+              }}
+            >
+              <option value="">All my ideas and watches</option>
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.symbol} · {c.name}
+                </option>
+              ))}
+            </Select>
+          </label>
+          <label>
+            Show updates
+            <Select
+              aria-label="Show updates"
+              value={review}
+              disabled={busy}
+              onChange={(e) => {
+                reset({ review: e.target.value });
+              }}
+            >
+              <option value="pending">Awaiting review</option>
+              <option value="unresolved">Left unresolved</option>
+              <option value="reviewed">Reviewed</option>
+              <option value="all">All updates</option>
+            </Select>
+          </label>
+        </div>
+      </details>
       {notice && (
         <p role="status" className="notice">
           {notice}
@@ -222,62 +243,22 @@ export default function UpdateInbox({
         <>
           <div className="inbox-counts" aria-label="Update counts">
             <strong>{data.totals.pending_count} awaiting review</strong>
-            <span>{data.totals.unresolved_count} left unresolved</span>
-            <span>{data.totals.new_count} retained updates</span>
-          </div>
-          <details
-            className={`inbox-coverage${gaps.length ? " has-concerns" : ""}`}
-          >
-            <summary>
-              Source coverage ·{" "}
-              {gaps.length
-                ? `${gaps.length} ${gaps.length === 1 ? "company needs" : "companies need"} attention`
-                : "inspect latest checks"}
-              {off.length
-                ? ` · ${off.length} ${off.length === 1 ? "watch" : "watches"} off`
-                : ""}
-            </summary>
-            <p className="fine">
-              A quiet inbox does not mean nothing important happened. These are
-              the latest recorded checks; opening this inbox does not refresh
-              sources.
-            </p>
-            {!scoped.length && (
-              <p>
-                No saved ideas or watches yet. Open a company to begin your
-                research.
-              </p>
+            {data.totals.unresolved_count > 0 && (
+              <span>{data.totals.unresolved_count} left unresolved</span>
             )}
-            {scoped.map((c) => (
-              <div key={c.id}>
-                <strong>
-                  {c.symbol} · {c.name}
-                </strong>
-                <p className="fine">
-                  {c.mode === "recorded"
-                    ? "Recorded fictional example"
-                    : c.coverage.watch?.enabled
-                      ? `Local watch on · every ${c.coverage.watch.interval_minutes === 60 ? "hour" : "four hours"} while the app runs`
-                      : "Local watch off"}
-                </p>
-                {c.coverage.concerns.map((message) => (
-                  <p className="fine" key={message}>
-                    {message}
-                  </p>
-                ))}
-                <button onClick={() => onOpen(c.id, "workspace")}>
-                  Open {c.symbol} research ↗
-                </button>
-              </div>
-            ))}
+          </div>
+          <details className="inbox-list-meta">
+            <summary>
+              {data.total} matching {data.total === 1 ? "update" : "updates"} ·
+              newest first
+            </summary>
+            <p>
+              Showing {data.records.length ? page * data.page_size + 1 : 0}–
+              {page * data.page_size + data.records.length} · recorded through{" "}
+              {stamp(data.cutoff)}. Review status is current; source event dates
+              may be earlier.
+            </p>
           </details>
-          <p className="fine inbox-list-meta">
-            Showing {data.records.length ? page * data.page_size + 1 : 0}–
-            {page * data.page_size + data.records.length} of {data.total}{" "}
-            matching updates · newest recorded first · recorded through{" "}
-            {stamp(data.cutoff)}. Review status is current; source event dates
-            may be earlier.
-          </p>
           {!data.records.length && (
             <div className="empty-history">
               <h3>
@@ -286,7 +267,7 @@ export default function UpdateInbox({
                   : "No updates in this view"}
               </h3>
               <p>
-                Check source coverage above, or choose another company or review
+                Check source coverage below, or choose another company or review
                 status. Quiet checks remain in History.
               </p>
             </div>
@@ -324,6 +305,22 @@ export default function UpdateInbox({
                     </div>
                     <h3>{summary.title}</h3>
                     <p className="inbox-preview">{summary.text}</p>
+                    {summary.source && (
+                      <p className="inbox-source-caption">
+                        {summary.source}
+                        {summary.publishedAt
+                          ? ` · Source dated ${stamp(summary.publishedAt)}`
+                          : ""}
+                        {summary.more > 0
+                          ? ` · +${summary.more} more saved sources`
+                          : ""}
+                      </p>
+                    )}
+                    {summary.alert && (
+                      <p className="inbox-alert-caption">
+                        Flagged for review: {summary.alert}
+                      </p>
+                    )}
                     {summary.question && (
                       <p className="fine inbox-preview">
                         Your question: {summary.question}
@@ -404,6 +401,52 @@ export default function UpdateInbox({
               </button>
             </div>
           )}
+          <details
+            className={`inbox-coverage${gaps.length ? " has-concerns" : ""}`}
+          >
+            <summary>
+              Source coverage ·{" "}
+              {gaps.length
+                ? `${gaps.length} ${gaps.length === 1 ? "company needs" : "companies need"} attention`
+                : "inspect latest checks"}
+              {off.length
+                ? ` · ${off.length} ${off.length === 1 ? "watch" : "watches"} off`
+                : ""}
+            </summary>
+            <p className="fine">
+              A quiet inbox does not mean nothing important happened. These are
+              the latest recorded checks; opening this inbox does not refresh
+              sources.
+            </p>
+            {!scoped.length && (
+              <p>
+                No saved ideas or watches yet. Open a company to begin your
+                research.
+              </p>
+            )}
+            {scoped.map((c) => (
+              <div key={c.id}>
+                <strong>
+                  {c.symbol} · {c.name}
+                </strong>
+                <p className="fine">
+                  {c.mode === "recorded"
+                    ? "Recorded fictional example"
+                    : c.coverage.watch?.enabled
+                      ? `Local watch on · every ${c.coverage.watch.interval_minutes === 60 ? "hour" : "four hours"} while the app runs`
+                      : "Local watch off"}
+                </p>
+                {c.coverage.concerns.map((message) => (
+                  <p className="fine" key={message}>
+                    {message}
+                  </p>
+                ))}
+                <button onClick={() => onOpen(c.id, "workspace")}>
+                  Open {c.symbol} research ↗
+                </button>
+              </div>
+            ))}
+          </details>
           <p className="fine">
             Marking an alert reviewed records your attention. It does not
             approve the investment, resolve a risk or change your saved idea.

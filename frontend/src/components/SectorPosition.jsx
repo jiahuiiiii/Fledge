@@ -141,8 +141,8 @@ function Map({ members, symbol }) {
     <div className="position-map-wrap">
       <h3>Growth and profitability together</h3>
       <p>
-        Further right means faster annual sales growth. Higher means a larger
-        reported operating margin.
+        Further right means faster fiscal-year sales growth. Higher means a
+        larger reported operating margin.
       </p>
       {valid.length >= 2 ? (
         <>
@@ -155,7 +155,7 @@ function Map({ members, symbol }) {
             <svg
               viewBox="0 0 660 320"
               role="img"
-              aria-label="Annual revenue growth against reported GAAP operating margin for the chosen competitors"
+              aria-label="Fiscal-year revenue growth against reported GAAP operating margin for the chosen competitors"
             >
               {[0, 0.5, 1].map((f) => (
                 <g key={f} className="position-grid">
@@ -175,7 +175,7 @@ function Map({ members, symbol }) {
                 y="317"
                 textAnchor="middle"
               >
-                Annual revenue growth →
+                Fiscal-year revenue growth →
               </text>
               <text className="position-axis" x="72" y="24">
                 Reported operating margin ↑

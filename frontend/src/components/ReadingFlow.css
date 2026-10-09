@@ -1,0 +1,569 @@
+/* One company rail; report sections use the available reading width. */
+.app-shell .research-browser {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+}
+.app-shell .research-browser > .research-navigation {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  padding-block: var(--space-2);
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-bg);
+}
+.app-shell .research-navigation .content-tabs {
+  flex-direction: row;
+  overflow-x: auto;
+  overflow-y: hidden;
+  gap: var(--space-1);
+}
+.app-shell .research-navigation .content-tabs button {
+  width: auto;
+  white-space: nowrap;
+}
+.app-shell .research-navigation .content-tabs button[aria-selected="true"] {
+  box-shadow: inset 0 -2px 0 var(--color-accent);
+}
+.app-shell .workspace-page {
+  max-width: var(--page-width);
+  padding-top: var(--space-5);
+}
+.notebook-intro {
+  margin: 0;
+  color: var(--color-muted);
+  line-height: 1.6;
+}
+.app-shell .history-page > h2,
+.app-shell .all-history h2 {
+  margin-top: 0;
+  font-size: var(--text-xl);
+}
+.app-shell .history-empty {
+  margin-top: var(--space-6);
+  padding: var(--space-7);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+}
+.history-empty-mark {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-3);
+  color: var(--color-accent);
+  font-size: var(--text-2xl);
+}
+.app-shell .history-empty h3 {
+  margin: var(--space-4) 0 var(--space-2);
+  color: var(--color-text);
+  font-size: var(--text-xl);
+}
+.app-shell .history-empty p {
+  max-width: 64ch;
+  color: var(--color-muted);
+  line-height: 1.7;
+}
+.history-empty button {
+  margin-top: var(--space-3);
+  min-height: 44px;
+}
+.app-shell .history-page .field {
+  max-width: none;
+}
+.inbox-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+.inbox-heading-actions > button {
+  min-height: 44px;
+}
+.app-shell .update-inbox .inbox-source-caption,
+.app-shell .update-inbox .inbox-alert-caption {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  margin: var(--space-3) 0 0;
+  line-height: 1.6;
+}
+.app-shell .update-inbox .inbox-preview {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.app-shell .financials-story {
+  padding-top: 0;
+  gap: var(--space-3);
+}
+.financial-section-nav {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.financial-section-nav > button {
+  flex: none;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  color: var(--color-muted);
+  background: transparent;
+  border-color: transparent;
+  font-size: var(--text-sm);
+}
+.financial-section-nav > button[aria-selected="true"] {
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  border-color: var(--color-line-strong);
+}
+.app-shell .financials-story .financial-section-intro {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-2);
+  font-size: var(--text-sm);
+}
+.app-shell .financials-story .financial-source-date {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xs);
+}
+.financial-chapter {
+  display: grid;
+  gap: var(--space-7);
+}
+.financial-chapter[hidden],
+.financial-reports-panel[hidden] {
+  display: none;
+}
+.financial-chapter > .financial-story-section:first-child {
+  border-top: 0;
+  padding-top: var(--space-4);
+}
+.app-shell .financial-chapter .financial-story-heading h2 {
+  font-size: var(--text-xl);
+}
+.app-shell .financial-chapter .financial-story-heading > p {
+  font-size: var(--text-sm);
+  margin-top: var(--space-2);
+}
+.financial-chapter .financial-insights {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  align-items: start;
+  gap: var(--space-4) var(--space-5);
+}
+.app-shell .financial-chapter .financial-insight h3 {
+  font-size: var(--text-base);
+}
+.app-shell .financial-chapter .financial-insight p {
+  font-size: var(--text-sm);
+}
+.financial-chapter .financial-story-section > .evidence-control {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line);
+}
+.financial-chapter .financial-story-section > .evidence-control > button {
+  min-height: 44px;
+  font-size: var(--text-sm);
+  border-color: transparent;
+  background: transparent;
+}
+.financial-chapter .story-map-legend > div {
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+}
+.financial-reports-panel {
+  margin-top: var(--space-5);
+}
+.financial-reports-panel .financials-reported-details {
+  margin-top: 0;
+}
+@media (max-width: 600px) {
+  .app-shell .research-browser {
+    gap: var(--space-2);
+  }
+  .app-shell .research-browser > .research-navigation {
+    padding-block: var(--space-1);
+  }
+  .app-shell .history-empty {
+    padding: var(--space-5);
+  }
+  .financial-section-nav {
+    width: 100%;
+    gap: 0;
+  }
+  .financial-section-nav > button {
+    padding-inline: var(--space-3);
+  }
+  .financial-chapter {
+    gap: var(--space-6);
+  }
+  .financial-chapter .financial-story-section > .evidence-control {
+    justify-content: flex-start;
+  }
+}
+
+/* Collection pages start with their own purpose, scope and actions. */
+.app-shell[data-view="ideas"] .company-header,
+.app-shell[data-view="history"] .company-header,
+.app-shell[data-view="updates"] .company-header,
+.app-shell[data-view="review"] .company-header,
+.app-shell[data-view="updates"] .mobile-company-picker {
+  display: none;
+}
+.app-shell
+  .financial-chapter
+  > .financial-story-section:first-child
+  .financial-story-heading
+  > p {
+  display: none;
+}
+.app-shell .update-inbox .inbox-filter-disclosure {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface);
+  margin-bottom: var(--space-4);
+}
+.app-shell .update-inbox .inbox-filter-disclosure > summary {
+  min-height: 44px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text);
+  flex-wrap: wrap;
+}
+.inbox-filter-disclosure > summary > span {
+  color: var(--color-muted);
+  font-weight: 400;
+  margin-left: auto;
+}
+.app-shell .update-inbox .inbox-filter-disclosure .inbox-filters {
+  border: 0;
+  background: transparent;
+  padding: var(--space-3) 0 0;
+}
+.app-shell .update-inbox .inbox-list-meta {
+  margin: var(--space-2) 0 var(--space-3);
+}
+.app-shell .update-inbox .inbox-list-meta > summary {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  min-height: 36px;
+}
+.app-shell .update-inbox .inbox-records + .inbox-coverage,
+.app-shell .update-inbox .review-pagination + .inbox-coverage {
+  margin-top: var(--space-5);
+}
+@media (max-width: 600px) {
+  .inbox-filter-disclosure > summary > span {
+    width: 100%;
+    margin-left: var(--space-5);
+  }
+  .app-shell .update-inbox .inbox-filter-disclosure > summary {
+    gap: var(--space-1) var(--space-2);
+  }
+}
+
+/* One topic per page, three main financial charts, evidence on the figures. */
+.app-shell .financial-main-flow {
+  gap: var(--space-5);
+}
+.app-shell .financial-peer-context {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+.financial-peer-context button {
+  min-height: 44px;
+}
+.financial-summary-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+.financial-summary-row > article {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.financial-summary-row > article > span:first-child,
+.financial-summary-row small {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+.financial-summary-row strong {
+  font-size: var(--text-2xl);
+}
+.app-shell .financial-figure-link > button {
+  min-height: 44px;
+  background: transparent;
+  border: 0;
+  padding: var(--space-1) 0;
+  color: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: var(--color-line-strong);
+  text-underline-offset: 5px;
+  text-decoration-thickness: 1px;
+}
+.app-shell .financial-figure-link > button:hover {
+  text-decoration-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.app-shell .figure-help {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+.app-shell .financial-main-flow .story-period-controls {
+  margin-bottom: 0;
+}
+.financial-main-flow > .financial-story-section {
+  margin: 0;
+}
+.balance-summary-chart {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+}
+.balance-summary-pair {
+  min-width: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.balance-summary-pair h3 {
+  margin-top: 0;
+}
+.balance-summary-pair > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+.balance-summary-pair small {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+.balance-summary-track {
+  grid-column: 1 / -1;
+  position: relative;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--color-surface-3);
+  overflow: hidden;
+}
+.balance-summary-track > span {
+  position: absolute;
+  top: 0;
+  height: 100%;
+}
+.app-shell .financial-more-detail,
+.comparison-ratios,
+.idea-history {
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+}
+.financial-more-detail > summary {
+  min-height: 44px;
+  font-size: var(--text-base);
+  flex-wrap: wrap;
+}
+.financial-more-detail > summary span {
+  color: var(--color-muted);
+  font-weight: 400;
+  font-size: var(--text-sm);
+}
+.financial-more-detail .financial-story-section,
+.financial-more-detail .revenue-breakdown {
+  margin-block: var(--space-6);
+}
+.financial-more-detail .financial-insights {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+}
+.financial-more-detail .story-map-legend > div {
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+}
+.app-shell .reasoning-page {
+  max-width: none;
+}
+.app-shell[data-view="idea"] .company-header {
+  display: none;
+}
+.sidebar-research {
+  margin: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+}
+.sidebar-research h3 {
+  font-size: var(--text-sm);
+  margin: 0;
+}
+.sidebar-research p {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+.sidebar-research button {
+  min-height: 44px;
+  width: 100%;
+  text-align: left;
+  font-size: var(--text-xs);
+}
+.sentiment-analyse-action {
+  max-width: 380px;
+  display: grid;
+  justify-items: end;
+  gap: var(--space-2);
+}
+.app-shell .sentiment-analyse-action p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+.news-section-status {
+  border-block: 1px solid var(--color-line);
+  margin-block: var(--space-3);
+}
+.app-shell .news-section-status > summary {
+  min-height: 44px;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  font-weight: 400;
+  line-height: 1.6;
+}
+.status-details-label {
+  color: var(--color-accent);
+  margin-left: auto;
+}
+.news-status-details {
+  padding: var(--space-3);
+  background: var(--color-surface);
+  font-size: var(--text-sm);
+}
+.app-shell .sample-reconciliation {
+  color: var(--color-text);
+}
+.app-shell .sample-count-explanation {
+  margin: var(--space-2) 0;
+}
+.app-shell .glance-tone > .glance-count-explanation {
+  display: block;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+.glance-tone-bar .unclear {
+  background: var(--color-faint);
+}
+.company-overview-tone {
+  display: grid;
+  gap: var(--space-1);
+  padding-bottom: var(--space-4);
+  font-size: var(--text-sm);
+}
+.company-overview-tone small {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+@media (max-width: 600px) {
+  .financial-summary-row {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+  .financial-summary-row > article {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: var(--space-3);
+    align-items: center;
+  }
+  .financial-summary-row small {
+    grid-column: 1 / -1;
+  }
+  .financial-summary-row strong {
+    font-size: var(--text-xl);
+  }
+  .balance-summary-chart {
+    grid-template-columns: 1fr;
+  }
+  .balance-summary-pair {
+    padding: var(--space-4);
+  }
+  .sentiment-analyse-action {
+    max-width: none;
+    width: 100%;
+    justify-items: start;
+  }
+  .news-section-status > summary {
+    flex-wrap: wrap;
+  }
+  .financial-more-detail {
+    padding: var(--space-3);
+  }
+}
+.financial-main-flow > *,
+.financial-more-detail {
+  min-width: 0;
+}
+.app-shell .financial-peer-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-3);
+}
+.app-shell .financial-peer-context > button.source-link {
+  display: inline-flex;
+  width: auto;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  border: 0;
+  padding: 0;
+  color: var(--color-accent);
+  background: transparent;
+}
+
+.app-shell .sentiment-reading-settings {
+  margin-block: var(--space-3);
+}
+.app-shell .sentiment-reading-settings > summary {
+  min-height: 44px;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  flex-wrap: wrap;
+}
+.sentiment-reading-settings > summary > span {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  font-weight: 400;
+}
+.app-shell .news-section-status > summary {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  gap: var(--space-2);
+}
+.app-shell .news-section-status > summary::before {
+  grid-column: 1;
+}
+.app-shell .news-section-status > summary > span:first-of-type {
+  grid-column: 2;
+}
+.app-shell .news-section-status > summary > .status-details-label {
+  grid-column: 3;
+}

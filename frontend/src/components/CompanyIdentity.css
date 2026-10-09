@@ -12,7 +12,8 @@
 .app-shell .price-change.positive {
   color: var(--color-positive-light);
 }
-.app-shell .price-change.negative {
+.app-shell .price-change.negative,
+.app-shell .market-quote .quote-value .price-change.negative {
   color: var(--color-negative-light);
 }
 .app-shell .price-change.unchanged {

@@ -40,7 +40,7 @@ def size(value):
 
 def test_fitting_request_is_identical_and_keeps_the_same_paid_identity():
     p = packet()
-    p['comparison_sources']=p['comparison_sources'][:5]
+    p['comparison_sources']=p['comparison_sources'][:3]
     assert size(p) <= ledger.MAX_REQUEST_BYTES
     before = deepcopy(p)
     assert fit(p, S.request_for) is p

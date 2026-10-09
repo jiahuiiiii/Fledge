@@ -58,7 +58,10 @@ export default function Modal({
         }
       }}
       onCancel={(e) => {
+        // React portals can propagate a nested dialog's cancel to its parent.
+        if (e.target !== e.currentTarget) return;
         e.preventDefault();
+        e.stopPropagation();
         onClose();
       }}
     >

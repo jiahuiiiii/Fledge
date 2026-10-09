@@ -91,6 +91,7 @@ export default function IdeaAlertChecks({
   instrumentId,
   embedded = false,
   readOnly = false,
+  hideEmpty = false,
 }) {
   const [filter, setFilter] = useState(history ? "all" : "pending");
   const scoped = (checks || []).filter(
@@ -99,6 +100,7 @@ export default function IdeaAlertChecks({
   const visible = scoped.filter(
     (c) => embedded || filter === "all" || (c.published && !c.review_action),
   );
+  if (hideEmpty && !scoped.length) return null;
   return (
     <section
       className="idea-alert-checks"
@@ -108,8 +110,7 @@ export default function IdeaAlertChecks({
         <>
           <div className="market-section-head">
             <div>
-              <span className="section-label">YOUR IDEA + NEW EVIDENCE</span>
-              <h2>Does this affect my reasoning?</h2>
+              <h2>News checked against your idea</h2>
             </div>
             <label>
               Show{" "}
@@ -124,9 +125,8 @@ export default function IdeaAlertChecks({
             </label>
           </div>
           <p className="fine">
-            AI connections to the exact reasoning saved at the time. News
-            framing and social opinions alone do not prove an idea right or
-            wrong.
+            Saved checks of how a source relates to the idea you held at the
+            time.
           </p>
         </>
       )}
@@ -134,7 +134,7 @@ export default function IdeaAlertChecks({
         <p className="muted">
           {filter === "pending"
             ? "No idea-related alerts awaiting review. Check current sources from the workspace, or choose saved-idea alerts in your news watch."
-            : "No private source checks have been saved yet."}
+            : "No news has been checked against this idea yet."}
         </p>
       )}
       {visible.map((c) => {

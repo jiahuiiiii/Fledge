@@ -70,7 +70,7 @@ let browser;
   await slider.press('End');
   assert.match(await panel.locator('output').innerText(), /provisional/);
   await panel.getByText('Inspect daily prices and source', { exact: true }).click();
-  assert.equal(await panel.locator('tbody tr').count(), 253);
+  assert.equal(await panel.locator('tbody tr').count(), fixture.snapshot.series.bars.length);
   assert.match(await panel.innerText(), /Today's supplied session is included/);
   assert.match(await panel.innerText(), /no AI call/);
   for (const width of [320, 390, 1440]) {

@@ -1,5 +1,3 @@
-import { useEffect, useState } from "react";
-
 const sections = {
   evidence: {
     label: "News & discussion",
@@ -34,15 +32,6 @@ const sections = {
 };
 
 export default function ResearchNavigation({ selected, onChange, recorded }) {
-  const [vertical, setVertical] = useState(
-    () => window.matchMedia("(min-width: 1100px)").matches,
-  );
-  useEffect(() => {
-    const media = window.matchMedia("(min-width: 1100px)");
-    const update = () => setVertical(media.matches);
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
   const keys = recorded
     ? ["business", "fundamentals", "evidence"]
     : ["business", "fundamentals", "evidence", "expectations", "valuation"];
@@ -52,7 +41,7 @@ export default function ResearchNavigation({ selected, onChange, recorded }) {
         className="content-tabs"
         role="tablist"
         aria-label="Research views"
-        aria-orientation={vertical ? "vertical" : "horizontal"}
+        aria-orientation="horizontal"
       >
         {keys.map((key) => (
           <button
@@ -64,8 +53,8 @@ export default function ResearchNavigation({ selected, onChange, recorded }) {
             key={key}
             onClick={() => onChange(key)}
             onKeyDown={(event) => {
-              const previous = vertical ? "ArrowUp" : "ArrowLeft";
-              const next = vertical ? "ArrowDown" : "ArrowRight";
+              const previous = "ArrowLeft";
+              const next = "ArrowRight";
               if (![previous, next, "Home", "End"].includes(event.key)) return;
               event.preventDefault();
               const buttons = [

@@ -25,15 +25,25 @@ function logoFor(company) {
 
 export default function CompanyAvatar({ company, small = false }) {
   const src = logoFor(company);
+  const seed = [...(company?.symbol || company?.name || "?")].reduce(
+    (hash, letter) => (hash * 31 + letter.charCodeAt(0)) >>> 0,
+    0,
+  );
+  const hue = seed % 360;
   const [loaded, setLoaded] = useState(null);
   const [failed, setFailed] = useState(null);
   const hasLogo = !!src && loaded === src && failed !== src;
   return (
     <span
       className={`company-avatar${small ? " small" : ""}${hasLogo ? " has-logo" : ""}${src === marvellLogo ? " logo-on-dark" : ""}`}
+      style={
+        !hasLogo
+          ? { background: `hsl(${hue} 24% 22%)`, color: `hsl(${hue} 60% 80%)` }
+          : undefined
+      }
       aria-hidden="true"
     >
-      {company?.name?.[0] || company?.symbol?.[0] || "?"}
+      {(company?.symbol || company?.name || "?").slice(0, 2).toUpperCase()}
       {src && failed !== src && (
         <img
           src={src}

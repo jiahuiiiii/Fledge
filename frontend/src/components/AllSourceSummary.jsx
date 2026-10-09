@@ -1,6 +1,7 @@
 import { SourceLabel } from "./SourceFilters";
 import { sourceCoverage, sourceExclusionLabels } from "../lib/sourceCoverage";
 import "./AllSourceSummary.css";
+import { sentimentSummaryLabel } from "../lib/sentimentSummary";
 
 export default function AllSourceSummary({ analysis, providerStatus = [] }) {
   const coverage = sourceCoverage(analysis);
@@ -51,7 +52,7 @@ export default function AllSourceSummary({ analysis, providerStatus = [] }) {
               <SourceLabel scope={sample.scope} />
               <strong>
                 {sample.analysed
-                  ? sample.tone
+                  ? sentimentSummaryLabel(sample.sentimentSummary)
                   : connection?.status === "disabled"
                     ? "Connection off"
                     : "No analysed texts"}

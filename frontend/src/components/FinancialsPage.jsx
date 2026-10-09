@@ -1,10 +1,11 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { api } from "../api/client";
 import EvidenceButton from "./EvidenceButton";
-import SectorPosition from "./SectorPosition";
 import RevenueFlow from "./RevenueFlow";
 import RevenueBreakdown from "./RevenueBreakdown";
 import Select from "./Select";
+import PeerContext from "./PeerContext";
+import TermHelp from "./TermHelp";
 import LoadingSkeleton from "./LoadingSkeleton";
 import {
   number,
@@ -22,10 +23,20 @@ import {
 } from "../lib/financialStory";
 import "./FinancialsPage.css";
 
-function Evidence({ rows, title = "Financial reading · evidence" }) {
+function Evidence({
+  rows,
+  title = "Financial reading · evidence",
+  label = "Figures & calculations",
+  children,
+}) {
   return (
-    <EvidenceButton title={title}>
-      {(rows || []).filter(Boolean).map((row, index) => (
+    <EvidenceButton
+      title={title}
+      label={label}
+      className="financial-figure-link"
+    >
+      {children}
+      {[...new Set((rows || []).filter(Boolean))].map((row, index) => (
         <section className="story-evidence-row" key={`${row.key}-${index}`}>
           <h3>{row.label}</h3>
           <p>
@@ -79,16 +90,20 @@ function Insights({ readings }) {
                   : "i"}
           </span>
           <div>
-            <h3>{reading.title}</h3>
-            <p>{reading.text}</p>
-            {reading.detail && (
-              <p className="insight-detail">{reading.detail}</p>
-            )}
-            {reading.rows?.length > 0 && (
+            {reading.basis && <p className="insight-basis">{reading.basis}</p>}
+            <h3>
               <Evidence
                 rows={reading.rows}
-                title={`${reading.title} · evidence`}
+                title={reading.title}
+                label={reading.title}
               />
+            </h3>
+            <p>{reading.text}</p>
+            {reading.period && (
+              <p className="insight-period">{reading.period}</p>
+            )}
+            {reading.detail && (
+              <p className="insight-detail">{reading.detail}</p>
             )}
           </div>
         </article>
@@ -282,8 +297,15 @@ function HistoryChart({ rows, series, active, onSelect, label }) {
                     className={`story-series series-${s.tone}`}
                     key={s.key}
                   >
-                    <span>{s.label}</span>
-                    <strong>{money(row?.value)}</strong>
+                    <span>
+                      {s.label}
+                      <TermHelp term={s.key} />
+                    </span>
+                    <Evidence
+                      rows={[row]}
+                      title={`${s.label} · ${day(active?.end)}`}
+                      label={<strong>{money(row?.value)}</strong>}
+                    />
                     <small>
                       {row?.start
                         ? `${day(row.start)} – ${day(row.end)}`
@@ -292,9 +314,6 @@ function HistoryChart({ rows, series, active, onSelect, label }) {
                           : "No matching figure"}
                     </small>
                     {s.key === "net_income" && <small>{row?.label}</small>}
-                    {row && (
-                      <Evidence rows={[row]} title={`${s.label} · evidence`} />
-                    )}
                   </article>
                 );
               })}
@@ -315,7 +334,6 @@ function Heading({ number: n, title, children }) {
   return (
     <header className="financial-story-heading">
       <div>
-        <span aria-hidden="true">{n}</span>
         <h2>{title}</h2>
       </div>
       <p>{children}</p>
@@ -361,9 +379,6 @@ function BalancePairs({ period }) {
                     )}
                   </div>
                   <span>{index === 0 ? "Assets" : "Liabilities"}</span>
-                  {row && (
-                    <Evidence rows={[row]} title={`${row.label} · evidence`} />
-                  )}
                 </div>
               );
             })}
@@ -423,8 +438,11 @@ function BalanceMap({ period, side }) {
                     assets
                   </small>
                 </span>
-                <strong>{money(row.value)}</strong>
-                <Evidence rows={[row]} title={`${row.label} · evidence`} />
+                <Evidence
+                  rows={[row]}
+                  title={`${row.label} · ${day(period?.end)}`}
+                  label={<strong>{money(row.value)}</strong>}
+                />
               </div>
             ))}
           </div>
@@ -438,7 +456,13 @@ function BalanceMap({ period, side }) {
     </article>
   );
 }
-export default function FinancialsPage({ instrumentId, workspace, visible }) {
+export default function FinancialsPage({
+  instrumentId,
+  workspace,
+  visible,
+  children,
+  onCompare,
+}) {
   const [attempt, setAttempt] = useState(0);
   const [story, setStory] = useState(null),
     [error, setError] = useState("");
@@ -486,7 +510,7 @@ export default function FinancialsPage({ instrumentId, workspace, visible }) {
   const balance =
     balances.find((row) => row.id === balanceId) || balances.at(-1);
   const past = previousYear(incomeRows, active);
-  const readings = incomeInsights(active, past);
+  const readings = incomeInsights(active, past, mode);
   const positionReadings = balanceInsights(balance);
   const debt = metric(balance, "debt");
   const ocf = metric(active, "operating_cash"),
@@ -523,27 +547,56 @@ export default function FinancialsPage({ instrumentId, workspace, visible }) {
       text: "Matching operating profit and non-operating interest expense are needed.",
       rows: [coverage].filter(Boolean),
     });
+  const basisLabel = mode === "annual" ? "Fiscal year" : "Past 12 months";
+  const growth = readings[0];
+  const summary = [
+    {
+      label: `Revenue growth · ${basisLabel.toLowerCase()}`,
+      value:
+        growth.tone === "unknown"
+          ? "Unavailable"
+          : `${((number(growth.rows[0].value) / number(growth.rows[1].value) - 1) * 100).toFixed(1)}%`,
+      rows: growth.rows,
+      detail: growth,
+    },
+    {
+      label: `Operating margin · ${basisLabel.toLowerCase()}`,
+      value: percent(metric(active, "operating_margin")?.value),
+      rows: [metric(active, "operating_margin")],
+    },
+    {
+      label: `Free cash flow · ${basisLabel.toLowerCase()}`,
+      value: money(metric(active, "free_cash_flow")?.value),
+      rows: [metric(active, "free_cash_flow")],
+    },
+  ];
   return (
-    <div className="financials-story">
-      <SectorPosition
+    <div className="financials-story financial-main-flow">
+      <PeerContext
         instrumentId={instrumentId}
         visible={visible}
-        financials
+        onCompare={onCompare}
       />
-      <div className="financials-intro">
-        <h2>What the financials show</h2>
-        <p>
-          Follow the company’s sales, profit, cash generation and obligations.
-          Each reading uses saved filing figures and shows what supports it.
-        </p>
-        {safe?.checked_at && (
-          <p className="story-footnote">
-            SEC filing data checked {day(safe.checked_at)}.{" "}
-            {workspace.performance?.source_status?.last_error
-              ? "The latest source check failed; these are retained figures."
-              : "Selecting a date reads saved data."}
-          </p>
-        )}
+      <div
+        className="story-period-controls"
+        role="group"
+        aria-label="Financial history period basis"
+      >
+        {[
+          ["trailing", "Past 12 months"],
+          ["annual", "Fiscal year"],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            aria-pressed={mode === key}
+            onClick={() => {
+              setMode(key);
+              setIncomeId("");
+            }}
+          >
+            {label}
+          </button>
+        ))}
       </div>
       {!safe && !error && (
         <LoadingSkeleton
@@ -552,65 +605,62 @@ export default function FinancialsPage({ instrumentId, workspace, visible }) {
         />
       )}
       {error && (
-        <p className="warning" role="alert">
+        <p role="alert">
           {error}{" "}
           <button onClick={() => setAttempt((old) => old + 1)}>
             Read saved financials again
           </button>
         </p>
       )}
-      {safe && safe.status !== "available" && (
-        <p className="story-gap">{safe.reason}</p>
-      )}
+      {safe && safe.status !== "available" && <p>{safe.reason}</p>}
       {safe && (
         <>
+          <div className="financial-summary-row" aria-label="Financial summary">
+            {summary.map((item) => (
+              <article key={item.label}>
+                <span>{item.label}</span>
+                <Evidence
+                  rows={item.rows}
+                  title={item.label}
+                  label={<strong>{item.value}</strong>}
+                >
+                  {item.detail && (
+                    <>
+                      <p>{item.detail.text}</p>
+                      <p>{item.detail.period}</p>
+                      <p>{item.detail.detail}</p>
+                    </>
+                  )}
+                </Evidence>
+                <small>
+                  {active
+                    ? `${day(active.start)} – ${day(active.end)}`
+                    : "No compatible saved period"}
+                </small>
+              </article>
+            ))}
+          </div>
+          <p className="figure-help">
+            Select an underlined figure to inspect its source and calculation.
+          </p>
           <section
             className="financial-story-section"
             aria-label="Revenue and expense story"
           >
-            <Heading number="1" title="How sales become profit">
-              Follow revenue through the company’s costs to the reported result.
-              Choose a period and inspect any figure.
+            <Heading title="How sales become profit">
+              Follow revenue through costs to the reported result. The chart
+              labels its own selected fiscal period.
             </Heading>
-            <RevenueFlow
-              data={workspace.income_flow}
-              segments={workspace.segment_revenue}
-              compactHeading
-            />
-            <details className="story-secondary">
-              <summary>Revenue by segment, product &amp; geography</summary>
-              <RevenueBreakdown data={workspace.segment_revenue} />
-            </details>
+            <RevenueFlow data={workspace.income_flow} compactHeading />
           </section>
           <section
             className="financial-story-section"
             aria-label="Earnings and cash-flow history"
           >
-            <Heading number="2" title="Sales, earnings & cash over time">
-              Growth matters alongside how much profit and cash the company
-              generates. Select a date to read that period.
+            <Heading title="Sales over time">
+              {basisLabel} · select a reporting date to inspect sales, profit
+              and cash flow.
             </Heading>
-            <div
-              className="story-period-controls"
-              role="group"
-              aria-label="Financial history period basis"
-            >
-              {[
-                ["trailing", "Trailing 12 months"],
-                ["annual", "Annual reports"],
-              ].map(([key, label]) => (
-                <button
-                  key={key}
-                  aria-pressed={mode === key}
-                  onClick={() => {
-                    setMode(key);
-                    setIncomeId("");
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
             <HistoryChart
               key={mode}
               rows={incomeRows}
@@ -619,18 +669,14 @@ export default function FinancialsPage({ instrumentId, workspace, visible }) {
               onSelect={setIncomeId}
               label="Sales, earnings and cash flow"
             />
-            <Insights readings={readings} />
           </section>
           <section
-            className="financial-story-section financial-position"
+            className="financial-story-section"
             aria-label="What it owns and owes"
           >
-            <Heading
-              number="3"
-              title="Can current assets cover near-term obligations?"
-            >
-              Compare matching balances at one reporting date. Current and
-              noncurrent amounts describe different timing.
+            <Heading title="What it owns and owes">
+              Assets and liabilities at one reporting date. Cash is part of
+              assets; borrowing is part of liabilities.
             </Heading>
             {balance && (
               <label className="story-balance-select">
@@ -647,93 +693,135 @@ export default function FinancialsPage({ instrumentId, workspace, visible }) {
                 </Select>
               </label>
             )}
-            <BalancePairs period={balance} />
-            <Insights readings={positionReadings.slice(0, 1)} />
-            <p className="story-footnote">
-              Both short- and long-term charts use the same zero-based dollar
-              scale. Liabilities include obligations beyond borrowing.
-            </p>
-          </section>
-          <section
-            className="financial-story-section"
-            aria-label="Borrowing and equity history"
-          >
-            <Heading
-              number="4"
-              title="How borrowing compares with cash & equity"
-            >
-              See how the reported balances change together. Borrowing, cash and
-              book equity are separate measures.
-            </Heading>
-            <HistoryChart
-              rows={balances}
-              series={balanceSeries}
-              active={balance}
-              onSelect={setBalanceId}
-              label="Borrowing, cash and equity"
-            />
-            <Insights readings={debtReadings} />
-          </section>
-          <section
-            className="financial-story-section"
-            aria-label="Balance-sheet breakdown"
-          >
-            <Heading number="5" title="What makes up the balance sheet?">
-              Assets show recorded resources. Liabilities and book equity show
-              how those resources are accounted for.
-            </Heading>
-            <div className="story-balance-maps">
-              <BalanceMap period={balance} side="assets" />
-              <BalanceMap period={balance} side="funding" />
-            </div>
-            <p className="story-footnote">
-              Each block’s size shows its share of total assets. Other &amp;
-              unclassified includes missing categories. Book values may differ
-              from resale values; goodwill and intangible assets are not cash.
-            </p>
-            <details className="story-secondary">
-              <summary>All balance figures &amp; evidence</summary>
-              <div className="story-balance-figures">
-                {balance?.metrics.map((row) => (
-                  <article key={row.key}>
-                    <span>{row.label}</span>
-                    <strong>
-                      {row.unit === "percent"
-                        ? percent(row.value)
-                        : money(row.value)}
-                    </strong>
-                    <Evidence rows={[row]} title={`${row.label} · evidence`} />
-                  </article>
-                ))}
-              </div>
-            </details>
+            <BalanceSummary period={balance} />
           </section>
         </>
       )}
-      {safe?.limitations && (
-        <details className="story-secondary">
-          <summary>Financial definitions &amp; coverage</summary>
-          {safe.limitations.map((line) => (
-            <p key={line}>{line}</p>
-          ))}
-          <p>
-            Learn how to read financial statements in the{" "}
-            <a
-              href="https://www.sec.gov/investor/pubs/begfinstmtguide.htm"
-              target="_blank"
-              rel="noreferrer"
-            >
-              SEC guide ↗
-            </a>
-            .
+      <details className="financial-more-detail">
+        <summary>
+          More detail{" "}
+          <span>Segments, liquidity, reported figures &amp; filings</span>
+        </summary>
+        <RevenueBreakdown data={workspace.segment_revenue} />
+        <section
+          className="financial-story-section"
+          aria-label="Financial readings"
+        >
+          <Heading title="Reading the figures">
+            {basisLabel} · {day(active?.end)}
+          </Heading>
+          <Insights readings={readings} />
+        </section>
+        <section
+          className="financial-story-section"
+          aria-label="Borrowing and equity history"
+        >
+          <Heading title="Borrowing, cash & equity over time" />
+          <HistoryChart
+            rows={balances}
+            series={balanceSeries}
+            active={balance}
+            onSelect={setBalanceId}
+            label="Borrowing, cash and equity"
+          />
+          <Insights readings={debtReadings} />
+        </section>
+        <section
+          className="financial-story-section"
+          aria-label="Liquidity detail"
+        >
+          <Heading title="Near-term and longer-term obligations" />
+          <BalancePairs period={balance} />
+          <Insights readings={positionReadings.slice(0, 1)} />
+        </section>
+        <section
+          className="financial-story-section"
+          aria-label="Balance-sheet breakdown"
+        >
+          <Heading title="What makes up the balance sheet?" />
+          <div className="story-balance-maps">
+            <BalanceMap period={balance} side="assets" />
+            <BalanceMap period={balance} side="funding" />
+          </div>
+          <p className="story-footnote">
+            Block area shows share of total assets. Book values may differ from
+            resale values. Goodwill and intangible assets are not cash.
           </p>
-          <p>
-            First saved source observation: {day(safe.first_recorded_at)}.
-            Method: {safe.method}. These readings do not create an AI assessment
-            or change your monitoring.
-          </p>
-        </details>
-      )}
+        </section>
+        {children}
+        {safe?.limitations && (
+          <details className="story-secondary">
+            <summary>Financial definitions &amp; coverage</summary>
+            {safe.limitations.map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+            <p>
+              SEC filing data checked {day(safe.checked_at)}. First saved
+              observation: {day(safe.first_recorded_at)}. Method: {safe.method}.
+            </p>
+            {workspace.performance?.source_status?.last_error && (
+              <p>The latest source check failed; these are retained figures.</p>
+            )}
+          </details>
+        )}
+      </details>
+    </div>
+  );
+}
+function BalanceSummary({ period }) {
+  return (
+    <div className="balance-summary-chart">
+      {[
+        ["assets", "liabilities"],
+        ["cash", "debt"],
+      ].map((keys, index) => {
+        const rows = keys.map((key) => metric(period, key)),
+          values = rows
+            .map((row) => number(row?.value))
+            .filter((value) => value != null),
+          low = Math.min(0, ...values),
+          high = Math.max(0, ...values),
+          span = high - low || 1;
+        return (
+          <div className="balance-summary-pair" key={index}>
+            <h3>{index === 0 ? "Assets & liabilities" : "Cash & borrowing"}</h3>
+            {rows.map((row, i) => (
+              <div key={keys[i]}>
+                <span>
+                  {row?.label ||
+                    {
+                      assets: "Assets",
+                      liabilities: "Liabilities",
+                      cash: "Cash",
+                      debt: "Borrowing",
+                    }[keys[i]]}
+                </span>
+                <Evidence
+                  rows={[row]}
+                  title={`${row?.label || keys[i]} · ${day(period?.end)}`}
+                  label={<strong>{money(row?.value)}</strong>}
+                />
+                <div className="balance-summary-track" aria-hidden="true">
+                  {number(row?.value) != null && (
+                    <span
+                      style={{
+                        left: `${((Math.min(0, number(row.value)) - low) / span) * 100}%`,
+                        width: `${(Math.abs(number(row.value)) / span) * 100}%`,
+                        background:
+                          i === 0 ? "var(--color-info)" : "var(--color-accent)",
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
+            ))}
+            <small>
+              One shared scale per pair, including zero. Balances at{" "}
+              {day(period?.end)}.
+            </small>
+          </div>
+        );
+      })}
     </div>
   );
 }

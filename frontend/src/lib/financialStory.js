@@ -40,7 +40,7 @@ export function previousYear(rows, active) {
     ) || null
   );
 }
-export function incomeInsights(active, previous) {
+export function incomeInsights(active, previous, mode) {
   const readings = [];
   const revenue = metric(active, "revenue"),
     before = metric(previous, "revenue");
@@ -56,6 +56,13 @@ export function incomeInsights(active, previous) {
     const change = (number(revenue.value) / number(before.value) - 1) * 100;
     readings.push({
       tone: change >= 0 ? "positive" : "caution",
+      basis:
+        mode === "trailing"
+          ? "Trailing 12 months"
+          : mode === "annual"
+            ? "Fiscal year"
+            : "Selected period",
+      period: `${day(revenue.start)} – ${day(revenue.end)} vs ${day(before.start)} – ${day(before.end)}`,
       title:
         change > 0
           ? "Sales grew"

@@ -47,7 +47,7 @@ export default function IdeasAndChanges({
           <h2>{mode === "ideas" ? "My ideas" : "What changed"}</h2>
           <p className="muted">
             {mode === "ideas"
-              ? "Your point of view, with the evidence to revisit it."
+              ? "The views you chose to save, in your own words."
               : "New evidence, age limits and coverage changes, linked to the reasoning you saved at the time."}
           </p>
         </div>
@@ -118,15 +118,14 @@ export default function IdeasAndChanges({
               </svg>
             </div>
             <div className="ideas-empty-copy">
-              <span className="section-label">YOUR FIRST IDEA</span>
               <h3>
                 {selectedCompany
                   ? `Save your view on ${selectedCompany.symbol}`
-                  : "Turn your research into an idea"}
+                  : "What do you think about the companies you follow?"}
               </h3>
               <p>
-                Keep your question and reasoning together, then revisit them as
-                the evidence changes. Monitoring is optional.
+                Write what you think, why you think it, and what would change
+                your mind. You can keep it as a draft and come back later.
               </p>
               <div className="ideas-empty-actions">
                 {onCreate ? (

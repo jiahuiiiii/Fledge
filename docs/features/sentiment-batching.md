@@ -1,5 +1,13 @@
 # Sentiment batching
 
+The [9 October price/evidence checks](sentiment-price-guards.md) advance the current
+method to sentiment v23 / `sentiment-whole-source-batches-5` /
+`sentiment-coverage-9`. Price extraction is part of the existing request; historical
+arithmetic and conservative downgrades run in code. The same model, low effort,
+12,000-token profile, eight-source/48kB bounds, ledger and retry controls remain.
+New leaning summaries require five interpretable groups. Old methods retain their
+original labels, thresholds, failed responses and charges.
+
 Implemented after the [8 October comparison](../testing/sentiment-batching.md).
 The app decides request size in code; no additional model classifies the task.
 **9 October correction:** the owner clarified that batching must cover every

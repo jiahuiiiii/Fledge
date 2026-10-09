@@ -38,6 +38,7 @@ export function sourceCoverage(analysis) {
     return {
       scope,
       tone: summary?.tone,
+      sentimentSummary: summary,
       candidates: Number.isInteger(candidates) ? candidates : null,
       analysed,
       relevant: summary?.relevant ?? 0,

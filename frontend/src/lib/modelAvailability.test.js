@@ -34,3 +34,14 @@ test("off, disconnected and exhausted states are distinct", () => {
     "budget",
   );
 });
+
+test("review blockers stay enforced while billing detail is separate from action guidance", () => {
+  const status = modelAvailability({
+    ...base,
+    budget: { ...base.budget, needs_attention: 1 },
+  });
+  assert.equal(status.blocked, true);
+  assert.match(status.message, /New AI analysis is paused/);
+  assert.doesNotMatch(status.message, /charge|paid|automatic confirmation/);
+  assert.match(status.detail, /without a confirmed charge/);
+});

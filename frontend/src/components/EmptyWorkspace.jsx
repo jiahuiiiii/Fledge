@@ -1,14 +1,12 @@
 import { useState } from "react";
 import CompanyDialog from "./CompanyDialog";
 import TelegramSettings from "./TelegramSettings";
+import { companionPromise } from "../lib/companion";
 
 export default function EmptyWorkspace({ view, onChoose }) {
   const [adding, setAdding] = useState(false);
   const copy = {
-    workspace: [
-      "Start with a company you’re curious about",
-      "Bring its news, financials and market expectations into one research workspace.",
-    ],
+    workspace: ["Start with a company you’re curious about", companionPromise],
     ideas: [
       "Your investment ideas start here",
       "Add a company, explore the evidence, then save the reasoning you want to test.",
@@ -34,7 +32,6 @@ export default function EmptyWorkspace({ view, onChoose }) {
             ["workspace", "Workspace"],
             ["ideas", "My ideas"],
             ["updates", "Updates"],
-            ["history", "History"],
           ].map(([id, label]) => (
             <button
               key={id}
@@ -52,6 +49,10 @@ export default function EmptyWorkspace({ view, onChoose }) {
         <span className="section-label">YOUR RESEARCH WORKSPACE</span>
         <h1>{title}</h1>
         <p>{description}</p>
+        <p className="fine">
+          Pick a company you own or want to understand. You don’t need a
+          position to start.
+        </p>
         <button className="primary" onClick={() => setAdding(true)}>
           Add your first company <span aria-hidden="true">＋</span>
         </button>

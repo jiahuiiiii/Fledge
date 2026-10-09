@@ -40,6 +40,7 @@ export default function CompanySidebar({
   onAdd,
   busy = false,
   loading = false,
+  research,
 }) {
   const shownCompanies = collapsed
     ? companies
@@ -76,6 +77,18 @@ export default function CompanySidebar({
                 </label>
               </div>
             </div>
+            {research && !collapsed && (
+              <section className="sidebar-research">
+                <h3>Your research</h3>
+                <p>
+                  {research.question ||
+                    "Explore a question. Save your view when you’re ready."}
+                </p>
+                <button onClick={research.onOpen}>
+                  Ask a question <span aria-hidden="true">↗</span>
+                </button>
+              </section>
+            )}
             <div className="company-list">
               <button
                 className={`watch-item all-companies-button ${!selectedCompanyId ? "selected" : ""}`}

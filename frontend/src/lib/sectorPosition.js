@@ -14,7 +14,7 @@ const revenueTags = [
 export const measures = [
   {
     key: "revenue_growth",
-    label: "Revenue growth",
+    label: "Revenue growth · fiscal year",
     question: "Who is growing faster?",
     unit: "percent",
   },

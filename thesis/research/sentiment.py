@@ -5,6 +5,7 @@ omits trading direction and synthetic sentiment precision; code counts labels.
 """
 
 import hashlib
+import json
 from copy import deepcopy
 from collections import Counter
 from datetime import datetime, timezone, timedelta
@@ -19,15 +20,23 @@ from . import market_brief, social, coverage
 from . import sentiment_context, reporting_basis
 from .citations import source_passages, model_source, FINDING_GROUNDING
 from .sec.checkpoint import current_documents, active_document
+from . import sentiment_guards
 
-PROMPT = "thesis-source-sentiment-22"
+PROMPT = "thesis-source-sentiment-23"
 EVIDENCE_POLICY = "sentiment-source-extracts-1"
-POLICY = "sentiment-coverage-8"
+POLICY = "sentiment-coverage-9"
 SELECTION_POLICY = "sentiment-all-eligible-1"
 
 
 class Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class PriceClaim(Strict):
+    passage_id: str
+    amount_text: str
+    kind: Literal["price_target", "option_strike", "historical_price", "other"]
+    direction_text: str | None
 
 
 class Item(Strict):
@@ -51,6 +60,7 @@ class Item(Strict):
     context_passages: list[str] = Field(default_factory=list, max_length=2)
     reporting: reporting_basis.Evidence | None = None
     basis: Literal["expressed_evaluation", "stated_outcome", "descriptive", "unclear"]
+    price_claims: list[PriceClaim] = Field(default_factory=list, max_length=3)
 
 
 class Classification(Strict):
@@ -137,10 +147,12 @@ def prepare(conn, iid, now=None, *, allow_empty=False, lookback_days=7):
         else:
             eligible.append(source)
     sources = eligible
+    sentiment_guards.attach(conn, iid, sources, company)
     available = dict(news=len(news), **dict(Counter(p.get('platform', 'reddit') for p in posts)))
     selected = Counter('news' if s['channel'] == 'news' else s.get('platform', 'reddit') for s in sources)
     packet = dict(
         context_policy=sentiment_context.POLICY,
+        guard_policy=sentiment_guards.POLICY,
         reporting_policy=reporting_basis.POLICY,
         comparison_sources=[],
         instrument_id=str(iid),
@@ -188,6 +200,7 @@ def request_for(packet):
     schema = Classification.model_json_schema()
     prototype = schema["$defs"].pop("Item")
     prototype["required"].append("context_passages")
+    prototype["required"].append("price_claims")
     if packet.get("reporting_policy") != reporting_basis.POLICY:
         schema["$defs"].pop("Evidence", None)
     branches = []
@@ -212,6 +225,11 @@ def request_for(packet):
         schema["$defs"][definition] = {"type": "string", "enum": own}
         props["passages"]["items"] = {"$ref": "#/$defs/" + definition}
         props["previous_passages"]["items"] = {"$ref": "#/$defs/" + definition}
+        price_claim = deepcopy(schema["$defs"]["PriceClaim"])
+        price_claim["properties"]["passage_id"]["enum"] = own
+        props["price_claims"]["items"] = price_claim
+        if source["channel"] != "social":
+            props["price_claims"]["maxItems"] = 0
         if source["channel"] != "social":
             props["previous_passages"]["maxItems"] = 0
         parent_ids = [
@@ -228,6 +246,7 @@ def request_for(packet):
             "passages",
             "previous_passages",
             "context_passages",
+            "price_claims",
             "basis",
             "relevance",
             "sentiment",
@@ -289,6 +308,7 @@ def request_for(packet):
                 + "\n"
                 + FINDING_GROUNDING
                 + SOCIAL_GUIDANCE
+                + "\nPrice claims: extract up to three explicit dollar amounts about the TARGET company's share price from the social item's OWN supplied passages. Return price_claims=[] for news or when there is no such claim. Each claim has passage_id, amount_text (the exact dollar token, including $/US$/USD and numeric separators), kind (price_target, option_strike, historical_price, or other), and direction_text (exact words explicitly saying rise/fall/up/down, otherwise null). Do not convert amounts, calculate returns, guess currency conversions, infer a missing direction from 'to', or use model knowledge of prices. Option strikes and historical prices are not targets. A bare target such as 'AVGO to $340' is unclear sentiment: the number alone expresses no upside/downside. Questions alone are not conviction. Code calculates any compatible historical price comparison separately. Explicit praise or criticism elsewhere in the selected source can still establish an attitude. Preserve negation, conditional wording and attribution when selecting direction_text."
                 + "\n"
                 + coverage.INSTRUCTION
                 + " Coverage grouping is only for the target company. First finish every selected item's relevance label. Never emit a coverage link whose item has relevance unrelated or unclear. If its reference is also a selected item, that reference must also have relevance relevant. A comparison-only reference must explicitly concern the same target-company development. Two reports may repeat the same story about another company: keep their classifications, but leave them unlinked. If no selected news item is relevant, return coverage_links as []."
@@ -333,7 +353,10 @@ def model_identity(packet):
 
 def identity(packet):
     from .sentiment_batching import plan_identity
-    return plan_identity(packet) + ":" + POLICY + (f":social-days-{packet["social_lookback_days"]}" if packet.get("social_lookback_days", 7) != 7 else "")
+    price_key = hashlib.sha256(ledger.canonical([
+        [s["id"], s.get("price_reference")] for s in packet["sources"]
+    ]).encode()).hexdigest()
+    return plan_identity(packet) + ":" + POLICY + ":prices:" + price_key + (f":social-days-{packet["social_lookback_days"]}" if packet.get("social_lookback_days", 7) != 7 else "")
 
 
 def coverage_key(source):
@@ -372,7 +395,7 @@ def summarize(
         n = sum(counts[k] for k in ("positive", "negative", "mixed", "neutral"))
         tone = (
             "thin sample"
-            if n < 3
+            if n < 5
             else (
                 "positive leaning"
                 if counts["positive"] > n / 2
@@ -390,6 +413,9 @@ def summarize(
             counted_groups=len(labels),
             unclear_or_unrelated=len(selected) - len(relevant),
             tone=tone,
+            interpretable_groups=n,
+            minimum_directional_groups=5,
+            majority_groups=(counts["positive"] if tone == "positive leaning" else counts["negative"] if tone == "negative leaning" else None),
         )
     if platforms and sources:
         result["social_platforms"] = {}
@@ -435,7 +461,12 @@ def response_text(call):
 
 
 def render(call, packet):
-    result = Classification.model_validate_json(response_text(call))
+    raw = json.loads(response_text(call))
+    result = Classification.model_validate(raw)
+    if packet.get("guard_policy") == sentiment_guards.POLICY and any(
+        "price_claims" not in item for item in raw["items"]
+    ):
+        raise ValueError("Current sentiment items must include their price-claim extraction list.")
     sources = {s["label"]: s for s in packet["sources"]}
     if Counter(i.id for i in result.items) != Counter(sources.keys()):
         raise ValueError(
@@ -480,6 +511,8 @@ def render(call, packet):
                 "A context-aware label needs the comment's own body evidence."
             )
         reporting = None
+        if source["channel"] == "news" and item.price_claims:
+            raise ValueError("Structured share-price claims are only accepted for social sources.")
         if packet.get("reporting_policy") == reporting_basis.POLICY and source["channel"] == "news":
             reporting = reporting_basis.render(item.reporting, source, item.relevance)
         elif item.reporting is not None:
@@ -502,6 +535,8 @@ def render(call, packet):
                 ],
                 **({"conversation": context} if context else {}),
             )
+            | (sentiment_guards.apply(item, source, packet["company"])
+               if packet.get("guard_policy") == sentiment_guards.POLICY else {})
         )
     links = coverage.render(result.coverage_links, packet, items)
     return dict(
@@ -513,6 +548,7 @@ def render(call, packet):
         summary_policy=POLICY,
         model=REASONING_MODEL,
         prompt_version=PROMPT,
+        guard_policy=packet.get("guard_policy"),
     )
 
 
@@ -541,7 +577,7 @@ def present(conn, record):
         return None
     p = record["packet"]
     allowed = permitted_ids(conn, record)
-    if any(
+    if not sentiment_guards.allowed(conn, p) or any(
         s["id"] not in allowed or not sentiment_context.allowed(conn, s)
         for s in p["sources"] + p.get("comparison_sources", [])
     ):

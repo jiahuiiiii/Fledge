@@ -18,7 +18,7 @@ from thesis.db import transaction, one
 from thesis.providers import ledger
 from thesis.service import Conflict
 
-POLICY = "sentiment-whole-source-batches-4"
+POLICY = "sentiment-whole-source-batches-5"
 MAX_SOURCES = 8
 # Conservative serialized-request bound, including prompt/schema/comparisons.
 # This is an input-size heuristic, not a prediction of reasoning/output tokens.
@@ -103,9 +103,9 @@ def plan_identity(packet):
 
 
 def check_access(conn, packet):
-    from . import sentiment, sentiment_context
+    from . import sentiment, sentiment_context, sentiment_guards
     allowed = sentiment.permitted_ids(conn, {"packet": packet, "instrument_id": packet["instrument_id"]})
-    if any(s["id"] not in allowed or not sentiment_context.allowed(conn, s)
+    if not sentiment_guards.allowed(conn, packet) or any(s["id"] not in allowed or not sentiment_context.allowed(conn, s)
            for s in packet["sources"] + packet.get("comparison_sources", [])):
         raise ValueError("Sentiment source access changed. Saved batches cannot be used for this sample.")
 

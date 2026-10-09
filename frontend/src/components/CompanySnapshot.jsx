@@ -1,5 +1,6 @@
 import { day, snapshot } from "../lib/companySnapshot";
 import "./CompanySnapshot.css";
+import TermHelp from "./TermHelp";
 
 const marks = {
   pass: ["✓", "Met"],
@@ -30,14 +31,26 @@ function Checks({ checks }) {
 
 function ToneBar({ tone }) {
   if (!tone?.total) return null;
-  const { positive = 0, neutral = 0, mixed = 0, negative = 0 } = tone.counts;
+  const {
+    positive = 0,
+    neutral = 0,
+    mixed = 0,
+    negative = 0,
+    unclear = 0,
+  } = tone.counts;
   const parts = [
     ["positive", positive, "positive"],
     ["neutral", neutral + mixed, "neutral or mixed"],
     ["negative", negative, "negative"],
+    ...(unclear ? [["unclear", unclear, "unclear"]] : []),
   ];
   return (
     <div className="glance-tone">
+      <p className="glance-count-explanation">
+        {tone.relevant != null &&
+          `${tone.relevant} relevant stories; ${tone.selected - tone.relevant} unrelated or relevance-unclear. `}
+        Repeated coverage counts once in these totals.
+      </p>
       <div
         className="glance-tone-bar"
         role="img"
@@ -58,7 +71,7 @@ function ToneBar({ tone }) {
   );
 }
 
-function Activity({ data, instrumentId, onUpdates }) {
+function Activity({ data, instrumentId, onUpdates, onView }) {
   const quote = data?.market?.quote?.quote;
   const watch = data?.news_watch;
   const unread = [
@@ -102,7 +115,15 @@ function Activity({ data, instrumentId, onUpdates }) {
           hour: "2-digit",
           minute: "2-digit",
         })}
-        {watch.error ? " · last check had a problem" : ""}
+        {watch.error && (
+          <>
+            {" "}
+            · check incomplete{" "}
+            <button className="glance-link" onClick={() => onView("evidence")}>
+              View feed status and next steps →
+            </button>
+          </>
+        )}
       </li>,
     );
   if (!items.length) return null;
@@ -121,18 +142,38 @@ export default function CompanySnapshot({
   onUpdates,
   chart = null,
 }) {
-  const { sentences, sections } = snapshot(data);
+  const { sentences, sections, growth } = snapshot(data);
   return (
     <section className="glance" aria-label="Company summary">
       {sentences.length ? (
-        <p className="glance-summary">{sentences.join(" ")}</p>
+        <p className="glance-summary">
+          {growth && (
+            <span className="glance-growth">
+              <strong>
+                Revenue {growth.growth >= 0 ? "grew" : "fell"}{" "}
+                {Math.abs(growth.growth).toFixed(1)}% · last fiscal year
+              </strong>
+              <TermHelp term="revenue_growth" />
+              <small>
+                Year ended {day(growth.periodEnd)} vs year ended{" "}
+                {day(growth.previousEnd)}
+              </small>
+            </span>
+          )}
+          {sentences.slice(growth ? 1 : 0).join(" ")}
+        </p>
       ) : (
         <p className="glance-summary muted">
           A short summary appears once filings and news are loaded. Use Refresh
           research to load them.
         </p>
       )}
-      <Activity data={data} instrumentId={instrumentId} onUpdates={onUpdates} />
+      <Activity
+        data={data}
+        instrumentId={instrumentId}
+        onUpdates={onUpdates}
+        onView={onView}
+      />
       {chart}
       <div className="glance-grid">
         {sections.map((section) => (
@@ -160,7 +201,10 @@ export default function CompanySnapshot({
                   <strong className={figure.value ? "" : "missing"}>
                     {figure.value || "Not available"}
                   </strong>
-                  <span>{figure.label}</span>
+                  <span>
+                    {figure.label}
+                    {figure.term && <TermHelp term={figure.term} />}
+                  </span>
                 </div>
               ))}
             </div>

@@ -42,6 +42,7 @@ def provider(tone="negative", kind="reported_development", mutate=None):
                         else "unclear" if tone == "unclear" else "expressed_evaluation"
                     ),
                     previous_passages=[],
+                    price_claims=[],
                     passages=[
                         next(
                             p["id"]
@@ -294,13 +295,13 @@ def test_shift_needs_distinct_new_evidence_and_separates_news_social():
                 sentiment=tone,
                 statement="opinion",
             )
-            for i in range(3)
+            for i in range(5)
         ]
         return dict(
             packet={
                 "sources": [
                     dict(id=str(i), content_hash=prefix + str(i), channel=kind)
-                    for i in range(3)
+                    for i in range(5)
                 ]
             },
             result={

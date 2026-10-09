@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import Select from "./Select";
 import AnalystForecasts from "./AnalystForecasts";
-const SectorPosition = lazy(() => import("./SectorPosition"));
+import TermHelp from "./TermHelp";
 const PeerComparison = lazy(() => import("./PeerComparison"));
 const stamp = (value) =>
   value ? new Date(value).toLocaleString("en-GB") : "Not collected";
@@ -121,19 +121,35 @@ export default function FmpPanel({ instrumentId, visible, mode = "peers" }) {
   );
   if (mode === "outlook")
     return (
-      <>
-        <SectorPosition instrumentId={instrumentId} visible={visible} />
-        <details className="outlook-company-detail">
-          <summary>Analyst forecast values and data sources</summary>
-          <AnalystForecasts
-            data={data}
-            busy={busy}
-            error={error}
-            onCheck={() => act()}
-            onCheckPublic={checkPublic}
-          />
-        </details>
-      </>
+      <AnalystForecasts
+        data={data}
+        busy={busy}
+        error={error}
+        onCheck={() => act()}
+        onCheckPublic={checkPublic}
+      />
+    );
+  if (mode === "ratios")
+    return (
+      <details className="comparison-ratios">
+        <summary>
+          Other comparison measures · valuation ratios &amp; cash flow
+        </summary>
+        <p>
+          Saved peer choices, with each provider and period kept separate. Edit
+          the group above.
+        </p>
+        {error && <p role="alert">{error}</p>}
+        <button disabled={busy} onClick={() => act()}>
+          {busy ? "Checking…" : "Check FMP data"}
+        </button>
+        {data && (
+          <Suspense fallback={<p>Loading saved measures…</p>}>
+            <PeerComparison members={data.members} symbol={data.symbol} />
+          </Suspense>
+        )}
+        <SourceState source={data?.ratios} />
+      </details>
     );
   return (
     <section
@@ -321,7 +337,8 @@ export default function FmpPanel({ instrumentId, visible, mode = "peers" }) {
                           this section rather than mixing vendors.
                         </p>
                         <p>
-                          P/E (TTM):{" "}
+                          P/E (TTM)
+                          <TermHelp term="pe" />:{" "}
                           {figure(member.saved_finnhub.metrics.earnings.value)}
                         </p>
                         <p>

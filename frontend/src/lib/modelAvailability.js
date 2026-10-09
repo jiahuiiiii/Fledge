@@ -17,6 +17,8 @@ export function modelAvailability(status, capability = "enabled") {
       blocked: true,
       state: "attention",
       message:
+        "New AI analysis is paused while an earlier request is reviewed. Saved research is still available.",
+      detail:
         "An earlier AI request ended without a confirmed charge. It needs review before another paid request; no automatic confirmation is running.",
     };
   if (status.budget?.running > 0)
@@ -31,6 +33,8 @@ export function modelAvailability(status, capability = "enabled") {
       blocked: true,
       state: "attention",
       message:
+        "New AI analysis is paused while an earlier request is reviewed. Saved research is still available.",
+      detail:
         "An earlier AI request needs review before another paid request. Saved research remains available.",
     };
   if (Number(status.budget?.remaining_usd) <= 0)

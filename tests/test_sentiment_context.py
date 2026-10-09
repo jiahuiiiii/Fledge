@@ -170,7 +170,7 @@ def test_removal_during_analysis_withholds_response(owner):
 
 
 def test_context_change_is_not_alerted_as_a_new_opinion_even_with_new_text():
-    # Three negative -> three positive groups plus a genuinely new comment.
+    # Five negative -> five positive groups plus a genuinely new comment.
     sources = [
         dict(
             id=str(i),
@@ -181,7 +181,7 @@ def test_context_change_is_not_alerted_as_a_new_opinion_even_with_new_text():
             title="HN",
             conversation=dict(content_key="old"),
         )
-        for i in range(3)
+        for i in range(5)
     ]
 
     def record(sources, tone):

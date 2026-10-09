@@ -232,7 +232,7 @@ def sample(prefix, platform, tone):
             title="Comment",
             text=f"Different view {prefix}{k}",
         )
-        for k in range(3)
+        for k in range(5)
     ]
     items = [
         dict(

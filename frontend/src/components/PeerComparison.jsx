@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import Select from "./Select";
 import { amount, day } from "./FinancialOverview";
 import { peerMetrics, peerRows, peerScale } from "../lib/peerComparison";
+import TermHelp from "./TermHelp";
 import "./PeerComparison.css";
 
 const stamp = (date) =>
@@ -55,7 +56,10 @@ export default function PeerComparison({ members, symbol }) {
           </Select>
         </label>
       </div>
-      <p className="peer-chart-intro">{metric.explanation}</p>
+      <p className="peer-chart-intro">
+        {metric.explanation}
+        {selected.startsWith("pe_") && <TermHelp term="pe" />}
+      </p>
       {!peers && (
         <p className="peer-chart-note">
           Choose and save a comparison company above to see its figures

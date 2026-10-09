@@ -1,4 +1,5 @@
 import ForecastRange from "./ForecastRange";
+import TermHelp from "./TermHelp";
 import "./PublicForecasts.css";
 
 const stamp = (value) => new Date(value).toLocaleString("en-GB");
@@ -66,7 +67,10 @@ export default function PublicForecasts({ source, busy, onRefresh }) {
                   FY {forecast.fiscal_year} · period ending{" "}
                   {forecast.period_end}
                 </h4>
-                <span className="outlook-status">Adjusted EPS</span>
+                <span className="outlook-status">
+                  Adjusted EPS
+                  <TermHelp term="accounting" />
+                </span>
               </div>
               <p className="outlook-data-note">
                 Forecast currency is not stated. Values use the source’s units.

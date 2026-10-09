@@ -9,6 +9,10 @@ import urllib.request
 from pathlib import Path
 
 journeys = {
+    "--topic-homes",
+    "--reading-flow",
+    "--companion",
+    "--content-first",
     "--company-overview",
     "--business",
     "--financials",
@@ -45,6 +49,7 @@ journeys = {
     "--roles",
     "--sec",
     "--sentiment",
+    "--sentiment-guards",
     "--sentiment-inputs",
     "--sentiment-history",
     "--social-platforms",
@@ -58,10 +63,11 @@ if len(sys.argv) > 2 or any(arg not in journeys for arg in sys.argv[1:]):
     )
 
 root = Path(__file__).resolve().parents[1]
+port = str(int(os.environ.get("THESIS_BROWSER_PORT", "8843")))
 env = dict(
     os.environ,
     THESIS_DATA_DIR=tempfile.mkdtemp(prefix="thesis-browser-", dir="/private/tmp"),
-    THESIS_TEST_URL="http://127.0.0.1:8843",
+    THESIS_TEST_URL=f"http://127.0.0.1:{port}",
     THESIS_TEST_OFFLINE="true",
     PYTHONPATH=str(root / "tests/offline_runtime") + os.pathsep + str(root),
 )
@@ -70,7 +76,7 @@ if "--research-design" in sys.argv:
 if "--source-filters" in sys.argv:
     env["THESIS_FILTERS_SYMBOL"] = "MSFT"
 server = subprocess.Popen(
-    [sys.executable, "run.py", "--port", "8843"], cwd=root, env=env
+    [sys.executable, "run.py", "--port", port], cwd=root, env=env
 )
 try:
     for _ in range(60):
@@ -85,7 +91,7 @@ try:
             time.sleep(0.2)
     else:
         raise RuntimeError("Browser test server did not start")
-    if "--financials" in sys.argv:
+    if any(flag in sys.argv for flag in ["--financials", "--content-first", "--reading-flow", "--companion", "--topic-homes"]):
         subprocess.run([sys.executable, "tests/seed_financials_browser.py"], cwd=root, env=env, check=True)
     elif "--business" in sys.argv or "--sector-position" in sys.argv or "--company-overview" in sys.argv:
         subprocess.run([sys.executable, "tests/seed_business_browser.py"], cwd=root, env=env, check=True)
@@ -261,7 +267,7 @@ try:
             env=env,
             check=True,
         )
-    elif "--sentiment" in sys.argv:
+    elif "--sentiment" in sys.argv or "--sentiment-guards" in sys.argv:
         subprocess.run(
             [sys.executable, "tests/seed_sentiment_browser.py"],
             cwd=root,
@@ -298,7 +304,7 @@ try:
     result = subprocess.run(
         [
             os.environ.get("THESIS_NODE", "node"),
-            "tests/browser_company_overview.cjs" if "--company-overview" in sys.argv else "tests/browser_news_discussion.cjs" if "--news-discussion" in sys.argv else "tests/browser_ideas.cjs" if "--ideas" in sys.argv else "tests/browser_sector_position.cjs" if "--sector-position" in sys.argv else "tests/browser_financials.cjs" if "--financials" in sys.argv else "tests/browser_business.cjs" if "--business" in sys.argv else "tests/browser_research_design.cjs" if "--research-design" in sys.argv else "tests/browser_source_filters.cjs" if "--source-filters" in sys.argv else "tests/browser_retained_watch.cjs" if "--watch-continuity" in sys.argv else "tests/browser_sentiment_limits.cjs" if "--sentiment-limits" in sys.argv else "tests/browser_report_expectations.cjs" if "--report-expectations" in sys.argv else (
+            "tests/browser_topic_homes.cjs" if "--topic-homes" in sys.argv else "tests/browser_companion.cjs" if "--companion" in sys.argv else "tests/browser_reading_flow.cjs" if "--reading-flow" in sys.argv else "tests/browser_sentiment_guards.cjs" if "--sentiment-guards" in sys.argv else "tests/browser_content_first.cjs" if "--content-first" in sys.argv else "tests/browser_company_overview.cjs" if "--company-overview" in sys.argv else "tests/browser_news_discussion.cjs" if "--news-discussion" in sys.argv else "tests/browser_ideas.cjs" if "--ideas" in sys.argv else "tests/browser_sector_position.cjs" if "--sector-position" in sys.argv else "tests/browser_financials.cjs" if "--financials" in sys.argv else "tests/browser_business.cjs" if "--business" in sys.argv else "tests/browser_research_design.cjs" if "--research-design" in sys.argv else "tests/browser_source_filters.cjs" if "--source-filters" in sys.argv else "tests/browser_retained_watch.cjs" if "--watch-continuity" in sys.argv else "tests/browser_sentiment_limits.cjs" if "--sentiment-limits" in sys.argv else "tests/browser_report_expectations.cjs" if "--report-expectations" in sys.argv else (
                 (
                     "tests/browser_recurring_events.cjs"
                     if "--recurring-events" in sys.argv

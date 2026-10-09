@@ -6,12 +6,21 @@ export function useWorkspaceLayout() {
     try {
       const saved = JSON.parse(localStorage.getItem(preferenceKey));
       return {
-        companiesHidden: saved?.companiesHidden === true,
+        companiesHidden:
+          saved?.railDefaultVersion === 2
+            ? saved.companiesHidden !== false
+            : true,
+        railDefaultVersion: 2,
         ideaHidden: saved?.ideaHidden === true,
         progressHidden: saved?.progressHidden !== false,
       };
     } catch {
-      return { companiesHidden: false, ideaHidden: true, progressHidden: true };
+      return {
+        companiesHidden: true,
+        ideaHidden: true,
+        progressHidden: true,
+        railDefaultVersion: 2,
+      };
     }
   });
   useEffect(() => {

@@ -53,7 +53,7 @@ def explain_saved_failure(conn, run):
             continue
         calls = rows(conn, """SELECT * FROM model_calls WHERE purpose=ANY(%s) AND status='settled'
                        AND created_at>=%s AND finished_at<=%s ORDER BY finished_at DESC,id DESC LIMIT 32""",
-                     ([sentiment.PROMPT, 'thesis-source-sentiment-20', 'thesis-source-sentiment-21'], step['started_at'], step['finished_at']))
+                     ([sentiment.PROMPT, 'thesis-source-sentiment-20', 'thesis-source-sentiment-21', 'thesis-source-sentiment-22'], step['started_at'], step['finished_at']))
         for call in calls:
             try:
                 wire = json.loads(call['request_body']['input'][1]['content'])

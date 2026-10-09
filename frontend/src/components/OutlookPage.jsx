@@ -18,15 +18,12 @@ export default function OutlookPage({
     <div className="outlook-page">
       {includeForecasts && (
         <>
+          <ManagementOutlook data={management} />
           <FmpPanel
             instrumentId={instrumentId}
             visible={visible}
             mode="outlook"
           />
-          <details className="outlook-company-detail">
-            <summary>Company guidance and original evidence</summary>
-            <ManagementOutlook data={management} />
-          </details>
         </>
       )}
       <details className="outlook-news">

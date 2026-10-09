@@ -35,6 +35,8 @@ export default function HistoryPanel({
   renderComparison,
   renderEventReview,
   initialRecord,
+  onIdeas,
+  hasChecks = false,
 }) {
   const [selected, setSelected] = useState(initialRecord || ""),
     [filter, setFilter] = useState("all");
@@ -77,15 +79,48 @@ export default function HistoryPanel({
   const unreviewed = records.filter(
     (r) => r.evaluation && !r.evaluation.review_action,
   ).length;
+  if (!versions.length && !initialRecord)
+    return (
+      <section className="history-page">
+        <h2>History</h2>
+        <p className="muted">
+          Past versions of your ideas and the evidence checked against them.
+        </p>
+        {!hasChecks && (
+          <div className="history-empty">
+            <span className="history-empty-mark" aria-hidden="true">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              >
+                <circle cx="12" cy="12" r="8" />
+                <path d="M12 7v5l3 2" />
+              </svg>
+            </span>
+            <h3>No saved history yet</h3>
+            <p>
+              Save an idea first. Its revisions and completed checks will appear
+              here, so you can see how your thinking changed.
+            </p>
+            {onIdeas && <button onClick={onIdeas}>Go to My ideas</button>}
+          </div>
+        )}
+      </section>
+    );
   return (
     <section className="history-page">
       <div className="row">
-        <h2>Research history</h2>
+        <h2>History</h2>
         <span className="muted">{versions.length} revisions</span>
       </div>
       <p className="muted">
-        Every saved definition, monitoring assessment, event check and AI
-        comparison stays available. {unreviewed} assessments awaiting review.
+        Past versions of your ideas and the evidence checked against them.
+        {unreviewed > 0 && ` ${unreviewed} checks awaiting review.`}
       </p>
       <div className="field">
         <label htmlFor="history-filter">Show</label>
@@ -97,10 +132,8 @@ export default function HistoryPanel({
             setSelected("");
           }}
         >
-          <option value="all">
-            All revisions, assessments and comparisons
-          </option>
-          <option value="unreviewed">Unreviewed assessments</option>
+          <option value="all">All saved versions and checks</option>
+          <option value="unreviewed">Checks awaiting review</option>
           <option value="unresolved">Left unresolved</option>
         </Select>
       </div>
@@ -115,9 +148,9 @@ export default function HistoryPanel({
           </h3>
           <p>
             {unavailable
-              ? "This link does not match a record in this company’s saved history. Choose All revisions, assessments and comparisons to browse available records."
+              ? "This link does not match a record in this company’s saved history. Choose All saved versions and checks to browse available records."
               : versions.length
-                ? "Other revisions, assessments and comparisons remain in All revisions, assessments and comparisons."
+                ? "Other saved versions and checks remain in All saved versions and checks."
                 : "Save a draft whenever you have reasoning worth revisiting."}
           </p>
         </div>

@@ -48,3 +48,81 @@ test("records from different streams keep separate identity and review state", (
     recordKey({ kind: "company", id: "same-id" }),
   );
 });
+
+test("company updates lead with their retained headline and own source excerpt", () => {
+  const record = {
+    kind: "company",
+    title: "New adverse or mixed company reporting",
+    detail: {
+      payload: {
+        items: [
+          {
+            source_id: "alert-source",
+            explanation: "AI reading: a generic classification",
+            citations: [
+              { source_id: "alert-source", quote: "A production delay" },
+              {
+                source_id: "alert-source",
+                quote: "The opening moved to September.",
+              },
+            ],
+          },
+        ],
+      },
+      sources: [
+        { id: "unrelated", title: "Wrong headline", body: "Wrong body" },
+        {
+          id: "alert-source",
+          title: "A production delay",
+          body: "The opening moved to September. The plan is being revised.",
+          kind: "news",
+          source: "Saved publisher",
+          published_at: "2026-05-01",
+        },
+      ],
+    },
+  };
+  const summary = inboxSummary(record);
+  assert.equal(summary.title, "A production delay");
+  assert.equal(summary.text, "The opening moved to September.");
+  assert.equal(summary.source, "Saved publisher");
+  assert.equal(summary.alert, record.title);
+  assert.doesNotMatch(JSON.stringify(summary), /Wrong|generic classification/);
+});
+
+test("company previews never borrow a parent or comparison-only source", () => {
+  for (const comparison_only of [false, true]) {
+    const record = {
+      kind: "company",
+      title: "A changed discussion",
+      detail: {
+        payload: {
+          items: [
+            {
+              source_id: "comment",
+              citations: [{ source_id: "parent", quote: "A parent claim" }],
+            },
+          ],
+        },
+        sources: [
+          { id: "parent", title: "Parent headline", body: "A parent claim" },
+          {
+            id: "comment",
+            kind: "social",
+            title: "Hacker News comment",
+            body: "The comment's own wording.",
+            comparison_only,
+          },
+        ],
+      },
+    };
+    const summary = inboxSummary(record);
+    assert.doesNotMatch(
+      JSON.stringify(summary),
+      /Parent headline|A parent claim|Hacker News comment/,
+    );
+    if (!comparison_only)
+      assert.equal(summary.text, "The comment's own wording.");
+    else assert.doesNotMatch(summary.text, /own wording/);
+  }
+});

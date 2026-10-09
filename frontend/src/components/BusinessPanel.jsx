@@ -33,6 +33,7 @@ export default function BusinessPanel({
   modelStatus,
   onRefresh,
   onDraft,
+  focusTopic,
 }) {
   const [history, setHistory] = useState(null),
     [selected, setSelected] = useState(null);
@@ -114,11 +115,35 @@ export default function BusinessPanel({
     ...new Set((selected?.sources || []).map((s) => s.form).filter(Boolean)),
   ];
   const brief = selected?.result && !selected.withheld ? selected : null;
+  const panel = useRef(null);
+  const focusedTopic = useRef(null);
+  useEffect(() => {
+    if (
+      !visible ||
+      !focusTopic ||
+      focusedTopic.current === focusTopic ||
+      (!history && !error)
+    )
+      return;
+    const frame = requestAnimationFrame(() => {
+      const target =
+        panel.current?.querySelector(`[data-topic="${focusTopic.topic}"] h3`) ||
+        panel.current?.querySelector("h2");
+      target?.focus({ preventScroll: true });
+      target?.scrollIntoView({ block: "center", behavior: "instant" });
+      focusedTopic.current = focusTopic;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [visible, focusTopic, history, error]);
   return (
-    <section className="business-panel" aria-label="Understand the business">
+    <section
+      ref={panel}
+      className="business-panel"
+      aria-label="Understand the business"
+    >
       <div className="brief-head">
         <div>
-          <h2>Understand the business</h2>
+          <h2 tabIndex={-1}>Understand the business</h2>
           {brief && (
             <p className="brief-meta">
               AI summary of the company’s own filings
@@ -163,6 +188,7 @@ export default function BusinessPanel({
             {Object.entries(titles).map(([category, title]) => (
               <BriefTopic
                 key={category}
+                category={category}
                 title={title}
                 findings={brief.result.findings.filter(
                   (finding) => finding.category === category,
@@ -279,13 +305,15 @@ export default function BusinessPanel({
 }
 
 // One card per topic: the first point is visible, the rest on request.
-function BriefTopic({ title, findings, onEvidence }) {
+function BriefTopic({ title, category, findings, onEvidence }) {
   const [open, setOpen] = useState(false);
   const id = useId();
   const shown = open ? findings : findings.slice(0, 1);
   return (
-    <article className="brief-topic" aria-labelledby={id}>
-      <h3 id={id}>{title}</h3>
+    <article className="brief-topic" aria-labelledby={id} data-topic={category}>
+      <h3 id={id} tabIndex={-1}>
+        {title}
+      </h3>
       {findings.length ? (
         <ul>
           {shown.map((finding, i) => (

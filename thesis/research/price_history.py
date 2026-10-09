@@ -1,7 +1,8 @@
 """Daily Yahoo chart acquisition adapted from Deus pipeline/price_feed.py.
 
 Whole-window snapshots avoid mixing prices across split-adjustment vintages.
-This data is display context only and never enters evidence/monitoring manifests.
+Completed captures can also provide explicitly dated arithmetic context for
+source sentiment. They do not establish author attitude or company events.
 """
 
 import hashlib

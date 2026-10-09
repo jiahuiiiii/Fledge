@@ -1,8 +1,20 @@
+import SentimentPriceContext from "./SentimentPriceContext";
+
 export default function SentimentBasis({ item }) {
   if (!item.evidence_policy) return <p>{item.explanation}</p>;
   return (
     <div className="sentiment-basis">
       <p className="fine">{item.explanation}</p>
+      {item.guard?.applied && (
+        <p className="fine">
+          Evidence check changed the AI's {item.guard.model_sentiment} label to
+          unclear.
+        </p>
+      )}
+      <SentimentPriceContext
+        values={item.price_comparisons}
+        quotedText={item.citations.map((c) => c.quote)}
+      />
       {item.reporting_basis && (
         <details className="reporting-evidence">
           <summary>{item.reporting_basis.label}</summary>

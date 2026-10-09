@@ -116,11 +116,7 @@ let browser;
         .evaluate((el) => getComputedStyle(el).transitionDuration),
       "0s",
     );
-    assert.ok(
-      await page
-        .locator(".periodic-review-entry")
-        .evaluate((el) => parseFloat(getComputedStyle(el).paddingLeft) >= 16),
-    );
+    assert.equal(await page.locator(".periodic-review-entry").count(), 0);
     await screenshot(`saved-${width}`);
   }
   // The original focus page/editor remains the saved-card destination.
@@ -180,17 +176,7 @@ let browser;
         .getByRole("button", { name: "Save my reasoning", exact: true })
         .evaluate((el) => el.getBoundingClientRect().height >= 44),
     );
-    assert.ok(
-      await page
-        .locator(".periodic-review-entry")
-        .evaluate(
-          (el) =>
-            el.getBoundingClientRect().top >=
-            document.querySelector(".ideas-page").getBoundingClientRect()
-              .bottom,
-        ),
-      "weekly review follows ideas",
-    );
+    assert.equal(await page.locator(".periodic-review-entry").count(), 0);
     await screenshot(`empty-${width}`);
   }
   await ideas
@@ -242,7 +228,7 @@ let browser;
   await page.goto(base + "/?view=ideas");
   await ideas
     .getByRole("heading", {
-      name: "Turn your research into an idea",
+      name: "What do you think about the companies you follow?",
       exact: true,
     })
     .waitFor();
@@ -253,6 +239,7 @@ let browser;
   await page
     .getByRole("region", { name: "All company workspaces", exact: true })
     .waitFor();
+  await page.locator('.company-overview-grid[aria-busy="false"]').waitFor();
   assert.equal(new URL(page.url()).searchParams.get("view"), "workspace");
   assert.ok(!new URL(page.url()).searchParams.get("company"));
   assert.deepEqual(writes, []);
@@ -266,7 +253,7 @@ let browser;
     originalEditors: true,
     cancelWithoutSave: true,
     focusRestored: true,
-    weeklyReviewBelowIdeas: true,
+    noDuplicateWeeklyBanner: true,
     allCompanyBrowser: true,
     writes,
     errors,

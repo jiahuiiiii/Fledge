@@ -5,7 +5,13 @@ import LoadingSkeleton from "./LoadingSkeleton";
 import CompanyAvatar from "./CompanyAvatar";
 import PriceChange from "./PriceChange";
 import { companyName, companyMatches } from "../lib/companyIdentity";
-import { day, money, percent, trailing } from "../lib/companySnapshot";
+import {
+  day,
+  money,
+  percent,
+  trailing,
+  newsTone,
+} from "../lib/companySnapshot";
 import { latestPriceQuote, quoteMovement } from "../lib/priceRefresh";
 import "./CompanyOverview.css";
 const stamp = (value) =>
@@ -127,6 +133,7 @@ export default function CompanyOverview({
               : null;
           const revenue = trailing(data?.financial_depth, "revenue");
           const margin = trailing(data?.financial_depth, "operating_margin");
+          const tone = newsTone(data?.sentiment);
           return (
             <button
               className="company-overview-card"
@@ -179,6 +186,20 @@ export default function CompanyOverview({
                         : "No saved quote"}
                       {reading.priceError && " · Latest-price read unavailable"}
                     </span>
+                  </span>
+                  <span className="company-overview-tone">
+                    <span>
+                      News tone ·{" "}
+                      {tone?.label ||
+                        (tone
+                          ? "Too few interpretable developments"
+                          : "No saved reading")}
+                    </span>
+                    <small>
+                      {tone
+                        ? `${tone.selected} ${tone.selected === 1 ? "story" : "stories"} · ${tone.total} counted groups · ${tone.stale ? "older reading" : "saved"} ${stamp(tone.savedAt)}`
+                        : "Analyse news in the company workspace"}
+                    </small>
                   </span>
                   <span className="company-overview-figures">
                     <span>
@@ -255,7 +276,12 @@ function recordsFor(company, versions) {
   });
 }
 
-export function AllHistory({ catalogue, onOpen, visible = true }) {
+export function AllHistory({
+  catalogue,
+  onOpen,
+  visible = true,
+  hasChecks = false,
+}) {
   const [state, setState] = useState({
     records: [],
     errors: [],
@@ -305,7 +331,7 @@ export function AllHistory({ catalogue, onOpen, visible = true }) {
     >
       <span className="section-label">ALL COMPANIES</span>
       <div className="row">
-        <h2>Research history</h2>
+        <h2>History</h2>
         <button
           onClick={() => setRefresh((value) => value + 1)}
           disabled={state.loading}
@@ -314,8 +340,7 @@ export function AllHistory({ catalogue, onOpen, visible = true }) {
         </button>
       </div>
       <p className="muted">
-        Saved definitions and checks, newest first. Open a record to inspect its
-        original evidence.
+        Past versions of your ideas and completed checks, newest first.
       </p>
       {state.loading ? (
         <LoadingSkeleton label="Loading saved company histories…" />
@@ -327,8 +352,31 @@ export function AllHistory({ catalogue, onOpen, visible = true }) {
               to retry.
             </p>
           )}
-          {!state.records.length && !state.errors.length && (
-            <h3>No saved research yet</h3>
+          {!state.records.length && !state.errors.length && !hasChecks && (
+            <div className="history-empty">
+              <span className="history-empty-mark" aria-hidden="true">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                >
+                  <circle cx="12" cy="12" r="8" />
+                  <path d="M12 7v5l3 2" />
+                </svg>
+              </span>
+              <h3>No saved history yet</h3>
+              <p>
+                Save an idea first. Its revisions and completed checks will
+                appear here, so you can see how your thinking changed.
+              </p>
+              <button onClick={() => onOpen("", "ideas")}>
+                Go to My ideas
+              </button>
+            </div>
           )}
           <div className="idea-collection">
             {state.records.map((record) => (

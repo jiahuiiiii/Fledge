@@ -1,5 +1,6 @@
 import { useState } from "react";
 import EvidenceButton from "./EvidenceButton";
+import TermHelp from "./TermHelp";
 import "../financial-overview.css";
 
 export { Evidence, amount, day };
@@ -249,6 +250,7 @@ export default function FinancialOverview({ data, compact = false }) {
                 operating_margin: "Operating margin",
                 free_cash_flow: "Free cash flow",
               }[row.key] || row.label}
+              <TermHelp term={row.key} />
             </span>
             <strong>
               {row.unit === "percent" && valueOf(row.value) != null

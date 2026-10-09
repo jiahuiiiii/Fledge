@@ -72,13 +72,13 @@ export function MarketQuote({ market, history, compact = false }) {
         ) : (
           <p>No quote retrieved. Choose Refresh research to load it.</p>
         )}
-        {status?.quote_error && (
+        {!compact && status?.quote_error && (
           <p className="warning" role="status">
             Finnhub quote check unavailable. {status.quote_error}{" "}
             {q && !latest && "Showing the previous Finnhub quote."}
           </p>
         )}
-        {interrupted && (
+        {!compact && interrupted && (
           <p className="warning">
             The previous refresh was interrupted. Displayed data may be older.
           </p>

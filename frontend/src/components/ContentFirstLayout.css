@@ -1,0 +1,157 @@
+/* Company context stays with the report; operational detail opens on demand. */
+.app-shell .company-actions .company-action-icon {
+  display: none;
+}
+.app-shell .company-actions .research-updates-trigger {
+  position: relative;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+}
+.app-shell .research-updates-dot {
+  position: absolute;
+  right: var(--space-2);
+  top: var(--space-2);
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-positive);
+}
+.research-updates-dialog {
+  width: min(760px, calc(100vw - 24px));
+}
+.research-updates-content {
+  padding: var(--space-5);
+  display: grid;
+  gap: var(--space-4);
+}
+.research-updates-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+}
+.research-updates-actions > button {
+  min-height: 44px;
+}
+.research-updates-dialog .research-loading {
+  margin: 0;
+  padding: var(--space-4);
+}
+.research-updates-dialog .research-loading-collapse {
+  width: 100%;
+}
+.research-ai-status {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-line);
+}
+.research-ai-status details {
+  margin-top: var(--space-2);
+}
+.research-ai-status summary {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+.app-shell .glance-growth {
+  display: block;
+  margin-bottom: var(--space-3);
+}
+.app-shell .glance-growth strong {
+  display: block;
+  color: var(--color-text);
+  font-weight: 600;
+}
+.app-shell .glance-growth small {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+.app-shell .financial-insights .financial-insight .insight-basis {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-accent);
+}
+.app-shell .financial-insights .financial-insight .insight-period {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+@media (max-width: 600px) {
+  .app-shell .company-header {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    gap: var(--space-2);
+    padding-block: var(--space-2);
+  }
+  .app-shell .company-header > .company-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-md);
+  }
+  .app-shell .company-header > div:first-of-type {
+    min-width: 0;
+  }
+  .app-shell .company-header .row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+  }
+  .app-shell .company-header h1 {
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-md);
+  }
+  .app-shell .company-header > div:first-of-type > p {
+    display: none;
+  }
+  .app-shell .company-header .company-actions {
+    grid-column: 3;
+    grid-row: 1;
+    width: auto;
+    margin: 0;
+    order: initial;
+    gap: var(--space-1);
+    flex-wrap: nowrap;
+  }
+  .app-shell .company-header .company-actions > button {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    flex: none;
+  }
+  .app-shell .company-actions .company-action-icon {
+    display: inline-flex;
+  }
+  .app-shell .company-actions .company-action-label {
+    display: none;
+  }
+  .app-shell .company-header .market-quote.compact {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .app-shell .company-header .quote-primary .quote-value > strong {
+    font-size: var(--text-lg);
+  }
+  .app-shell .company-header .quote-primary > small {
+    margin: 0;
+  }
+  .research-updates-content {
+    padding: var(--space-4);
+  }
+  .app-shell .research-browser {
+    gap: var(--space-2);
+  }
+  .app-shell .research-navigation {
+    padding-block: var(--space-1);
+  }
+}

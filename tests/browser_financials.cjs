@@ -24,14 +24,17 @@ let browser;
   await page.getByRole('tab',{name:'Financials',exact:true}).click();
   const story=page.locator('.financials-story');
   const history=page.getByRole('region',{name:'Earnings and cash-flow history',exact:true});
-  const position=page.getByRole('region',{name:'What it owns and owes',exact:true});
+  const position=page.getByRole('region',{name:'Liquidity detail',exact:true});
+  const more=page.locator('.financial-more-detail');
   const debt=page.getByRole('region',{name:'Borrowing and equity history',exact:true});
   const balance=page.getByRole('region',{name:'Balance-sheet breakdown',exact:true});
   await history.locator('.story-selected-values').getByText('US$64bn',{exact:true}).waitFor();
-  assert.equal(await story.locator('.financial-story-section').count(),5);
-  assert.match(await history.innerText(),/23.1% higher/);
-  assert.match(await history.innerText(),/US\$31.3 in net result/);
-  assert.match(await history.innerText(),/left US\$40bn/);
+  assert.equal(await story.locator(':scope > .financial-story-section:visible').count(),3);
+  await more.locator(':scope > summary').click();
+  assert.match(await story.innerText(),/23.1% higher/);
+  assert.match(await story.innerText(),/US\$31.3 in net result/);
+  assert.match(await story.innerText(),/left US\$40bn/);
+
   assert.match(await position.innerText(),/US\$30bn surplus/);
   assert.match(await debt.innerText(),/US\$38bn remains/);
   assert.match(await debt.innerText(),/61.8%/);
@@ -43,31 +46,34 @@ let browser;
   const tiles=await balance.locator('.story-balance-map').first().locator('.story-map-block').evaluateAll(els=>els.map(el=>({area:parseFloat(el.style.width)*parseFloat(el.style.height),label:el.title})));
   assert.ok(Math.abs(tiles.reduce((sum,tile)=>sum+tile.area,0)-10000)<1e-2);
   assert.ok(Math.abs(tiles.find(tile=>tile.label.startsWith('Cash')).area-1500)<1e-2);
-  const trigger=history.locator('.financial-insight').filter({hasText:'Sales grew'}).getByRole('button',{name:'Evidence',exact:true});
+  const trigger=page.locator('.financial-summary-row article').first().getByRole('button');
+
   await trigger.focus();await page.keyboard.press('Enter');
-  const evidence=page.getByRole('dialog',{name:'Sales grew · evidence',exact:true});
+  const evidence=page.getByRole('dialog',{name:/Revenue growth · (past 12 months|fiscal year)/,exact:true});
   assert.match(await evidence.innerText(),/64000000000 USD/);
   assert.match(await evidence.innerText(),/52000000000 USD/);
   assert.match(await evidence.getByRole('link').first().getAttribute('href'),/^https:\/\/www.sec.gov\/Archives\//);
   await page.keyboard.press('Escape'); assert.equal(await trigger.evaluate(el=>document.activeElement===el),true);
   const slider=history.getByLabel('Sales, earnings and cash flow reporting date');
   await slider.focus();await page.keyboard.press('Home');await page.keyboard.press('ArrowRight');await page.keyboard.press('ArrowRight');
-  assert.match(await history.innerText(),/30 Sept? 2023/);
-  assert.match(await history.innerText(),/period ended in a loss/);
-  assert.match(await history.innerText(),/−US\$3bn/);
+  assert.match(await story.innerText(),/30 Sept? 2023/);
+  assert.match(await story.innerText(),/period ended in a loss/);
+  assert.match(await story.innerText(),/−US\$3bn/);
   await history.getByRole('button',{name:'Operating cash flow',exact:true}).click();
   assert.equal(await history.getByRole('button',{name:'Operating cash flow',exact:true}).getAttribute('aria-pressed'),'true');
-  await history.getByRole('button',{name:'Annual reports',exact:true}).click();
-  assert.equal(await history.getByRole('button',{name:'Annual reports',exact:true}).getAttribute('aria-pressed'),'true');
+  await story.getByRole('button',{name:'Fiscal year',exact:true}).click();
+  assert.equal(await story.getByRole('button',{name:'Fiscal year',exact:true}).getAttribute('aria-pressed'),'true');
   await page.getByRole('tab',{name:'Overview',exact:true}).click();
   assert.equal(await page.locator('.revenue-flow:visible').count(),0);
   await page.getByRole('tab',{name:'Financials',exact:true}).click();
-  assert.equal(await history.getByRole('button',{name:'Annual reports',exact:true}).getAttribute('aria-pressed'),'true');
+  assert.equal(await story.getByRole('button',{name:'Fiscal year',exact:true}).getAttribute('aria-pressed'),'true');
   await slider.focus();await page.keyboard.press('End');
   for(const [width,height] of [[1440,1100],[980,1000],[390,844],[320,740]]) {
     await page.setViewportSize({width,height});
     for(const [name,section] of [['history',history],['position',position],['borrowing',debt],['balance',balance]]) {
+
       await section.scrollIntoViewIfNeeded();await page.mouse.move(1,1);
+      if(!await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)){console.log(await page.evaluate(()=>[...document.querySelectorAll('.main-workspace *')].filter(el=>{const r=el.getBoundingClientRect();return r.width && r.right>innerWidth+1&&!el.closest('.story-chart-viewport,.flow-viewport,.revenue-chart-viewport')}).map(el=>({tag:el.tagName,cls:el.className,width:el.getBoundingClientRect().width,scroll:el.scrollWidth,text:el.textContent.slice(0,60)})).slice(0,40)));await page.screenshot({path:path.join(folder,`page-overflow-${name}-${width}.png`)});}
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`page overflow ${name} ${width}`);
       if(!await section.evaluate(el=>el.scrollWidth<=el.clientWidth)){
         console.log(await section.evaluate(el=>({width:el.clientWidth,scroll:el.scrollWidth,offenders:[...el.querySelectorAll('*')].filter(child=>{const r=child.getBoundingClientRect(),p=el.getBoundingClientRect();return r.right>p.right+1 && !child.closest('.story-chart-viewport');}).map(child=>({tag:child.tagName,cls:child.className,width:child.getBoundingClientRect().width,text:child.textContent.slice(0,70)}))})));
@@ -77,8 +83,9 @@ let browser;
       await section.getByRole('heading').first().evaluate(el=>el.scrollIntoView({block:'start'}));
       await page.evaluate(()=>{const chrome=document.querySelector('.company-header');const main=document.querySelector('.main-workspace');if(main&&getComputedStyle(main).overflowY==='auto')main.scrollTop-=chrome?.getBoundingClientRect().height+100||100;else window.scrollBy(0,-150);});
       await page.screenshot({path:path.join(folder,`${name}-${width}.png`),animations:'disabled'});
-      if(['history','borrowing'].includes(name)) {await section.locator('.financial-insights').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(folder,`${name}-readings-${width}.png`),animations:'disabled'});}
+      if(name==='borrowing') {await section.locator('.financial-insights').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(folder,`${name}-readings-${width}.png`),animations:'disabled'});}
     }
+
     await trigger.click();await evidence.waitFor();
     assert.ok(await evidence.evaluate(el=>el.scrollWidth<=el.clientWidth));
     await page.keyboard.press('Escape');
@@ -102,10 +109,13 @@ let browser;
   });
   await page.reload();await page.getByRole('tab',{name:'Financials',exact:true}).click();
   await history.locator('.story-selected-values').getByText('−US$1bn',{exact:true}).waitFor();
-  assert.match(await history.innerText(),/fell short by US\$1bn/);
+  await more.locator(':scope > summary').click();
+  assert.match(await story.innerText(),/fell short by US\$1bn/);
+
   assert.match(await position.innerText(),/Missing obligations are not zero/);
   assert.match(await debt.innerText(),/ratio unavailable/);
   assert.equal(await balance.locator('.story-map-block').count(),0);
+
   assert.equal((await history.locator('.series-revenue path').getAttribute('d')).match(/M/g).length,2);
   await page.screenshot({path:path.join(folder,'missing-desktop.png'),animations:'disabled'});
   await page.unroute('**/companies/*/financial-story');
@@ -116,6 +126,6 @@ let browser;
   assert.equal(await story.locator('.story-map-block').count(),0);
   assert.equal(await story.locator('.story-pair-track > span').count(),0);
   assert.deepEqual(errors,[]);assert.deepEqual(external,[]);assert.deepEqual(writes,[]);
-  console.log('Financials passed: 5 sections, shared scales, proportional blocks, exact evidence, keyboard, retained selections, source gaps/withdrawal and 1440/980/390/320px; zero writes or external requests.');
+  console.log('Financials passed: 3 main charts plus expanded detail, shared scales, proportional blocks, exact evidence, keyboard, retained selections, source gaps/withdrawal and 1440/980/390/320px; zero writes or external requests.');
   await browser.close();
 })().catch(async error=>{console.error(error);if(browser)await browser.close();process.exit(1);});

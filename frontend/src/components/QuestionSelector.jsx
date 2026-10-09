@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import Select from "./Select";
 import Modal from "./Modal";
+import { starterQuestions } from "../lib/companion";
 
 export const questionDefaults = [
   "Can growth hold up without sacrificing margins?",
@@ -58,6 +59,7 @@ export default function QuestionSelector({
     ...new Set(
       [
         question,
+        ...starterQuestions.map((item) => item.question),
         ...questionDefaults,
         ...(library?.items || []).map((item) => item.question),
         currentQuestion,

@@ -1,6 +1,7 @@
 import PublicForecasts from "./PublicForecasts";
 import ForecastRange from "./ForecastRange";
 import LoadingSkeleton from "./LoadingSkeleton";
+import TermHelp from "./TermHelp";
 
 const stamp = (value) =>
   value ? new Date(value).toLocaleString("en-GB") : "Not established";
@@ -26,7 +27,10 @@ export default function AnalystForecasts({
       <header className="outlook-section-heading">
         <div>
           <h2>Analyst forecasts</h2>
-          <p>Revenue and earnings estimates, kept separate by source.</p>
+          <p>
+            Revenue and earnings estimates, kept separate by source.{" "}
+            <TermHelp term="consensus" />
+          </p>
         </div>
       </header>
       {error && (
