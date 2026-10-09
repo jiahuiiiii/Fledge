@@ -82,7 +82,7 @@ export default function CompanionGuide({
             </div>
           </div>
           <p className="fine">
-            Thesis does not tell you what to buy. You choose whether to save an
+            Fledge does not tell you what to buy. You choose whether to save an
             idea or enable a watch.
           </p>
         </div>

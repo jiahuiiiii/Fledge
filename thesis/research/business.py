@@ -184,4 +184,4 @@ def download(iid,did):
         body+='<p>'+esc(record['result']['limitation'])+'</p><p>'+esc(record['coverage']['selection'])+'</p>'
         for source in record['sources']:body+='<p><a href="'+esc(source['url'])+'">'+esc(source['title'])+'</a> · '+esc(source['published_at'])+'</p>'
     html='<!doctype html><html lang="en"><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; base-uri \'none\'; form-action \'none\'"><title>Business brief</title><body>'+body+'</body></html>'
-    return 'thesis-business-'+str(did)+'.html',html
+    return 'fledge-business-'+str(did)+'.html',html

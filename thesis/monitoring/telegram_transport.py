@@ -67,7 +67,7 @@ def call(key, method, payload):
             messages = {
                 401: "Telegram rejected the bot token. Check .env and reconnect.",
                 403: "Telegram blocked delivery. Open your bot chat and unblock it, then reconnect.",
-                409: "Another app is receiving this bot’s updates. Use a dedicated Thesis bot.",
+                409: "Another app is receiving this bot’s updates. Use a dedicated Fledge bot.",
             }
             raise TelegramError("rejected", messages.get(code, "Telegram rejected this request. Check the connection before trying again."))
         raise ValueError("Unconfirmed response")

@@ -25,7 +25,7 @@ export default function EmptyWorkspace({ view, onChoose }) {
     <div className="app-shell all-companies-view empty-app">
       <header className="topbar">
         <a className="brand" href="/">
-          thesis<span>↗</span>
+          fledge<span>↗</span>
         </a>
         <nav aria-label="Workspace navigation">
           {[

@@ -1,12 +1,14 @@
-# Thesis
+# Fledge
 
-**Thesis helps you explore an investment idea, keep your reasoning, and review changes in the evidence you follow.**
+Previously named Thesis. The app is now Fledge; the repository directory, configuration names and saved-data identifiers retain their existing names for compatibility.
+
+**Fledge helps you explore an investment idea, keep your reasoning, and review changes in the evidence you follow.**
 
 A local research companion for newer investors: start with a question, understand a company, save your own reasoning and revisit it alongside dated evidence. It does not tell you what to buy or execute trades.
 
 **Current stage: local pitch MVP.** The first companion features—starter questions, explanations beside financial terms and reasoning prompts—are implemented alongside company research, source-backed sentiment, saved ideas, opt-in monitoring, in-app updates and optional Telegram alerts. Source coverage and interpretation quality still have gaps. Status below reflects recorded verification on **9 October 2026**, not participant validation or public-launch readiness.
 
-Built with React/Vite, FastAPI and PostgreSQL, selectively adapting [Kestrel](https://github.com/jiahuiiiii/Kestrel) and [Deus](https://github.com/c0vo/Deus). Thesis has its own schema and evidence/monitoring contracts; it does not install either upstream application wholesale. [Source provenance](PROVENANCE.md) records the versions and adaptations.
+Built with React/Vite, FastAPI and PostgreSQL, selectively adapting [Kestrel](https://github.com/jiahuiiiii/Kestrel) and [Deus](https://github.com/c0vo/Deus). Fledge has its own schema and evidence/monitoring contracts; it does not install either upstream application wholesale. [Source provenance](PROVENANCE.md) records the versions and adaptations.
 
 [Companion features](#start-with-a-question) · [Run locally](#open-it-on-this-mac) · [Fresh setup](#fresh-setup) · [Source availability](#sources-and-current-availability) · [Paid AI restriction](#paid-ai-installation-restriction) · [Documentation](docs/README.md)
 
@@ -31,7 +33,7 @@ The companion has no buy/sell score or trading streak. Distinct evidence limitat
 
 ## Open it on this Mac
 
-Double-click **Start Thesis.command**, or run from this folder:
+Double-click **Start Fledge.command**, or run from this folder:
 
 ```sh
 .venv/bin/python run.py --open
@@ -77,7 +79,7 @@ Sentiment is a way to inspect the tone and themes of selected sources and identi
 | X / Twitter | Original posts through official recent search | Deferred by the owner; remains disabled. Adapter and controlled-response tests exist, but no live X request was made during verification. Replies, quotes and reposts are excluded. |
 | Nitter | Potential upstream social source | Not enabled. It is not an active fallback for unavailable X access. |
 
-Publisher retrieval retains available headlines/summaries and original links; it does not fetch full paywalled articles. Matching and selection are bounded. The successful WSJ Business/Technology checks returned the same Broadcom report: both source versions were retained, with one selected news candidate after URL deduplication. A responding feed does not guarantee relevant or comprehensive coverage. Alpha Vantage's own sentiment scores are not imported as Thesis labels.
+Publisher retrieval retains available headlines/summaries and original links; it does not fetch full paywalled articles. Matching and selection are bounded. The successful WSJ Business/Technology checks returned the same Broadcom report: both source versions were retained, with one selected news candidate after URL deduplication. A responding feed does not guarantee relevant or comprehensive coverage. Alpha Vantage's own sentiment scores are not imported as Fledge labels.
 
 Open **Data & sources → Publisher feeds & source connections** for feed outcomes and setup/failure reasons. Provider checks, cached feeds and cooldowns persist across restarts. One failed news provider does not stop all other collectors; partial coverage stays visible in watch history.
 
@@ -85,7 +87,7 @@ Open **Data & sources → Publisher feeds & source connections** for feed outcom
 
 **Our own Reddit HTML reader is experimental and off.** It needs no API key or scraper subscription. The owner-approved public-page check on 8 October returned a JavaScript verification page, with no usable posts or comments. Offline tests pass, but current discussion markup and working collection remain unverified. [Collector bounds and setup](docs/features/reddit-html-collector.md).
 
-**Deus-style Reddit RSS is now integrated.** The exact upstream diagnostic established the hot-post route; Thesis also fetched real comments through the same host’s comment RSS. The NVIDIA workspace contains a saved eight-source sentiment reading with two original comments, tested for about US$0.08. Comment feeds do not expose the reply tree or verified publication time, so the app labels their feed-update dates and includes only comments that name the company themselves. Thirty-second pacing, persistent cooldowns and cached recovery reduce failed work; 429 responses still occur. RSS retirement remains scheduled for 13 November 2026. [How it works](docs/features/reddit-rss-collection.md) · [Actual verification](docs/reviews/2026-10-08/reddit-rss-integration.md).
+**Deus-style Reddit RSS is now integrated.** The exact upstream diagnostic established the hot-post route; Fledge also fetched real comments through the same host’s comment RSS. The NVIDIA workspace contains a saved eight-source sentiment reading with two original comments, tested for about US$0.08. Comment feeds do not expose the reply tree or verified publication time, so the app labels their feed-update dates and includes only comments that name the company themselves. Thirty-second pacing, persistent cooldowns and cached recovery reduce failed work; 429 responses still occur. RSS retirement remains scheduled for 13 November 2026. [How it works](docs/features/reddit-rss-collection.md) · [Actual verification](docs/reviews/2026-10-08/reddit-rss-integration.md).
 
 ## Monitoring and Telegram
 
@@ -101,7 +103,7 @@ The **local server and an awake Mac must remain running** for monitoring and Tel
 
 ## Fresh setup
 
-Verified here with **Python 3.12, Node 24 and PostgreSQL 18**. Use an installed PostgreSQL 18 distribution; Thesis does not modify another cluster. The default binary directory is `/opt/homebrew/opt/postgresql@18/bin`; set `THESIS_PG_BIN` if different. The launcher is verified on this Mac, not a cross-platform deployment package.
+Verified here with **Python 3.12, Node 24 and PostgreSQL 18**. Use an installed PostgreSQL 18 distribution; Fledge does not modify another cluster. The default binary directory is `/opt/homebrew/opt/postgresql@18/bin`; set `THESIS_PG_BIN` if different. The launcher is verified on this Mac, not a cross-platform deployment package.
 
 From the cloned project folder:
 

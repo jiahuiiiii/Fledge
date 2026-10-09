@@ -31,7 +31,7 @@ def settings(path=None):
 def live_key(model=MODEL):
     if ROOT.resolve() != APPROVED_ROOT or DATA.resolve() != APPROVED_ROOT / ".local":
         raise ValueError(
-            "Live requests require the original persistent Thesis database"
+            "Live requests require the original persistent Fledge database"
         )
     model_setting = {
         MODEL: "THESIS_MODEL",

@@ -24,7 +24,7 @@ const assert=require('node:assert/strict');let browser;
  await answer.locator('summary').filter({hasText:'Evidence 1'}).first().click();
  await answer.getByRole('button',{name:'Inspect this source ↗',exact:true}).first().click();
  const modal=page.getByRole('dialog');await modal.waitFor();assert.match(await modal.innerText(),/not confirmed/);await page.keyboard.press('Escape');
- const downloaded=page.waitForEvent('download');await answer.getByRole('link',{name:'Download private answer ↗',exact:true}).click();assert.match((await downloaded).suggestedFilename(),/^thesis-research-/);
+ const downloaded=page.waitForEvent('download');await answer.getByRole('link',{name:'Download private answer ↗',exact:true}).click();assert.match((await downloaded).suggestedFilename(),/^fledge-research-/);
  await input.fill('A different unsaved question?');assert.equal(await answer.getByRole('heading',{name:question,exact:true}).count(),1);
  await answer.getByRole('button',{name:/Explore next:/}).click();assert.match(await panel.innerText(),/Follow-up to:/);
  assert.equal(await input.inputValue(),'What company disclosure would establish a signed contract?');

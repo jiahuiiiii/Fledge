@@ -146,7 +146,7 @@ export default function AccountGate({ children }) {
     <main className="account-page">
       <section className="account-card">
         <a className="brand" href="/">
-          thesis<span>↗</span>
+          fledge<span>↗</span>
         </a>
         <h1>Sign in to your research</h1>
         <p>

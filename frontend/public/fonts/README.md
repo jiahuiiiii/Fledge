@@ -1,6 +1,6 @@
 # MiSans Latin
 
-Thesis uses MiSans Latin by Xiaomi. These four WOFF2 files are unmodified
+Fledge uses MiSans Latin by Xiaomi. These four WOFF2 files are unmodified
 official files bundled as part of this application, not a standalone font offer.
 
 - Official download page: https://hyperos.mi.com/font/en/download/

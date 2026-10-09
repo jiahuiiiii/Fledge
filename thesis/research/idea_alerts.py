@@ -1097,4 +1097,4 @@ def download(owner, check_id):
         + "".join(parts)
         + "</body></html>"
     )
-    return f'thesis-{record["symbol"]}-reasoning-check-{str(check_id)[:8]}.html', html
+    return f'fledge-{record["symbol"]}-reasoning-check-{str(check_id)[:8]}.html', html

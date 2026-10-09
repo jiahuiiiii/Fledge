@@ -129,7 +129,7 @@ async def lifespan(app):
 
 
 app = FastAPI(
-    title="Thesis local prototype", lifespan=lifespan, docs_url=None, redoc_url=None
+    title="Fledge local prototype", lifespan=lifespan, docs_url=None, redoc_url=None
 )
 app.add_middleware(
     TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"]

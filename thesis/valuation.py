@@ -520,4 +520,4 @@ def download(owner, scenario_id):
             ]
         )
     parts.append("</html>")
-    return "thesis-valuation-" + str(scenario_id) + ".html", "".join(parts)
+    return "fledge-valuation-" + str(scenario_id) + ".html", "".join(parts)

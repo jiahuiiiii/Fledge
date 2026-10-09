@@ -160,7 +160,7 @@ def review_html(manifest, results):
     parts = [
         "<!doctype html><html lang='en'><meta charset='utf-8'><meta name='viewport' content='width=device-width'>",
         "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'\">",
-        "<title>Thesis alert quality review</title><style>body{font:16px/1.6 system-ui;max-width:1000px;margin:auto;padding:24px;color:#17282c}section{border:1px solid #bcc9c9;padding:20px;margin:18px 0}blockquote{border-left:3px solid #6a9292;margin-left:0;padding-left:16px}pre{white-space:pre-wrap;overflow-wrap:anywhere}summary{cursor:pointer}h2{margin-top:40px}a{color:#00646b}</style>",
+        "<title>Fledge alert quality review</title><style>body{font:16px/1.6 system-ui;max-width:1000px;margin:auto;padding:24px;color:#17282c}section{border:1px solid #bcc9c9;padding:20px;margin:18px 0}blockquote{border-left:3px solid #6a9292;margin-left:0;padding-left:16px}pre{white-space:pre-wrap;overflow-wrap:anywhere}summary{cursor:pointer}h2{margin-top:40px}a{color:#00646b}</style>",
         "<h1>Alert quality review</h1><p>Development review of actual stored public sources and authored research situations. This is not investment advice, an independent benchmark or participant feedback.</p>",
         "<p>Review the source and explanation before opening the expected labels. Check company identity, time, attribution, whether the connection is meaningful, and whether you would want the alert. Record disagreements separately; do not rewrite frozen expectations.</p>",
         "<p>" + esc(manifest["description"]) + "</p>",

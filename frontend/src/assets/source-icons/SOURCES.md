@@ -9,6 +9,6 @@ Retrieved 9 October 2026 and served locally; no runtime icon service is used.
 | `LICENSE.md` | [Simple Icons CC0 license, same revision](https://raw.githubusercontent.com/simple-icons/simple-icons/98820a4dc8c363ca72fa2c0d294ea4a0a9bba75d/LICENSE.md) | `9046848b63a5c92bff14e4accca80bd987e0623b74adf9226ce5198d312b79d5` |
 | `hackernews.svg` | [Official Hacker News masthead asset](https://news.ycombinator.com/y18.svg) | `e1b6622b6ea15f1f48dfda6e720265cd426981d2a7ae1f9d7ddeb8409897c6ff` |
 
-Files are unmodified. Reddit/X use their original paths as CSS masks so their colour follows the selected theme. Hacker News retains its orange square and white Y. CC0 applies to the Simple Icons files, not to third-party trademarks or the official Hacker News asset. These marks identify the source platforms and imply no affiliation. The generic news/grid and research navigation glyphs are new Thesis SVG paths.
+Files are unmodified. Reddit/X use their original paths as CSS masks so their colour follows the selected theme. Hacker News retains its orange square and white Y. CC0 applies to the Simple Icons files, not to third-party trademarks or the official Hacker News asset. These marks identify the source platforms and imply no affiliation. The generic news/grid and research navigation glyphs are new Fledge SVG paths.
 
 The initial Simple Icons Hacker News asset lookup returned 404. The official Hacker News asset returned HTTP 200. Both outcomes are retained in `.local/live-tests/sentiment-source-filters-20261009/`.

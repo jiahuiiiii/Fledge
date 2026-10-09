@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   reportedRow,
+  peRows,
+  peerAverage,
   forecastRow,
   position,
   scale,
@@ -188,4 +190,82 @@ test("withdrawn and historical management targets cannot become current targets"
   m.management.releases[0].current = true;
   m.management.releases[0].sections[0].review_status = "withdrawn";
   assert.equal(managementRows([m])[0].margin, undefined);
+});
+
+test("peer average excludes the company, missing figures and incompatible fiscal periods; mean is not median", () => {
+  const rows = [
+    { symbol: "AVGO", value: 200, unit: "percent", end: "2025-12-31" },
+    { symbol: "A", value: -10, unit: "percent", end: "2025-12-31" },
+    { symbol: "B", value: 0, unit: "percent", end: "2026-01-31" },
+    { symbol: "C", value: 100, unit: "percent", end: "2025-11-30" },
+    { symbol: "OLD", value: 1000, unit: "percent", end: "2023-12-31" },
+    { symbol: "GAP", value: null, unit: "percent", end: "2025-12-31" },
+  ];
+  const result = peerAverage(rows, "AVGO");
+  assert.equal(result.value, 30);
+  assert.deepEqual(
+    result.peers.map((r) => r.symbol),
+    ["A", "B", "C"],
+  );
+  assert.deepEqual(
+    result.missing.map((r) => r.symbol),
+    ["OLD", "GAP"],
+  );
+  assert.equal(peerAverage([rows[0]], "AVGO").value, null);
+  assert.equal(
+    peerAverage([{ ...rows[0], end: null }, rows[1]], "AVGO").value,
+    null,
+  );
+});
+test("P/E reuses only matching permitted Finnhub references and averages usable peers", () => {
+  const members = [
+    { symbol: "AVGO", name: "Broadcom" },
+    { symbol: "A", name: "A" },
+    { symbol: "B", name: "B" },
+    { symbol: "GAP", name: "Gap" },
+  ];
+  const ref = (symbol, value) => ({
+    symbol,
+    available: true,
+    reference: {
+      symbol,
+      id: "saved-" + symbol,
+      retrieved_at: "2026-10-09T00:00:00Z",
+      metrics: { earnings: { value, field: "peTTM" } },
+    },
+  });
+  const refs = [ref("AVGO", "46.611"), ref("A", "20"), ref("B", "80")];
+  const rows = peRows(members, refs);
+  assert.equal(rows[0].exact, "46.611");
+  assert.equal(rows[0].identity, "saved-AVGO");
+  assert.equal(rows[0].name, "Broadcom");
+  assert.equal(peerAverage(rows, "AVGO").value, 50);
+  assert.equal(peerAverage(rows, "AVGO").peers.length, 2);
+  assert.match(position(rows, "AVGO").text, /above A; below B/);
+  for (const change of [
+    (r) => (r.available = false),
+    (r) => (r.reference.symbol = "OTHER"),
+    (r) => (r.reference.metrics.earnings.value = "0"),
+    (r) => (r.reference.metrics.earnings.value = "-5"),
+    (r) => (r.reference.metrics.earnings.value = "NaN"),
+  ]) {
+    const altered = structuredClone(refs);
+    change(altered[0]);
+    assert.equal(peRows(members, altered)[0].value, null);
+  }
+  assert.equal(
+    peRows(
+      [
+        {
+          ...members[0],
+          ratios: {
+            status: "saved",
+            data: { period: "TTM", metrics: [{ key: "pe", value: "99" }] },
+          },
+        },
+      ],
+      [],
+    )[0].value,
+    null,
+  );
 });

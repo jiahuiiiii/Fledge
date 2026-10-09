@@ -656,7 +656,7 @@ def download(owner, answer_id):
 
     r = get(owner, answer_id)
     parts = [
-        '<!doctype html><html lang="en"><meta charset="utf-8"><title>Thesis research answer</title><style>body{font:16px system-ui;max-width:850px;margin:40px auto;padding:0 20px;line-height:1.6}blockquote{border-left:3px solid #999;padding-left:14px}section{margin:28px 0}pre{white-space:pre-wrap}</style>',
+        '<!doctype html><html lang="en"><meta charset="utf-8"><title>Fledge research answer</title><style>body{font:16px system-ui;max-width:850px;margin:40px auto;padding:0 20px;line-height:1.6}blockquote{border-left:3px solid #999;padding-left:14px}section{margin:28px 0}pre{white-space:pre-wrap}</style>',
         "<h1>"
         + text(r["question"])
         + "</h1><p>Private research record · contains your question. Evidence cutoff "
@@ -737,4 +737,4 @@ def download(owner, answer_id):
                 )
                 + "</section>"
             )
-    return "thesis-research-" + str(answer_id) + ".html", "".join(parts) + "</html>"
+    return "fledge-research-" + str(answer_id) + ".html", "".join(parts) + "</html>"

@@ -587,7 +587,7 @@ function CompanyWorkspace({
       >
         <header className="topbar">
           <a className="brand" href="#workspace">
-            thesis<span>↗</span>
+            fledge<span>↗</span>
           </a>
           <nav aria-label="Workspace navigation">
             {[
@@ -1245,7 +1245,7 @@ function CompanyWorkspace({
             setView("workspace");
           }}
         >
-          thesis<span>↗</span>
+          fledge<span>↗</span>
         </a>
         <nav aria-label="Workspace navigation">
           {[

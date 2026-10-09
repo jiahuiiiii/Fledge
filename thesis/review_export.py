@@ -212,7 +212,7 @@ def render(record):
         )
     )
     parts = [
-        f"<header><p class='eyebrow'>THESIS / RESEARCH RECORD</p><h1>{text(company['name'])} <span>{text(company['symbol'])}</span></h1><p>{kind} · revision {text(v['revision'])} · {text(v['status'])} when saved</p></header>",
+        f"<header><p class='eyebrow'>FLEDGE / RESEARCH RECORD</p><h1>{text(company['name'])} <span>{text(company['symbol'])}</span></h1><p>{kind} · revision {text(v['revision'])} · {text(v['status'])} when saved</p></header>",
         "<aside class='notice'>Private research record. It contains the author's saved reasoning. Check it before sharing. This is not a recommendation to buy, sell or hold.</aside>",
         f"<section><h2>{text(v['question'])}</h2><p class='reasoning'>{text(v['reasoning'] or 'No reasoning saved in this revision.')}</p><dl><dt>Revision saved</dt><dd>{text(stamp(v['created_at']))}</dd><dt>Evidence cutoff</dt><dd>{text(stamp(record['cutoff'])) if record['cutoff'] else 'No evidence assessed in this definition export'}</dd><dt>Export created</dt><dd>{text(stamp(record['exported_at']))}</dd></dl></section>",
     ]
@@ -445,7 +445,7 @@ def render(record):
     )
     style = """body{font:16px/1.55 system-ui,sans-serif;color:#18222d;background:#f3f5f7;margin:0}main{max-width:860px;margin:auto;padding:40px 24px}h1{font-size:32px;letter-spacing:-1px}h1 span,.muted,dt{color:#526071}h2{font-size:22px}h3{font-size:17px}section,footer{margin:32px 0}article{padding:18px 20px;margin:12px 0;background:white;border:1px solid #d2dae2;border-radius:8px;break-inside:avoid}.notice{padding:14px 18px;background:#fff5d8;border-left:3px solid #997114}.reasoning,.source-text{white-space:pre-wrap;overflow-wrap:anywhere}blockquote{margin:12px 0;padding-left:14px;border-left:3px solid #8a99aa}a{color:#174e93;overflow-wrap:anywhere}.identity{font-size:11px;color:#526071;overflow-wrap:anywhere}.eyebrow{font-size:12px;letter-spacing:2px}dl{display:grid;grid-template-columns:160px 1fr;gap:6px}dd{margin:0}p{overflow-wrap:anywhere}@media(max-width:480px){main{padding:20px 14px}dl{display:block}dd{margin-bottom:12px}}@media print{body{background:white;font-size:11pt}main{max-width:none;padding:0}article{border-radius:0}a{color:inherit}details{display:block}details>p{display:block}summary{font-weight:bold}h2,h3{break-after:avoid}}"""
     return (
-        "<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'\"><title>Thesis research record — "
+        "<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'\"><title>Fledge research record — "
         + text(company["symbol"])
         + "</title><style>"
         + style
@@ -464,5 +464,5 @@ def download(owner, version_id, **selection):
         or selection.get("evaluation_id")
         or version_id
     )
-    filename = f"thesis-{record['instrument']['symbol']}-r{record['version']['revision']}-{str(suffix)[:8]}.html"
+    filename = f"fledge-{record['instrument']['symbol']}-r{record['version']['revision']}-{str(suffix)[:8]}.html"
     return filename, render(record)

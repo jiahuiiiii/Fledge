@@ -78,7 +78,7 @@ def connect(owner):
             raise ValueError("Telegram did not return a valid bot identity.")
         webhook = transport.call(key, "getWebhookInfo", {})
         if not isinstance(webhook, dict) or webhook.get("url") != "":
-            raise ValueError("This bot has a webhook for another app. Create a dedicated Thesis bot; its webhook has not been changed.")
+            raise ValueError("This bot has a webhook for another app. Create a dedicated Fledge bot; its webhook has not been changed.")
         nonce = secrets.token_urlsafe(32)
         expires = clock() + timedelta(minutes=10)
         with transaction(owner) as conn:

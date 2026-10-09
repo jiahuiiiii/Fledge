@@ -39,7 +39,7 @@ export default function ReviewDownload({
       link.download =
         response.headers
           .get("content-disposition")
-          ?.match(/filename="([^"]+)"/)?.[1] || "thesis-research-record.html";
+          ?.match(/filename="([^"]+)"/)?.[1] || "fledge-research-record.html";
       document.body.appendChild(link);
       link.click();
       link.remove();

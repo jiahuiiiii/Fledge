@@ -1,4 +1,4 @@
-/* Thesis application styles: the former global stylesheets merged in their
+/* Fledge application styles: the former global stylesheets merged in their
    original import order, so the cascade is unchanged. Values come from
    tokens.css. Phone overrides that used to live in mobile.css are in the
    section marked below; keep them after the desktop rules. */

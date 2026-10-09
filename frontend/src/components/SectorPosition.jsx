@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import Select from "./Select";
-import EvidenceButton from "./EvidenceButton";
+import Modal from "./Modal";
+import { companyName } from "../lib/companyIdentity";
 import LoadingSkeleton from "./LoadingSkeleton";
 import { money, percent, day } from "../lib/financialStory";
 import {
   measures,
+  peRows,
+  peerAverage,
   reportedRow,
   forecastRow,
   yearsFor,
@@ -21,13 +24,32 @@ const display = (value, unit) =>
     ? "Unavailable"
     : unit === "USD"
       ? money(value)
-      : percent(value);
-function Evidence({ row, expected }) {
+      : unit === "multiple"
+        ? `${value.toLocaleString("en-GB", { maximumFractionDigits: 1 })}×`
+        : percent(value);
+const rowPeriod = (row, expected) =>
+  row.unit === "multiple"
+    ? `Saved ${stamp(row.observed)}`
+    : expected
+      ? `Forecast year ends ${day(row.end)}`
+      : `${day(row.start)} – ${day(row.end)}`;
+function EvidenceContents({ row, expected }) {
   return (
-    <EvidenceButton
-      title={`${row.symbol} · ${expected ? "forecast growth" : row.row?.label || "reported figure"}`}
-    >
-      {expected ? (
+    <>
+      {row.unit === "multiple" ? (
+        <>
+          <p>{row.basis}</p>
+          <p>
+            Exact value: {row.exact ?? "Unavailable"} times. Source: Finnhub ·{" "}
+            {row.field || "peTTM"}.
+          </p>
+          <p>
+            First saved {stamp(row.observed)}. This is a saved trailing P/E, not
+            a forward estimate or live quote.
+          </p>
+          {row.identity && <p>Source snapshot: {row.identity}.</p>}
+        </>
+      ) : expected ? (
         <>
           <p>
             FMP annual revenue averages: {row.current?.average ?? "Unavailable"}{" "}
@@ -68,56 +90,208 @@ function Evidence({ row, expected }) {
         </>
       )}
       {row.reason && <p>{row.reason}</p>}
-    </EvidenceButton>
+    </>
   );
 }
-function Bars({ rows, symbol, expected }) {
-  const range = scale(rows);
+function Bars({ rows, symbol, expected, label }) {
+  const [evidence, setEvidence] = useState(null);
+  const range = scale(rows),
+    average = peerAverage(rows, symbol),
+    multiple = rows[0]?.unit === "multiple",
+    available = rows.filter((row) => row.value != null),
+    x = (value) => ((value - range.low) / range.span) * 100,
+    ticks = !available.length
+      ? []
+      : available.every((row) => row.value === 0)
+        ? [0]
+        : [0, range.low, range.high, range.low + range.span / 2].filter(
+            (tick, index, values) =>
+              values
+                .slice(0, index)
+                .every((other) => Math.abs(tick - other) / range.span > 0.12),
+          );
+  const basis = multiple
+    ? "Finnhub · trailing 12 months"
+    : expected
+      ? "annual forecasts"
+      : "annual SEC figures";
+  const averageExplanation = `Equal-weight mean of ${average.peers.length} of ${Math.max(0, rows.length - 1)} peers. Excludes ${symbol} and unavailable figures${multiple ? "; saved dates may differ." : "; only fiscal ends within 120 days are included."}`;
   return (
-    <div className="position-bars">
-      {rows.map((row) => (
-        <article
-          key={row.symbol}
-          className={`position-bar-row ${row.symbol === symbol ? "is-company" : ""}`}
+    <div className="position-comparison">
+      <div className="position-chart-toolbar">
+        <p>
+          {label} · {basis}
+          <span>
+            {multiple
+              ? "Saved observations may be from different dates."
+              : "Each company uses its own fiscal year."}
+          </span>
+        </p>
+        <button
+          type="button"
+          className="secondary"
+          aria-haspopup="dialog"
+          onClick={() => setEvidence({ symbol: null })}
         >
-          <div className="position-bar-heading">
-            <div>
-              <strong>{row.symbol}</strong>
-              <small>
-                {row.symbol === symbol
-                  ? "Company you’re researching"
-                  : row.name}
-              </small>
-            </div>
-            <strong>{display(row.value, row.unit)}</strong>
-          </div>
-          {row.value != null ? (
-            <div
-              className="position-track"
-              role="img"
-              aria-label={`${row.symbol}: ${display(row.value, row.unit)}`}
-            >
-              <i style={{ left: `${(-range.low / range.span) * 100}%` }} />
+          Evidence &amp; periods
+        </button>
+      </div>
+      <div
+        className="position-bars"
+        role="region"
+        aria-label={`${label} by company`}
+        tabIndex={0}
+      >
+        <div className="position-bar-chart">
+          <div className="position-average-slot">
+            {average.value != null ? (
               <span
+                className="position-average-flag"
+                title={averageExplanation}
                 style={{
-                  left: `${((Math.min(0, row.value) - range.low) / range.span) * 100}%`,
-                  width: `${(Math.abs(row.value) / range.span) * 100}%`,
+                  left: `${x(average.value)}%`,
+                  transform: `translateX(${x(average.value) > 75 ? "-100%" : x(average.value) < 25 ? "0" : "-50%"})`,
                 }}
-              />
-            </div>
-          ) : (
-            <p className="position-gap">{row.reason}</p>
-          )}
-          <div className="position-bar-foot">
-            <small>
-              {expected
-                ? `Forecast year ends ${day(row.end)}`
-                : `${day(row.start)} – ${day(row.end)}`}
-            </small>
-            <Evidence row={row} expected={expected} />
+              >
+                Peer avg{" "}
+                <strong>{display(average.value, rows[0]?.unit)}</strong>
+              </span>
+            ) : (
+              <span className="position-average-unavailable">
+                Peer average unavailable
+              </span>
+            )}
           </div>
-        </article>
-      ))}
+          <div className="position-shared-plot">
+            <div className="position-row-guides" aria-hidden="true">
+              {ticks.map((tick) => (
+                <i
+                  key={tick}
+                  className={tick === 0 ? "is-zero" : ""}
+                  style={{ left: `${x(tick)}%` }}
+                />
+              ))}
+            </div>
+            {average.value != null && (
+              <i
+                className="position-average-line"
+                style={{ left: `${x(average.value)}%` }}
+                aria-hidden="true"
+              />
+            )}
+            <div className="position-rows">
+              {rows.map((row) => (
+                <button
+                  type="button"
+                  key={row.symbol}
+                  className={`position-comparison-row${row.symbol === symbol ? " is-company" : ""}`}
+                  aria-label={`${row.symbol}: ${display(row.value, row.unit)}. ${row.value == null ? row.reason + " " : ""}Open comparison evidence.`}
+                  aria-haspopup="dialog"
+                  title={`${companyName(row)} · ${rowPeriod(row, expected)}`}
+                  onClick={() => setEvidence({ symbol: row.symbol })}
+                >
+                  {row.value != null && (
+                    <>
+                      <span
+                        className={`position-row-fill${row.value === 0 ? " is-zero" : ""}`}
+                        aria-hidden="true"
+                        style={{
+                          left: `${x(Math.min(0, row.value))}%`,
+                          width: `${(Math.abs(row.value) / range.span) * 100}%`,
+                        }}
+                      />
+                      <span
+                        className="position-row-end"
+                        style={{ left: `${x(row.value)}%` }}
+                        aria-hidden="true"
+                      />
+                    </>
+                  )}
+                  <span className="position-row-label" aria-hidden="true">
+                    <strong className={row.value == null ? "is-missing" : ""}>
+                      {display(row.value, row.unit)}
+                    </strong>
+                    <span>
+                      <b>{row.symbol}</b> {companyName(row)}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="position-scale" aria-hidden="true">
+            {ticks.map((tick) => (
+              <span
+                key={tick}
+                style={{
+                  left: `${x(tick)}%`,
+                  transform: `translateX(${x(tick) > 90 ? "-100%" : x(tick) < 10 ? "0" : "-50%"})`,
+                }}
+              >
+                {display(tick, rows[0]?.unit)}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+      <p className="position-chart-hint">
+        {averageExplanation} Select a row for evidence.
+      </p>
+      <Modal
+        open={!!evidence}
+        onClose={() => setEvidence(null)}
+        title="Competitor comparison · evidence"
+        className="evidence-dialog position-evidence-dialog"
+        initialFocus={evidence?.symbol ? '[data-selected="true"]' : undefined}
+      >
+        <p className="position-evidence-intro">
+          {label} · {basis}. Expand a company for its exact figures and sources.
+        </p>
+        <section className="position-average-evidence">
+          <h3>Peer average: {display(average.value, rows[0]?.unit)}</h3>
+          <p>{averageExplanation}</p>
+          {average.peers.length > 0 && (
+            <p>
+              Included:{" "}
+              {average.peers
+                .map((row) => `${row.symbol} (${display(row.value, row.unit)})`)
+                .join(", ")}
+              . The average uses unrounded values.
+            </p>
+          )}
+          {average.missing.length > 0 && (
+            <p>
+              Excluded: {average.missing.map((row) => row.symbol).join(", ")} ·
+              missing or incomparable figures. Dates and reasons are listed
+              below.
+            </p>
+          )}
+        </section>
+        <div className="position-evidence-list">
+          {rows.map((row) => (
+            <details
+              key={row.symbol}
+              open={row.symbol === evidence?.symbol || undefined}
+            >
+              <summary
+                tabIndex={0}
+                data-selected={row.symbol === evidence?.symbol}
+              >
+                <span>
+                  <strong>
+                    {row.symbol} · {companyName(row)}
+                  </strong>
+                  <small>{rowPeriod(row, expected)}</small>
+                </span>
+                <strong>{display(row.value, row.unit)}</strong>
+              </summary>
+              <div className="position-evidence-content">
+                <EvidenceContents row={row} expected={expected} />
+              </div>
+            </details>
+          ))}
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -257,9 +431,19 @@ export default function SectorPosition({
     const token = ++version.current;
     setBusy(true);
     try {
-      const next = await api.sectorPosition(instrumentId, peers);
+      const [next, valuation] = await Promise.all([
+        api.sectorPosition(instrumentId, peers),
+        api
+          .valuationContext(instrumentId)
+          .then((value) => ({ references: value.references || [] }))
+          .catch((failure) => ({ references: [], error: failure.message })),
+      ]);
       if (mounted.current && token === version.current) {
-        setData(next);
+        setData({
+          ...next,
+          references: valuation.references,
+          referenceError: valuation.error,
+        });
         if (peers !== undefined) applied.current = peers;
         if (replaceDraft || !dirty.current) {
           setDraft(next.peers);
@@ -374,9 +558,14 @@ export default function SectorPosition({
       : years[0] || String(new Date().getFullYear() + 1);
   const expected = view === "expected",
     current = measures.find((m) => m.key === measure),
-    rows = (data?.members || []).map((m) =>
-      expected ? forecastRow(m, chosenYear, now) : reportedRow(m, measure),
-    ),
+    rows =
+      !expected && measure === "pe"
+        ? peRows(data?.members || [], data?.references || [])
+        : (data?.members || []).map((m) =>
+            expected
+              ? forecastRow(m, chosenYear, now)
+              : reportedRow(m, measure),
+          ),
     reading = position(rows, data?.symbol);
   return (
     <section className="sector-position" aria-label="Competitor position">
@@ -544,7 +733,9 @@ export default function SectorPosition({
               </button>
             </div>
           )}
-          {!expected && <Map members={data.members} symbol={data.symbol} />}
+          {!expected && measure !== "pe" && (
+            <Map members={data.members} symbol={data.symbol} />
+          )}
           <div className="position-measure">
             <h3>
               {expected
@@ -572,7 +763,7 @@ export default function SectorPosition({
                     ))
                   : measures.map((m) => (
                       <option key={m.key} value={m.key}>
-                        {m.label} · annual SEC
+                        {m.label} · {m.source || "annual SEC"}
                       </option>
                     ))}
               </Select>
@@ -585,19 +776,18 @@ export default function SectorPosition({
             {reading.coverage > 0 && (
               <p>
                 Based on {reading.coverage} of {data.peers.length} peers with
-                usable figures and fiscal ends within 120 days.
-                {reading.median != null &&
-                  (expected || current.unit === "percent") && (
-                    <>
-                      {" "}
-                      Peer median {percent(reading.median)}; difference{" "}
-                      {reading.difference > 0 ? "+" : ""}
-                      {reading.difference.toFixed(1)} percentage points.
-                    </>
-                  )}
+                usable{" "}
+                {current.unit === "multiple" && !expected
+                  ? "saved Finnhub P/E figures. A lower P/E does not establish better value."
+                  : "figures and fiscal ends within 120 days."}
               </p>
             )}
           </div>
+          {!expected && measure === "pe" && data.referenceError && (
+            <p className="position-caption" role="status">
+              Saved P/E could not be loaded: {data.referenceError}
+            </p>
+          )}
           {expected && (
             <p className="position-caption">
               FMP annual revenue growth uses two consecutive annual forecast
@@ -606,8 +796,14 @@ export default function SectorPosition({
               Company fiscal calendars differ.
             </p>
           )}
-          <Bars rows={rows} symbol={data.symbol} expected={expected} />
-          {!expected && (
+          <Bars
+            key={`${expected ? "expected" : measure}-${expected ? chosenYear : "reported"}`}
+            rows={rows}
+            symbol={data.symbol}
+            expected={expected}
+            label={expected ? "Expected revenue growth" : current.label}
+          />
+          {!expected && measure !== "pe" && (
             <button
               className="position-check"
               disabled={busy}
@@ -667,7 +863,9 @@ export default function SectorPosition({
             it is not an investment score.{" "}
             {expected
               ? ""
-              : "Annual growth compares each company with its own prior year. Operating margin uses reported GAAP operating income and revenue, separate from management’s adjusted targets."}
+              : measure === "pe"
+                ? "P/E uses saved Finnhub trailing-earnings definitions; underlying quote times and GAAP versus adjusted conventions are not established."
+                : "Annual growth compares each company with its own prior year. Operating margin uses reported GAAP operating income and revenue, separate from management’s adjusted targets."}
           </p>
         </>
       )}

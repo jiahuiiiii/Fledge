@@ -1,6 +1,28 @@
-# Thesis — implementation guide
+# Fledge — implementation guide
 
-Last updated: 2026-10-09. Project root is the directory containing this file. **Keep all Thesis work here, separate from the unrelated Fork project.**
+Last updated: 2026-10-09. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
+
+## Clarified peer chart, average and P/E — 9 October 2026
+
+The owner's new reference supersedes the vertical bars below: use compact **horizontal rows on one shared scale**, a highlighted researched company and a continuous peer-average marker. **Price / earnings (P/E)** joins the main selector using existing permitted Finnhub TTM references from the read-only valuation context; preserve symbol identity, exact decimals/snapshot/field/timestamp, unknown underlying conventions and no FMP/price fallback. The mean excludes the researched company and unavailable figures; annual measures retain the120-day fiscal-end rule, while P/E keeps one provider with differing saved dates disclosed. Show included/excluded peers in the same evidence modal. Original source/peer/save/forecast rules remain. [Contract](docs/features/competitor-position.md) · [verification](docs/reviews/2026-10-09/peer-average-and-pe.md).
+
+18focused checks/build/touched-format plus guarded authored and saved Broadcom browsers pass1440/980/390/320. Actual saved P/E46.611; five-peer mean62.40892. These are saved Finnhub observations, not the supplied screenshot's values. Retain first floating-point assertion and centered-label captures; corrected final layout inspected. Evidence `.local/live-tests/peer-average-20261009/`, backup `.local/backups/peer-average-20261009/`. Atomic guarded frontend installation only, older assets retained/no restart. No backend/schema/source/AI/email/Telegram or owner-data write; one authored peer save is disposable only. Existing paid hold/original broader goal untouched.
+
+Final installed index2b4edc3c/all30candidate files/session200 verified. Installed saved-data browser passes the same four widths, exact P/E/average/modal/focus and unchanged comparison; desktop/phone screenshots inspected. Retain initial installed keyboard-selection wait timeout; diagnostics-only rerun passed without product-code changes, and its cause remains unconfirmed.
+
+## Combined competitor chart — 9 October 2026
+
+The owner requested one vertical bar chart and one shared evidence modal. `SectorPosition` now shows every company on the original signed zero-inclusive scale; researched company highlighted, stable order, negative/zero/missing values retained. **Evidence & periods** lists all companies, values and dates; clicking a column opens the same modal with that company's exact original evidence expanded. Keyboard/Escape/focus, internal phone scrolling and existing reduced-motion behaviour remain. The scatter chart, source/period validation, private peer drafts/save and explicit source-check action are unchanged. Read [the contract](docs/features/competitor-position.md) and [verification](docs/reviews/2026-10-09/competitor-bars.md).
+
+Seven existing unit checks/build, guarded authored browser1440/980/390/320 and actual saved Broadcom read-only preview pass. One peer write only in disposable fixtures; original saved comparison exact. Retain initial toolbar cascade and ambiguous test-selector failures. Evidence `.local/live-tests/competitor-bars-20261009/`; backup `.local/backups/competitor-bars-20261009/`. Guarded atomic frontend installation retains older assets; no restart/backend/schema/source/AI/email/Telegram or owner-data write. Separate unknown paid hold/original broader research goal untouched.
+
+## Product renamed to Fledge — 9 October 2026
+
+The owner renamed the product **Fledge**, styled **fledge ↗** in the existing wordmark. Use Fledge in new product copy. The normal/loading/empty/sign-in shells, page title, starter guide, Telegram copy/templates, new HTML download names/titles, launcher and current README now use Fledge. `Start Fledge.command` is the current launcher; retain `Start Thesis.command` for existing shortcuts.
+
+Keep the physical `Thesis` directory, Python package, database/schema, `THESIS_*` configuration, request headers, browser storage/events, model/method identities, source user agents and immutable research/evidence unchanged. Historical documentation and retained source/provenance wording can still say Thesis. Do not mass-replace these identifiers or rewrite saved records. The separate pitch deck is unchanged.
+
+Build, 220 focused offline backend checks (three optional skips), Python/launcher syntax and guarded candidate browser checks pass. Desktop1440/phone390/320, loading, empty, sign-in and starter-guide branding verified; first loading selector failure retained. [Verification and installation](docs/reviews/2026-10-09/fledge-rename.md). Idle app-only restart,29candidate files and atomic index `ac7c12b4` verified; all114tables/schema47/.env/original ledger exact across installation. The FN unknown hold remains untouched. No live source/AI/email/Telegram request or database restart by this rename.
 
 ## Topic homes, compact Financials and news counts — 9 October 2026
 

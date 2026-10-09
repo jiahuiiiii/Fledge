@@ -1,4 +1,4 @@
-# Thesis documentation
+# Fledge documentation
 
 Use this index to find feature rules, development setup, testing guidance and earlier project decisions. Start with the [project README](../README.md) for the current user workflow and setup. [AGENTS.md](../AGENTS.md) records implementation constraints and the latest changes.
 
@@ -17,6 +17,7 @@ Feature documents also retain dated sections. For current controls and scope, re
 
 ## Common starting points
 
+- **Product name:** [Fledge rename and compatibility](reviews/2026-10-09/fledge-rename.md).
 - **Try the app:** [setup and current journey](../README.md), [usability testing guide](testing/wednesday-testing-guide.md), [feedback notes](testing/wednesday-feedback-notes.md).
 - **Workspace layout:** [single topic homes, simpler Financials and reconciled news counts](reviews/2026-10-09/topic-homes.md), [reading journey and evidence dialogs](features/reading-journey.md), [financial reading flow, navigation and collection pages](reviews/2026-10-09/reading-flow.md), [content-first headers and explicit growth periods](reviews/2026-10-09/content-first-ui.md), [company identity, price change and All companies cards](reviews/2026-10-09/company-overview-ui.md), [News and discussion UI](reviews/2026-10-09/news-discussion-ui.md), [My ideas UI](reviews/2026-10-09/ideas-ui.md), [Updates cards and disclosure fix](reviews/2026-10-09/updates-ui.md), [redesign verification](reviews/2026-10-09/reading-journey-and-evidence.md), [sidebar/progress controls and spacing](reviews/2026-10-08/layout-controls-and-spacing.md), [Workspace-only idea sidebar and company logos](reviews/2026-10-09/workspace-panels-and-company-logos.md), [compact logo rail and footer removal](reviews/2026-10-09/company-logo-rail-and-footer.md), [company report navigation, source icons and All view](reviews/2026-10-09/research-navigation-and-source-filters.md).
 - **Sentiment and alerts:** [discussion themes](features/discussion-themes.md), [discussion summary feedback and actual failure](reviews/2026-10-09/discussion-summary-feedback.md), [bounded analysis batches and saved progress](features/sentiment-batching.md), [news and social watches](features/sentiment-alerts.md), [alerts linked to saved reasoning](features/idea-relevance-alerts.md), [Telegram delivery](features/telegram-alerts.md)., [price-target checks and historical comparison](features/sentiment-price-guards.md)

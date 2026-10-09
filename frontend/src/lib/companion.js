@@ -1,5 +1,5 @@
 export const companionPromise =
-  "Thesis helps you explore an investment idea, keep your reasoning, and review changes in the evidence you follow.";
+  "Fledge helps you explore an investment idea, keep your reasoning, and review changes in the evidence you follow.";
 
 // Reading shortcuts, not saved questions or requests for generated answers.
 export const starterQuestions = [

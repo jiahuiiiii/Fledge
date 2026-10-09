@@ -549,6 +549,6 @@ def render_report(report):
         + "</body></html>"
     )
     return (
-        "thesis-research-review-" + report["cutoff"].strftime("%Y%m%d") + ".html",
+        "fledge-research-review-" + report["cutoff"].strftime("%Y%m%d") + ".html",
         html,
     )

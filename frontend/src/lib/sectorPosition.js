@@ -1,5 +1,6 @@
 // Compare retained figures within one source, measure and fiscal-period kind.
 import { number, metric } from "./financialStory.js";
+import { peerMetrics, peerRows } from "./peerComparison.js";
 const numeric = (raw) =>
   typeof raw === "number" ||
   (typeof raw === "string" && /^-?\d+(?:\.\d+)?$/.test(raw))
@@ -12,6 +13,13 @@ const revenueTags = [
   "SalesRevenueNet",
 ];
 export const measures = [
+  {
+    key: "pe",
+    label: "Price / earnings (P/E)",
+    question: "How does its P/E compare with peers?",
+    unit: "multiple",
+    source: "Finnhub · trailing 12 months",
+  },
   {
     key: "revenue_growth",
     label: "Revenue growth · fiscal year",
@@ -31,6 +39,41 @@ export const measures = [
     unit: "USD",
   },
 ];
+export function peRows(members, references = []) {
+  const metric = peerMetrics.find((item) => item.id === "pe_finnhub");
+  return members.map((member) => {
+    const entry = references.find((item) => item.symbol === member.symbol);
+    const reference =
+      entry?.available && entry.reference?.symbol === member.symbol
+        ? entry.reference
+        : null;
+    const [row] = peerRows([{ ...member, saved_finnhub: reference }], metric);
+    return { ...row, name: member.name, source: "Finnhub" };
+  });
+}
+export function comparablePeers(rows, symbol) {
+  const own = rows.find((row) => row.symbol === symbol);
+  return rows.filter(
+    (row) =>
+      row.symbol !== symbol &&
+      row.value != null &&
+      (row.unit === "multiple"
+        ? row.source === "Finnhub" && row.value > 0
+        : row.end && own?.end && Math.abs(days(row.end, own.end)) <= 120),
+  );
+}
+export function peerAverage(rows, symbol) {
+  const peers = comparablePeers(rows, symbol);
+  return {
+    value: peers.length
+      ? peers.reduce((sum, row) => sum + row.value, 0) / peers.length
+      : null,
+    peers,
+    missing: rows.filter(
+      (row) => row.symbol !== symbol && !peers.includes(row),
+    ),
+  };
+}
 export function reportedRow(member, key) {
   const source = member.performance,
     report = source?.reports?.annual;
@@ -164,17 +207,13 @@ export function position(rows, symbol) {
       text: "The company’s comparable figure is unavailable.",
       coverage: 0,
     };
-  const peers = rows.filter(
-    (r) =>
-      r.symbol !== symbol &&
-      r.value != null &&
-      r.end &&
-      own.end &&
-      Math.abs(days(r.end, own.end)) <= 120,
-  );
+  const peers = comparablePeers(rows, symbol);
   if (!peers.length)
     return {
-      text: "No peer with a usable figure and fiscal end within 120 days is available.",
+      text:
+        own.unit === "multiple"
+          ? "No peer with a usable saved Finnhub P/E is available."
+          : "No peer with a usable figure and fiscal end within 120 days is available.",
       coverage: 0,
     };
   const above = peers.filter((r) => own.value > r.value),

@@ -187,14 +187,14 @@ def alpha_error(body):
         return 'Alpha Vantage requires Premium access for NEWS_SENTIMENT. A free API key does not unlock this endpoint; waiting will not change the plan. Confirm endpoint access with Alpha Vantage or use the other news sources. Saved news is unchanged.'
     if re.search(r'invalid (?:api call|request|parameter|function)', text):
         return 'Alpha Vantage rejected the request parameters. The integration needs checking; replacing the key or buying a plan is not an established fix. Saved news is unchanged.'
-    return 'Alpha Vantage returned an unrecognised service message. Thesis could not determine whether it concerns the key, usage or endpoint access. NEWS_SENTIMENT is documented as Premium; check access with Alpha Vantage. Saved news is unchanged.'
+    return 'Alpha Vantage returned an unrecognised service message. Fledge could not determine whether it concerns the key, usage or endpoint access. NEWS_SENTIMENT is documented as Premium; check access with Alpha Vantage. Saved news is unchanged.'
 
 
 def alpha_pause(conn, now):
     clock = one(conn, "SELECT blocked_until FROM provider_clocks WHERE provider='alpha_vantage'")
     if clock and clock['blocked_until'] and clock['blocked_until'] > now:
         until = clock['blocked_until'].astimezone(timezone.utc).strftime('%d %b %Y, %H:%M UTC')
-        return f'Thesis has paused requests until {until}. This is the app’s cooldown, not a confirmed provider reset time.'
+        return f'Fledge has paused requests until {until}. This is the app’s cooldown, not a confirmed provider reset time.'
     return None
 
 

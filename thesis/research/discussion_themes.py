@@ -529,6 +529,6 @@ def download(iid, identity):
         ]
     head = '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; base-uri \'none\'; form-action \'none\'"><title>Discussion themes</title><style>body{font:16px/1.6 system-ui;max-width:850px;margin:40px auto;padding:0 20px;color:#192427}section{border-top:1px solid #abb5b8;padding:20px 0}blockquote{border-left:3px solid #627d42;padding-left:16px}a{overflow-wrap:anywhere}@media print{body{margin:0}}</style><body>'
     return (
-        "thesis-discussion-themes-" + value["id"] + ".html",
+        "fledge-discussion-themes-" + value["id"] + ".html",
         head + "".join(parts) + "</body></html>",
     )

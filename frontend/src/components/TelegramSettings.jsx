@@ -172,7 +172,7 @@ export default function TelegramSettings() {
                     <li>Come back here and connect your chat.</li>
                   </ol>
                   <p className="muted">
-                    Use a dedicated Thesis bot so it can run alongside Kestrel.
+                    Use a dedicated Fledge bot so it can run alongside Kestrel.
                   </p>
                   <button
                     disabled={!!busy}
@@ -221,7 +221,7 @@ export default function TelegramSettings() {
                     <span>
                       Send future alerts to this chat
                       <small>
-                        Old updates stay in Thesis. Your research watches keep
+                        Old updates stay in Fledge. Your research watches keep
                         their own settings.
                       </small>
                     </span>
@@ -330,7 +330,7 @@ export default function TelegramSettings() {
                   generate alerts.
                 </p>
                 <p>
-                  Thesis must be running on this Mac. Watches check on their
+                  Fledge must be running on this Mac. Watches check on their
                   saved schedule; these are research alerts, not live price
                   alarms. After a restart, only alerts from the last 24 hours
                   are forwarded.

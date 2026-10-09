@@ -75,7 +75,7 @@ def render(record):
             parts.append(escape(metric) + ": " + escape(before) + " → " + escape(after))
         for item in change.get("affected_events", [])[:2]:
             parts.append(escape(plain(item.get("description"), 150)) + ": " + escape(plain(item.get("before"), 40)) + " → " + escape(plain(item.get("after"), 40)))
-        parts.append("A saved comparison changed. Check its reporting period, evidence and coverage in Thesis.")
+        parts.append("A saved comparison changed. Check its reporting period, evidence and coverage in Fledge.")
     sources = {str(s["id"]): s for s in d.get("sources", [])}
     links = []
     for sid in dict.fromkeys(map(str, source_ids)):
@@ -90,7 +90,7 @@ def render(record):
     if links:
         parts.append("<b>Sources</b>\n" + "\n".join(links[:2]))
     parts.append("Flagged " + stamp(record["created_at"]))
-    parts.append(f"Open Thesis on your Mac → Updates → {escape(symbol)}.\nResearch alert · not a buy/sell instruction.")
+    parts.append(f"Open Fledge on your Mac → Updates → {escape(symbol)}.\nResearch alert · not a buy/sell instruction.")
     # Telegram counts parsed text; UTF-16 units are a conservative bound even
     # with emoji. Drop whole optional sections, never split tags or entities.
     footer = parts[-2:]
@@ -119,4 +119,4 @@ def stamp(value):
     return value.astimezone(timezone.utc).strftime("%d %b %Y, %H:%M UTC")
 
 
-TEST_MESSAGE = "<b>Thesis · Connection test</b>\n\nYour private Telegram chat is connected.\n\nWhen delivery is enabled, new company, saved-idea and monitored-condition alerts will arrive here with evidence and context.\n\nThis is a test message, not a market event. Your research watches are unchanged."
+TEST_MESSAGE = "<b>Fledge · Connection test</b>\n\nYour private Telegram chat is connected.\n\nWhen delivery is enabled, new company, saved-idea and monitored-condition alerts will arrive here with evidence and context.\n\nThis is a test message, not a market event. Your research watches are unchanged."

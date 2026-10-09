@@ -135,7 +135,7 @@ def test_download_endpoint_requires_session_and_returns_attachment(owner):
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("text/html")
         assert response.headers["content-disposition"].startswith(
-            'attachment; filename="thesis-'
+            'attachment; filename="fledge-'
         )
         assert response.headers["cache-control"] == "no-store"
         assert (

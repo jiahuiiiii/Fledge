@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start a private PostgreSQL cluster and the local Thesis app. No live APIs."""
+"""Start a private PostgreSQL cluster and the local Fledge app. No live APIs."""
 import argparse
 import os
 from pathlib import Path
@@ -110,7 +110,7 @@ def main():
         return
     database()
     if args.init_only:
-        print("Thesis database ready. Saved workspace preferences are preserved.")
+        print("Fledge database ready. Saved workspace preferences are preserved.")
         return
     if not (ROOT / "frontend/dist/index.html").exists():
         raise SystemExit(
@@ -122,7 +122,7 @@ def main():
         threading.Timer(
             1.5, lambda: webbrowser.open(f"http://127.0.0.1:{args.port}")
         ).start()
-    print(f"Thesis is available at http://127.0.0.1:{args.port} (local research workspace)")
+    print(f"Fledge is available at http://127.0.0.1:{args.port} (local research workspace)")
     uvicorn.run("thesis.app:app", host="127.0.0.1", port=args.port, log_level="warning")
 
 

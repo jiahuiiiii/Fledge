@@ -1,4 +1,4 @@
-/* Thesis design tokens. Every colour, type size and corner radius in the
+/* Fledge design tokens. Every colour, type size and corner radius in the
    app's CSS comes from this file; change the look here, not per component. */
 :root {
   --color-bg: #0f141c;
