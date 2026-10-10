@@ -21,6 +21,7 @@ const share = (value) =>
     ? "<0.1%"
     : `${Number(value).toFixed(1)}%`;
 const periodKey = (group) => `${group.start}/${group.end}`;
+const viewName = (group) => group.view_label || group.kind;
 const colours = [
   "#a6c9b2",
   "#91bccc",
@@ -62,9 +63,9 @@ export default function RevenueBreakdown({ data }) {
   const [period, setPeriod] = useState("");
   if (!data) return null;
   const groups = data.groups || [];
-  const kinds = [...new Set(groups.map((group) => group.kind))];
+  const kinds = [...new Set(groups.map(viewName))];
   const activeKind = kinds.includes(kind) ? kind : kinds[0];
-  const periods = groups.filter((group) => group.kind === activeKind);
+  const periods = groups.filter((group) => viewName(group) === activeKind);
   const group =
     periods.find((item) => periodKey(item) === period) || periods[0];
   const members = group
@@ -159,10 +160,10 @@ export default function RevenueBreakdown({ data }) {
                 below.
               </p>
             )}
-            {activeKind === "Reported geographies" && (
+            {group.kind === "Reported geographies" && (
               <p className="mix-note">
-                Countries and regions may overlap. Read the filing for how the
-                company assigns revenue to each location.
+                Read the filing for how the company assigns revenue to each
+                location.
               </p>
             )}
             <ul className="mix-members">

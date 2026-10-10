@@ -1,15 +1,21 @@
+import { readableNote } from "../lib/readingNotes";
 import { useEffect, useId, useRef, useState } from "react";
 import Modal from "./Modal";
 import FinancialEvidence from "./FinancialEvidence";
 import Select from "./Select";
 import { amount, day } from "./FinancialOverview";
-import { flowLayout, matchingMix, shortLabel } from "../lib/incomeFlow";
+import { flowLayout, matchingBreakdowns, shortLabel } from "../lib/incomeFlow";
 import "./RevenueFlow.css";
 
 const names = {
-  trailing: "Trailing year",
+  trailing: "Past 12 months",
   annual: "Annual",
   quarter: "Quarterly",
+};
+const periodHelp = {
+  trailing: "12 months ending at the latest report.",
+  annual: "The company’s full financial year.",
+  quarter: "One quarter, labelled by its ending date.",
 };
 const metricKeys = [
   "revenue",
@@ -31,8 +37,11 @@ export default function RevenueFlow({
   const [kind, setKind] = useState("");
   const [selection, setSelection] = useState("");
   const [category, setCategory] = useState("");
+  const [geographyView, setGeographyView] = useState("");
   const [evidence, setEvidence] = useState(null);
   const timeline = useRef(null);
+  const viewport = useRef(null);
+  const [chartWidth, setChartWidth] = useState(0);
   const periods = data?.periods || [];
   const kinds = ["trailing", "annual", "quarter"].filter((name) =>
     periods.some((row) => row.kind === name),
@@ -43,11 +52,31 @@ export default function RevenueFlow({
     .sort((a, b) => a.end.localeCompare(b.end));
   const selected =
     choices.find((row) => row.id === selection) || choices.at(-1);
-  const mixes = matchingMix(selected, segments?.groups);
-  const mix = mixes.find((row) => row.axis === category) || mixes[0];
-  const graph = flowLayout(selected, mix);
+  const mixes = matchingBreakdowns(selected, [
+    ...(segments?.groups || []),
+    ...(segments?.trailing_groups || []),
+  ]);
+  const activeCategory =
+    category ||
+    mixes.find((row) => row.kind === "Operating segments")?.kind ||
+    mixes[0]?.kind ||
+    "Total revenue";
+  const revenueInputs =
+    selected?.metrics.find((row) => row.key === "revenue")?.inputs || [];
+  const hasFiling =
+    revenueInputs.length > 0 &&
+    revenueInputs.every((input) =>
+      segments?.filing_urls?.includes(input.filing_url),
+    );
+  const categoryMixes = mixes.filter((row) => row.kind === activeCategory);
+  const mix =
+    categoryMixes.find((row) => row.view_label === geographyView) ||
+    categoryMixes[0];
+  const graph = flowLayout(selected, mix?.chartable ? mix : null, chartWidth);
+  const connectedSources = graph?.nodes.some((row) => row.group);
   const values =
     selected?.metrics.filter((row) => metricKeys.includes(row.key)) || [];
+  useEffect(() => setEvidence(null), [data, segments]);
   useEffect(() => {
     const element = timeline.current;
     if (!element) return;
@@ -64,14 +93,41 @@ export default function RevenueFlow({
     reveal();
     return () => observer.disconnect();
   }, [selected?.id]);
+  useEffect(() => {
+    const element = viewport.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) =>
+      setChartWidth(entry.contentRect.width),
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [selected?.id, Boolean(graph)]);
   if (!data) return null;
   function choose(value) {
     setSelection(value);
     setEvidence(null);
   }
+  const sourceFigures = mix && (
+    <div className="flow-source-figures" aria-label="Reported revenue sources">
+      {mix.members.map((row) => (
+        <button
+          key={row.member}
+          aria-haspopup="dialog"
+          onClick={() => setEvidence({ ...row, group: mix })}
+        >
+          <span>{row.label}</span>
+          <strong>{amount(row.value)}</strong>
+          {mix.chartable && (
+            <small>{Number(row.percentage).toFixed(1)}% of revenue</small>
+          )}
+        </button>
+      ))}
+    </div>
+  );
   return (
     <section
       className="revenue-flow financial-chart-card"
+      data-period={selected?.id}
       aria-labelledby={`${id}-heading`}
     >
       <div className="flow-heading">
@@ -86,26 +142,30 @@ export default function RevenueFlow({
           </p>
         </div>
         {selected && (
-          <div
-            className="flow-kind"
-            role="group"
-            aria-label="Income statement period type"
-          >
-            {kinds.map((name) => (
-              <button
-                key={name}
-                aria-pressed={name === activeKind}
-                onClick={() => {
-                  setKind(name);
-                  setSelection("");
-                  setEvidence(null);
-                }}
-              >
-                {compactOverview && name === "trailing"
-                  ? "Past 12 months"
-                  : names[name]}
-              </button>
-            ))}
+          <div className="flow-period-types">
+            <div
+              className="flow-kind"
+              role="group"
+              aria-label="Income statement period type"
+              aria-describedby={`${id}-period-help`}
+            >
+              {kinds.map((name) => (
+                <button
+                  key={name}
+                  aria-pressed={name === activeKind}
+                  onClick={() => {
+                    setKind(name);
+                    setSelection("");
+                    setEvidence(null);
+                  }}
+                >
+                  {names[name]}
+                </button>
+              ))}
+            </div>
+            <p className="flow-period-help" id={`${id}-period-help`}>
+              {periodHelp[activeKind]}
+            </p>
           </div>
         )}
       </div>
@@ -113,7 +173,7 @@ export default function RevenueFlow({
         <p>{data.reason || "No saved income statement is available."}</p>
       ) : (
         <>
-          {(!compactOverview || choices.length > 1) && (
+          {choices.length > 1 && (
             <div
               className="flow-timeline"
               ref={timeline}
@@ -124,48 +184,113 @@ export default function RevenueFlow({
                 <button
                   key={row.id}
                   aria-pressed={row.id === selected.id}
+                  aria-label={`${row.kind === "annual" ? "Fiscal year" : names[row.kind]} ending ${day(row.end)}`}
                   onClick={() => choose(row.id)}
                 >
-                  <span>
-                    {row.kind === "quarter"
-                      ? day(row.end)
-                      : row.end.slice(0, 4)}
-                  </span>
-                  <small>
-                    {amount(
-                      row.metrics.find((m) => m.key === "revenue")?.value,
-                    )}{" "}
-                    revenue
-                  </small>
+                  {row.kind === "quarter" ? day(row.end) : row.end.slice(0, 4)}
                 </button>
               ))}
             </div>
           )}
           <div className="flow-meta">
             <p>
-              {names[selected.kind]} · {day(selected.start)} –{" "}
-              {day(selected.end)}
+              {selected.kind === "annual"
+                ? "Fiscal year"
+                : names[selected.kind]}{" "}
+              · {day(selected.start)} – {day(selected.end)}
               <br />
               <small>US dollars · reported income, not cash flow</small>
             </p>
-            {mixes.length > 1 && (
+            <div className="flow-source-controls">
               <label htmlFor={`${id}-mix`}>
                 Revenue sources
                 <Select
                   id={`${id}-mix`}
-                  value={mix.axis}
-                  onChange={(e) => setCategory(e.target.value)}
+                  value={activeCategory}
+                  onChange={(e) => {
+                    setCategory(e.target.value);
+                    setEvidence(null);
+                  }}
                 >
-                  {mixes.map((row) => (
-                    <option key={row.axis} value={row.axis}>
-                      {row.kind}
+                  {[
+                    "Total revenue",
+                    "Operating segments",
+                    "Products and services",
+                    "Reported geographies",
+                  ].map((name) => (
+                    <option key={name} value={name}>
+                      {name === "Reported geographies"
+                        ? "Countries & regions"
+                        : name === "Operating segments"
+                          ? "Business segments"
+                          : name}
                     </option>
                   ))}
                 </Select>
               </label>
-            )}
-            {mix && mixes.length === 1 && <span>{mix.kind}</span>}
+              {categoryMixes.length > 1 && (
+                <label htmlFor={`${id}-geography`}>
+                  Geographic view
+                  <Select
+                    id={`${id}-geography`}
+                    value={mix.view_label}
+                    onChange={(e) => {
+                      setGeographyView(e.target.value);
+                      setEvidence(null);
+                    }}
+                  >
+                    {categoryMixes.map((row) => (
+                      <option key={row.view_id} value={row.view_label}>
+                        {row.view_label}
+                      </option>
+                    ))}
+                  </Select>
+                </label>
+              )}
+            </div>
           </div>
+          {activeCategory !== "Total revenue" && (
+            <div
+              className="flow-source-detail"
+              aria-live="polite"
+              data-category={activeCategory}
+            >
+              {mix ? (
+                <>
+                  {mix.calculated && (
+                    <p className="flow-footnote">
+                      Calculated from the same annual and year-to-date reports
+                      as total revenue.
+                    </p>
+                  )}
+                  {mix.kind === "Reported geographies" && (
+                    <p className="flow-footnote">
+                      Countries and regions use the company’s reporting basis
+                      {!mix.chartable
+                        ? " and may overlap. Amounts are shown separately, without a percentage split"
+                        : ""}
+                      .
+                    </p>
+                  )}
+                  {!mix.chartable && (
+                    <p className="flow-footnote">{mix.reason}</p>
+                  )}
+                  {!connectedSources && sourceFigures}
+                </>
+              ) : (
+                <p className="flow-footnote">
+                  {selected.kind === "trailing"
+                    ? "The past 12 months combines several reports. A matching breakdown is not available; choose Annual or Quarterly to see reported revenue sources."
+                    : segments?.status === "unavailable"
+                      ? segments.message ||
+                        "Original-filing source access is unavailable."
+                      : hasFiling
+                        ? "This breakdown is not available for these dates in the reported figures. Other revenue views may be available."
+                        : "This breakdown is not available in the saved filing for this period. Check reported data in Data & sources to collect missing historical reports."}
+                </p>
+              )}
+            </div>
+          )}
           {graph ? (
             <>
               <p className="flow-phone-hint">
@@ -173,6 +298,7 @@ export default function RevenueFlow({
               </p>
               <div
                 className="flow-viewport"
+                ref={viewport}
                 tabIndex={0}
                 role="region"
                 aria-label="Revenue and expense flow chart"
@@ -180,7 +306,7 @@ export default function RevenueFlow({
                 <svg
                   className="flow-svg"
                   viewBox={`0 0 ${graph.width} ${graph.height}`}
-                  style={{ minWidth: Math.max(690, graph.width * 0.85) }}
+                  style={{ width: graph.width, height: graph.height }}
                   aria-labelledby={`${id}-chart-title`}
                 >
                   <title id={`${id}-chart-title`}>
@@ -197,11 +323,16 @@ export default function RevenueFlow({
                     ))}
                   </g>
                   {graph.nodes.map((row) => {
-                    const lines = shortLabel(row.label);
+                    const allLines = shortLabel(row.label, row.group ? 22 : 25);
+                    const lines =
+                      row.group && allLines.length > 2
+                        ? [allLines[0], allLines[1] + "…"]
+                        : allLines;
+                    const labelX = row.labelX ?? row.x;
                     return (
                       <g
                         key={row.key}
-                        className={`flow-node flow-${row.tone}`}
+                        className={`flow-node flow-${row.tone}${row.group ? " flow-source-node" : ""}`}
                         role="button"
                         tabIndex={0}
                         aria-label={`${row.label}: ${amount(row.value)}. Inspect evidence`}
@@ -220,10 +351,12 @@ export default function RevenueFlow({
                         </title>
                         <rect
                           className="flow-hit"
-                          x={row.x - 8}
-                          y={row.y - 80}
+                          x={labelX - 8}
+                          y={row.hitY ?? row.y - 80}
                           width="207"
-                          height={Math.max(110, row.height + 84)}
+                          height={
+                            row.hitHeight ?? Math.max(110, row.height + 84)
+                          }
                           rx="8"
                         />
                         <rect
@@ -235,19 +368,23 @@ export default function RevenueFlow({
                         />
                         <text
                           className="flow-node-label"
-                          x={row.x}
-                          y={row.y - 28 - 17 * lines.length}
+                          x={labelX}
+                          y={
+                            row.group
+                              ? row.labelY - 8 - 17 * (lines.length - 1)
+                              : row.y - 28 - 17 * lines.length
+                          }
                         >
                           {lines.map((line, index) => (
-                            <tspan key={index} x={row.x} dy={index ? 17 : 0}>
+                            <tspan key={index} x={labelX} dy={index ? 17 : 0}>
                               {line}
                             </tspan>
                           ))}
                         </text>
                         <text
                           className="flow-node-amount"
-                          x={row.x}
-                          y={row.y - 12}
+                          x={labelX}
+                          y={row.group ? row.labelY + 16 : row.y - 12}
                         >
                           {amount(row.value)}
                           <tspan className="flow-calculated">
@@ -260,14 +397,10 @@ export default function RevenueFlow({
                 </svg>
               </div>
               <p className="flow-footnote">
-                Band width shows the amount. * Calculated difference.{" "}
-                {selected.kind === "trailing"
-                  ? "Trailing figures use an annual/YTD bridge; a matching revenue-segment mix is not available."
-                  : !mix
-                    ? "No matching revenue-segment mix is available for this filing and period."
-                    : mix.members.length > 5
-                      ? "The complete category list is available in Where revenue comes from below."
-                      : ""}
+                Band width shows the amount. * Calculated from reported figures.{" "}
+                {mix?.chartable && !connectedSources
+                  ? "Revenue sources are listed above to keep the flow compact."
+                  : ""}
               </p>
             </>
           ) : (
@@ -287,6 +420,7 @@ export default function RevenueFlow({
             open={!graph || undefined}
           >
             <summary>View all figures &amp; evidence</summary>
+            {connectedSources && sourceFigures}
             <div className="flow-figures" aria-label="Income statement figures">
               {values.map((row) => (
                 <button
@@ -335,7 +469,7 @@ export default function RevenueFlow({
           <details className="flow-definitions">
             <summary>How to read this chart</summary>
             {data.limitations.map((line) => (
-              <p key={line}>{line}</p>
+              <p key={line}>{readableNote(line)}</p>
             ))}
             <p>
               Gross profit is revenue after costs directly associated with

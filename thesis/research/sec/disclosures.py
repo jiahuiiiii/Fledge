@@ -63,7 +63,7 @@ def commit(conn, iid, item, raw, data, now, name):
     did=uuid5(NAMESPACE_URL,f'thesis:disclosure:{iid}:{item["url"]}:{digest}')
     # Exact A -> B -> A returns reuse the original availability timestamp.
     data=dict(data,report_period_end=item.get('period_end'))
-    current=one(conn,'SELECT d.published_at,d.data FROM disclosure_current c JOIN disclosure_documents d ON d.id=c.document_id WHERE c.instrument_id=%s AND c.slot=%s',(iid,item['slot']))
+    current=None if item.get('history') else one(conn,'SELECT d.published_at,d.data FROM disclosure_current c JOIN disclosure_documents d ON d.id=c.document_id WHERE c.instrument_id=%s AND c.slot=%s',(iid,item['slot']))
     if current:
         previous_period=current['data'].get('report_period_end');incoming_period=item.get('period_end')
         if previous_period and incoming_period and incoming_period<previous_period:raise ValueError('Filing metadata would move the reporting period backwards.')
@@ -72,11 +72,38 @@ def commit(conn, iid, item, raw, data, now, name):
                  (did,iid,SOURCE,item['slot'],item['accession'],item['form'],item['url'],f'{name} · {item["form"]} · {item["slot"].replace("_"," ")}',item['published_at'],now,digest,raw,Jsonb(data)))
     # Selection follows reporting periods, so an older-period amendment cannot
     # replace a newer report merely because its acceptance date is later.
-    conn.execute('INSERT INTO disclosure_current VALUES(%s,%s,%s,%s) ON CONFLICT(instrument_id,slot) DO UPDATE SET document_id=excluded.document_id,checked_at=excluded.checked_at',(iid,item['slot'],did,now))
+    if not item.get('history'):
+        conn.execute('INSERT INTO disclosure_current VALUES(%s,%s,%s,%s) ON CONFLICT(instrument_id,slot) DO UPDATE SET document_id=excluded.document_id,checked_at=excluded.checked_at',(iid,item['slot'],did,now))
     return str(did)
 
 
-def refresh(iid, *, fetcher=None, submissions=None):
+def revenue_history_plan(submissions, cik, now):
+    """The same five annual/quarterly periods as the flow, including amendments.
+
+    Retain originals separately: historical checks must never move the current
+    disclosure pointers or feed old reports into current business/guidance reads.
+    """
+    from .normalize import filing_rows
+    if int(submissions.get('cik', 0)) != int(cik):
+        raise ValueError('Filing metadata belongs to another issuer.')
+    filings = filing_rows(submissions, now)
+    chosen = {}
+    for filing in filings:
+        kind = 'annual' if filing['form'].startswith('10-K') else 'quarter'
+        chosen[(kind, filing['end'])] = filing
+    selected = []
+    for kind in ('annual', 'quarter'):
+        for (_, end), latest in [(key, f) for key, f in chosen.items() if key[0] == kind][-5:]:
+            chain = [f for f in filings if f['end'] == end and f['form'].startswith('10-K' if kind == 'annual' else '10-Q')]
+            # Never partially collect an unbounded amendment chain.
+            selected.extend(chain if len(chain) <= 8 else [latest])
+    return [dict(slot='revenue_history', history=True, form=f['form'], accession=f['accessionNumber'],
+                 published_at=f['accepted_at'], period_end=f['end'].isoformat(), filed_on=f['filingDate'],
+                 url=archive_url(cik, f['accessionNumber'], f['primaryDocument']))
+            for f in reversed(selected)]
+
+
+def refresh(iid, *, fetcher=None, submissions=None, history_only=False):
     if fetcher is None:client.identity()
     now=datetime.now(timezone.utc);attempt=uuid4()
     with transaction(source=True) as conn:
@@ -94,18 +121,23 @@ def refresh(iid, *, fetcher=None, submissions=None):
                 raise ValueError('Refresh structured filings first to obtain current issuer metadata.')
             submissions=bundle['payload']['submissions']
         conn.execute('UPDATE disclosure_refresh_state SET attempt_id=%s,last_attempt_at=%s,lease_until=%s WHERE instrument_id=%s',(attempt,now,now+timedelta(minutes=3),iid))
-    coverage=[];saved=0
+    coverage=[row for row in (state.get('coverage') or []) if row['slot'] != 'revenue_history'] if history_only else []
+    saved=0
     try:
-        items=plan(submissions,company['cik'],now)
+        items=[] if history_only else plan(submissions,company['cik'],now)
+        current_urls = {item['url'] for item in items}
+        # Structured history is supported only for domestic 10-K/10-Q filers.
+        if history_only or any(item['form'].startswith(('10-K', '10-Q')) for item in items):
+            items += [item for item in revenue_history_plan(submissions,company['cik'],now) if item['url'] not in current_urls]
         for slot in ('annual','quarter','earnings_filing'):
-            if slot not in {i['slot'] for i in items}:coverage.append(dict(slot=slot,status='missing',message='No supported filing in the retained metadata.'))
+            if not history_only and slot not in {i['slot'] for i in items}:coverage.append(dict(slot=slot,status='missing',message='No supported filing in the retained metadata.'))
         read=fetcher or client.fetch_document
         for item in items:
             fence(iid,attempt)
-            if '_amendment_' in item['slot']:
+            if '_amendment_' in item['slot'] or item.get('history'):
                 with transaction(source=True, consistent=True) as conn:
-                    retained = one(conn, 'SELECT id FROM disclosure_documents WHERE instrument_id=%s AND accession=%s AND url=%s ORDER BY available_at DESC LIMIT 1', (iid,item['accession'],item['url']))
-                if retained:
+                    retained = one(conn, 'SELECT id,content_hash,raw_html FROM disclosure_documents WHERE instrument_id=%s AND accession=%s AND url=%s ORDER BY available_at DESC LIMIT 1', (iid,item['accession'],item['url']))
+                if retained and hashlib.sha256(bytes(retained['raw_html'])).hexdigest() == retained['content_hash']:
                     coverage.append(dict(slot=item['slot'],status='available',document_id=str(retained['id'])));continue
             raw=read(item['url']);data=parse(raw,form=item['form'],cik=company['cik'])
             documents=[(item,raw,data)]
@@ -129,6 +161,9 @@ def refresh(iid, *, fetcher=None, submissions=None):
                 for metadata,body,parsed in documents:
                     did=commit(conn,iid,metadata,body,parsed,checked,company['name'])
                     coverage.append(dict(slot=metadata['slot'],status='available',document_id=did));saved+=1
+                # Each bounded request renews only this attempt's live lease.
+                conn.execute('UPDATE disclosure_refresh_state SET lease_until=%s WHERE instrument_id=%s AND attempt_id=%s',
+                             (checked+timedelta(minutes=3),iid,attempt))
         if not items:raise ValueError('No supported original filings in the retained metadata.')
         message=None
     except (ValueError,client.SourceFailure):

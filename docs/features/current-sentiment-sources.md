@@ -1,5 +1,11 @@
 # Read current sources before another sentiment analysis
 
+## Tone filters and reading order — 10 October 2026
+
+**All** is now the initial source selection whether or not a saved analysis exists. The Positive, Negative, Mixed, Neutral and Unclear tags are buttons that filter the saved source list by its existing relevant source labels. Clicking a tone opens **Read analysed sources** and resets pagination; clicking the selected tone again, or **All tones**, clears the tone filter. Source type and tone can be combined. Selecting unrelated, relevance-unclear or all analysed texts clears the tone filter; selecting a tone returns to company-relevant texts. These are temporary reading controls, not saved preferences or requests for new analysis.
+
+**Read analysed sources** comes before **Sample details & method**, **How sources are counted** and the discussion themes. Original per-source-type group counts remain unchanged: a filter can show several matching reports belonging to one counted development. The All view offers tone filters without creating a combined news/social tone statistic. Empty categories remain clickable and show an explicit empty result. Buttons expose their selected state, control the source disclosure and keep 44px targets and keyboard support. Source access, original evidence and withheld-analysis boundaries remain unchanged. See [verification](../reviews/2026-10-10/tone-filters.md).
+
 ## Direct reading before analysis — 9 October 2026
 
 When no tone reading exists for the selected source type, the main News & discussion panel now displays the current permitted source texts immediately. The existing source icons filter this list; six texts per page retain exact original wording, publication/feed-update dates, publisher/platform identity and the original-source dialog. Long text has a four-line preview, with full wording in evidence. The All filter starts selected before the first analysis. The evidence dialog continues to expose the complete eligible selection, exclusions and source limits.

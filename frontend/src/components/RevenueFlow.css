@@ -14,55 +14,79 @@
 .revenue-flow p {
   line-height: 1.7;
 }
+.flow-period-types {
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 0 340px;
+}
 .flow-kind {
   display: flex;
   gap: 4px;
-  flex-shrink: 0;
-  padding: 4px;
-  border: 1px solid var(--color-line-strong);
-  border-radius: var(--radius-md);
+  border-bottom: 1px solid var(--color-line);
+}
+.revenue-flow :is(.flow-kind, .flow-timeline) button {
+  min-height: 44px;
+  font-size: var(--text-sm);
 }
 .flow-kind button {
-  padding: 9px 11px;
-  border-radius: var(--radius-md);
-  font-size: var(--text-xs);
+  flex: 1 0 auto;
+  min-height: 44px;
+  padding: 10px 8px;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
   white-space: nowrap;
 }
-.flow-kind button[aria-pressed="true"] {
-  background: var(--color-line-strong);
+.flow-kind button:hover:not(:disabled) {
+  background: var(--color-surface-2);
   color: var(--color-text);
+}
+.flow-kind button[aria-pressed="true"] {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.app-shell .revenue-flow .flow-period-help {
+  margin: 8px 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  line-height: 1.5;
 }
 .flow-timeline {
   display: flex;
   overflow-x: auto;
-  gap: 7px;
-  margin-top: 26px;
-  padding: 6px;
-  background: var(--color-bg);
-  border-radius: var(--radius-lg);
+  gap: 6px;
+  margin-top: 12px;
+  padding: 5px;
+  margin-left: -5px;
+  margin-right: -5px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
 }
 .flow-timeline button {
-  min-width: 115px;
-  flex: 1 0 auto;
-  text-align: left;
+  min-width: 60px;
+  min-height: 44px;
+  flex: 0 0 auto;
+  justify-content: center;
+  background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
-  padding: 12px 16px;
-}
-.flow-timeline button span {
-  display: block;
-  font-size: var(--text-md);
-  font-weight: 600;
-}
-.flow-timeline button small {
-  display: block;
+  padding: 10px 14px;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
   color: var(--color-muted);
-  font-size: var(--text-xs);
-  margin-top: 4px;
+  white-space: nowrap;
+}
+.flow-timeline button:hover:not(:disabled) {
+  background: var(--color-surface-2);
+  color: var(--color-text);
 }
 .flow-timeline button[aria-pressed="true"] {
-  background: var(--color-line);
-  border-color: var(--color-info-mid);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-mid);
+  color: var(--color-accent-light);
 }
 .flow-meta {
   display: flex;
@@ -84,15 +108,49 @@
   gap: 6px;
   max-width: 250px;
 }
+.flow-source-controls {
+  display: flex;
+  gap: 12px;
+}
+.flow-source-node .flow-node-amount {
+  font-size: var(--text-base);
+}
 .flow-viewport {
   overflow-x: auto;
+  max-height: 486px;
   padding: 6px 0 0;
   border-radius: var(--radius-md);
 }
 .flow-svg {
-  width: 100%;
   display: block;
-  overflow: visible;
+}
+.flow-source-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 16px 0;
+}
+.flow-source-figures button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.flow-source-figures span,
+.flow-source-figures small {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+.flow-source-figures strong {
+  font-size: var(--text-base);
+  color: var(--color-info-light);
 }
 .flow-revenue {
   --flow-colour: var(--color-info-light);
@@ -229,6 +287,10 @@
     flex-direction: column;
     gap: 16px;
   }
+  .flow-period-types {
+    flex-basis: auto;
+    width: 340px;
+  }
 }
 @media (max-width: 700px) {
   .revenue-flow {
@@ -246,6 +308,10 @@
     width: 100%;
     max-width: none;
   }
+  .flow-source-controls {
+    flex-wrap: wrap;
+    width: 100%;
+  }
   .flow-figures {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
@@ -262,16 +328,8 @@
     color: var(--color-muted);
     margin: 14px 0 0;
   }
-  .flow-timeline button {
-    min-width: 105px;
-    padding: 10px;
-  }
   .flow-expense-list button {
     flex-direction: column;
     gap: 8px;
-  }
-  .flow-kind {
-    max-width: 100%;
-    flex-wrap: wrap;
   }
 }

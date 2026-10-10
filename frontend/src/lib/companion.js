@@ -50,6 +50,11 @@ export const financialTerms = {
     "The percentage change in sales from the stated earlier period to the later one.",
     "Compare the same kind of period and read both dates; fiscal-year and trailing results can differ.",
   ],
+  net_income: [
+    "Net profit / loss",
+    "The company’s profit or loss for the period after expenses, interest and taxes, including other gains or losses. It is also called net income or net result.",
+    "A positive amount is a profit; a negative amount is a loss. This is an accounting figure, so it can differ from cash generated. It is not the company’s cash balance.",
+  ],
   operating_margin: [
     "Operating margin",
     "Operating profit as a percentage of revenue, before non-operating items such as interest and tax.",

@@ -2,6 +2,7 @@
 
 import hashlib
 from collections import Counter
+from copy import deepcopy
 from datetime import datetime, timezone, timedelta
 from typing import Literal
 from uuid import uuid4
@@ -15,9 +16,10 @@ from . import sentiment, sentiment_context
 from . import discussion_theme_check as evidence_check
 from .citations import model_source
 
-PROMPT = "thesis-discussion-themes-8"
+PROMPT = "thesis-discussion-themes-9"
+LEGACY_PROMPT = "thesis-discussion-themes-8"
 LIMITATION = "AI interpretation of selected, previously classified source text. News, Reddit, Hacker News and X are separate samples, not market consensus or independent verification. Only explicitly supplied saved parents provide conversation context; full threads and linked articles are not model inputs."
-EVIDENCE_POLICY = "theme-source-title-parent-2"
+EVIDENCE_POLICY = "theme-source-title-parent-3"
 SCOPES = ("news", "reddit", "hackernews", "x")
 
 
@@ -103,6 +105,26 @@ def request_for(packet):
     schema["$defs"]["Claim"]["properties"]["item_id"]["enum"] = [
         s["label"] for s in packet["sources"]
     ] or ["not_applicable"]
+    if not packet.get("theme_legacy_request"):
+        # Bind each label to its supplied parent passage set. Article titles
+        # are own-source evidence, never conversation context. Group identical
+        # passage sets to keep the schema bounded without weakening identity.
+        groups = {}
+        for source in packet["sources"]:
+            ids = tuple(p["id"] for p in (source.get("conversation") or {}).get("passages", []))
+            groups.setdefault(ids, []).append(source["label"])
+        variants = []
+        for ids, labels in groups.items():
+            variant = deepcopy(schema["$defs"]["Claim"])
+            variant["properties"]["item_id"]["enum"] = labels
+            context = variant["properties"]["context_passages"]
+            context.pop("default", None)
+            context.update(minItems=1 if ids else 0, maxItems=2 if ids else 0)
+            if ids:
+                context["items"]["enum"] = list(ids)
+            variants.append(variant)
+        if variants:
+            schema["$defs"]["Claim"] = variants[0] if len(variants) == 1 else {"anyOf": variants}
     return dict(
         model=REASONING_MODEL,
         store=False,
@@ -163,7 +185,8 @@ def identity(packet):
         "shared-discussion-themes:"
         + hashlib.sha256(
             (
-                PROMPT + packet["analysis_id"] + ledger.canonical(request_for(packet))
+                (LEGACY_PROMPT if packet.get("theme_legacy_request") else PROMPT)
+                + packet["analysis_id"] + ledger.canonical(request_for(packet))
             ).encode()
         ).hexdigest()
     )
@@ -172,7 +195,7 @@ def identity(packet):
 def reading_identity(packet):
     # Keep synthesis cache identity stable. A new checking policy must not bill
     # another synthesis or silently promote an earlier unchecked record.
-    return identity(packet) + ":" + evidence_check.POLICY
+    return identity(packet) + ":" + evidence_check.POLICY + ":" + EVIDENCE_POLICY
 
 
 def render(call, packet):
@@ -201,6 +224,7 @@ def render(call, packet):
     seen = set()
     counts = Counter()
     themes = []
+    title_references = []
 
     def view(value, expected_scope):
         claims, citations, used_claims = [], [], set()
@@ -253,7 +277,19 @@ def render(call, packet):
                         role="source_title",
                     ),
                 )
-            context = sentiment_context.evidence(source, claim.context_passages)
+            parent_ids = claim.context_passages
+            if (
+                not source.get("conversation")
+                and expected_scope in {"news", "reddit"}
+                and parent_ids == ["p0"]
+                and any(q["passage_id"] == "p0" and q["role"] == "source_title" for q in quoted)
+            ):
+                # A narrow formatting projection: this exact title is ALREADY
+                # included above. No finding, quotation or support is added.
+                # Keep the paid response immutable and disclose the projection.
+                title_references.append(dict(source_id=source["id"], context_passages=["p0"], own_passage_id="p0"))
+                parent_ids = []
+            context = sentiment_context.evidence(source, parent_ids)
             claims.append(
                 dict(
                     source_id=source["id"],
@@ -303,7 +339,11 @@ def render(call, packet):
         context_policy=sentiment_context.POLICY,
         gaps=result.gaps,
         model=REASONING_MODEL,
-        prompt_version=PROMPT,
+        prompt_version=LEGACY_PROMPT if packet.get("theme_legacy_request") else PROMPT,
+        **(dict(citation_normalization=dict(
+            policy=EVIDENCE_POLICY, title_references=title_references,
+            limitation="Article or post titles referenced as parent context were resolved only to the identical own-source titles already included as evidence. Original findings and paid responses remain unchanged; the evidence check is still required."
+        )) if title_references else {}),
         limitation=LIMITATION,
     )
 
@@ -346,6 +386,15 @@ def present(conn, row):
 
 
 def generate(iid, aid, *, transport=None):
+    from .theme_batching import reading_lock
+
+    with reading_lock(iid):
+        return _generate(iid, aid, transport=transport)
+
+
+def _generate(iid, aid, *, transport=None):
+    from . import theme_batching
+
     with transaction() as c:
         packet = prepare(c, iid, aid)
         if not packet["sources"]:
@@ -358,26 +407,18 @@ def generate(iid, aid, *, transport=None):
         )
         if old:
             return present(c, old)
-    call = ledger.execute(
-        identity(packet), PROMPT, request_for(packet), transport=transport
-    )
-    candidate = render(call, packet)
-    # Permission can change during synthesis. Do not dispatch another paid
-    # request after withdrawal; the original paid response stays auditable.
+    parts = theme_batching.available_plan(packet)
+    key = theme_batching.identity(packet, parts)
     with transaction() as c:
-        prepare(c, iid, aid)
-    checked = ledger.execute(
-        evidence_check.identity(packet, candidate),
-        evidence_check.POLICY,
-        evidence_check.request_for(packet, candidate),
-        transport=transport,
-    )
-    result = evidence_check.apply(checked, candidate)
+        old = one(c, "SELECT * FROM discussion_theme_reviews WHERE request_key=%s", (key,))
+        if old:
+            return present(c, old)
+    result, synthesis_call_id = theme_batching.run(packet, parts, transport=transport)
     with transaction() as c:
         row = one(
             c,
             "INSERT INTO discussion_theme_reviews VALUES(%s,%s,%s,%s,%s,%s,%s,now()) ON CONFLICT(request_key) DO NOTHING RETURNING *",
-            (uuid4(), iid, aid, key, call["id"], Jsonb(packet), Jsonb(result)),
+            (uuid4(), iid, aid, key, synthesis_call_id, Jsonb(packet), Jsonb(result)),
         )
         return present(
             c,
@@ -389,6 +430,8 @@ def generate(iid, aid, *, transport=None):
 
 
 def history(iid, aid=None, before=None):
+    from . import theme_batching
+
     if not sentiment.market_brief.company_for(iid):
         raise Missing("Choose a supported company.")
     with transaction(consistent=True) as c:
@@ -425,6 +468,7 @@ def history(iid, aid=None, before=None):
         return dict(
             items=[present(c, r) for r in saved[:20]],
             current=present(c, current),
+            generation=theme_batching.preview(c, iid, aid) if aid and not before else None,
             next_cursor=str(saved[19]["id"]) if len(saved) > 20 else None,
         )
 
@@ -463,6 +507,9 @@ def download(iid, identity):
             "<p>Quotations are selected excerpts. Inspect each original source for full context.</p>"
         ]
         parts += ["<p>" + esc(value["result"]["limitation"]) + "</p>"]
+        recoveries = [p.get("citation_normalization") for p in value["result"].get("batching", {}).get("parts", [])] or [value["result"].get("citation_normalization")]
+        if any(recoveries):
+            parts += ["<p>A title-reference formatting issue was corrected using only the same original titles already included as evidence. The findings were unchanged and still passed through the evidence check.</p>"]
         check = value["result"].get("evidence_check")
         if check:
             parts += ["<p>" + esc(check["limitation"]) + "</p>"]

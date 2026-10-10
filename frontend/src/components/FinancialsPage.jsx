@@ -81,7 +81,7 @@ function Insights({ readings }) {
 }
 const incomeSeries = [
   { key: "revenue", label: "Revenue", tone: "revenue" },
-  { key: "net_income", label: "Net result", tone: "earnings" },
+  { key: "net_income", label: "Net profit / loss", tone: "earnings" },
   { key: "free_cash_flow", label: "Free cash flow", tone: "cashflow" },
   { key: "operating_cash", label: "Operating cash flow", tone: "operations" },
   { key: "operating_income", label: "Operating profit", tone: "operating" },
@@ -260,6 +260,24 @@ function HistoryChart({ rows, series, active, onSelect, label }) {
               .filter((s) => enabled.includes(s.key))
               .map((s) => {
                 const row = metric(active, s.key);
+                const netScope =
+                  s.key !== "net_income"
+                    ? null
+                    : row?.label ===
+                        "Net result including non-controlling interests"
+                      ? {
+                          caption:
+                            "Whole group, including other owners’ share.",
+                          explanation:
+                            "This figure includes the profit or loss belonging to other owners of subsidiaries, as well as the parent company. The filing calls those other owners’ share ‘non-controlling interests’.",
+                        }
+                      : row?.label === "Net income attributable to parent"
+                        ? {
+                            caption: "Parent company’s share.",
+                            explanation:
+                              "This figure is the profit or loss attributable to the parent company. It excludes the share belonging to other owners of subsidiaries.",
+                          }
+                        : null;
                 return (
                   <article
                     className={`story-series series-${s.tone}`}
@@ -267,7 +285,7 @@ function HistoryChart({ rows, series, active, onSelect, label }) {
                   >
                     <span className="story-stat-label">
                       {s.label}
-                      <TermHelp term={s.key} />
+                      <TermHelp term={s.key} context={netScope?.explanation} />
                     </span>
                     <Evidence
                       rows={[row]}
@@ -281,7 +299,12 @@ function HistoryChart({ rows, series, active, onSelect, label }) {
                           ? `At ${day(row.end)}`
                           : "No matching figure"}
                     </small>
-                    {s.key === "net_income" && <small>{row?.label}</small>}
+                    {s.key === "net_income" && (
+                      <>
+                        <small>After expenses, interest and taxes.</small>
+                        <small>{netScope?.caption || row?.label}</small>
+                      </>
+                    )}
                     {s.key === "free_cash_flow" &&
                       row?.spending_basis === "productive_assets" && (
                         <small>
@@ -631,7 +654,11 @@ export default function FinancialsPage({
               Follow revenue through costs to the reported result. The chart
               labels its own selected fiscal period.
             </Heading>
-            <RevenueFlow data={workspace.income_flow} compactHeading />
+            <RevenueFlow
+              data={workspace.income_flow}
+              segments={workspace.segment_revenue}
+              compactHeading
+            />
           </section>
           <section
             className="financial-story-section"

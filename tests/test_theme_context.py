@@ -6,7 +6,7 @@ import pytest
 from thesis.db import transaction, one
 from thesis.providers import ledger
 from thesis.research import sentiment as S, sentiment_context, conversation as cv
-from thesis.research import discussion_themes as D, discussion_theme_check as C
+from thesis.research import discussion_themes as D, discussion_theme_check as C, theme_batching as B
 from test_conversation import setup, fetcher, unlock
 from test_sentiment import provider as classify
 from test_discussion_themes import response, check_response, packet_for
@@ -36,9 +36,11 @@ def test_both_theme_stages_use_the_same_parent_with_separate_citations(owner):
         return response(body)
 
     result = D.generate(iid, reading["id"], transport=provider)
-    assert len(calls) == 2
-    synthesis = json.loads(calls[0]["input"][1]["content"])
-    checking = json.loads(calls[1]["input"][1]["content"])
+    assert len(calls) == 2 * len(B.plan(packet))
+    drafts = [json.loads(body["input"][1]["content"]) for body in calls if body["text"]["format"]["name"] == "discussion_themes"]
+    reviews = [json.loads(body["input"][1]["content"]) for body in calls if body["text"]["format"]["name"] == "discussion_theme_evidence_check"]
+    synthesis = next(wire for wire in drafts if any(s.get("conversation") for s in wire["sources"]))
+    checking = next(wire for wire in reviews if any(s.get("conversation") for s in wire["source_context"]))
     s = next(s for s in synthesis["sources"] if s.get("conversation"))
     c = next(s for s in checking["source_context"] if s.get("conversation"))
     assert (
@@ -47,8 +49,8 @@ def test_both_theme_stages_use_the_same_parent_with_separate_citations(owner):
         == sentiment_context.wire(original["conversation"])
     )
     assert (
-        len(synthesis["sources"])
-        == len(checking["source_context"])
+        sum(len(wire["sources"]) for wire in drafts)
+        == sum(len(wire["source_context"]) for wire in reviews)
         == len(packet["sources"])
     )
     assert "An incomplete parent statement" not in json.dumps(synthesis)
@@ -69,7 +71,7 @@ def test_both_theme_stages_use_the_same_parent_with_separate_citations(owner):
         "citations",
     }
     assert (
-        checked_claim["conversation"]["citations"] == claim["conversation"]["citations"]
+        checked_claim["conversation"]["citations"] == [{k: v for k, v in citation.items() if k != "quote"} for citation in claim["conversation"]["citations"]]
     )
     assert (
         "context_passages"
@@ -174,7 +176,7 @@ def test_parent_withdrawal_controls_both_stages_history_and_export(owner, stage)
 
     def provider(body):
         calls.append(body["text"]["format"]["name"])
-        if stage == "synthesis" or (stage == "checker" and len(calls) == 2):
+        if stage == "synthesis" or (stage == "checker" and body["text"]["format"]["name"] == "discussion_theme_evidence_check" and any(s.get("conversation") for s in json.loads(body["input"][1]["content"])["source_context"])):
             withdraw()
         return response(body)
 
@@ -194,7 +196,7 @@ def test_parent_withdrawal_controls_both_stages_history_and_export(owner, stage)
         assert D.history(iid, reading["id"])["current"]["withheld"]
         html = D.download(iid, saved["id"])[1]
         assert "are withheld" in html and "I think Microsoft software" not in html
-        assert len(calls) == 2
+        assert len(calls) == 4
 
 
 def test_checker_cannot_mutate_context_when_filtering_failed_theme(owner):

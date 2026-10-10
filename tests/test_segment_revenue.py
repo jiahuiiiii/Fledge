@@ -156,6 +156,156 @@ def test_real_saved_broadcom_arithmetic_and_fact_anchor():
     annual=segments.extract((Path(folder)/'annual.html').read_bytes(),1730168)
     operating=next(g for g in annual['groups'] if g['kind']=='Operating segments')
     assert operating['total']=='63887000000' and operating['chartable']
-    geography=next(g for g in annual['groups'] if g['kind']=='Reported geographies')
-    assert not geography['chartable'] and len(geography['members'])==8
-    assert all(m['percentage'] is None for m in geography['members'])
+    geography=[g for g in annual['groups'] if g['kind']=='Reported geographies']
+    assert {g['view_label'] for g in geography}=={'Countries','Regions'}
+    assert all(g['chartable'] and g['total']=='63887000000' for g in geography)
+    assert sorted(len(g['members']) for g in geography)==[3,5]
+
+
+def test_historical_exact_filing_is_read_without_latest_period_substitution(owner):
+    from datetime import datetime, timezone
+    from thesis.research.sec.disclosure_text import parse
+    iid=add_company('MSFT')['instrument_id']
+    raw=filing();item=disclosures.plan(metadata(),789019,datetime.now(timezone.utc))[0]
+    # Retain a historical document without installing a current pointer.
+    item.update(history=True,slot='revenue_history')
+    with transaction(source=True) as conn:
+        disclosures.commit(conn,iid,item,raw,parse(raw,form='10-K',cik=789019),datetime.now(timezone.utc),'Example')
+    flow={'periods':[{'kind':'annual','metrics':[{'key':'revenue','inputs':[{'filing_url':item['url'],'start':'2024-10-01','end':'2025-09-30','concept':CONCEPT.split(':')[1]}]}]}]}
+    with transaction(consistent=True) as conn:
+        assert segments.present(conn,iid,flow)['groups'][0]['total']=='100000000'
+        assert segments.present(conn,iid,{'periods':[]})['groups']==[]
+    with transaction(admin=True) as conn:
+        conn.execute("UPDATE sources SET entitlement='fictional' WHERE id='sec-disclosures'")
+    try:
+        with transaction(consistent=True) as conn:
+            assert segments.present(conn,iid,flow)['groups']==[]
+    finally:
+        with transaction(admin=True) as conn:
+            conn.execute("UPDATE sources SET entitlement='sec-public' WHERE id='sec-disclosures'")
+
+
+def test_comparative_periods_are_opt_in_and_never_pooled():
+    extra=context('old-total',start='2023-10-01',end='2024-09-30')+context('old-part','custom:ProductsMember',start='2023-10-01',end='2024-09-30')
+    raw=filing(more_contexts=extra,more_facts=fact('old-total','25')+fact('old-part','25'))
+    assert len(read(raw)['groups'])==1
+    groups=segments.extract(raw,789019,True)['groups']
+    assert len(groups)==2 and all(g['chartable'] for g in groups)
+    assert {g['total'] for g in groups}=={'100000000','25000000'}
+
+
+def bridge_fixture():
+    base=read()['groups'][0]
+    dates=[('2024-10-01','2025-09-30'),('2025-10-01','2026-06-30'),('2024-10-01','2025-06-30')]
+    groups=[];inputs=[]
+    for n,(start,end) in enumerate(dates):
+        g=deepcopy(base);g.update(start=start,end=end,url=f'https://www.sec.gov/filing{n}.htm',form='10-K' if n==0 else '10-Q')
+        groups.append(g)
+        inputs.append(dict(value=g['total'],start=start,end=end,concept=CONCEPT.split(':')[1],filing_url=g['url']))
+    p=dict(id='trailing:fixture',kind='trailing',start='2025-07-01',end='2026-06-30',metrics=[dict(key='revenue',value='100000000',inputs=inputs,calculated=True)])
+    return p,groups
+
+
+def test_trailing_breakdown_matches_exact_three_input_bridge_and_evidence():
+    period,groups=bridge_fixture()
+    result=segments.trailing_groups(period,groups)
+    assert len(result)==1 and result[0]['total']=='100000000'
+    assert {m['value'] for m in result[0]['members']}=={'40000000','60000000'}
+    assert result[0]['period_id']==period['id'] and result[0]['revenue_inputs']==period['metrics'][0]['inputs']
+    assert all(len(m['inputs'])==3 and m['calculated'] for m in result[0]['members'])
+    assert all('#f-' in f['filing_url'] for m in result[0]['members'] for f in m['inputs'])
+
+
+@pytest.mark.parametrize('change',['missing','overlap','member','label','total','dates','concept','negative','url'])
+def test_trailing_breakdown_rejects_incomplete_or_changed_categories(change):
+    p,groups=bridge_fixture()
+    if change=='missing':groups.pop()
+    if change=='overlap':groups[1]['chartable']=False
+    if change=='member':groups[1]['members'][0]['member']='custom:NewMember'
+    if change=='label':groups[1]['members'][0]['label']='Changed basis'
+    if change=='total':p['metrics'][0]['value']='101000000'
+    if change=='dates':p['start']='2025-07-02'
+    if change=='concept':p['metrics'][0]['inputs'][1]['concept']='Revenues'
+    if change=='negative':groups[2]['members'][0]['value']='1000000000'
+    if change=='url':groups[1]['url']='https://www.sec.gov/other.htm'
+    assert segments.trailing_groups(p,groups)==[]
+
+
+def test_older_dei_quarter_namespace_keeps_exact_reporting_date():
+    raw=filing().replace(b'xbrl.sec.gov/dei/2025',b'xbrl.sec.gov/dei/2021q4')
+    assert read(raw)['groups'][0]['chartable']
+
+
+def test_standard_operating_segments_qualifier_is_retained_and_reconciled():
+    qualifier='<xbrldi:explicitMember dimension="srt:ConsolidationItemsAxis">us-gaap:OperatingSegmentsMember</xbrldi:explicitMember>'
+    raw=filing().replace(b'</xbrldi:explicitMember>',('</xbrldi:explicitMember>'+qualifier).encode())
+    group=read(raw)['groups'][0]
+    assert group['chartable'] and group['total']=='100000000'
+    assert len(group['members'][0]['inputs'][0]['dimensions'])==2
+    for member in ['us-gaap:IntersegmentEliminationMember','custom:OperatingSegmentsMember']:
+        assert read(raw.replace(b'us-gaap:OperatingSegmentsMember',member.encode()))['groups']==[]
+
+
+def geographic_disclosures():
+    axis='srt:StatementGeographicalAxis'
+    members=[('custom:AmericasMember','60'),('custom:AsiaPacificMember','40')]
+    extra=context('country-a','custom:FirstCountryMember',axis=axis)+context('country-b','custom:OtherCountriesMember',axis=axis)
+    raw=filing(axis=axis,members=members,more_contexts=extra)
+    region=fact('total','100')+fact('s0','60')+fact('s1','40')
+    countries='Net revenue by country is based on delivery location. '+fact('country-a','70')+fact('country-b','30')
+    return raw.replace(('<div>'+region+'</div>').encode(),('<table><tr><td>'+region+'</td></tr></table><div>'+countries+'</div>').encode())
+
+
+def test_complete_country_and_region_disclosures_connect_separately():
+    groups=read(geographic_disclosures())['groups']
+    assert [g['view_label'] for g in groups]==['Countries','Regions']
+    assert all(g['chartable'] and g['component_sum']==g['total']=='100000000' for g in groups)
+    assert [set(m['value'] for m in g['members']) for g in groups]==[{'70000000','30000000'},{'60000000','40000000'}]
+    assert len({g['view_id'] for g in groups})==2
+    assert 'delivery location' in groups[0]['disclosure']['description']
+    assert all(m['inputs'][0]['fact_id'] for g in groups for m in g['members'])
+
+
+@pytest.mark.parametrize('change',['same-block','missing-total','missing-member','conflict','overlap','unlabelled-prose','hidden'])
+def test_geographic_partitions_require_source_proof_and_complete_nonoverlap(change):
+    raw=geographic_disclosures()
+    if change=='same-block':
+        region=fact('total','100')+fact('s0','60')+fact('s1','40')
+        raw=raw.replace(('<table><tr><td>'+region+'</td></tr></table><div>').encode(),('<div>'+region).encode())
+    if change=='missing-total':raw=raw.replace(fact('total','100').encode(),b'').replace(b'</body>',fact('total','100').encode()+b'</body>')
+    if change=='missing-member':raw=raw.replace(fact('country-b','30').encode(),b'')
+    if change=='conflict':raw=raw.replace(b'</body>',fact('country-a','71',id='conflicting-country').encode()+b'</body>')
+    if change=='overlap':raw=raw.replace(fact('country-a','70').encode(),fact('s0','60',id='duplicate-a').encode()).replace(fact('country-b','30').encode(),fact('s1','40',id='duplicate-b').encode())
+    if change=='unlabelled-prose':raw=raw.replace(b'Net revenue by country',b'Some figures')
+    if change=='hidden':raw=raw.replace(b'<div>Net revenue',b'<ix:hidden><div>Net revenue').replace(b'</div></body>',b'</div></ix:hidden></body>')
+    groups=read(raw)['groups']
+    if change=='overlap':
+        # An identical repeated full set stays one set, never two flows.
+        assert len(groups)==1 and len(groups[0]['members'])==2
+    else:
+        assert len(groups)==1 and not groups[0]['chartable'] and 'view_id' not in groups[0]
+
+
+def test_trailing_geographies_do_not_mix_country_and_region_views():
+    period,groups=bridge_fixture()
+    country=[];region=[]
+    for group in groups:
+        group.update(kind='Reported geographies',view_id='country',view_label='Countries')
+        country.append(group)
+        region.append(dict(deepcopy(group),view_id='region',view_label='Regions'))
+    assert len(segments.trailing_groups(period,country+region))==2
+    country[1]['view_id']='different-members'
+    assert [g['view_id'] for g in segments.trailing_groups(period,country+region)]==['region']
+
+
+def test_country_prose_follows_only_an_explicit_bounded_page_continuation():
+    raw=geographic_disclosures()
+    start='<div>Net revenue by country is based on delivery location. '+fact('country-a','70')
+    raw=raw.replace(start.encode(),('<ix:continuation id="first" continuedAt="second">'+start+' for fiscal').encode())
+    raw=raw.replace(fact('country-b','30').encode(),('</div></ix:continuation><ix:continuation id="second"><div>years '+fact('country-b','30')).encode())
+    raw=raw.replace(b'</div></body>',b'</div></ix:continuation></body>')
+    groups=read(raw)['groups']
+    assert [g['view_label'] for g in groups]==['Countries','Regions']
+    assert groups[0]['disclosure']['continuation_ids']==['second']
+    for changed in [raw.replace(b'continuedAt="second"',b'continuedAt="missing"'),raw.replace(b'for fiscal',b'for fiscal.'),raw.replace(b'<div>years',b'<div>Unrelated')]:
+        assert not read(changed)['groups'][0]['chartable']

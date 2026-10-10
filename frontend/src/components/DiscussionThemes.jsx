@@ -1,10 +1,14 @@
+import { readableNote, readingGap } from "../lib/readingNotes";
+import ReadingNotes from "./ReadingNotes";
 import LoadingSkeleton from "./LoadingSkeleton";
 import Select from "./Select";
+import Modal from "./Modal";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { stamp } from "./MarketResearch";
 import SentimentContext from "./SentimentContext";
 import { SourceLabel } from "./SourceFilters";
+import "./DiscussionThemes.css";
 const names = {
   all: "All sources",
   news: "Company news",
@@ -24,10 +28,15 @@ export default function DiscussionThemes({
   const [open, setOpen] = useState(false),
     [data, setData] = useState(null),
     [selected, setSelected] = useState(null);
+  const [evidence, setEvidence] = useState(null);
   const [busy, setBusy] = useState(""),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
   const sequence = useRef(0);
+  useEffect(
+    () => setEvidence(null),
+    [selected, scope, open, instrumentId, analysisId],
+  );
   useEffect(() => {
     if (open) load();
     return () => {
@@ -72,11 +81,29 @@ export default function DiscussionThemes({
     if (ticket !== sequence.current) return;
     if (failure) {
       setError(failure);
+      try {
+        const refreshed = await api.themeHistory(instrumentId, analysisId);
+        if (ticket !== sequence.current) return;
+        setData(refreshed);
+        setSelected(
+          (previous) =>
+            [refreshed.current, ...refreshed.items].find(
+              (reading) => reading && reading.id === previous?.id,
+            ) ||
+            refreshed.current ||
+            refreshed.items[0] ||
+            null,
+        );
+      } catch {
+        // Keep the original failure; this read never repeats paid work.
+      }
+      if (ticket !== sequence.current) return;
     } else {
       setSelected(next);
       setData((d) => ({
         ...d,
         current: next,
+        generation: { cached: true, maximum_new_usd: "0" },
         items: [next, ...(d?.items || []).filter((r) => r.id !== next.id)],
       }));
       setNotice("Discussion summary ready below.");
@@ -108,6 +135,8 @@ export default function DiscussionThemes({
       if (ticket === sequence.current) setBusy("");
     }
   }
+  const generationBlock = unavailableReason || data?.generation?.blocked_reason;
+  const generationPlan = data?.generation;
   const readings = [data?.current, ...(data?.items || []), selected].filter(
     (r, i, all) => r && all.findIndex((v) => v?.id === r.id) === i,
   );
@@ -115,52 +144,87 @@ export default function DiscussionThemes({
     (t) => scope === "all" || t.scope === scope,
   );
   const sources = new Map((selected?.sources || []).map((s) => [s.id, s]));
+  const titleRecovery = selected?.result?.batching
+    ? selected.result.batching.parts.some((p) => p.citation_normalization)
+    : !!selected?.result?.citation_normalization;
+  const omitted = selected?.result?.evidence_check?.withheld_themes || 0;
+  const activeEvidence =
+    open && !selected?.withheld && evidence?.readingId === selected?.id
+      ? evidence?.value
+      : null;
   function claim(value, index) {
-    const source = value.source_id && sources.get(value.source_id);
+    const citedSources = [
+      ...new Set(
+        value.source_id
+          ? [value.source_id]
+          : value.citations.map((c) => c.source_id),
+      ),
+    ]
+      .map((id) => sources.get(id))
+      .filter(Boolean);
     return (
       <div className="theme-claim" key={index}>
-        {source && (
-          <p className="fine theme-claim-source">
-            {source.source} · {stamp(source.published_at)}
-          </p>
-        )}
+        <div className="theme-claim-sources">
+          {citedSources.length ? (
+            citedSources.map((source) => (
+              <button
+                className="theme-claim-source"
+                key={source.id}
+                aria-haspopup="dialog"
+                onClick={() => setEvidence({ readingId: selected.id, value })}
+              >
+                {source.source} · {stamp(source.published_at)}
+              </button>
+            ))
+          ) : (
+            <button
+              className="theme-claim-source"
+              aria-haspopup="dialog"
+              onClick={() => setEvidence({ readingId: selected.id, value })}
+            >
+              View supporting passages
+            </button>
+          )}
+        </div>
         <p>{value.text}</p>
-        <details>
-          <summary>Inspect supporting passages</summary>
-          <p className="fine">
-            Selected excerpts · open the original source for full context.
-          </p>
-          {[...new Set(value.citations.map((c) => c.source_id))].map((id) => {
-            const source = sources.get(id);
-            return (
-              <div className="theme-source" key={id}>
-                {source && (
-                  <>
-                    <p className="fine">Source title</p>
-                    <h4>{source.title}</h4>
-                    <p className="fine">
-                      {source.source} · published {stamp(source.published_at)}
-                    </p>
-                  </>
-                )}
-                {value.citations
-                  .filter(
-                    (c) => c.source_id === id && c.role !== "source_title",
-                  )
-                  .map((c) => (
-                    <blockquote key={c.passage_id}>{c.quote}</blockquote>
-                  ))}
-                {source && (
-                  <button onClick={() => onSource(source)}>
-                    Open theme source ↗
-                  </button>
-                )}
-              </div>
-            );
-          })}
-          <SentimentContext value={value.conversation} purpose="finding" />
-        </details>
       </div>
+    );
+  }
+  function passages(value) {
+    return (
+      <>
+        <p className="theme-evidence-finding">{value.text}</p>
+        <p className="fine">
+          Selected excerpts · open the original source for full context.
+        </p>
+        {[...new Set(value.citations.map((c) => c.source_id))].map((id) => {
+          const source = sources.get(id);
+          return (
+            <div className="theme-source" key={id}>
+              {source && (
+                <>
+                  <p className="fine">Source title</p>
+                  <h4>{source.title}</h4>
+                  <p className="fine">
+                    {source.source} · published {stamp(source.published_at)}
+                  </p>
+                </>
+              )}
+              {value.citations
+                .filter((c) => c.source_id === id && c.role !== "source_title")
+                .map((c) => (
+                  <blockquote key={c.passage_id}>{c.quote}</blockquote>
+                ))}
+              {source && (
+                <button onClick={() => onSource(source)}>
+                  Open theme source ↗
+                </button>
+              )}
+            </div>
+          );
+        })}
+        <SentimentContext value={value.conversation} purpose="finding" />
+      </>
     );
   }
   function view(value, heading) {
@@ -182,35 +246,56 @@ export default function DiscussionThemes({
         <section aria-label="Discussion themes" aria-busy={!!busy}>
           <div className="market-section-head">
             <div>
-              <span className="section-label">DISCUSSION THEMES</span>
-              <h3>{names[scope]}</h3>
+              <h3>Discussion summary</h3>
+              <p className="theme-intro">
+                Topics and differing views in the saved sources.
+              </p>
             </div>
             <button
-              disabled={!!busy || !!unavailableReason || !analysisId}
+              disabled={!!busy || !!generationBlock || !analysisId}
               onClick={generate}
             >
               {busy === "generate"
                 ? "Creating discussion summary…"
-                : "Summarise discussions"}
+                : generationPlan?.saved_drafts && !generationPlan.cached
+                  ? "Continue discussion summary"
+                  : "Summarise discussions"}
             </button>
           </div>
-          <p>
-            Summarise recurring topics, differing views and open questions from
-            the relevant saved news and social posts, with links to the
-            evidence. Creates one reading for the whole sample.
-          </p>
-          <p className="fine">
-            Uses your existing AI budget for two steps: drafting and an evidence
-            check. Reopening saved summaries makes no AI call.
-          </p>
+          {generationPlan?.maximum_new_usd != null && !generationBlock && (
+            <p className="fine">
+              {generationPlan.cached
+                ? "Saved summary · no AI cost to reopen."
+                : `${generationPlan.sources} relevant sources · maximum new cost US$${(Math.ceil(Number(generationPlan.maximum_new_usd) * 10000) / 10000).toFixed(4)}.`}
+            </p>
+          )}
+          {!generationPlan?.cached && (
+            <p className="fine">
+              A new summary uses your AI budget. Reading saved summaries is
+              free.
+            </p>
+          )}
+          {!!generationPlan?.saved_drafts &&
+            !generationPlan.cached &&
+            !generationBlock && (
+              <p className="fine">
+                {generationPlan.saved_drafts} saved{" "}
+                {generationPlan.saved_drafts === 1
+                  ? "draft will"
+                  : "drafts will"}{" "}
+                be reused. Only unfinished steps use budget.
+                {!!generationPlan.normalized_title_references &&
+                  " The saved draft is ready for its evidence check."}
+              </p>
+            )}
           {busy === "generate" ? (
             <p className="fine" role="status">
               Creating your summary and checking its evidence. This can take a
               few minutes; the result will appear here.
             </p>
-          ) : unavailableReason ? (
+          ) : generationBlock ? (
             <p className="warning" role="status">
-              {unavailableReason}
+              {generationBlock}
             </p>
           ) : null}
           {notice && !busy && <p role="status">{notice}</p>}
@@ -231,7 +316,7 @@ export default function DiscussionThemes({
           )}
           {!!readings.length && (
             <label className="theme-history">
-              Saved theme reading{" "}
+              Saved summary{" "}
               <Select
                 aria-label="Saved theme reading"
                 value={selected?.id || ""}
@@ -242,7 +327,7 @@ export default function DiscussionThemes({
               >
                 {readings.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {stamp(r.cutoff)} · saved {stamp(r.created_at)}
+                    Saved {stamp(r.created_at)}
                     {r.analysis_id === analysisId
                       ? " · this sample"
                       : " · earlier sample"}
@@ -259,35 +344,19 @@ export default function DiscussionThemes({
           {!selected && !busy && <p>No discussion summary saved yet.</p>}
           {selected && (
             <>
-              <p className="fine">
-                Captured {stamp(selected.cutoff)} ·{" "}
+              <p className="fine theme-sample">
                 {scope === "all"
                   ? Object.values(selected.coverage.by_scope).reduce(
                       (sum, count) => sum + count,
                       0,
                     )
                   : selected.coverage.by_scope[scope] || 0}{" "}
-                eligible {names[scope]} texts · not market consensus.
+                relevant sources · {names[scope]} · captured{" "}
+                {stamp(selected.cutoff)}
                 {scope === "hackernews" &&
                   selected.result?.context_policy &&
                   ` ${selected.coverage.parent_contexts || 0} saved parent ${selected.coverage.parent_contexts === 1 ? "message" : "messages"} supplied as context, not additional sources.`}
               </p>
-              {selected.analysis_id !== analysisId && (
-                <p className="warning">
-                  Earlier source sample. This reading does not describe the
-                  sentiment sample currently displayed.
-                </p>
-              )}
-              {selected.stale && (
-                <p className="warning">
-                  This source sample was captured more than 24 hours ago.
-                </p>
-              )}
-              {selected.earlier_method && (
-                <p className="warning">
-                  This saved reading uses an earlier interpretation method.
-                </p>
-              )}
               {selected.withheld ? (
                 <p className="warning">
                   Source access changed. This interpretation and its evidence
@@ -295,38 +364,41 @@ export default function DiscussionThemes({
                 </p>
               ) : (
                 <>
-                  <details className="theme-method">
-                    <summary>How this sample was read</summary>
+                  <ReadingNotes
+                    className="theme-method"
+                    title="About this summary"
+                    differentSources={selected.analysis_id !== analysisId}
+                    stale={selected.stale}
+                    earlierMethod={selected.earlier_method}
+                    omitted={omitted}
+                  >
                     {selected.result.evidence_policy && (
                       <p className="fine">
                         Each finding has its own source. Original source titles
                         provide context alongside the selected passages.
                       </p>
                     )}
-                    <p className="fine">{selected.result.limitation}</p>
+                    <p>{readableNote(selected.result.limitation)}</p>
+                    {titleRecovery && (
+                      <p className="fine">
+                        Some source links were repaired using the original
+                        article titles. The findings were unchanged and still
+                        went through the evidence check.
+                      </p>
+                    )}
                     {selected.result.evidence_check && (
                       <p className="fine">
-                        {selected.result.evidence_check.limitation}
+                        {readableNote(
+                          selected.result.evidence_check.limitation,
+                        )}
                       </p>
                     )}
                     <p className="fine">
-                      Selection follows the saved relevance classification;
-                      excluded texts can contain missed themes. Unchanged
-                      samples reuse their readings. Opening history makes no
-                      source or model request.
+                      Only sources previously labelled relevant were included.
+                      That selection can miss useful topics. Reading saved
+                      summaries does not use your AI budget.
                     </p>
-                  </details>
-                  {!!selected.result.evidence_check?.withheld_themes && (
-                    <p className="warning">
-                      {selected.result.evidence_check.withheld_themes}{" "}
-                      {selected.result.evidence_check.withheld_themes === 1
-                        ? "proposed theme was"
-                        : "proposed themes were"}{" "}
-                      withheld after an automated evidence check across this
-                      reading. The original source texts remain available in the
-                      source view.
-                    </p>
-                  )}
+                  </ReadingNotes>
                   {!themes.length && (
                     <p>
                       No specific theme was identified for {names[scope]} in
@@ -336,22 +408,22 @@ export default function DiscussionThemes({
                   )}
                   {themes.map((t, i) => (
                     <article className="theme-card" key={i}>
-                      {scope === "all" && <SourceLabel scope={t.scope} />}
                       <header>
                         <h3>{t.title}</h3>
-                        <span className="fine">
-                          {t.source_count} selected{" "}
-                          {t.source_count === 1 ? "text" : "texts"} · not
-                          independent confirmations
-                        </span>
+                        <div className="theme-card-meta">
+                          {scope === "all" && <SourceLabel scope={t.scope} />}
+                          <span>
+                            {t.source_count} cited{" "}
+                            {t.source_count === 1 ? "source" : "sources"}
+                          </span>
+                        </div>
                       </header>
                       {view(t.reading, "What these sources say")}
                       {t.differing_view ? (
                         view(t.differing_view, "A differing view on this issue")
                       ) : (
                         <p className="fine">
-                          No specific differing view identified within this
-                          supplied sample.
+                          No differing view found in this sample.
                         </p>
                       )}
                       <p className="theme-unknown">
@@ -361,10 +433,12 @@ export default function DiscussionThemes({
                   ))}
                   {!!selected.result.gaps.length && (
                     <details>
-                      <summary>Limits of the combined reading</summary>
+                      <summary>What this summary may miss</summary>
                       <ul>
                         {selected.result.gaps.map((g, i) => (
-                          <li key={i}>{g}</li>
+                          <li key={i}>
+                            {readingGap(g, selected.result.batching)}
+                          </li>
                         ))}
                       </ul>
                     </details>
@@ -382,6 +456,16 @@ export default function DiscussionThemes({
           )}
         </section>
       )}
+      <Modal
+        open={!!activeEvidence}
+        onClose={() => setEvidence(null)}
+        title="Supporting evidence"
+        className="theme-evidence-dialog"
+      >
+        {activeEvidence && (
+          <div className="theme-evidence-body">{passages(activeEvidence)}</div>
+        )}
+      </Modal>
     </details>
   );
 }

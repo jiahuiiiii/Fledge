@@ -150,8 +150,8 @@ let browser;
   );
   assert.equal(await panel.locator(".position-map-wrap").count(), 0);
   await rows.first().click();
-  assert.match(await dialog.innerText(), /29.375 times/);
-  assert.match(await dialog.innerText(), /peTTM/);
+  assert.match(await dialog.innerText(), /29.38×/);
+  assert.match(await dialog.innerText(), /Finnhub vendor TTM definition/);
   assert.match(
     await dialog.locator(".position-average-evidence").innerText(),
     /Included: NVDA/,
@@ -168,7 +168,7 @@ let browser;
     await page.screenshot({ path: `${folder}/pe-${width}.png` });
   }
   await page.setViewportSize({ width: 1440, height: 1100 });
-  // One chart retains positive, negative, zero and missing figures on a common baseline.
+  // Comparable positive, negative and zero figures share a baseline; gaps stay readable separately.
   let scenario = "mixed";
   await page.route("**/sector-position*", async (route) => {
     const response = await route.fetch(),
@@ -209,7 +209,9 @@ let browser;
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
   await rows.first().getByText("-25.0%", { exact: true }).waitFor();
-  assert.equal(await rows.count(), 4);
+  assert.equal(await rows.count(), 3);
+  assert.equal(await panel.locator(".position-excluded-row").count(), 1);
+  assert.match(await panel.locator(".position-excluded-row").innerText(), /GAP.*Authored missing/s);
   const geometry = await rows.evaluateAll((nodes) =>
     nodes.map((n) => {
       const f = n.querySelector(".position-row-fill");
@@ -228,7 +230,6 @@ let browser;
   );
   assert.equal(geometry[2].width, 0);
   assert.equal(geometry[2].zero, true);
-  assert.equal(geometry[3], null);
   await panel
     .getByRole("button", { name: "Evidence & periods", exact: true })
     .click();
@@ -236,7 +237,7 @@ let browser;
     await dialog.locator(".position-evidence-list > details").count(),
     4,
   );
-  await dialog.locator("summary").last().click();
+  await dialog.locator(".position-evidence-list > details > summary").last().click();
   assert.match(await dialog.innerText(), /unavailable/i);
   await page.keyboard.press("Escape");
   await page.screenshot({
@@ -252,7 +253,8 @@ let browser;
   await reloadComparison();
   await page.waitForFunction(
     () =>
-      document.querySelectorAll(".position-row-label .is-missing").length === 4,
+      document.querySelectorAll(".position-row-label .is-missing").length === 1 &&
+      document.querySelectorAll(".position-excluded-row").length === 3,
   );
   assert.equal(await panel.locator(".position-row-fill").count(), 0);
   assert.equal(await panel.locator(".position-scale > span").count(), 0);
@@ -310,11 +312,10 @@ let browser;
     /20.0%/,
   );
   await rows.first().click();
-  assert.match(
-    await dialog.innerText(),
-    /FMP annual revenue averages: 120 USD/,
-  );
-  assert.match(await dialog.innerText(), /authored-MSFT/);
+  assert.match(await dialog.innerText(), /120/);
+  assert.match(await dialog.innerText(), /100/);
+  assert.match(await dialog.innerText(), /two annual forecasts from the same FMP response/);
+  assert.match(await dialog.innerText(), /underlying forecast date is unknown/);
   await page.keyboard.press("Escape");
   await panel.locator(".position-forward-details > summary").click();
   assert.match(

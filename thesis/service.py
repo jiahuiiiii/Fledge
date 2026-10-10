@@ -736,8 +736,8 @@ def state(owner, instrument_id=INSTRUMENT):
             ),
             disclosures=disclosures_present(conn, instrument_id) if info['mode']=='sec' else None,
             financial_depth=financial_depth_present(conn, instrument_id) if info['mode']=='sec' else None,
-            income_flow=income_flow_present(conn, instrument_id) if info['mode']=='sec' else None,
-            segment_revenue=segment_revenue_present(conn, instrument_id) if info['mode']=='sec' else None,
+            income_flow=(income_flow_view := income_flow_present(conn, instrument_id) if info['mode']=='sec' else None),
+            segment_revenue=segment_revenue_present(conn, instrument_id, income_flow_view) if info['mode']=='sec' else None,
             management_outlook=guidance_present(conn, instrument_id) if info['mode']=='sec' else None,
             filing_calculations=rows(
                 conn,

@@ -8445,3 +8445,38 @@ details > summary:hover {
 .brief-grid > .brief-topic:last-child:nth-child(odd) {
   grid-column: 1 / -1;
 }
+
+/* Data & sources: reported-figure list and monitoring inputs, collapsed. */
+.technical-details {
+  margin-top: var(--space-5);
+  border-top: 1px solid var(--color-line);
+  padding-top: var(--space-3);
+}
+.technical-details > summary {
+  min-height: 44px;
+  align-content: center;
+  color: var(--color-text);
+  font-weight: 600;
+}
+.technical-details > summary span {
+  margin-left: var(--space-2);
+  color: var(--color-muted);
+  font-weight: 400;
+  font-size: var(--text-sm);
+}
+.technical-details[open] > summary {
+  margin-bottom: var(--space-3);
+}
+.technical-details .monitoring-inputs-heading {
+  margin-top: var(--space-5);
+}
+.overview-flow-link {
+  margin: 0;
+}
+.sources-list > .text-button {
+  min-height: 44px;
+  justify-self: start;
+}
+.technical-details > p.fine {
+  margin: 0 0 var(--space-4);
+}

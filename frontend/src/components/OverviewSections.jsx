@@ -10,7 +10,6 @@ import {
   number,
   yearLabel,
 } from "../lib/overviewSections";
-import RevenueFlow from "./RevenueFlow";
 import FinancialEvidence from "./FinancialEvidence";
 import Modal from "./Modal";
 import TermHelp from "./TermHelp";
@@ -504,12 +503,14 @@ export default function OverviewSections({
             onBrief={openBrief}
           />
         </div>
-        <RevenueFlow
-          data={data.income_flow}
-          segments={data.segment_revenue}
-          compactOverview
-          compactHeading
-        />
+        <p className="overview-flow-link">
+          <button
+            className="text-button"
+            onClick={() => onView("fundamentals")}
+          >
+            See how revenue becomes profit in Financials →
+          </button>
+        </p>
         <details
           className="overview-brief"
           ref={briefRef}

@@ -12,6 +12,7 @@ import CompanySidebar, { CompanyAddButton } from "./components/CompanySidebar";
 import Checkbox from "./components/Checkbox";
 import CompanyDialog from "./components/CompanyDialog";
 import { companyName } from "./lib/companyIdentity";
+import { mentionsCompany } from "./lib/companyHeadlines";
 import LoadingSkeleton from "./components/LoadingSkeleton";
 import RemovalNotice from "./components/RemovalNotice";
 import RetainedView from "./components/RetainedView";
@@ -168,6 +169,63 @@ function Icon({ name, ...props }) {
     >
       <path d={paths[name] || paths.workspace} />
     </svg>
+  );
+}
+// Plain explanation of a failed source check; unknown errors are shown as-is.
+function sourceCheckProblem(check) {
+  const when = check.checked_at ? ` (${date(check.checked_at)})` : "";
+  if (/interrupted/i.test(check.error || ""))
+    return `The last check${when} stopped before it finished, so newer information may be missing. Figures shown come from the last complete check. Use Research updates to try again.`;
+  return check.error
+    ? `${check.error} Saved information is still shown, but newer information may be missing.`
+    : "This source could not be checked, so newer information may be missing. Saved information is still shown.";
+}
+// Company mentions first; the full saved catalogue stays one click away.
+function SourceLibrary({ documents, instrument, filterMentions, onOpen }) {
+  const [all, setAll] = useState(!filterMentions);
+  const [shown, setShown] = useState(12);
+  const mentioned = filterMentions
+    ? documents.filter(
+        (d) => d.kind !== "news" || mentionsCompany(d, instrument),
+      )
+    : documents;
+  const list = all ? documents : mentioned;
+  const hidden = documents.length - mentioned.length;
+  return (
+    <>
+      {filterMentions && hidden > 0 && (
+        <p className="fine">
+          {all
+            ? `Showing all ${documents.length} saved sources.`
+            : `Showing ${mentioned.length} sources that name ${instrument.symbol}. ${hidden} other saved headlines are hidden.`}{" "}
+          <button
+            className="text-button"
+            onClick={() => {
+              setAll(!all);
+              setShown(12);
+            }}
+          >
+            {all ? "Show only company mentions" : "Show all"}
+          </button>
+        </p>
+      )}
+      {list.slice(0, shown).map((d) => (
+        <button className="source-link" key={d.id} onClick={() => onOpen(d)}>
+          <span>
+            {d.title}
+            <small>
+              {d.source} · {date(d.published_at)}
+            </small>
+          </span>
+          <Icon name="source" />
+        </button>
+      ))}
+      {list.length > shown && (
+        <button className="text-button" onClick={() => setShown(shown + 12)}>
+          Show more ({list.length - shown} left)
+        </button>
+      )}
+    </>
   );
 }
 const defaultCompany = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -1061,19 +1119,11 @@ function CompanyWorkspace({
       </>
     );
   }
+  // Real companies keep only filings and the daily check here; the full
+  // reported-figure list and monitoring inputs live in Data & sources.
   function renderFinancialReports() {
     return (
       <div className="financial-reports-panel">
-        {" "}
-        {!isRecorded && (
-          <details className="financials-reported-details">
-            <summary>All reported figures</summary>
-            <FinancialPerformance
-              key={data.instrument.id}
-              data={data.performance}
-            />
-          </details>
-        )}
         {!isRecorded && (
           <h3 className="financials-sources-heading">Filings &amp; checks</h3>
         )}
@@ -1108,11 +1158,13 @@ function CompanyWorkspace({
             }
           />
         )}
-        {!isRecorded && (
-          <h3 className="monitoring-inputs-heading">
-            Current monitoring inputs
-          </h3>
-        )}
+        {isRecorded && renderMonitoringInputs()}
+      </div>
+    );
+  }
+  function renderMonitoringInputs() {
+    return (
+      <>
         <div className="metrics-table">
           <div className="table-heading">
             <span>REPORTED METRIC</span>
@@ -1162,7 +1214,27 @@ function CompanyWorkspace({
             forecasts separately in Outlook.
           </p>
         </div>
-      </div>
+      </>
+    );
+  }
+  function renderTechnicalDetails() {
+    return (
+      <details className="technical-details">
+        <summary>
+          Technical details{" "}
+          <span>All reported figures and monitoring inputs</span>
+        </summary>
+        <p className="fine">
+          The full list of figures from the latest filings, and the exact inputs
+          behind any monitoring conditions you save.
+        </p>
+        <FinancialPerformance
+          key={data.instrument.id}
+          data={data.performance}
+        />
+        <h3 className="monitoring-inputs-heading">Monitoring inputs</h3>
+        {renderMonitoringInputs()}
+      </details>
     );
   }
   function renderIdeaHistory() {
@@ -2512,6 +2584,14 @@ function CompanyWorkspace({
             <p className="fine">
               {data.demo.label} · {date(data.demo.as_of)}
             </p>
+            {!isRecorded &&
+              data.source_checks
+                .filter((c) => ["failed", "denied"].includes(c.state))
+                .map((c) => (
+                  <p className="fine" key={c.source_id}>
+                    <strong>{c.name}:</strong> {sourceCheckProblem(c)}
+                  </p>
+                ))}
             <div className="research-updates-actions">
               <button
                 disabled={!!loadingRun?.active}
@@ -2598,7 +2678,7 @@ function CompanyWorkspace({
                   <p>
                     {c.state === "unknown"
                       ? "This source has not been checked yet. Refresh when the connection is configured."
-                      : "The supplier could not be checked. This is a coverage gap, not confirmation that nothing changed."}
+                      : sourceCheckProblem(c)}
                   </p>
                 </article>
               ))}
@@ -2627,22 +2707,15 @@ function CompanyWorkspace({
               </details>
             )}
             <h3>Source library</h3>
-            {data.documents.map((d) => (
-              <button
-                className="source-link"
-                key={d.id}
-                onClick={() => setSource(d)}
-              >
-                <span>
-                  {d.title}
-                  <small>
-                    {d.source} · {date(d.published_at)}
-                  </small>
-                </span>
-                <Icon name="source" />
-              </button>
-            ))}
+            <SourceLibrary
+              key={data.instrument.id}
+              documents={data.documents}
+              instrument={data.instrument}
+              filterMentions={!isRecorded}
+              onOpen={setSource}
+            />
           </div>
+          {!isRecorded && renderTechnicalDetails()}
         </Modal>
       </div>
       <Modal

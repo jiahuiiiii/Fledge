@@ -177,3 +177,36 @@ def test_archive_denial_arriving_during_wait_stops_dispatch(owner,monkeypatch):
         with transaction() as conn:assert one(conn,"SELECT requests FROM provider_clocks WHERE provider='sec-disclosures'")['requests']==0
     finally:
         with transaction(admin=True) as conn:conn.execute("DELETE FROM provider_clocks WHERE provider='sec-disclosures'")
+
+
+def test_revenue_history_covers_five_periods_and_keeps_amendment_chain():
+    from datetime import datetime, timezone
+    data=metadata();recent=data['filings']['recent']
+    records=[]
+    for year in range(2018,2026):
+        for form,month,day in [('10-K',6,30),('10-Q',3,31)]:
+            records.append(dict(accessionNumber=f'0000789019-{year%100:02d}-{len(records):06d}',form=form,
+                filingDate=f'{year}-08-01',reportDate=f'{year}-{month:02d}-{day:02d}',primaryDocument='report.htm',acceptanceDateTime=f'{year}-08-01T12:00:00Z'))
+    records.append(dict(records[-2],accessionNumber='0000789019-25-000999',form='10-K/A',acceptanceDateTime='2025-09-01T12:00:00Z'))
+    data['filings']['recent']={k:[r[k] for r in records] for k in records[0]}
+    result=disclosures.revenue_history_plan(data,789019,datetime(2026,1,1,tzinfo=timezone.utc))
+    assert len(result)==11
+    assert len({i['period_end'] for i in result if i['form'].startswith('10-K')})==5
+    assert len({i['period_end'] for i in result if i['form']=='10-Q'})==5
+    assert all(i['history'] and i['slot']=='revenue_history' for i in result)
+    assert {'0000789019-25-000999',records[-3]['accessionNumber']} <= {i['accession'] for i in result}
+    with pytest.raises(ValueError,match='issuer'):
+        disclosures.revenue_history_plan(data,320193,NOW)
+
+
+def test_historical_collection_reuses_original_and_never_moves_current(owner):
+    iid=company();data=metadata()
+    disclosures.refresh(iid,fetcher=lambda _:HTML,submissions=data)
+    with transaction(consistent=True) as conn:
+        original=disclosures.present(conn,iid)['documents']
+    reset_attempt(iid)
+    result=disclosures.refresh(iid,fetcher=lambda _:pytest.fail('Retained history fetched again'),submissions=data,history_only=True)
+    with transaction(consistent=True) as conn:
+        assert disclosures.present(conn,iid)['documents']==original
+        assert one(conn,'SELECT count(*) n FROM disclosure_documents WHERE instrument_id=%s',(iid,))['n']==1
+    assert any(c['status']=='available' for c in result['coverage'])

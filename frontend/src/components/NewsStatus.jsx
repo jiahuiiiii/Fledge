@@ -1,5 +1,35 @@
 import { newsSourceStatus } from "../lib/newsPresentation";
 import { stamp } from "./MarketResearch";
+// Feeds that failed the same way share one line instead of repeating it.
+function groupFailures(rows) {
+  const groups = new Map();
+  for (const row of rows) {
+    // The label inside the message is replaced so identical failures match.
+    const template = (row.message || "").split(row.label).join("\u0000");
+    const key = `${template}|${row.next_check_at || ""}`;
+    if (!groups.has(key))
+      groups.set(key, {
+        key,
+        template,
+        rows: [],
+        next_check_at: row.next_check_at,
+      });
+    groups.get(key).rows.push(row);
+  }
+  return [...groups.values()].map(({ key, template, rows, next_check_at }) => ({
+    key,
+    next_check_at,
+    labels: rows.map((row) => row.label),
+    message:
+      rows.length === 1
+        ? rows[0].message
+        : template
+            .replace(/^\u0000\s*(?:·\s*)?/, "")
+            .replace(/^\w/, (c) => c.toUpperCase())
+            .split("\u0000")
+            .join("this feed"),
+  }));
+}
 export default function NewsStatus({ data, availability, onCoverage }) {
   const status = newsSourceStatus(data),
     analysis = data.sentiment;
@@ -7,10 +37,13 @@ export default function NewsStatus({ data, availability, onCoverage }) {
     <details className="news-section-status">
       <summary>
         <span>
-          {status.feeds.length
-            ? `${status.checked.length} of ${status.feeds.length} news feeds checked successfully`
-            : "No news feeds checked"}
+          {!status.feeds.length
+            ? "No news feeds checked"
+            : status.failed.length === status.feeds.length
+              ? "No news feed could be reached at the last check · saved news is still shown"
+              : `${status.checked.length} of ${status.feeds.length} news feeds checked successfully`}
           {status.failed.length > 0 &&
+            status.failed.length < status.feeds.length &&
             ` · ${status.failed.length} ${status.failed.length === 1 ? "needs" : "need"} attention`}
           {status.waiting.length > 0 && ` · ${status.waiting.length} deferred`}
           {status.unchecked.length > 0 &&
@@ -70,11 +103,11 @@ export default function NewsStatus({ data, availability, onCoverage }) {
               <strong>{row.label}:</strong> {row.message}
             </p>
           ))}
-        {status.failed.map((row) => (
-          <p key={row.provider}>
-            <strong>{row.label}:</strong> {row.message}
-            {row.next_check_at &&
-              ` Next check allowed ${stamp(row.next_check_at)}.`}
+        {groupFailures(status.failed).map((group) => (
+          <p key={group.key}>
+            <strong>{group.labels.join(", ")}:</strong> {group.message}
+            {group.next_check_at &&
+              ` Next check allowed ${stamp(group.next_check_at)}.`}
           </p>
         ))}
         {status.optional.length > 0 && (

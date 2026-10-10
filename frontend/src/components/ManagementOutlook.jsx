@@ -1,3 +1,4 @@
+import { readableNote } from "../lib/readingNotes";
 import { useId, useState } from "react";
 import TermHelp from "./TermHelp";
 import Select from "./Select";
@@ -251,8 +252,8 @@ export default function ManagementOutlook({ data }) {
                 ))}
                 {section.truncated && (
                   <p>
-                    This saved excerpt is bounded. Open the full release for the
-                    remaining context.
+                    Only part of this section is saved. Open the full release to
+                    read the rest.
                   </p>
                 )}
                 <a href={release.url} target="_blank" rel="noreferrer">
@@ -276,14 +277,13 @@ export default function ManagementOutlook({ data }) {
             </a>
           </details>
           <details className="outlook-limits">
-            <summary>Coverage &amp; comparison rules</summary>
+            <summary>About these forecasts</summary>
             {data.limitations.map((line) => (
-              <p key={line}>{line}</p>
+              <p key={line}>{readableNote(line)}</p>
             ))}
             <p>
-              At most 20 release versions and 100 reporting periods with their
-              first retained original filing result are inspected. Earlier
-              history may remain outside this view.
+              This view covers a limited set of saved releases and reports.
+              Earlier forecasts and results may be missing.
             </p>
           </details>
         </div>

@@ -1,0 +1,26 @@
+.app-shell .reading-notes {
+  margin: 12px 0 20px;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+.app-shell .reading-notes > summary {
+  min-height: 44px;
+  font-size: inherit;
+  font-weight: 400;
+  line-height: 1.6;
+}
+.reading-notes > summary span {
+  color: var(--color-muted);
+}
+.reading-notes-label {
+  flex: 1;
+  min-width: 0;
+}
+.app-shell .reading-notes > div {
+  max-width: 78ch;
+}
+.app-shell .reading-notes > div > p {
+  margin: 8px 0;
+  font-size: inherit;
+  line-height: 1.6;
+}

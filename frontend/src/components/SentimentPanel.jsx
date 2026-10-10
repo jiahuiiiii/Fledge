@@ -14,21 +14,15 @@ import CurrentSentimentSources from "./CurrentSentimentSources";
 import WatchCheckHistory from "./WatchCheckHistory";
 import SentimentHistory from "./SentimentHistory";
 import SourceFilters, { SourceLabel, sourceScope } from "./SourceFilters";
-import AllSourceSummary from "./AllSourceSummary";
+import AllSourceSummary, { SourceCountingDetails } from "./AllSourceSummary";
+import ToneFilters, { toneNames as names } from "./ToneFilters";
 import { originalSample } from "../lib/originalSample";
 import { sourceHeadline } from "../lib/sourceHeadline";
 import "./NewsDiscussion.css";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import Modal from "./Modal";
 import EvidenceButton from "./EvidenceButton";
 import { stamp } from "./MarketResearch";
-const names = {
-  positive: "Positive",
-  negative: "Negative",
-  mixed: "Mixed",
-  neutral: "Neutral",
-  unclear: "Unclear",
-};
 export default function SentimentPanel({
   data,
   busy,
@@ -49,10 +43,11 @@ export default function SentimentPanel({
   const availability = modelAvailability(modelStatus, "briefing_enabled");
   const analysisStep = loadingRun?.steps.find((s) => s.key === "analysis");
   const batchProgress = analysisStep?.batches;
-  const [tab, setTab] = useState(
-    data.sentiment && !data.sentiment.withheld ? "news" : "all",
-  );
+  const [tab, setTab] = useState("all");
   const [relevanceFilter, setRelevanceFilter] = useState("relevant");
+  const [toneFilter, setToneFilter] = useState("all");
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const sourceListId = useId();
   const [page, setPage] = useState(1);
   const [checkPurpose, setCheckPurpose] = useState("reasoning");
   const channel = tab === "all" ? "all" : tab === "news" ? "news" : "social";
@@ -104,9 +99,18 @@ export default function SentimentPanel({
         : 0,
     );
   const coverageLinks = a?.coverage_links || [];
-  useEffect(() => setPage(1), [a?.id, tab, relevanceFilter]);
+  useEffect(() => setPage(1), [a?.id, tab, relevanceFilter, toneFilter]);
+  function filterTone(value) {
+    setToneFilter(value);
+    if (value !== "all") setRelevanceFilter("relevant");
+    setPage(1);
+    setSourcesOpen(true);
+  }
   const filteredItems = items.filter(
-    (item) => relevanceFilter === "all" || item.relevance === relevanceFilter,
+    (item) =>
+      (relevanceFilter === "all" || item.relevance === relevanceFilter) &&
+      (toneFilter === "all" ||
+        (item.relevance === "relevant" && item.sentiment === toneFilter)),
   );
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / 6));
   const currentPage = Math.min(page, totalPages);
@@ -263,10 +267,18 @@ export default function SentimentPanel({
             </p>
           )}
           {tab === "all" ? (
-            <AllSourceSummary
-              analysis={a}
-              providerStatus={data.provider_status}
-            />
+            <>
+              <AllSourceSummary
+                analysis={a}
+                providerStatus={data.provider_status}
+                showDetails={false}
+              />
+              <ToneFilters
+                selected={toneFilter}
+                onChange={filterTone}
+                controls={sourceListId}
+              />
+            </>
           ) : (
             <>
               <div className="sentiment-summary">
@@ -286,65 +298,26 @@ export default function SentimentPanel({
                 {!counts.reconciled &&
                   " The earlier saved group total differs; the categories below show the recorded counts."}
               </p>
-              <div className="sentiment-counts">
-                {Object.entries(names).map(([key, label]) => (
-                  <span className={`tone-${key}`} key={key}>
-                    {label} <b>{sample.counts[key]}</b>
-                  </span>
-                ))}
-              </div>
-              <details className="secondary-details sample-method">
-                <summary>Sample details &amp; method</summary>
-                {Number.isInteger(pool) && (
-                  <p className="fine">
-                    Available pool: {pool} candidate texts on this source.{" "}
-                    {sample.selected} analysed in this saved reading.
-                  </p>
-                )}
-                <p className="fine">
-                  Counted relevant text groups:{" "}
-                  {sample.counted_groups ?? sample.relevant}.{" "}
-                  {channel === "social"
-                    ? "Exact repeated text counts once within this platform. Different comments are not necessarily independent opinions."
-                    : a.summary_policy?.startsWith("sentiment-coverage-")
-                      ? "Related news reports count once per compared development; each original report and its framing remain below. AI grouping can be wrong. Social opinions stay separate."
-                      : "Identical substantive news bodies count once even when headlines differ."}{" "}
-                  A direction requires a strict majority with at least{" "}
-                  {sample.minimum_directional_groups ?? 3} interpretable groups
-                  in this saved method.
-                </p>
-                {channel === "news" &&
-                  a.summary_policy?.startsWith("sentiment-coverage-") && (
-                    <p className="fine">
-                      Compared with {a.coverage?.comparison_news ?? 0}{" "}
-                      additional recent news reports, which are not counted in
-                      this sample. This is bounded coverage, not a search of
-                      every past report.
-                    </p>
-                  )}
-                <p className="fine">
-                  Analysed {stamp(a.created_at)} ·{" "}
-                  {a.coverage?.selection?.policy === "sentiment-all-eligible-1"
-                    ? "every eligible saved source in the date window, split into batches."
-                    : "earlier limited sample. Refresh & analyse now covers every eligible saved source in batches."}{" "}
-                  {sample.tone === "thin sample"
-                    ? "Too few interpretable items for a directional summary."
-                    : ""}{" "}
-                  {channel === "social"
-                    ? `${a.coverage.platform_authors?.[platform] ?? a.coverage.selected_social_authors} distinct ${(a.coverage.platform_authors?.[platform] ?? a.coverage.selected_social_authors) === 1 ? "author" : "authors"} represented. Selected sources: ${sampledFeeds || "none"}. ${platform === "hackernews" ? "Tech-community comments, not investor consensus." : platform === "x" ? "Original X posts, not investor consensus." : "Public Reddit posts and available replies, not investor consensus."} ${a.coverage.parent_contexts || 0} parent messages supplied across this saved analysis as context, not extra votes. Each author's words are classified separately; ambiguous replies may remain unclear.`
-                    : "Provider headlines/snippets, not full articles."}
-                </p>
-                <p>
-                  News framing and expressed social opinions are separate
-                  samples. They do not measure all investors or predict returns.
-                </p>
-              </details>
+              <ToneFilters
+                selected={toneFilter}
+                onChange={filterTone}
+                counts={sample.counts}
+                controls={sourceListId}
+              />
             </>
           )}
-          <details className="sentiment-source-list">
+          <details
+            className="sentiment-source-list"
+            id={sourceListId}
+            open={sourcesOpen}
+            onToggle={(event) => setSourcesOpen(event.currentTarget.open)}
+          >
             <summary>
               Read analysed sources{" "}
-              <span>{filteredItems.length} in this view</span>
+              <span>
+                {filteredItems.length} in this view
+                {toneFilter !== "all" ? ` · ${names[toneFilter]}` : ""}
+              </span>
             </summary>
             <div className="sentiment-result-controls">
               <label>
@@ -352,7 +325,11 @@ export default function SentimentPanel({
                 <Select
                   aria-label="Source relevance"
                   value={relevanceFilter}
-                  onChange={(event) => setRelevanceFilter(event.target.value)}
+                  onChange={(event) => {
+                    setRelevanceFilter(event.target.value);
+                    if (event.target.value !== "relevant") setToneFilter("all");
+                    setPage(1);
+                  }}
                 >
                   <option value="all">All analysed texts</option>
                   <option value="relevant">Relevant to company</option>
@@ -367,6 +344,12 @@ export default function SentimentPanel({
                 · newest first in All
               </span>
             </div>
+            {toneFilter !== "all" && (
+              <p className="fine" role="status">
+                Showing {names[toneFilter].toLowerCase()} source labels. Tone
+                totals above count groups; this list keeps each matching source.
+              </p>
+            )}
             {shownItems.length ? (
               <div className="sentiment-items">
                 {shownItems.map((i) => {
@@ -530,7 +513,7 @@ export default function SentimentPanel({
             ) : (
               <p className="muted">
                 {items.length
-                  ? "No analysed texts match this relevance filter."
+                  ? "No analysed texts match these filters."
                   : "No analysed texts for this source type. Missing coverage is not neutral sentiment."}
               </p>
             )}
@@ -557,6 +540,56 @@ export default function SentimentPanel({
               </nav>
             )}
           </details>
+          {tab === "all" ? (
+            <SourceCountingDetails analysis={a} />
+          ) : (
+            <details className="secondary-details sample-method">
+              <summary>Sample details &amp; method</summary>
+              {Number.isInteger(pool) && (
+                <p className="fine">
+                  Saved sources on this platform: {pool}. {sample.selected}{" "}
+                  analysed in this saved reading.
+                </p>
+              )}
+              <p className="fine">
+                Distinct reports or posts counted:{" "}
+                {sample.counted_groups ?? sample.relevant}.{" "}
+                {channel === "social"
+                  ? "Exact repeated text counts once within this platform. Different comments are not necessarily independent opinions."
+                  : a.summary_policy?.startsWith("sentiment-coverage-")
+                    ? "Related news reports count once per compared development; each original report and its framing remain below. AI grouping can be wrong. Social opinions stay separate."
+                    : "Identical substantive news bodies count once even when headlines differ."}{" "}
+                A positive or negative overall tone needs more than half of the
+                items with a clear tone to agree, and at least{" "}
+                {sample.minimum_directional_groups ?? 3} items with a clear
+                tone.
+              </p>
+              {channel === "news" &&
+                a.summary_policy?.startsWith("sentiment-coverage-") && (
+                  <p className="fine">
+                    Compared with {a.coverage?.comparison_news ?? 0} additional
+                    recent news reports, which are not counted in this sample.
+                    Older reports outside this selection were not checked.
+                  </p>
+                )}
+              <p className="fine">
+                Analysed {stamp(a.created_at)} ·{" "}
+                {a.coverage?.selection?.policy === "sentiment-all-eligible-1"
+                  ? "all usable saved sources in the date window."
+                  : "a limited selection of saved sources. A new analysis can include every usable saved source."}{" "}
+                {sample.tone === "thin sample"
+                  ? "Too few items have a clear tone to describe the overall mood."
+                  : ""}{" "}
+                {channel === "social"
+                  ? `${a.coverage.platform_authors?.[platform] ?? a.coverage.selected_social_authors} distinct ${(a.coverage.platform_authors?.[platform] ?? a.coverage.selected_social_authors) === 1 ? "author" : "authors"} represented. Selected sources: ${sampledFeeds || "none"}. ${platform === "hackernews" ? "Tech-community comments, not investor consensus." : platform === "x" ? "Original X posts, not investor consensus." : "Public Reddit posts and available replies, not investor consensus."} ${a.coverage.parent_contexts || 0} parent messages supplied across this saved analysis as context, not extra votes. Each author's words are classified separately; ambiguous replies may remain unclear.`
+                  : "Provider headlines/snippets, not full articles."}
+              </p>
+              <p>
+                News framing and expressed social opinions are separate samples.
+                They do not measure all investors or predict returns.
+              </p>
+            </details>
+          )}
         </>
       ) : (
         <>
@@ -589,7 +622,7 @@ export default function SentimentPanel({
                   : availability.state === "running"
                     ? "Another AI request is running. Wait for it to finish before starting a discussion summary. Saved readings remain available."
                     : availability.blocked
-                      ? "New summaries are paused. See the analysis status above; saved summaries remain available."
+                      ? availability.message
                       : ""
           }
           onRefresh={onThemesChange}

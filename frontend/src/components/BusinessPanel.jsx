@@ -1,3 +1,4 @@
+import { readableNote } from "../lib/readingNotes";
 import { useEffect, useId, useRef, useState } from "react";
 import { api } from "../api/client";
 import { modelAvailability } from "../lib/modelAvailability";
@@ -115,6 +116,12 @@ export default function BusinessPanel({
     ...new Set((selected?.sources || []).map((s) => s.form).filter(Boolean)),
   ];
   const brief = selected?.result && !selected.withheld ? selected : null;
+  const omittedFindings = new Map();
+  for (const item of brief?.result.withheld_findings || []) {
+    const key = JSON.stringify([item.category, item.reason]);
+    const prior = omittedFindings.get(key);
+    omittedFindings.set(key, { ...item, count: (prior?.count || 0) + 1 });
+  }
   const panel = useRef(null);
   const focusedTopic = useRef(null);
   useEffect(() => {
@@ -215,15 +222,17 @@ export default function BusinessPanel({
           <details className="secondary-details brief-about">
             <summary>About this summary</summary>
             <p className="fine">
-              Saved {stamp(brief.created_at)} · source cutoff{" "}
+              Saved {stamp(brief.created_at)} · sources saved through{" "}
               {stamp(brief.cutoff)}. Points are the company’s own statements
               unless marked as AI interpretation.
             </p>
-            <p className="fine">{brief.result.limitation}</p>
-            <p className="fine">{brief.coverage.selection}</p>
-            {brief.result.withheld_findings?.map((item, index) => (
-              <p className="fine" key={index}>
-                Withheld · {titles[item.category]}: {item.reason}
+            <p className="fine">{readableNote(brief.result.limitation)}</p>
+            <p className="fine">{readableNote(brief.coverage.selection)}</p>
+            {[...omittedFindings].map(([key, item]) => (
+              <p className="fine" key={key}>
+                {titles[item.category]} · {item.count}{" "}
+                {item.count === 1 ? "finding" : "findings"} not shown.{" "}
+                {readableNote(item.reason)}
               </p>
             ))}
             {brief.result.gaps.map((gap) => (

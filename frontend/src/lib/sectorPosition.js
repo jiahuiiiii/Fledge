@@ -51,16 +51,32 @@ export function peRows(members, references = []) {
     return { ...row, name: member.name, source: "Finnhub" };
   });
 }
+export function comparisonExclusion(row, own) {
+  if (row === own) return null;
+  if (row.value == null)
+    return row.reason || "A usable saved figure is unavailable.";
+  if (row.unit === "multiple")
+    return row.source === "Finnhub" && row.value > 0
+      ? null
+      : "A usable saved Finnhub P/E is unavailable.";
+  if (!own?.end || !Number.isFinite(Date.parse(own.end)))
+    return "The researched company’s fiscal year end is unavailable.";
+  if (!row.end || !Number.isFinite(Date.parse(row.end)))
+    return "This company’s fiscal year end is unavailable.";
+  const gap = Math.abs(days(row.end, own.end));
+  return gap <= 120
+    ? null
+    : `Fiscal year ends are ${gap} days apart (120-day limit).`;
+}
 export function comparablePeers(rows, symbol) {
   const own = rows.find((row) => row.symbol === symbol);
   return rows.filter(
-    (row) =>
-      row.symbol !== symbol &&
-      row.value != null &&
-      (row.unit === "multiple"
-        ? row.source === "Finnhub" && row.value > 0
-        : row.end && own?.end && Math.abs(days(row.end, own.end)) <= 120),
+    (row) => row.symbol !== symbol && !comparisonExclusion(row, own),
   );
+}
+export function comparisonRows(rows, symbol) {
+  const peers = comparablePeers(rows, symbol);
+  return rows.filter((row) => row.symbol === symbol || peers.includes(row));
 }
 export function peerAverage(rows, symbol) {
   const peers = comparablePeers(rows, symbol);
@@ -222,12 +238,11 @@ export function position(rows, symbol) {
     below = peers.filter((r) => own.value < r.value),
     equal = peers.filter((r) => own.value === r.value);
   const clauses = [];
-  if (above.length)
-    clauses.push(`above ${above.map((r) => r.symbol).join(" and ")}`);
-  if (below.length)
-    clauses.push(`below ${below.map((r) => r.symbol).join(" and ")}`);
-  if (equal.length)
-    clauses.push(`equal to ${equal.map((r) => r.symbol).join(" and ")}`);
+  const names = (items) =>
+    new Intl.ListFormat("en-GB").format(items.map((r) => r.symbol));
+  if (above.length) clauses.push(`above ${names(above)}`);
+  if (below.length) clauses.push(`below ${names(below)}`);
+  if (equal.length) clauses.push(`equal to ${names(equal)}`);
   const values = peers.map((r) => r.value).sort((a, b) => a - b),
     mid = Math.floor(values.length / 2);
   const median =

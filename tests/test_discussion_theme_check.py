@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from thesis.db import transaction
 from thesis.providers import ledger
-from thesis.research import discussion_themes as D, discussion_theme_check as C
+from thesis.research import discussion_themes as D, discussion_theme_check as C, theme_batching as B
 from test_discussion_themes import setup, response, check_response, packet_for
 
 
@@ -40,14 +40,14 @@ def test_failed_theme_is_withheld_whole_without_rewriting_valid_themes(owner):
             return response(body)
         return check_response(
             body,
-            lambda r, p: r["themes"][1].update(
+            lambda r, p: [decision.update(
                 verdict="withhold",
                 reason="Mock compatible views incorrectly presented as disagreement.",
-            ),
+            ) for decision, theme in zip(r["themes"], p["themes"]) if theme["scope"] == "reddit"],
         )
 
     saved = D.generate(iid, aid, transport=provider)
-    assert ledger.snapshot()["calls"] == before + 2
+    assert ledger.snapshot()["calls"] == before + 2 * len(B.plan(packet_for(iid, aid)))
     assert [t["scope"] for t in saved["result"]["themes"]] == ["news", "hackernews"]
     check = saved["result"]["evidence_check"]
     assert check["withheld_themes"] == 1 and check["policy"] == C.POLICY
@@ -126,7 +126,7 @@ def test_withdrawal_during_check_withholds_saved_result_and_export(owner):
     iid, aid = setup(owner)
 
     def provider(body):
-        if body["text"]["format"]["name"] == "discussion_theme_evidence_check":
+        if body["text"]["format"]["name"] == "discussion_theme_evidence_check" and any(s["scope"] == "hackernews" for s in json.loads(body["input"][1]["content"])["source_context"]):
             with transaction(admin=True) as c:
                 c.execute("UPDATE social_feeds SET enabled=false")
         return response(body)

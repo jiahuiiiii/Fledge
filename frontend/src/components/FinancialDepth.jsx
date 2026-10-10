@@ -1,3 +1,4 @@
+import { readableNote } from "../lib/readingNotes";
 import { FinancialEvidenceRow } from "./FinancialEvidence";
 import { evidenceValue } from "../lib/financialEvidence";
 const day = (value) =>
@@ -30,7 +31,7 @@ export default function FinancialDepth({ data }) {
   if (!data || data.status !== "available")
     return (
       <section className="financial-performance">
-        <h3>Trailing results & borrowing</h3>
+        <h3>Past 12 months & borrowing</h3>
         <p>
           {data?.reason || "Refresh filings to prepare these calculations."}
         </p>
@@ -42,12 +43,12 @@ export default function FinancialDepth({ data }) {
       aria-label="Trailing results and borrowing"
     >
       <span className="section-label">A LONGER VIEW</span>
-      <h3>Trailing results & borrowing</h3>
+      <h3>Past 12 months & borrowing</h3>
       <p>
         Calculated from saved financial reports. Expand a figure to inspect its
         dates, formula and original evidence.
       </p>
-      <h4>Trailing fiscal year</h4>
+      <h4>Past 12 months</h4>
       {data.trailing.map((row) => (
         <Calculation key={row.key} row={row} />
       ))}
@@ -69,7 +70,7 @@ export default function FinancialDepth({ data }) {
       <details className="financial-note">
         <summary>Definitions and limits</summary>
         {data.limitations.map((line) => (
-          <p key={line}>{line}</p>
+          <p key={line}>{readableNote(line)}</p>
         ))}
       </details>
     </section>

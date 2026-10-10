@@ -22,10 +22,12 @@ function display(number, unit) {
   );
 }
 
-export default function PeerComparison({ members, symbol }) {
-  const [selected, setSelected] = useState("pe_finnhub");
+// `exclude` hides measures already charted elsewhere on the same page.
+export default function PeerComparison({ members, symbol, exclude = [] }) {
+  const metrics = peerMetrics.filter((item) => !exclude.includes(item.id));
+  const [selected, setSelected] = useState(metrics[0].id);
   const id = useId();
-  const metric = peerMetrics.find((item) => item.id === selected);
+  const metric = metrics.find((item) => item.id === selected);
   const rows = peerRows(members, metric),
     scale = peerScale(rows);
   const peers = rows.length > 1;
@@ -49,7 +51,7 @@ export default function PeerComparison({ members, symbol }) {
             value={selected}
             onChange={(event) => setSelected(event.target.value)}
           >
-            {peerMetrics.map((item) => (
+            {metrics.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.label}
               </option>

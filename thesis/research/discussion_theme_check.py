@@ -1,6 +1,7 @@
 """Bounded second-pass evidence review; withhold, never repair, generated themes."""
 
 import hashlib
+import json
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from thesis.providers import ledger
@@ -8,7 +9,7 @@ from thesis.providers.settings import REASONING_MODEL
 from .citations import model_source
 from . import sentiment_context
 
-POLICY = "discussion-theme-evidence-check-4"
+POLICY = "discussion-theme-evidence-check-5"
 NOTE = "An additional AI evidence check can withhold proposed themes. It can still miss errors; inspect the original sources."
 
 
@@ -21,7 +22,7 @@ class Decision(BaseModel):
 
 class Review(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    themes: list[Decision] = Field(max_length=6)
+    themes: list[Decision] = Field(max_length=8)
     gaps: list[Decision] = Field(max_length=3)
 
 
@@ -56,8 +57,8 @@ def review_theme(theme):
     )
 
 
-def request_for(packet, candidate):
-    return dict(
+def request_for(packet, candidate, *, compact=False):
+    body = dict(
         model=REASONING_MODEL,
         store=False,
         service_tier="default",
@@ -119,12 +120,43 @@ Some source_context items include a nested saved conversation parent, and their 
         },
     )
 
+    if compact:
+        # Lossless references: eligible wording occurs once in source_context.
+        # Each claim still selects its own exact child and parent passages.
+        wire = json.loads(body["input"][1]["content"])
+        sources = {s["id"]: s for s in wire["source_context"]}
+        for theme in wire["themes"]:
+            for name in ("reading", "differing_view"):
+                view = theme[name]
+                if not view:
+                    continue
+                for claim in view["claims"]:
+                    source = sources[claim["source_id"]]
+                    passages = {p["id"]: p["quote"] for p in source["passages"]}
+                    for citation in claim["citations"]:
+                        if citation["source_id"] != claim["source_id"] or passages.get(citation["passage_id"]) != citation["quote"]:
+                            raise ValueError("The theme check requires each claim's exact own-source evidence.")
+                        citation.pop("quote")
+                    context = claim.get("conversation")
+                    if context:
+                        parent = {p["id"]: p["quote"] for p in source["conversation"]["passages"]}
+                        for citation in context["citations"]:
+                            if parent.get(citation["passage_id"]) != citation["quote"]:
+                                raise ValueError("The theme check requires the exact saved parent evidence.")
+                            citation.pop("quote")
+                # Aggregate fields repeat the same claims/quotations in the
+                # legacy presentation format; the checker needs each claim once.
+                theme[name] = {"claims": view["claims"]}
+        body["input"][1]["content"] = ledger.canonical(wire)
+        body["input"][0]["content"] += " Each claim's citations are exact passage references, not omitted evidence. Resolve source_id and passage_id only within the matching source_context record's passages. A source_title role is title context. Parent citation IDs resolve only within that same child's nested conversation.passages. Only these selected references support the claim; other full passages can reveal omissions or contradictions but cannot repair missing support. Never borrow another source's or parent's wording."
+    return body
 
-def identity(packet, candidate):
+
+def identity(packet, candidate, *, compact=False):
     return (
         "shared-theme-evidence-check:"
         + hashlib.sha256(
-            (POLICY + ledger.canonical(request_for(packet, candidate))).encode()
+            (POLICY + ledger.canonical(request_for(packet, candidate, compact=compact))).encode()
         ).hexdigest()
     )
 

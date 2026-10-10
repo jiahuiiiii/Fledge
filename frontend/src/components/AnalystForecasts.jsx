@@ -1,10 +1,13 @@
+import { readableNote, sourceTiming } from "../lib/readingNotes";
 import PublicForecasts from "./PublicForecasts";
 import ForecastRange from "./ForecastRange";
 import LoadingSkeleton from "./LoadingSkeleton";
 import TermHelp from "./TermHelp";
 
 const stamp = (value) =>
-  value ? new Date(value).toLocaleString("en-GB") : "Not established";
+  value
+    ? new Date(value).toLocaleString("en-GB", { timeZone: "UTC" }) + " UTC"
+    : "Not established";
 const exact = (value) => (value == null ? "Unavailable" : String(value));
 
 export default function AnalystForecasts({
@@ -78,8 +81,7 @@ export default function AnalystForecasts({
               </div>
               {forecasts.length > 0 && (
                 <p className="outlook-source-time">
-                  First observed {stamp(source.first_observed_at)} · checked{" "}
-                  {stamp(source.checked_at)}
+                  {sourceTiming(source, stamp)}
                 </p>
               )}
               {source?.message && (
@@ -129,14 +131,9 @@ export default function AnalystForecasts({
               )}
               <details className="outlook-source-details">
                 <summary>Data source details</summary>
-                {!forecasts.length && (
-                  <p>
-                    First observed {stamp(source?.first_observed_at)} · last
-                    checked {stamp(source?.checked_at)}
-                  </p>
-                )}
+                {!forecasts.length && <p>{sourceTiming(source, stamp)}</p>}
                 <p>
-                  {source?.data?.limitation ||
+                  {readableNote(source?.data?.limitation) ||
                     "Consensus is separate from management guidance and price targets. Missing forecasts remain unknown."}
                 </p>
                 <p>
@@ -146,18 +143,24 @@ export default function AnalystForecasts({
                 {data.profile?.data && (
                   <p>
                     FMP classification: {data.profile.data.sector} ·{" "}
-                    {data.profile.data.industry}. {data.profile.data.limitation}
+                    {data.profile.data.industry}.{" "}
+                    {readableNote(data.profile.data.limitation)}
                   </p>
                 )}
               </details>
               {data.consensus_history?.length > 0 && (
                 <details className="outlook-source-details forecast-history">
                   <summary>
-                    Saved forecast vintages ({data.consensus_history.length})
+                    Earlier saved forecasts ({data.consensus_history.length})
                   </summary>
                   {data.consensus_history.map((vintage) => (
                     <section key={vintage.id}>
-                      <p>First observed {stamp(vintage.available_at)}</p>
+                      <p>
+                        {sourceTiming(
+                          { first_observed_at: vintage.available_at },
+                          stamp,
+                        )}
+                      </p>
                       {vintage.data.forecasts.map((forecast) => (
                         <p key={forecast.period_end}>
                           Period ending {forecast.period_end} · revenue average{" "}

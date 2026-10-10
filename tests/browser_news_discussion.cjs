@@ -59,6 +59,8 @@ let browser;
       .waitFor();
   };
   await open();
+  assert.equal(await filters.getByRole("button", {name:"All sources",exact:true}).getAttribute("aria-pressed"), "true");
+  await filters.getByRole("button", {name:"Company news",exact:true}).click();
   assert.equal(await panel.locator('.sentiment-source-list').getAttribute('open'), null);
   await panel.locator('.sentiment-source-list > summary').click();
   const saved = (

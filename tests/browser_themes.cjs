@@ -24,22 +24,24 @@ const assert=require('node:assert/strict'),fs=require('node:fs');let browser;
  assert.equal(records.items.length,3);
  await sentiment.getByRole('button',{name:'Reddit discussion',exact:true}).click();
  assert.match(await panel.innerText(),/A differing view on this issue/);assert.match(await panel.innerText(),/same author/);
- await panel.getByText('Inspect supporting passages',{exact:true}).last().click();
- await panel.getByRole('button',{name:'Open theme source ↗',exact:true}).click();await page.getByRole('dialog').waitFor();assert.match(await page.getByRole('dialog').innerText(),/price too high/);await page.keyboard.press('Escape');
+ await panel.locator('.theme-claim-source').last().click();
+ const supporting=page.getByRole('dialog',{name:'Supporting evidence',exact:true});await supporting.waitFor();
+ await supporting.getByRole('button',{name:'Open theme source ↗',exact:true}).click();const original=page.getByRole('dialog',{name:'Source evidence',exact:true});await original.waitFor();assert.match(await original.innerText(),/price too high/);await page.keyboard.press('Escape');await page.keyboard.press('Escape');
  await sentiment.getByRole('button',{name:'Hacker News',exact:true}).click();
- assert.match(await panel.innerText(),/No specific differing view identified/);assert.doesNotMatch(await panel.innerText(),/The same author also questions/);
+ assert.match(await panel.innerText(),/No differing view found/);assert.doesNotMatch(await panel.innerText(),/The same author also questions/);
  assert.match(await panel.innerText(),/1 saved parent message supplied as context/);
- await panel.getByText('Inspect supporting passages',{exact:true}).click();
- await panel.getByText('Parent context used for this finding',{exact:true}).click();
- assert.match(await panel.innerText(),/Microsoft software frustrates me because it crashes/);
- assert.match(await panel.innerText(),/I think Microsoft software is reliable/);
- assert.match(await panel.innerText(),/not another source or independent confirmation/);
- assert.equal(await panel.getByRole('link',{name:'Open cited parent discussion ↗',exact:true}).getAttribute('href'),'https://news.ycombinator.com/item?id=99');
+ await panel.locator('.theme-claim-source').click();await supporting.waitFor();
+ await supporting.getByText('Parent context used for this finding',{exact:true}).click();
+ assert.match(await supporting.innerText(),/Microsoft software frustrates me because it crashes/);
+ assert.match(await supporting.innerText(),/I think Microsoft software is reliable/);
+ assert.match(await supporting.innerText(),/not another source or independent confirmation/);
+ assert.equal(await supporting.getByRole('link',{name:'Open cited parent discussion ↗',exact:true}).getAttribute('href'),'https://news.ycombinator.com/item?id=99');
+ await page.keyboard.press('Escape');
  const dl=page.waitForEvent('download');await panel.getByRole('link',{name:'Download this theme reading',exact:true}).click();const html=fs.readFileSync(await(await dl).path(),'utf8');assert.match(html,/price too high/);assert.match(html,/hackernews/);assert.doesNotMatch(html,/<script/);
  assert.match(html,/Parent context used for this finding/);assert.match(html,/I think Microsoft software is reliable/);
- await panel.getByLabel('Saved theme reading',{exact:true}).selectOption(records.items[1].id);assert.match(await panel.innerText(),/Earlier source sample/);assert.match(await panel.innerText(),/earlier interpretation method/);assert.equal(await panel.locator('.theme-claim-source').count(),0);
+ await panel.getByLabel('Saved theme reading',{exact:true}).selectOption(records.items[1].id);assert.match(await panel.innerText(),/Different sources/);await panel.locator('.theme-method > summary').click();assert.match(await panel.innerText(),/before the latest improvements/);assert.ok(await panel.locator('.theme-claim-source').count()>0);await panel.locator('.theme-method > summary').click();
  assert.equal(await panel.getByText('Parent context used for this finding',{exact:true}).count(),0);
- await panel.getByLabel('Saved theme reading',{exact:true}).selectOption(records.items[0].id);assert.doesNotMatch(await panel.innerText(),/Earlier source sample/);assert.equal(await panel.locator('.theme-claim-source').count(),1);
+ await panel.getByLabel('Saved theme reading',{exact:true}).selectOption(records.items[0].id);assert.doesNotMatch(await panel.innerText(),/Different sources/);assert.equal(await panel.locator('.theme-claim-source').count(),1);
  assert.deepEqual(paid,[]);
  const before=(await(await page.request.get(base+'/api/v1/workspace?instrument_id='+iid)).json()).result;
  await panel.getByRole('button',{name:'Summarise discussions',exact:true}).click();await panel.getByRole('button',{name:'Summarise discussions',exact:true}).waitFor();
@@ -59,8 +61,9 @@ const assert=require('node:assert/strict'),fs=require('node:fs');let browser;
  });
  await panel.getByRole('button',{name:'Summarise discussions',exact:true}).click();
  await panel.getByRole('button',{name:'Creating discussion summary…',exact:true}).waitFor();
+ const activePoll=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/v1/model-status');
  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
- await sentiment.getByText(/AI is analysing a request/).waitFor();
+ assert.equal((await (await activePoll).json()).result.budget.running,1);
  assert.match(await panel.innerText(),/Creating your summary and checking its evidence/);
  assert.doesNotMatch(await panel.innerText(),/Another AI request|unavailable right now/);
  assert.equal(await panel.getByRole('button',{name:'Creating discussion summary…',exact:true}).isDisabled(),true);
@@ -70,16 +73,17 @@ const assert=require('node:assert/strict'),fs=require('node:fs');let browser;
  await panel.getByText('Discussion summary ready below.',{exact:true}).waitFor();
  assert.equal(await panel.getByRole('button',{name:'Summarise discussions',exact:true}).isEnabled(),true);
  await page.unroute('**/api/v1/companies/*/sentiment/*/discussion-themes');
+ // The failed attempt's read-only refresh must also apply source withdrawal.
+ await page.route('**/api/v1/companies/*/discussion-themes?*',async r=>{const response=await r.fetch(),body=await response.json();for(const v of [body.result.current,...body.result.items])if(v){v.withheld=true;v.result=null;v.sources=[];}await r.fulfill({response,json:body});});
  const failure='The AI reached its response limit before producing a discussion summary. No theme reading was saved. This AI attempt still used budget; no automatic retry was made.';
  await page.route('**/api/v1/companies/*/sentiment/*/discussion-themes',r=>r.fulfill({status:422,json:{result:{errors:[{error_message:failure}]}}}));
- await panel.getByRole('button',{name:'Summarise discussions',exact:true}).click();await panel.getByRole('alert').waitFor();assert.match(await panel.getByRole('alert').innerText(),/response limit.*still used budget/);assert.equal(await panel.locator('.theme-card').count(),1);
+ await panel.getByRole('button',{name:'Summarise discussions',exact:true}).click();await panel.getByRole('alert').waitFor();assert.match(await panel.getByRole('alert').innerText(),/response limit.*still used budget/);await panel.getByText('Source access changed. This interpretation and its evidence are withheld.',{exact:true}).waitFor();assert.equal(await panel.locator('.theme-card').count(),0);
  await panel.screenshot({path:`${shots}/thesis-themes-failed.png`});
  // A read-only reload rechecks source permission; withdrawn evidence disappears.
- await page.route('**/api/v1/companies/*/discussion-themes?*',async r=>{const response=await r.fetch(),body=await response.json();for(const v of [body.result.current,...body.result.items])if(v){v.withheld=true;v.result=null;v.sources=[];}await r.fulfill({response,json:body});});
  await panel.getByRole('button',{name:'Reload saved readings',exact:true}).click();await panel.getByText('Source access changed. This interpretation and its evidence are withheld.',{exact:true}).waitFor();assert.equal(await panel.locator('.theme-card').count(),0);
  for(const [budget,message] of [
   [{unresolved:1,running:1,needs_attention:0,remaining_usd:'2'},'Another AI request is running.'],
-  [{unresolved:1,running:0,needs_attention:1,remaining_usd:'2'},'ended without a confirmed charge'],
+  [{unresolved:1,running:0,needs_attention:1,remaining_usd:'2'},'needs a spending decision'],
   [{unresolved:0,running:0,needs_attention:0,remaining_usd:'0'},'allowance has been used'],
  ]){
   modelStatus={briefing_enabled:true,budget};
@@ -110,6 +114,26 @@ const assert=require('node:assert/strict'),fs=require('node:fs');let browser;
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`empty/error overflow ${width}`);
   await page.screenshot({path:`${shots}/thesis-themes-empty-error-${width}.png`,fullPage:true});
  }
- assert.deepEqual(errors,[]);assert.deepEqual(external,[]);assert.equal(paid.length,4);
+ // A recoverable saved draft is explicit; a failed check refreshes the plan
+ // read-only and disables continuation without another paid request.
+ let recoveryBlocked=false;
+ const recoveryFailure='The saved evidence check was incomplete. No automatic retry was made.';
+ await page.route('**/api/v1/companies/*/discussion-themes?*',r=>r.fulfill({json:{result:{current:null,items:[],next_cursor:null,generation:recoveryBlocked?{blocked_reason:recoveryFailure}:{sources:76,batches:6,maximum_new_usd:'2.2328675',saved_drafts:1,normalized_title_references:6}}}}));
+ await panel.getByRole('button',{name:'Reload saved readings',exact:true}).click();
+ const continueButton=panel.getByRole('button',{name:'Continue discussion summary',exact:true});
+ await continueButton.waitFor();
+ assert.match(await panel.innerText(),/1 saved draft will be reused/);
+ assert.match(await panel.innerText(),/maximum new cost US\$2.2329/);
+ assert.match(await panel.innerText(),/evidence check is still required/);
+ assert.equal(paid.length,4);
+ await page.route('**/api/v1/companies/*/sentiment/*/discussion-themes',r=>{recoveryBlocked=true;return r.fulfill({status:422,json:{result:{errors:[{error_message:recoveryFailure}]}}});});
+ await continueButton.focus();await page.keyboard.press('Enter');
+ await panel.getByRole('status').filter({hasText:recoveryFailure}).waitFor();
+ assert.equal(await panel.getByRole('button',{name:'Summarise discussions',exact:true}).isDisabled(),true);
+ assert.equal(paid.length,5);
+ await panel.getByRole('button',{name:'Reload saved readings',exact:true}).click();
+ await panel.getByRole('status').filter({hasText:recoveryFailure}).waitFor();
+ assert.equal(paid.length,5);
+ assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
  console.log('Theme browser passed: separate platforms, saved parent and child evidence, same-issue differing view, source dialog, original quotes, immutable current/legacy history, source labels beside each claim, cached generation, export, unchanged watches/labels, pending own reservation without false warning, precise failure, blocked reasons with readable history and withdrawal, 320/390/1440 layouts. No paid calls.');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();});

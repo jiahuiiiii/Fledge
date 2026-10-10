@@ -4,12 +4,125 @@ import {
   reportedRow,
   peRows,
   peerAverage,
+  comparisonRows,
+  comparisonExclusion,
   forecastRow,
   position,
   scale,
   yearsFor,
   managementRows,
 } from "./sectorPosition.js";
+test("one fiscal comparison set controls chart scale, mean and verdict without changing excluded values", () => {
+  const rows = [
+    { symbol: "AVGO", value: 23.874432853763524, end: "2025-11-02" },
+    { symbol: "AMD", value: 34.33779329067287, end: "2025-12-27" },
+    { symbol: "MRVL", value: 42.08728521145077, end: "2026-01-31" },
+    {
+      symbol: "MU",
+      value: 256.3272513243084,
+      exact: "256.3272513243084167157151265",
+      end: "2026-09-03",
+    },
+    { symbol: "NVDA", value: 65.4735357900948, end: "2026-01-25" },
+    { symbol: "QCOM", value: 13.65946306657769, end: "2025-09-28" },
+  ];
+  const before = structuredClone(rows),
+    plotted = comparisonRows(rows, "AVGO"),
+    average = peerAverage(rows, "AVGO");
+  assert.deepEqual(
+    plotted.map((r) => r.symbol),
+    ["AVGO", "AMD", "MRVL", "NVDA", "QCOM"],
+  );
+  assert.equal(scale(plotted).high, rows[4].value);
+  assert.deepEqual(plotted.slice(1), average.peers);
+  assert.equal(average.value.toFixed(1), "38.9");
+  assert.deepEqual(average.missing, [rows[3]]);
+  assert.equal(
+    position(rows, "AVGO").text,
+    "AVGO is above QCOM; below AMD, MRVL and NVDA.",
+  );
+  assert.equal(
+    comparisonExclusion(rows[3], rows[0]),
+    "Fiscal year ends are 305 days apart (120-day limit).",
+  );
+  assert.deepEqual(rows, before);
+  assert.equal(
+    average.missing[0],
+    rows[3],
+    "exact original evidence is retained",
+  );
+});
+test("annual date limit includes both 120-day boundaries, zero and negative figures", () => {
+  const own = { symbol: "OWN", value: 10, end: "2025-07-01" };
+  const peer = (symbol, offset, value) => ({
+    symbol,
+    value,
+    end: new Date(Date.parse(own.end) + offset * 86400000)
+      .toISOString()
+      .slice(0, 10),
+  });
+  const rows = [
+    own,
+    peer("BEFORE", -120, -10),
+    peer("AFTER", 120, 0),
+    peer("OLD", -121, -999),
+    peer("LATE", 121, 999),
+    { symbol: "GAP", value: null },
+    { symbol: "DATE", value: 100 },
+    { symbol: "BAD_DATE", value: 100, end: "unknown" },
+  ];
+  assert.deepEqual(comparisonRows(rows, "OWN"), rows.slice(0, 3));
+  assert.deepEqual(scale(comparisonRows(rows, "OWN")), {
+    low: -10,
+    high: 10,
+    span: 20,
+  });
+  assert.equal(peerAverage(rows, "OWN").value, -5);
+  assert.equal(position(rows, "OWN").coverage, 2);
+  assert.match(comparisonExclusion(rows[3], own), /121 days/);
+  assert.match(
+    comparisonExclusion(rows[5], own),
+    /saved figure is unavailable/,
+  );
+  assert.match(
+    comparisonExclusion(rows[6], own),
+    /fiscal year end is unavailable/,
+  );
+  assert.match(
+    comparisonExclusion(rows[7], own),
+    /fiscal year end is unavailable/,
+  );
+  for (const end of [null, "unknown"]) {
+    const missingDate = [{ ...own, end }, ...rows.slice(1)];
+    assert.deepEqual(comparisonRows(missingDate, "OWN"), [missingDate[0]]);
+    assert.equal(peerAverage(missingDate, "OWN").value, null);
+    assert.equal(position(missingDate, "OWN").coverage, 0);
+  }
+  const missing = [
+    { ...own, value: null },
+    { ...rows[1], value: null },
+  ];
+  assert.equal(comparisonRows(missing, "OWN").length, 1);
+  assert.equal(position(missing, "OWN").coverage, 0);
+  assert.equal(peerAverage(missing, "OWN").value, null);
+});
+test("P/E comparison keeps differing saved dates and only usable Finnhub peers", () => {
+  const rows = [
+    { symbol: "OWN", value: 40, unit: "multiple", source: "Finnhub" },
+    {
+      symbol: "PEER",
+      value: 100,
+      unit: "multiple",
+      source: "Finnhub",
+      end: "2000-01-01",
+    },
+    { symbol: "OTHER", value: 900, unit: "multiple", source: "FMP" },
+    { symbol: "ZERO", value: 0, unit: "multiple", source: "Finnhub" },
+  ];
+  assert.deepEqual(comparisonRows(rows, "OWN"), rows.slice(0, 2));
+  assert.equal(peerAverage(rows, "OWN").value, 100);
+  assert.equal(position(rows, "OWN").text, "OWN is below PEER.");
+});
 const member = (symbol = "AVGO", value = "20", key = "revenue_growth") => {
   const revenue = {
     namespace: "us-gaap",

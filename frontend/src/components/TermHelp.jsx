@@ -3,7 +3,7 @@ import Modal from "./Modal";
 import { financialTerms } from "../lib/companion";
 import "./Companion.css";
 
-export default function TermHelp({ term }) {
+export default function TermHelp({ term, context }) {
   const [open, setOpen] = useState(false);
   const definition = financialTerms[term];
   if (!definition) return null;
@@ -29,6 +29,7 @@ export default function TermHelp({ term }) {
           <p>{meaning}</p>
           <h3>When you read this figure</h3>
           <p>{check}</p>
+          {context && <p>{context}</p>}
         </div>
       </Modal>
     </span>

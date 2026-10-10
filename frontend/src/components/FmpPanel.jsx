@@ -1,3 +1,4 @@
+import { readableNote, sourceTiming } from "../lib/readingNotes";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import Select from "./Select";
@@ -5,7 +6,9 @@ import AnalystForecasts from "./AnalystForecasts";
 import TermHelp from "./TermHelp";
 const PeerComparison = lazy(() => import("./PeerComparison"));
 const stamp = (value) =>
-  value ? new Date(value).toLocaleString("en-GB") : "Not collected";
+  value
+    ? new Date(value).toLocaleString("en-GB", { timeZone: "UTC" }) + " UTC"
+    : "Not collected";
 const figure = (value) =>
   value == null
     ? "Unavailable"
@@ -16,11 +19,8 @@ function SourceState({ source }) {
   return (
     <>
       <p className="financial-note">{source?.message}</p>
-      {source?.checked_at && (
-        <p className="financial-note">
-          First observed {stamp(source.first_observed_at)} · last checked{" "}
-          {stamp(source.checked_at)}
-        </p>
+      {source && (
+        <p className="financial-note">{sourceTiming(source, stamp)}</p>
       )}
     </>
   );
@@ -145,7 +145,11 @@ export default function FmpPanel({ instrumentId, visible, mode = "peers" }) {
         </button>
         {data && (
           <Suspense fallback={<p>Loading saved measures…</p>}>
-            <PeerComparison members={data.members} symbol={data.symbol} />
+            <PeerComparison
+              members={data.members}
+              symbol={data.symbol}
+              exclude={["pe_finnhub", "growth_sec"]}
+            />
           </Suspense>
         )}
         <SourceState source={data?.ratios} />
@@ -172,7 +176,8 @@ export default function FmpPanel({ instrumentId, visible, mode = "peers" }) {
         {data?.profile?.data && (
           <p>
             FMP classification: {data.profile.data.sector} ·{" "}
-            {data.profile.data.industry}. {data.profile.data.limitation}
+            {data.profile.data.industry}.{" "}
+            {readableNote(data.profile.data.limitation)}
           </p>
         )}
       </details>
@@ -373,7 +378,11 @@ export default function FmpPanel({ instrumentId, visible, mode = "peers" }) {
                   </section>
                 ))}
               </div>
-              {data && <p className="financial-note">{data.limitation}</p>}
+              {data && (
+                <p className="financial-note">
+                  {readableNote(data.limitation)}
+                </p>
+              )}
             </details>
           )}
         </>

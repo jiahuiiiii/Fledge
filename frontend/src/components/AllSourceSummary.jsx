@@ -3,24 +3,24 @@ import { sourceCoverage, sourceExclusionLabels } from "../lib/sourceCoverage";
 import "./AllSourceSummary.css";
 import { sentimentSummaryLabel } from "../lib/sentimentSummary";
 
-export default function AllSourceSummary({ analysis, providerStatus = [] }) {
+export default function AllSourceSummary({
+  analysis,
+  providerStatus = [],
+  showDetails = true,
+}) {
   const coverage = sourceCoverage(analysis);
   return (
     <div className="all-source-summary source-analysis-coverage">
       <div className="sentiment-summary">
         <strong>Source coverage</strong>
-        <span>
-          {analysis.batching?.completed
-            ? `${analysis.batching.completed} batches combined`
-            : "Saved AI reading"}
-        </span>
+        <span>Saved AI reading</span>
       </div>
       <div
         className="source-coverage-totals"
         aria-label="Analysis coverage totals"
       >
         {[
-          ["Available candidates", coverage.candidates],
+          ["Available sources", coverage.candidates],
           ["Analysed", coverage.analysed],
           ["Relevant to company", coverage.relevant],
           ["Unrelated", coverage.unrelated],
@@ -36,8 +36,8 @@ export default function AllSourceSummary({ analysis, providerStatus = [] }) {
         className={`source-coverage-status ${coverage.complete ? "" : "warning"}`}
       >
         {coverage.complete
-          ? `Every eligible source in this saved pool was analysed. ${coverage.excluded} excluded before analysis.`
-          : `Earlier limited reading: ${coverage.analysed} analysed${coverage.candidates == null ? "" : ` from ${coverage.candidates} candidates`}. Refresh & analyse now covers every eligible saved source in batches.`}
+          ? `All usable saved sources were analysed. ${coverage.excluded} left out before analysis; see the reasons below.`
+          : `This earlier reading covers ${coverage.analysed} sources${coverage.candidates == null ? "" : ` out of ${coverage.candidates} saved`}. A new analysis can include every usable saved source.`}
       </p>
       <div
         className="source-summary-list"
@@ -90,40 +90,46 @@ export default function AllSourceSummary({ analysis, providerStatus = [] }) {
           );
         })}
       </div>
-      <details className="secondary-details">
-        <summary>How sources are counted</summary>
-        <p>
-          Available candidates are locally saved texts in the reading’s date
-          window. A company mention alone does not establish usefulness. Each
-          eligible text receives a relevance label; unrelated and unclear items
-          remain inspectable.
-        </p>
-        {coverage.scopes
-          .filter((sample) => sample.excludedCount)
-          .map((sample) => (
-            <p key={sample.scope}>
-              <SourceLabel scope={sample.scope} />:{" "}
-              {Object.entries(sample.excluded)
-                .map(
-                  ([reason, n]) =>
-                    `${sourceExclusionLabels[reason] || reason}: ${n}`,
-                )
-                .join(" · ")}
-            </p>
-          ))}
-        <p>
-          Exact duplicate text is analysed once within its source type. Distinct
-          replies from the same thread are included. Missing passages or
-          required reply context are excluded with a reason, rather than
-          labelled unrelated.
-        </p>
-        <p>
-          Tone counts use relevant text groups. Repeated reporting and comments
-          do not establish independent confirmation or a survey of investors.
-          News comparison context is bounded within each batch; grouping is not
-          exhaustive.
-        </p>
-      </details>
+      {showDetails && <SourceCountingDetails analysis={analysis} />}
     </div>
+  );
+}
+
+export function SourceCountingDetails({ analysis }) {
+  const coverage = sourceCoverage(analysis);
+  return (
+    <details className="secondary-details">
+      <summary>How sources are counted</summary>
+      <p>
+        Available sources are saved news and posts from the dates covered by
+        this reading. Mentioning the company does not always make a source
+        relevant. You can still open sources labelled unrelated or unclear.
+      </p>
+      {coverage.scopes
+        .filter((sample) => sample.excludedCount)
+        .map((sample) => (
+          <p key={sample.scope}>
+            <SourceLabel scope={sample.scope} />:{" "}
+            {Object.entries(sample.excluded)
+              .map(
+                ([reason, n]) =>
+                  `${sourceExclusionLabels[reason] || reason}: ${n}`,
+              )
+              .join(" · ")}
+          </p>
+        ))}
+      <p>
+        Exact duplicate text is analysed once within its source type. Distinct
+        replies from the same thread are included. Missing passages or required
+        reply context are excluded with a reason, rather than labelled
+        unrelated.
+      </p>
+      <p>
+        Related reports count as one development; identical posts count once
+        within their platform. Repeated coverage is not independent
+        confirmation, and these posts are not a survey of investors. Sources are
+        compared in smaller sets, so some repeated coverage may be missed.
+      </p>
+    </details>
   );
 }

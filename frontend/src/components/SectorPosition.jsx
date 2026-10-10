@@ -10,6 +10,8 @@ import {
   measures,
   peRows,
   peerAverage,
+  comparisonRows,
+  comparisonExclusion,
   reportedRow,
   forecastRow,
   yearsFor,
@@ -97,10 +99,12 @@ function EvidenceContents({ row, expected }) {
 
 function Bars({ rows, symbol, expected, label }) {
   const [evidence, setEvidence] = useState(null);
-  const range = scale(rows),
+  const plotted = comparisonRows(rows, symbol),
+    own = rows.find((row) => row.symbol === symbol),
+    range = scale(plotted),
     average = peerAverage(rows, symbol),
     multiple = rows[0]?.unit === "multiple",
-    available = rows.filter((row) => row.value != null),
+    available = plotted.filter((row) => row.value != null),
     x = (value) => ((value - range.low) / range.span) * 100,
     ticks = !available.length
       ? []
@@ -129,7 +133,7 @@ function Bars({ rows, symbol, expected, label }) {
           <span>
             {multiple
               ? "Saved observations may be from different dates."
-              : "Each company uses its own fiscal year."}
+              : "Bars, peer average and verdict use fiscal year ends within 120 days."}
           </span>
         </p>
         <button
@@ -185,7 +189,7 @@ function Bars({ rows, symbol, expected, label }) {
               />
             )}
             <div className="position-rows">
-              {rows.map((row) => (
+              {plotted.map((row) => (
                 <button
                   type="button"
                   key={row.symbol}
@@ -242,6 +246,32 @@ function Bars({ rows, symbol, expected, label }) {
       <p className="position-chart-hint">
         {averageExplanation} Select a row for evidence.
       </p>
+      {average.missing.length > 0 && (
+        <section
+          className="position-excluded"
+          aria-label="Not included in this comparison"
+        >
+          <h4>Not included in this comparison</h4>
+          {average.missing.map((row) => (
+            <button
+              type="button"
+              key={row.symbol}
+              className="position-excluded-row"
+              aria-haspopup="dialog"
+              onClick={() => setEvidence({ symbol: row.symbol })}
+            >
+              <span>
+                <b>
+                  {row.symbol} · {companyName(row)}
+                </b>
+                <strong>{display(row.value, row.unit)}</strong>
+              </span>
+              <span>{rowPeriod(row, expected)}</span>
+              <span>{comparisonExclusion(row, own)} Open evidence.</span>
+            </button>
+          ))}
+        </section>
+      )}
       {reviewed.length > 0 && (
         <p className="position-chart-note">
           {reviewed.map((row) => row.symbol).join(", ")}: earlier figures
@@ -299,6 +329,9 @@ function Bars({ rows, symbol, expected, label }) {
                 <strong>{display(row.value, row.unit)}</strong>
               </summary>
               <div className="position-evidence-content">
+                {average.missing.includes(row) && (
+                  <p>Not compared: {comparisonExclusion(row, own)}</p>
+                )}
                 <EvidenceContents row={row} expected={expected} />
               </div>
             </details>
@@ -324,8 +357,13 @@ function Map({ members, symbol }) {
     growth: reportedRow(member, "revenue_growth"),
     margin: reportedRow(member, "operating_margin"),
   }));
+  const comparable = comparisonRows(
+    rows.map((r) => r.growth),
+    symbol,
+  );
   const valid = rows.filter(
     (r) =>
+      comparable.includes(r.growth) &&
       r.growth.value != null &&
       r.margin.value != null &&
       r.growth.start === r.margin.start &&
@@ -423,15 +461,16 @@ function Map({ members, symbol }) {
             </svg>
           </div>
           <p className="position-caption">
-            {valid.length} of {members.length} companies have both figures. Each
-            uses its own fiscal year; dates and exact sources are in the
-            comparisons below.
+            {valid.length} of {members.length} companies have both figures and
+            comparable fiscal year ends (within 120 days of {symbol}). Dates,
+            exclusions and exact sources are in the comparison below.
           </p>
         </>
       ) : (
         <p className="position-gap">
-          At least two companies need both annual growth and operating margin to
-          plot their positions.
+          At least two companies need both annual growth and operating margin
+          with comparable fiscal year ends (within 120 days) to plot their
+          positions.
         </p>
       )}
     </div>
@@ -624,7 +663,16 @@ export default function SectorPosition({
               ? forecastRow(m, chosenYear, now)
               : reportedRow(m, measure),
           ),
-    reading = position(rows, data?.symbol);
+    reading = position(rows, data?.symbol),
+    excludedFigures = rows.filter(
+      (row) =>
+        row.symbol !== data?.symbol &&
+        row.value != null &&
+        comparisonExclusion(
+          row,
+          rows.find((own) => own.symbol === data?.symbol),
+        ),
+    );
   return (
     <section className="sector-position" aria-label="Competitor position">
       <header className="outlook-section-heading">
@@ -831,6 +879,15 @@ export default function SectorPosition({
             className={`position-reading ${reading.coverage ? "has-comparison" : "has-gap"}`}
           >
             <strong>{reading.text}</strong>
+            {excludedFigures.map((row) => (
+              <p key={row.symbol}>
+                {row.symbol} is not compared:{" "}
+                {comparisonExclusion(
+                  row,
+                  rows.find((own) => own.symbol === data.symbol),
+                )}
+              </p>
+            ))}
             {reading.coverage > 0 && (
               <p>
                 Based on {reading.coverage} of {data.peers.length} peers with

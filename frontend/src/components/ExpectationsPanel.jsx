@@ -1,4 +1,6 @@
 import { readableLoad } from "../lib/loading";
+import { readableNote } from "../lib/readingNotes";
+import ReadingNotes from "./ReadingNotes";
 import LoadingSkeleton from "./LoadingSkeleton";
 import Select from "./Select";
 import { useEffect, useRef, useState } from "react";
@@ -103,9 +105,7 @@ export default function ExpectationsPanel({
         already achieved.
       </p>
       <p className="fine">
-        Explicit AI reading of up to twelve saved news snippets · uses your
-        existing budget · unchanged inputs reuse the saved reading. Opening this
-        view makes no source or model request.
+        A new reading uses your AI budget. Reading saved results is free.
       </p>
       {error && (
         <div className="warning" role="alert">
@@ -122,18 +122,10 @@ export default function ExpectationsPanel({
       {data && (
         <>
           <p className="fine">
-            Current news pool: {data.current_coverage.available_news} items ·{" "}
+            Saved news: {data.current_coverage.available_news} items ·{" "}
             {data.current_coverage.company_mentions} mention this company ·{" "}
-            {data.current_coverage.selected} selected from the last seven days.{" "}
-            {data.current_coverage.selection}
+            {data.current_coverage.selected} selected from the last seven days.
           </p>
-          {selected && selected.id !== data.current_reading?.id && (
-            <p className="warning">
-              The available source sample differs from the saved reading.
-              Extract again to inspect the currently selected news; the older
-              reading stays in history.
-            </p>
-          )}
           {!!readings.length && (
             <label className="expectation-history">
               Saved reading
@@ -148,7 +140,7 @@ export default function ExpectationsPanel({
                 {readings.map((r) => (
                   <option key={r.id} value={r.id}>
                     {stamp(r.cutoff)}
-                    {r.id === data.latest?.id ? " · latest source cutoff" : ""}
+                    {r.id === data.latest?.id ? " · latest sources" : ""}
                   </option>
                 ))}
               </Select>
@@ -175,21 +167,8 @@ export default function ExpectationsPanel({
         <>
           <p className="fine">
             Saved {stamp(selected.created_at)} · sources available through{" "}
-            {stamp(selected.cutoff)}. Source publication dates below are not
-            inferred statement dates.
+            {stamp(selected.cutoff)}.
           </p>
-          {selected.stale && (
-            <p className="warning">
-              This source sample is over 24 hours old. Its age says nothing
-              about whether the expectation was met, revised or withdrawn.
-            </p>
-          )}
-          {selected.earlier_method && (
-            <p className="warning">
-              Saved using an earlier extraction method. Original findings are
-              preserved.
-            </p>
-          )}
           {selected.withheld ? (
             <p className="warning">
               Source access changed. Evidence and interpretation are withheld;
@@ -197,7 +176,26 @@ export default function ExpectationsPanel({
             </p>
           ) : (
             <>
-              <p className="fine">{selected.result.limitation}</p>
+              <ReadingNotes
+                differentSources={selected.id !== data?.current_reading?.id}
+                stale={selected.stale}
+                earlierMethod={selected.earlier_method}
+              >
+                {(selected.stale ||
+                  selected.id !== data?.current_reading?.id) && (
+                  <p>
+                    Use “Extract from saved news” to read the currently selected
+                    sources. This saved reading stays in history. A report's age
+                    does not tell us whether its forecast was met or changed.
+                  </p>
+                )}
+                <p>{readableNote(selected.result.limitation)}</p>
+                <p>{readableNote(data?.current_coverage.selection)}</p>
+                <p>
+                  Dates below show when a report was published, which may differ
+                  from when the quoted statement was made.
+                </p>
+              </ReadingNotes>
               {[
                 ["management_outlook", "Reported management outlook"],
                 ["analyst_view", "Attributed analyst views"],
@@ -282,19 +280,18 @@ export default function ExpectationsPanel({
                     })}
                 </div>
               ))}
-              <div className="warning">
-                <strong>Evidence still missing</strong>
+              <details className="secondary-details">
+                <summary>What this reading may miss</summary>
                 <ul>
                   {selected.result.gaps.map((g, n) => (
                     <li key={n}>{g}</li>
                   ))}
                 </ul>
                 <p>
-                  Independent analyst consensus is unavailable. These readings
-                  do not calculate whether later results beat or missed a
-                  forecast.
+                  These individual views do not establish an analyst consensus
+                  or whether later results beat or missed a forecast.
                 </p>
-              </div>
+              </details>
             </>
           )}
           <a

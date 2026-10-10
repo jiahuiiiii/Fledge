@@ -1,3 +1,4 @@
+import { readableNote } from "./readingNotes.js";
 import { day } from "./financialStory.js";
 
 export function evidenceValue(raw, unit = "USD") {
@@ -105,7 +106,7 @@ export function evidenceFormula(row) {
   if (row.key === "revenue_growth")
     return "(Revenue ÷ previous revenue − 1) × 100";
   if (row.key === "operating_margin") return "Operating income ÷ revenue × 100";
-  return row.formula?.replace(/_/g, " ");
+  return readableNote(row.formula)?.replace(/_/g, " ");
 }
 export function filingName(form) {
   const base = form?.replace("/A", "");
