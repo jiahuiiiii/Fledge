@@ -54,7 +54,7 @@ export default function OriginalFilings({
           <h3>Filings & earnings releases</h3>
         </div>
         <button disabled={busy} onClick={onRefresh}>
-          Collect original documents
+          Update data
         </button>
       </div>
       <p>

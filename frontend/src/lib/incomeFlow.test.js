@@ -95,14 +95,14 @@ test("plot height is bounded and width never magnifies labels", () => {
     assert.equal(graph.nodes[1].width, 12);
     const many = {
       ...group,
-      members: Array.from({ length: 8 }, (_, i) => ({
+      members: Array.from({ length: 9 }, (_, i) => ({
         label: String(i),
-        value: "12.5",
+        value: String(100 / 9),
       })),
     };
-    const compact = flowLayout(period, many, available);
-    assert.ok(compact.height <= 480);
-    assert.equal(compact.nodes.length, period.nodes.length);
+    const listed = flowLayout(period, many, available);
+    assert.ok(listed.height <= 480);
+    assert.equal(listed.nodes.length, period.nodes.length);
   }
 });
 
@@ -128,7 +128,7 @@ test("trailing categories are invalidated when any original revenue input change
   assert.equal(matchingBreakdowns(p, [g]).length, 0);
 });
 
-test("five countries connect to revenue at one scale with bounded, nonoverlapping labels", () => {
+test("up to eight countries connect to revenue at one scale with bounded, nonoverlapping labels", () => {
   const five = {
     ...group,
     members: [30, 26, 18, 16, 10].map((value, i) => ({
@@ -138,6 +138,15 @@ test("five countries connect to revenue at one scale with bounded, nonoverlappin
   };
   for (const values of [
     five.members,
+    // Micron FY2025: eight reported geographies, one dominant.
+    [24113, 5672, 2639, 1913, 1138, 895, 625, 383].map((value, i) => ({
+      label: `Country ${i}`,
+      value: String((value / 37378) * 100),
+    })),
+    [99.3, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1].map((value, i) => ({
+      label: `Country ${i}`,
+      value: String(value),
+    })),
     [99.5, 0.1, 0.1, 0.1, 0.1, 0.1].map((value, i) => ({
       label: `Country ${i}`,
       value: String(value),

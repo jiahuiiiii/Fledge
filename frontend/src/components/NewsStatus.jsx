@@ -145,8 +145,8 @@ export default function NewsStatus({ data, availability, onCoverage }) {
         </button>
         <p>
           Saved news remains available in News &amp; discussion. Open Data &amp;
-          sources for individual checks; use Research updates to refresh sources
-          when their wait has ended.
+          sources for individual checks; use Update data to refresh sources when
+          their wait has ended.
         </p>
       </div>
     </details>

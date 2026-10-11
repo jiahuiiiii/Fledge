@@ -43,7 +43,7 @@ export default function AnalystTargets({ value, quote, onRefresh }) {
           disabled={busy || !value?.available}
           onClick={refresh}
         >
-          {busy ? "Checking targets…" : "Refresh analyst targets"}
+          {busy ? "Checking targets…" : "Update data"}
         </button>
       </div>
       <p className="fine">
@@ -73,7 +73,7 @@ export default function AnalystTargets({ value, quote, onRefresh }) {
                   <small>
                     {range.current && quote?.quoted_at
                       ? date(quote.quoted_at)
-                      : "Refresh research to compare potential returns."}
+                      : "Use Update data to compare potential returns."}
                   </small>
                 </div>
               </div>
@@ -196,9 +196,9 @@ export default function AnalystTargets({ value, quote, onRefresh }) {
             The individual targets’ dates are not supplied with this range.
           </p>
           {record.stale && (
-            <p className="financial-note">
-              This saved snapshot was fetched more than 24 hours ago. Refresh
-              before comparing it with today’s prices.
+            <p className="fine">
+              Over a day old. Use Update data before comparing with today’s
+              price.
             </p>
           )}
           <details className="secondary-details">

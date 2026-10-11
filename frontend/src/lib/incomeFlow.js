@@ -77,12 +77,15 @@ export function flowLayout(period, mix, availableWidth = 0) {
             group: mix,
           }))
       : [];
-  // Labels sit beside source bars, so five-country disclosures fit without
-  // either stretching the SVG or suppressing their links to total revenue.
-  const included = sources.length <= 6 ? sources : [];
+  // Labels sit beside source bars, so disclosures of up to eight categories
+  // fit without stretching the SVG or suppressing their links to total
+  // revenue. Seven or eight use one-line labels in shorter slots.
+  const included = sources.length <= 8 ? sources : [];
+  const compact = included.length > 6;
+  const minSlot = compact ? 40 : 56;
   let scale = 190 / numeric(revenue.value);
   const sourceHeight = (s) =>
-    included.reduce((h, row) => h + Math.max(56, numeric(row.value) * s), 0) +
+    included.reduce((h, row) => h + Math.max(minSlot, numeric(row.value) * s), 0) +
     Math.max(0, included.length - 1) * 12;
   if (sourceHeight(scale) > 420) {
     let low = 0,
@@ -104,9 +107,10 @@ export function flowLayout(period, mix, availableWidth = 0) {
     const column = row.column + offset;
     const height = numeric(row.value) * scale;
     if (row.group) {
-      const slot = Math.max(56, height);
+      const slot = Math.max(minSlot, height);
       const node = {
         ...row,
+        compact,
         x: 196,
         y: sourceY + (slot - height) / 2,
         height,

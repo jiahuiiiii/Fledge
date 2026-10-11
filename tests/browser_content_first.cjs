@@ -146,7 +146,7 @@ let browser;
       ),
       `overflow ${width}`,
     );
-    for (const name of ["Notebook", "Data & sources", "Research updates"])
+    for (const name of ["Notebook", "Data & sources", "Update data"])
       assert.ok(
         await page
           .getByRole("button", { name, exact: true })
@@ -161,13 +161,13 @@ let browser;
   }
   await page.setViewportSize({ width: 375, height: 812 });
   const tools = page.getByRole("button", {
-    name: "Research updates",
+    name: "Update data",
     exact: true,
   });
   await tools.focus();
   await page.keyboard.press("Enter");
   const dialog = page.getByRole("dialog", {
-    name: "Research updates",
+    name: "Update data",
     exact: true,
   });
   await dialog.waitFor();

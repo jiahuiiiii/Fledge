@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from copy import deepcopy
 import json
 import re
+import threading
+import time
 from uuid import uuid4
 from psycopg.types.json import Jsonb
 from thesis.db import transaction, one, rows
@@ -28,6 +30,49 @@ def worker_lease():
         return conn
     conn.close()
     return None
+
+
+class WorkerLease:
+    """Keep trying to own the worker lock instead of trying once at startup.
+
+    A restarted app can start while its predecessor still holds the lock; it
+    previously ran no workers at all once that predecessor exited.
+    """
+    def __init__(self, owners, retry_seconds=5):
+        self._owners = owners
+        self._retry = retry_seconds
+        self._conn = None
+        self._last = None
+        self._lock = threading.Lock()
+
+    def held(self):
+        with self._lock:
+            conn = self._conn
+            if conn is not None and not conn.closed and not conn.broken:
+                return True
+            self._conn = None
+            now = time.monotonic()
+            if self._last is not None and now - self._last < self._retry:
+                return False
+            self._last = now
+            conn = worker_lease()
+            if conn is None:
+                return False
+            # Recover before any worker in this process can claim a step.
+            try:
+                for owner in self._owners():
+                    recover(owner)
+            except Exception:
+                conn.close()
+                raise
+            self._conn = conn
+            return True
+
+    def close(self):
+        with self._lock:
+            if self._conn is not None:
+                self._conn.close()
+                self._conn = None
 
 
 def latest(owner, iid):

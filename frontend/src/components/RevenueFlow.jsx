@@ -324,9 +324,13 @@ export default function RevenueFlow({
                   </g>
                   {graph.nodes.map((row) => {
                     const allLines = shortLabel(row.label, row.group ? 22 : 25);
+                    const limit = row.compact ? 1 : 2;
                     const lines =
-                      row.group && allLines.length > 2
-                        ? [allLines[0], allLines[1] + "…"]
+                      row.group && allLines.length > limit
+                        ? [
+                            ...allLines.slice(0, limit - 1),
+                            allLines[limit - 1] + "…",
+                          ]
                         : allLines;
                     const labelX = row.labelX ?? row.x;
                     return (

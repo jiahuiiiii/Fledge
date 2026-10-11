@@ -82,7 +82,7 @@ export default function FinancialPerformance({ data }) {
         {data.source_status?.last_error
           ? "The latest filing check failed; these are retained figures."
           : stale
-            ? "The source check is over 24 hours old. Refresh research to check for newer reports."
+            ? "The source check is over 24 hours old. Use Update data to check for newer reports."
             : "Opening this view uses saved filing data."}
       </p>
       {!chosen ? (

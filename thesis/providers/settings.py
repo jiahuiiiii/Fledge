@@ -49,8 +49,8 @@ def live_key(model=MODEL):
         raise ValueError(
             "The configured provider/model has not been priced for this allowance"
         )
-    if values.get("THESIS_LIVE_TEST_BUDGET_USD") != "30":
-        raise ValueError("The configured allowance must match the approved US$30 total")
+    if values.get("THESIS_LIVE_TEST_BUDGET_USD") != "40":
+        raise ValueError("The configured allowance must match the approved US$40 total")
     key = values.get("OPENAI_API_KEY", "")
     if not key:
         raise ValueError("Add the OpenAI key to the private .env file")

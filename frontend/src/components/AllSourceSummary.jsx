@@ -71,6 +71,11 @@ export default function AllSourceSummary({
                   <dd>{sample.relevant}</dd>
                 </div>
               </dl>
+              {sample.quickSkipped > 0 && (
+                <span className="fine">
+                  {sample.quickSkipped} skipped as unrelated by a quick check
+                </span>
+              )}
               {sample.excludedCount > 0 && (
                 <span className="fine">
                   {sample.excludedCount} excluded before analysis
@@ -105,6 +110,15 @@ export function SourceCountingDetails({ analysis }) {
         this reading. Mentioning the company does not always make a source
         relevant. You can still open sources labelled unrelated or unclear.
       </p>
+      {analysis?.prefilter && (
+        <p>
+          A quick check with a smaller AI model looked at all{" "}
+          {analysis.prefilter.checked} sources first.{" "}
+          {analysis.prefilter.skipped
+            ? `${analysis.prefilter.skipped} it called clearly unrelated were not sent for the full reading; they are listed under Unrelated. Sources it was unsure about were still read in full.`
+            : "None were skipped."}
+        </p>
+      )}
       {coverage.scopes
         .filter((sample) => sample.excludedCount)
         .map((sample) => (

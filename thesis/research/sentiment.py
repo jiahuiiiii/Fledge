@@ -674,11 +674,14 @@ def generate(iid, *, transport=None, now=None, lookback_days=7, progress=None, r
 
 
 def _generate(iid, *, transport, now, lookback_days, progress, retry_failed):
-    from . import sentiment_batching
+    from . import relevance_prefilter, sentiment_batching
     with transaction() as c:
         packet = prepare(c, iid, now, lookback_days=lookback_days)
-        key = identity(packet)
-        old = one(c, "SELECT * FROM sentiment_analyses WHERE request_key=%s", (key,))
+        # Unchanged inputs reuse an earlier full reading instead of paying again.
+        legacy = identity(packet)
+        key = legacy + ":" + relevance_prefilter.POLICY
+        old = one(c, "SELECT * FROM sentiment_analyses WHERE request_key IN (%s,%s) ORDER BY request_key=%s DESC LIMIT 1",
+                  (key, legacy, key))
     if old:
         with transaction() as c:
             return present(c, old)

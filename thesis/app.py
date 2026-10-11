@@ -101,18 +101,19 @@ async def lifespan(app):
     telegram_thread = threading.Thread(target=telegram_loop, daemon=True)
     telegram_thread.start()
     from .research import loading
-    load_lease = loading.worker_lease()
-    if load_lease is not None:
-        for owner in auth.background_owners():
-            loading.recover(owner)
+    load_lease = loading.WorkerLease(auth.background_owners)
+
     def load_loop():
         while not stop.wait(0.5):
             try:
+                if not load_lease.held():
+                    continue
                 for owner in auth.background_owners():
                     loading.work_once(owner)
             except Exception:
                 logging.getLogger("thesis").warning("Research loading worker could not finish a step")
-    load_threads = [threading.Thread(target=load_loop, daemon=True) for _ in range(4 if load_lease is not None else 0)]
+
+    load_threads = [threading.Thread(target=load_loop, daemon=True) for _ in range(4)]
     for worker in load_threads:
         worker.start()
     yield
@@ -124,8 +125,7 @@ async def lifespan(app):
     telegram_thread.join(timeout=5)
     for worker in load_threads:
         worker.join(timeout=1)
-    if load_lease is not None:
-        load_lease.close()
+    load_lease.close()
 
 
 app = FastAPI(

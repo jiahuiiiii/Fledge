@@ -13,6 +13,7 @@ export default function OutlookPage({
   onView,
   onDraft,
   includeForecasts = true,
+  revision,
 }) {
   return (
     <div className="outlook-page">
@@ -22,6 +23,7 @@ export default function OutlookPage({
           <FmpPanel
             instrumentId={instrumentId}
             visible={visible}
+            revision={revision}
             mode="outlook"
           />
         </>

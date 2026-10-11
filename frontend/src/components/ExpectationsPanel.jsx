@@ -157,7 +157,7 @@ export default function ExpectationsPanel({
               <p>
                 {data.current_coverage.selected
                   ? "Extract the selected news to identify attributed outlooks and the evidence still missing."
-                  : "No complete recent company-news passages are available. Use Refresh research in the company toolbar."}
+                  : "No complete recent company-news passages are available. Use Update data at the top of the page."}
               </p>
             </div>
           )}

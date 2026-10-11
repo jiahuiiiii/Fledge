@@ -130,7 +130,7 @@ export default function SocialConversation({ sourceId, onRemoved }) {
       {data?.can_refresh === false && (
         <p className="fine">
           {data.unavailable_reason ||
-            "Collected with this discussion. Use Refresh research to check the thread again."}
+            "Collected with this discussion. Use Update data to check the thread again."}
         </p>
       )}
       {cooling && data?.can_refresh !== false && (

@@ -174,10 +174,10 @@ def combine(packet, parts, calls):
     ]}}, packet)
 
 
-def preflight(parts, *, retry_failed=False):
+def preflight(parts, *, retry_failed=False, extra_nano=0):
     """Check the complete plan; per-call reservations still enforce the cap."""
     from .sentiment import render, request_for
-    needed = 0
+    needed = extra_nano
     for part in parts:
         previous, attempt = prior_attempt(part)
         if previous:
@@ -201,7 +201,43 @@ def preflight(parts, *, retry_failed=False):
     return dict(maximum_new_usd=str(maximum), available_usd=str(remaining))
 
 
-def run(packet, *, transport=None, progress=None, retry_failed=False):
+def run(packet, *, transport=None, progress=None, retry_failed=False, prefilter=None):
+    """Return (result, calls). A cheap quick check first drops only sources it
+    calls clearly unrelated; everything else gets the full reading."""
+    from . import relevance_prefilter
+    full = packet
+    record, quick = None, []
+    if prefilter is None:
+        prefilter = relevance_prefilter.enabled()
+    if prefilter and packet["sources"]:
+        # Worst case: the quick check skips nothing and every batch still runs.
+        try:
+            preflight(plan(packet), retry_failed=retry_failed,
+                      extra_nano=relevance_prefilter.maximum_nano(packet))
+        except ledger.BudgetBlocked as exc:
+            if progress:
+                progress(dict(completed=0, total=0, source_counts=[], failed=None, message=str(exc)))
+            raise
+        with transaction() as conn:
+            check_access(conn, packet)
+        if progress:
+            progress(dict(completed=0, total=0, source_counts=[], failed=None,
+                          message=f"Quick relevance check · {len(packet['sources'])} sources"))
+        kept, skipped, record, quick = relevance_prefilter.run(packet, transport=transport)
+        keep = set(kept)
+        packet = dict(packet, sources=[s for s in packet["sources"] if s["id"] in keep])
+    if packet["sources"]:
+        result, calls = _run(packet, transport=transport, progress=progress, retry_failed=retry_failed)
+    else:
+        result, calls = relevance_prefilter_empty(packet), []
+        result["batching"] = dict(policy=POLICY, completed=0, total=0, source_counts=[],
+                                  comparison_limit=MAX_COMPARISONS, comparison_context_bounded=False)
+    if record is not None:
+        result = relevance_prefilter.merge(full, result, record)
+    return result, quick + calls
+
+
+def _run(packet, *, transport=None, progress=None, retry_failed=False):
     from .sentiment import request_for, render, PROMPT
     parts = plan(packet)
     calls = []
@@ -265,3 +301,12 @@ def run(packet, *, transport=None, progress=None, retry_failed=False):
                              comparison_limit=MAX_COMPARISONS,
                              comparison_context_bounded=any(p['comparison_selection']['supplied'] < p['comparison_selection']['available'] for p in parts))
     return result, calls
+
+
+def relevance_prefilter_empty(packet):
+    """Every source was skipped by the quick check: no full-reading call is made."""
+    from .sentiment import POLICY as SUMMARY_POLICY, PROMPT, summarize
+    from thesis.providers.settings import REASONING_MODEL
+    return dict(items=[], coverage_links=[], summary=summarize([], packet["sources"], [], packet.get("comparison_sources", [])),
+                summary_policy=SUMMARY_POLICY, model=REASONING_MODEL, prompt_version=PROMPT,
+                guard_policy=packet.get("guard_policy"))

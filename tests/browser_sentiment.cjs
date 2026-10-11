@@ -137,7 +137,7 @@ let browser;
  await page.reload();await page.getByRole('tab',{name:'News & discussion',exact:true}).click();await batchProgress.waitFor();assert.equal(await batchProgress.getAttribute('aria-valuenow'),'1');
  await panel.locator('.sentiment-batch-progress').getByText(stoppedMessage,{exact:true}).waitFor();
  // Progress is now inside the company Research updates dialog.
- if(await page.getByRole('button',{name:'Research updates',exact:true}).count())await page.getByRole('button',{name:'Research updates',exact:true}).click();
+ if(await page.getByRole('button',{name:'Update data',exact:true}).count())await page.getByRole('button',{name:'Update data',exact:true}).click();
  await page.locator('button.progress-restore').click();
  await page.getByRole('button',{name:'View progress',exact:true}).click();
  await page.locator('.loading-steps').getByText(stoppedMessage,{exact:true}).waitFor();

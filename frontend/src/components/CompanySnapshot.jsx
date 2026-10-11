@@ -2,6 +2,86 @@ import { day, snapshot } from "../lib/companySnapshot";
 import "./CompanySnapshot.css";
 import TermHelp from "./TermHelp";
 import OverviewSections from "./OverviewSections";
+import { companyName } from "../lib/companyIdentity";
+
+const when = (value) =>
+  new Date(value).toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+// One freshness line for the whole page instead of a stale note per section.
+function Freshness({ data, onUpdate }) {
+  const checks = (data?.source_checks || []).filter((c) => c.checked_at);
+  if (!checks.length || !onUpdate) return null;
+  const latest = checks
+    .map((c) => c.checked_at)
+    .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+  const problems = (data.source_checks || []).filter(
+    (c) => c.state !== "fresh",
+  );
+  return (
+    <p className="glance-freshness">
+      <span>
+        Sources last checked {when(latest)}
+        {problems.length > 0 &&
+          ` · ${problems.map((c) => c.name).join(", ")} ${problems.length === 1 ? "needs" : "need"} another try`}
+      </span>
+      <button className="glance-link" onClick={onUpdate}>
+        Update {data.instrument?.symbol} →
+      </button>
+    </p>
+  );
+}
+
+// The product's core loop: save a view, then get told what supports or challenges it.
+function YourView({ data, savedView, onSaveView, onAsk }) {
+  if (!onSaveView) return null;
+  const name = companyName(data.instrument);
+  if (!savedView)
+    return (
+      <section className="glance-view" aria-labelledby="glance-view-title">
+        <div>
+          <h4 id="glance-view-title">What do you think of {name}?</h4>
+          <p>
+            Write your view in a sentence or two. Fledge then watches news,
+            filings and results for evidence that supports or challenges it.
+          </p>
+        </div>
+        <div className="glance-view-actions">
+          <button className="primary" onClick={onSaveView}>
+            Save my view
+          </button>
+          {onAsk && (
+            <button onClick={onAsk}>Not sure yet? Ask a question</button>
+          )}
+        </div>
+      </section>
+    );
+  return (
+    <section className="glance-view saved" aria-labelledby="glance-view-title">
+      <div>
+        <h4 id="glance-view-title">
+          Your view{" "}
+          <span
+            className={`status ${savedView.status === "monitoring" ? "met" : ""}`}
+          >
+            {savedView.status === "monitoring" ? "Watching" : "Draft"}
+          </span>
+        </h4>
+        {savedView.question && <p>{savedView.question}</p>}
+        {savedView.reasoning && (
+          <p className="glance-view-reasoning">{savedView.reasoning}</p>
+        )}
+      </div>
+      <div className="glance-view-actions">
+        <button onClick={onSaveView}>Edit my view</button>
+      </div>
+    </section>
+  );
+}
 
 function Activity({ data, instrumentId, onUpdates, onView }) {
   const quote = data?.market?.quote?.quote;
@@ -77,6 +157,10 @@ export default function CompanySnapshot({
   onSource,
   businessPanel,
   focusTopic,
+  savedView,
+  onSaveView,
+  onAsk,
+  onUpdate,
 }) {
   const { sentences, growth } = snapshot(data);
   return (
@@ -102,10 +186,17 @@ export default function CompanySnapshot({
         </p>
       ) : (
         <p className="glance-summary muted">
-          A short summary appears once filings and news are loaded. Use Refresh
-          research to load them.
+          A short summary appears once filings and news are loaded. Use Update
+          to load them.
         </p>
       )}
+      <Freshness data={data} onUpdate={onUpdate} />
+      <YourView
+        data={data}
+        savedView={savedView}
+        onSaveView={onSaveView}
+        onAsk={onAsk}
+      />
       <Activity
         data={data}
         instrumentId={instrumentId}

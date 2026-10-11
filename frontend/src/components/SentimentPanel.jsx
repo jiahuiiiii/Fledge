@@ -174,7 +174,7 @@ export default function SentimentPanel({
           >
             <span
               style={{
-                width: `${(batchProgress.completed / batchProgress.total) * 100}%`,
+                width: `${batchProgress.total ? (batchProgress.completed / batchProgress.total) * 100 : 0}%`,
               }}
             />
           </div>
@@ -402,7 +402,11 @@ export default function SentimentPanel({
                       <div className="story-footer">
                         <div className="story-labels">
                           <span className="fine">
-                            {i.guard?.applied ? "Checked label" : "AI label"}
+                            {i.prefilter
+                              ? "Quick check"
+                              : i.guard?.applied
+                                ? "Checked label"
+                                : "AI label"}
                           </span>
                           <span className={`sentiment-tag tone-${i.sentiment}`}>
                             {i.relevance === "relevant"
@@ -411,9 +415,11 @@ export default function SentimentPanel({
                                 ? "Not about this company"
                                 : "Unclear relevance"}
                           </span>
-                          <span className="story-statement fine">
-                            {i.statement.replaceAll("_", " ")}
-                          </span>
+                          {!i.prefilter && (
+                            <span className="story-statement fine">
+                              {i.statement.replaceAll("_", " ")}
+                            </span>
+                          )}
                         </div>
                         <EvidenceButton
                           key={`${a.id}:${i.id}`}
@@ -433,7 +439,9 @@ export default function SentimentPanel({
                             <h3>Original text</h3>
                             <p>{s?.body || "Original text unavailable."}</p>
                           </div>
-                          <h3>AI classification</h3>
+                          <h3>
+                            {i.prefilter ? "Quick check" : "AI classification"}
+                          </h3>
                           <SentimentBasis item={i} />
                           {comparison && (
                             <details className="coverage-comparison">

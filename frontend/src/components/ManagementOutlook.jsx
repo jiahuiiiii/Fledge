@@ -154,7 +154,7 @@ export default function ManagementOutlook({ data }) {
           <p>
             {data.status === "unavailable"
               ? data.message
-              : "Use Refresh research in the company toolbar to collect original earnings releases."}
+              : "Use Update data at the top of the page to collect original earnings releases."}
           </p>
         </div>
       ) : (

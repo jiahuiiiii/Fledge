@@ -45,3 +45,24 @@ test("missing collection counts stay unknown", () => {
   assert.equal(coverage.candidates, null);
   assert.equal(coverage.unanalysed, null);
 });
+
+test("counts sources skipped by the quick relevance check", () => {
+  const coverage = sourceCoverage({
+    summary: { news: { selected: 3, relevant: 1 } },
+    sources: [{ id: "a" }, { id: "b" }, { id: "c" }],
+    items: [
+      { source_id: "a", channel: "news", relevance: "relevant" },
+      {
+        source_id: "b",
+        channel: "news",
+        relevance: "unrelated",
+        prefilter: true,
+      },
+      { source_id: "c", channel: "news", relevance: "unrelated" },
+    ],
+  });
+  const news = coverage.scopes.find((scope) => scope.scope === "news");
+  assert.equal(news.quickSkipped, 1);
+  assert.equal(news.unrelated, 2);
+  assert.equal(coverage.quickSkipped, 1);
+});

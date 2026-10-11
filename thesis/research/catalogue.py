@@ -6,6 +6,8 @@ candidate for analysis, never proof that the source is relevant to investing.
 
 import re
 
+from .word_tickers import WORD_TICKERS
+
 COMPANIES = {
     "MSFT": (789019, "Microsoft", "Software"),
     "AAPL": (320193, "Apple", "Consumer technology"),
@@ -70,8 +72,12 @@ def mentions(text, symbol, company_name=None):
         # still require the existing explicit financial context.
         short = search != alias and search != symbol or (symbol == 'AMD' and alias and alias.lower() == 'advanced micro devices')
         flags = 0 if search in ('Micron', 'AMD') else re.I
+        # A distinctive ticker (QCOM, MRVL) counts on its own in capitals; tickers
+        # that are also words or forum shorthand (ALL, ARM, IMO) stay strict.
+        distinctive = len(symbol) >= 3 and symbol not in WORD_TICKERS
         return bool((alias and re.search(r"(?<!\w)" + re.escape(alias) + r"(?!\w)", text, re.I)) or
                     (short and re.search(r"(?<!\w)" + re.escape(search) + r"(?!\w)", text, flags)) or
+                    (distinctive and re.search(rf"(?<![A-Za-z0-9]){ticker}(?![A-Za-z0-9])", text)) or
                     re.search(rf"\${ticker}\b|\b(?:NASDAQ|NYSE):\s*{ticker}\b", text, re.I) or
                     re.search(rf"\b{ticker}\s+(?i:stock|shares|earnings)\b", text))
     if re.search(patterns[symbol], text, re.I):

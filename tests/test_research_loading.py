@@ -140,6 +140,32 @@ def test_only_one_app_process_can_recover_the_queue(db):
     second.close()
 
 
+def test_new_process_takes_over_workers_after_old_lease_ends(owner):
+    old=loading.worker_lease()
+    lease=loading.WorkerLease(lambda: [owner],retry_seconds=0)
+    try:
+        assert not lease.held()
+        old.close()
+        assert lease.held() and lease.held()
+        assert loading.worker_lease() is None
+    finally:
+        lease.close()
+    second=loading.worker_lease()
+    assert second is not None
+    second.close()
+
+
+def test_lease_recovers_interrupted_steps_when_acquired(owner):
+    iid=prepare(owner); loading.start(owner,iid)
+    assert loading.claim(owner)
+    lease=loading.WorkerLease(lambda: [owner],retry_seconds=0)
+    try:
+        assert lease.held()
+    finally:
+        lease.close()
+    assert loading.latest(owner,iid)['steps'][0]['status']=='interrupted'
+
+
 def test_interrupted_worker_cannot_overwrite_recovery(owner):
     iid=prepare(owner); loading.start(owner,iid)
     def execute(run,key):

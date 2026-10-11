@@ -27,7 +27,7 @@ export default function PublicForecasts({ source, busy, onRefresh }) {
             onClick={onRefresh}
             disabled={busy || paused || !source.available}
           >
-            {busy ? "Checking…" : "Check public forecasts"}
+            {busy ? "Checking…" : "Update data"}
           </button>
           {paused && source.available && (
             <small>Next check {stamp(source.next_check_at)}</small>

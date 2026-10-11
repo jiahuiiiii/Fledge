@@ -76,7 +76,7 @@ export default function FilingWatch({
       <p className="fine">
         {watch?.enabled
           ? `${running ? "A check is in progress. " : "Daily checks on. "}Next scheduled: ${time(watch.next_check_at)}. An overdue check runs once after reopening.`
-          : "Daily checks are off. You can still use Refresh research."}
+          : "Daily checks are off. You can still use Update data."}
       </p>
       <p className="fine">
         This checks structured annual and quarterly figures, not every filing or

@@ -150,3 +150,17 @@ def test_switched_off_discussions_are_not_successful_empty_checks(owner):
     finally:
         with transaction(admin=True) as c:
             c.execute('UPDATE social_feeds SET enabled=true')
+
+
+@pytest.mark.parametrize('text,symbol,name,expected',[
+    ('QCOM to the moon','QCOM','QUALCOMM INC/DE',True),
+    ("QCOM's guidance looks soft",'QCOM','QUALCOMM INC/DE',True),
+    ('MRVL ripping today','MRVL','Marvell Technology, Inc.',True),
+    ('qcom in lowercase','QCOM','QUALCOMM INC/DE',False),
+    ('QCOMX is a different fund','QCOM','QUALCOMM INC/DE',False),
+    ('ALL IN on this one','ALL','Allstate Corp',False),
+    ('ARM is up today','ARM','Arm Holdings plc',False),
+    ('IMO this is cheap','IMO','Imperial Oil Ltd',False),
+])
+def test_bare_distinctive_tickers_count_but_word_tickers_stay_strict(text,symbol,name,expected):
+    assert catalogue.mentions(text,symbol,name) is expected

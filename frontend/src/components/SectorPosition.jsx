@@ -490,6 +490,7 @@ export default function SectorPosition({
     [year, setYear] = useState(""),
     [search, setSearch] = useState(""),
     [searchResults, setSearchResults] = useState([]),
+    [searched, setSearched] = useState(""),
     [reasons, setReasons] = useState({});
   const version = useRef(0),
     mounted = useRef(true),
@@ -557,20 +558,39 @@ export default function SectorPosition({
     const token = ++searchVersion.current;
     if (!value.trim()) {
       setSearchResults([]);
+      setSearched("");
       return;
     }
     try {
       const result = await api.companyDirectory(value);
-      if (mounted.current && token === searchVersion.current)
+      if (mounted.current && token === searchVersion.current) {
         setSearchResults(
           result.companies.filter(
             (c) => c.available && c.symbol !== data.symbol,
           ),
         );
+        setSearched(value);
+      }
     } catch (failure) {
       if (mounted.current && token === searchVersion.current)
         setError(failure.message);
     }
+  }
+  // A found company goes straight into the first empty slot (or a new one),
+  // so searching visibly changes the draft instead of only the dropdowns.
+  function addPeer(symbol) {
+    dirty.current = true;
+    setDraft((old) => {
+      const next = [...(old || [])];
+      const empty = next.indexOf("");
+      if (empty >= 0) next[empty] = symbol;
+      else next.push(symbol);
+      return next.slice(0, 8);
+    });
+    setSearch("");
+    setSearchResults([]);
+    setSearched("");
+    searchVersion.current++;
   }
   async function save() {
     if (acting.current) return;
@@ -725,6 +745,33 @@ export default function SectorPosition({
                 onChange={(event) => searchPeers(event.target.value)}
               />
             </label>
+            {search.trim() && searched === search && (
+              <div className="position-search-results" aria-live="polite">
+                {searchResults.filter((c) => !draft?.includes(c.symbol))
+                  .length ? (
+                  searchResults
+                    .filter((c) => !draft?.includes(c.symbol))
+                    .slice(0, 6)
+                    .map((c) => (
+                      <button
+                        key={c.symbol}
+                        disabled={
+                          busy || (draft || []).filter(Boolean).length >= 8
+                        }
+                        onClick={() => addPeer(c.symbol)}
+                      >
+                        + {c.symbol} · {companyName(c)}
+                      </button>
+                    ))
+                ) : (
+                  <p>
+                    {searchResults.length
+                      ? "Already in this comparison group."
+                      : "No supported company matches this search."}
+                  </p>
+                )}
+              </div>
+            )}
             <div className="position-peer-editor">
               {Array.from(
                 { length: Math.max(1, draft?.length || 0) },
@@ -786,10 +833,12 @@ export default function SectorPosition({
               {busy ? "Loading…" : "Apply comparison group"}
             </button>
             <button
-              disabled={busy || (draft?.length || 0) >= 8}
+              disabled={busy || Math.max(1, draft?.length || 0) >= 8}
               onClick={() => {
                 dirty.current = true;
-                setDraft((old) => [...(old || []), ""]);
+                // An empty group already shows one blank slot; keep it and
+                // add a second so the click is visible.
+                setDraft((old) => [...(old?.length ? old : [""]), ""]);
               }}
             >
               Add peer

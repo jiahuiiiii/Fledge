@@ -167,7 +167,7 @@ def test_process_loss_and_idempotency_survive_new_connections():
 def test_exhaustion_and_immutable_cap():
     with transaction(admin=True) as conn:
         conn.execute(
-            "INSERT INTO model_calls(id,request_key,request_hash,purpose,model,price_version,request_body,reserved_nano_usd,status,charged_nano_usd) VALUES(%s,'earlier-work','x','test',%s,'test','{}',29999999999,'settled',29999999999)",
+            "INSERT INTO model_calls(id,request_key,request_hash,purpose,model,price_version,request_body,reserved_nano_usd,status,charged_nano_usd) VALUES(%s,'earlier-work','x','test',%s,'test','{}',39999999999,'settled',39999999999)",
             (uuid4(), MODEL),
         )
     with pytest.raises(ledger.BudgetBlocked, match="allowance"):
@@ -248,6 +248,15 @@ def test_budget_extension_preserves_spent_calls_holds_and_dispatches():
                 assert conn.execute("SELECT * FROM model_calls ORDER BY id").fetchall() == calls
                 assert conn.execute("SELECT * FROM model_dispatches").fetchall() == dispatches
                 assert one(conn, "SELECT count(*) n FROM model_budget_amendments")["n"] == 2
+                conn.execute((migration.parent / "048_build_budget_extension.sql").read_text())
+                latest = ledger.snapshot(conn)
+                assert latest["cap_usd"] == "40.0"
+                assert latest["authorization"] == "thesis-openai-build-20261011-usd40"
+                assert float(latest["remaining_usd"]) - float(current["remaining_usd"]) == pytest.approx(10)
+                for field in ("spent_usd", "reserved_usd", "calls", "unresolved"):
+                    assert latest[field] == before[field]
+                assert conn.execute("SELECT * FROM model_calls ORDER BY id").fetchall() == calls
+                assert one(conn, "SELECT count(*) n FROM model_budget_amendments")["n"] == 3
                 raise RollbackCheck()
 
 
@@ -406,7 +415,7 @@ def test_authorized_maximum_is_still_counted_without_inventing_usage():
     with transaction(admin=True) as conn:
         conn.execute(
             """INSERT INTO model_calls(id,request_key,request_hash,purpose,model,price_version,request_body,reserved_nano_usd,status,charged_nano_usd) VALUES(%s,'near-cap','x','test',%s,'test','{}',9999999999,'settled',%s)""",
-            (uuid4(), MODEL, 30_000_000_000 - ledger.estimate(body())),
+            (uuid4(), MODEL, 40_000_000_000 - ledger.estimate(body())),
         )
     with pytest.raises(ledger.BudgetBlocked, match="allowance"):
         ledger.reserve("held-maximum-still-counts", "test", body())
@@ -574,7 +583,7 @@ def test_both_models_require_explicit_config_in_original_installation(monkeypatc
         THESIS_LIVE_MODELS_ENABLED="true",
         THESIS_MODEL_PROVIDER="openai",
         THESIS_MODEL=MODEL,
-        THESIS_LIVE_TEST_BUDGET_USD="30",
+        THESIS_LIVE_TEST_BUDGET_USD="40",
         OPENAI_API_KEY="mock-only-key",
     )
     monkeypatch.setattr(module, "settings", lambda: deepcopy(values))
@@ -588,7 +597,7 @@ def test_both_models_require_explicit_config_in_original_installation(monkeypatc
         module.live_key()
     assert module.live_key(REASONING_MODEL) == "mock-only-key"
     values["THESIS_LIVE_TEST_BUDGET_USD"] = "10"
-    with pytest.raises(ValueError, match="US\\$30"):
+    with pytest.raises(ValueError, match="US\\$40"):
         module.live_key(REASONING_MODEL)
     monkeypatch.setattr(
         module, "settings", lambda: pytest.fail("Unknown model must not read keys")
@@ -642,8 +651,8 @@ def test_stronger_profile_cannot_start_a_separate_allowance():
                 MODEL,
                 ledger.PRICE_VERSION,
                 Jsonb(body()),
-                30 * ledger.NANO - remaining,
-                30 * ledger.NANO - remaining,
+                40 * ledger.NANO - remaining,
+                40 * ledger.NANO - remaining,
             ),
         )
     with pytest.raises(ledger.BudgetBlocked, match="allowance"):

@@ -14,6 +14,7 @@ import FinancialEvidence from "./FinancialEvidence";
 import Modal from "./Modal";
 import TermHelp from "./TermHelp";
 import { SourceIcon } from "./SourceFilters";
+import { growthTakeaway, peTakeaway } from "../lib/overviewTakeaways";
 import "./OverviewSections.css";
 
 const fallback = (value) => value ?? "Not available";
@@ -311,6 +312,7 @@ export default function OverviewSections({
       ["valuation", api.valuationContext],
       ["fmp", api.fmp],
       ["business", api.businessHistory],
+      ["sector", (id) => api.sectorPosition(id)],
     ]) {
       read(instrumentId)
         .then((result) => {
@@ -379,6 +381,8 @@ export default function OverviewSections({
       }
     : null;
   const growthNumber = number(m.growth?.value);
+  const growthVsPeers = growthTakeaway(reads.sector);
+  const peVsPeers = peTakeaway(reads.sector, reads.valuation?.references);
   const borrowedRatio = m.cashRatio > 0 ? 1 / m.cashRatio : null;
   const sources = m.headlines
     .filter((s) => filter === "all" || s.kind === filter)
@@ -543,6 +547,7 @@ export default function OverviewSections({
           {growthNumber != null
             ? `Revenue ${growthNumber >= 0 ? "grew" : "fell"} ${Math.abs(growthNumber).toFixed(1)}% to ${money(m.revenue?.value)} in the fiscal year ended ${day(m.revenue?.end)}. `
             : "Comparable annual revenue growth is not available. "}
+          {growthVsPeers && `${growthVsPeers} `}
           {guidance
             ? `Management’s revenue outlook is ${guidanceAmount(guidance)} for the ${guidance.section.period_type} ending ${day(guidance.section.period_end)}.`
             : "No current management revenue outlook is saved."}
@@ -780,11 +785,6 @@ export default function OverviewSections({
             ]}
           >
             <Tone tone={m.tone} />
-            {data.sentiment?.earlier_method && (
-              <p className="overview-caption">
-                Saved with an earlier reading method.
-              </p>
-            )}
           </KeyInformation>
           <article className="overview-card overview-headlines">
             <div className="overview-headlines-heading">
@@ -814,7 +814,7 @@ export default function OverviewSections({
                 <li key={source.id}>
                   <button
                     className="overview-headline"
-                    onClick={() => onSource(source.id)}
+                    onClick={() => onSource(source)}
                   >
                     <strong>
                       {source.headline}
@@ -872,8 +872,9 @@ export default function OverviewSections({
           {m.pe != null
             ? `The saved trailing P/E is ${multiple(m.pe)}: about $${m.pe.toFixed(0)} of share price for every $1 of annual earnings. `
             : "A saved price-to-earnings multiple is not available. "}
-          Whether that is expensive depends on the company’s growth, risks and
-          the peers or assumptions you compare it with.
+          {peVsPeers
+            ? `${peVsPeers} ${peVsPeers.includes(" below ") ? "A lower multiple can mean the market expects slower growth or more risk, not only a bargain." : "A higher multiple can mean the market expects faster growth, which then has to arrive."}`
+            : "Whether that is expensive depends on the company’s growth, risks and the peers or assumptions you compare it with."}
         </Reading>
         <div className="overview-section-grid">
           <KeyInformation
@@ -912,8 +913,9 @@ export default function OverviewSections({
                 : "What would make this price make sense?"}
             </h4>
             <p>
-              Compare growth and valuation across your chosen companies, or see
-              what your own revenue, margin and valuation assumptions imply.
+              {peVsPeers && growthVsPeers
+                ? `${peTakeaway(reads.sector, reads.valuation?.references, "Its P/E is")} ${growthTakeaway(reads.sector, "Its revenue growth is")} Compare the two side by side, or test your own assumptions.`
+                : "Compare growth and valuation across your chosen companies, or see what your own revenue, margin and valuation assumptions imply."}
             </p>
             <div className="overview-actions">
               <button className="primary" onClick={() => onView("valuation")}>

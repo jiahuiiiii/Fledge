@@ -13,6 +13,7 @@ import Checkbox from "./components/Checkbox";
 import CompanyDialog from "./components/CompanyDialog";
 import { companyName } from "./lib/companyIdentity";
 import { mentionsCompany } from "./lib/companyHeadlines";
+import { UPDATE_EVENT, requestUpdate } from "./lib/updateRequest";
 import LoadingSkeleton from "./components/LoadingSkeleton";
 import RemovalNotice from "./components/RemovalNotice";
 import RetainedView from "./components/RetainedView";
@@ -171,11 +172,24 @@ function Icon({ name, ...props }) {
     </svg>
   );
 }
+const dateTime = (value) =>
+  new Date(value).toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+function lastSourceCheck(data) {
+  return (data.source_checks || [])
+    .map((c) => c.checked_at)
+    .filter(Boolean)
+    .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+}
 // Plain explanation of a failed source check; unknown errors are shown as-is.
 function sourceCheckProblem(check) {
   const when = check.checked_at ? ` (${date(check.checked_at)})` : "";
   if (/interrupted/i.test(check.error || ""))
-    return `The last check${when} stopped before it finished, so newer information may be missing. Figures shown come from the last complete check. Use Research updates to try again.`;
+    return `The last check${when} stopped before it finished, so newer information may be missing. Figures shown come from the last complete check. Use Update data to try again.`;
   return check.error
     ? `${check.error} Saved information is still shown, but newer information may be missing.`
     : "This source could not be checked, so newer information may be missing. Saved information is still shown.";
@@ -429,6 +443,14 @@ function CompanyWorkspace({
   const [loadingRun, setLoadingRun] = useState(null);
   const [loadingError, setLoadingError] = useState("");
   const lastLoadingRevision = useRef(null);
+  useEffect(() => {
+    const open = () => setUpdatesOpen(true);
+    window.addEventListener(UPDATE_EVENT, open);
+    return () => window.removeEventListener(UPDATE_EVENT, open);
+  }, []);
+  // Changes when an Update data run finishes, so open panels re-read saved data.
+  const updatedAt =
+    loadingRun && !loadingRun.active ? loadingRun.updated_at : null;
   async function startLoading(options = {}) {
     const token = scope;
     setLoadingError("");
@@ -1133,12 +1155,7 @@ function CompanyWorkspace({
             instrumentId={data.instrument.id}
             data={data.disclosures}
             busy={busy}
-            onRefresh={() =>
-              act(
-                () => api.refreshDisclosures(data.instrument.id),
-                "Original company documents checked.",
-              )
-            }
+            onRefresh={requestUpdate}
           />
         )}
         {!isRecorded && (
@@ -1499,19 +1516,17 @@ function CompanyWorkspace({
                   className="research-updates-trigger"
                   disabled={companyLoading}
                   onClick={() => setUpdatesOpen(true)}
-                  aria-label="Research updates"
+                  aria-label="Update data"
                   title={
-                    loadingRun?.active
-                      ? "Research updates · working"
-                      : "Research updates"
+                    loadingRun?.active ? "Update data · working" : "Update data"
                   }
                   aria-haspopup="dialog"
                 >
                   <Icon name="pulse" />
                   <span className="company-action-label company-action-full">
-                    Research updates
+                    Update data
                   </span>
-                  <span className="company-action-short">Status</span>
+                  <span className="company-action-short">Update</span>
                   {loadingRun?.active && (
                     <span className="research-updates-dot" aria-hidden="true" />
                   )}
@@ -1865,6 +1880,7 @@ function CompanyWorkspace({
                         >
                           <OutlookPage
                             key={instrumentId}
+                            revision={updatedAt}
                             management={data.management_outlook}
                             includeForecasts={!isRecorded}
                             instrumentId={instrumentId}
@@ -1968,6 +1984,10 @@ function CompanyWorkspace({
                                   });
                               }}
                               onUpdates={() => setView("updates")}
+                              savedView={current}
+                              onSaveView={openEditor}
+                              onAsk={() => setResearchOpen(true)}
+                              onUpdate={() => setUpdatesOpen(true)}
                               chart={
                                 <details
                                   className="company-chart-disclosure"
@@ -2018,6 +2038,7 @@ function CompanyWorkspace({
                               view === "workspace" && tab === "valuation"
                             }
                             key={data.instrument.id}
+                            revision={updatedAt}
                             instrument={data.instrument}
                             performance={data.performance}
                             quote={data.market?.quote?.quote}
@@ -2027,6 +2048,7 @@ function CompanyWorkspace({
                               <FmpPanel
                                 key={`peers-${instrumentId}`}
                                 mode="ratios"
+                                revision={updatedAt}
                                 instrumentId={instrumentId}
                                 visible={
                                   view === "workspace" && tab === "valuation"
@@ -2506,7 +2528,7 @@ function CompanyWorkspace({
                         <p className="fine">
                           {data.filing_watch?.enabled
                             ? "Daily filing checks are enabled while this app runs."
-                            : "Daily filing checks are off. Enable them in Financials or use Refresh research."}{" "}
+                            : "Daily filing checks are off. Enable them in Financials or use Update data."}{" "}
                           Annual figures cannot satisfy quarterly conditions.
                         </p>
                       )}
@@ -2577,27 +2599,47 @@ function CompanyWorkspace({
         <Modal
           open={updatesOpen && !companyLoading}
           onClose={() => setUpdatesOpen(false)}
-          title="Research updates"
+          title={
+            isRecorded
+              ? "Research updates"
+              : `Update ${companyName(data.instrument)}`
+          }
           className="research-updates-dialog"
         >
           <div className="research-updates-content">
-            <p className="fine">
-              {data.demo.label} · {date(data.demo.as_of)}
-            </p>
-            {!isRecorded &&
-              data.source_checks
-                .filter((c) => ["failed", "denied"].includes(c.state))
-                .map((c) => (
-                  <p className="fine" key={c.source_id}>
-                    <strong>{c.name}:</strong> {sourceCheckProblem(c)}
+            {isRecorded ? (
+              <p className="fine">
+                {data.demo.label} · {date(data.demo.as_of)}
+              </p>
+            ) : (
+              <>
+                <p>
+                  Checks news, discussions, filings, prices, analyst targets and
+                  forecasts for {data.instrument.symbol} in one go. It usually
+                  takes a minute or two and uses no AI credit. Sources checked
+                  recently are skipped until they are due again.
+                </p>
+                {lastSourceCheck(data) && (
+                  <p className="fine">
+                    Sources last checked {dateTime(lastSourceCheck(data))}.
                   </p>
-                ))}
+                )}
+                {data.source_checks
+                  .filter((c) => ["failed", "denied"].includes(c.state))
+                  .map((c) => (
+                    <p className="fine" key={c.source_id}>
+                      <strong>{c.name}:</strong> {sourceCheckProblem(c)}
+                    </p>
+                  ))}
+              </>
+            )}
             <div className="research-updates-actions">
               <button
+                className="primary"
                 disabled={!!loadingRun?.active}
                 onClick={() => startLoading()}
               >
-                {loadingRun?.active ? "Updating research…" : "Refresh research"}
+                {loadingRun?.active ? "Updating…" : "Update now"}
               </button>
               {layout.progressHidden && (
                 <ResearchProgressToggle
@@ -2613,18 +2655,22 @@ function CompanyWorkspace({
               onCollapse={toggleProgress}
               hidden={!!layout.progressHidden}
             />
+            {!isRecorded && (
+              <p className="fine">
+                The AI tone reading is separate: use Refresh &amp; analyse in
+                News &amp; discussion when you want a new one.
+              </p>
+            )}
             {modelAvailability(modelStatus).blocked && (
-              <div className="research-ai-status">
+              <details className="research-ai-status">
+                <summary>New AI analysis is paused</summary>
                 <p className="fine">{modelAvailability(modelStatus).message}</p>
                 {modelAvailability(modelStatus).detail && (
-                  <details>
-                    <summary>AI request details</summary>
-                    <p className="fine">
-                      {modelAvailability(modelStatus).detail}
-                    </p>
-                  </details>
+                  <p className="fine">
+                    {modelAvailability(modelStatus).detail}
+                  </p>
                 )}
-              </div>
+              </details>
             )}
           </div>
         </Modal>

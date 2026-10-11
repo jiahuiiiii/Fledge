@@ -71,7 +71,7 @@ export function MarketQuote({ market, history, compact = false }) {
             </small>
           </>
         ) : (
-          <p>No quote retrieved. Choose Refresh research to load it.</p>
+          <p>No quote retrieved. Choose Update data to load it.</p>
         )}
         {!compact && status?.quote_error && (
           <p className="warning" role="status">

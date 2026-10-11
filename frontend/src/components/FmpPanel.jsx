@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import Select from "./Select";
 import AnalystForecasts from "./AnalystForecasts";
 import TermHelp from "./TermHelp";
+import { requestUpdate } from "../lib/updateRequest";
 const PeerComparison = lazy(() => import("./PeerComparison"));
 const stamp = (value) =>
   value
@@ -25,7 +26,12 @@ function SourceState({ source }) {
     </>
   );
 }
-export default function FmpPanel({ instrumentId, visible, mode = "peers" }) {
+export default function FmpPanel({
+  instrumentId,
+  visible,
+  mode = "peers",
+  revision,
+}) {
   const [data, setData] = useState(null),
     [selections, setSelections] = useState([]),
     [hasDraft, setHasDraft] = useState(false),
@@ -68,7 +74,7 @@ export default function FmpPanel({ instrumentId, visible, mode = "peers" }) {
     return () => {
       active = false;
     };
-  }, [instrumentId, visible]);
+  }, [instrumentId, visible, revision]);
   async function act(save = false) {
     if (actionBusy.current) return;
     actionBusy.current = true;
@@ -95,23 +101,6 @@ export default function FmpPanel({ instrumentId, visible, mode = "peers" }) {
       if (mounted.current && company.current === id) setBusy(false);
     }
   }
-  async function checkPublic() {
-    if (actionBusy.current) return;
-    actionBusy.current = true;
-    requestVersion.current++;
-    const id = instrumentId;
-    setBusy(true);
-    setError("");
-    try {
-      const result = await api.refreshPublicForecasts(id);
-      if (mounted.current && company.current === id) setData(result);
-    } catch (failure) {
-      if (mounted.current && company.current === id) setError(failure.message);
-    } finally {
-      actionBusy.current = false;
-      if (mounted.current && company.current === id) setBusy(false);
-    }
-  }
   const candidates = [
     ...(data?.suggestions?.data?.candidates || []),
     ...(data?.registered || []),
@@ -126,7 +115,7 @@ export default function FmpPanel({ instrumentId, visible, mode = "peers" }) {
         busy={busy}
         error={error}
         onCheck={() => act()}
-        onCheckPublic={checkPublic}
+        onCheckPublic={requestUpdate}
       />
     );
   if (mode === "ratios")

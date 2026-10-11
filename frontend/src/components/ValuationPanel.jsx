@@ -5,6 +5,7 @@ import AnalystTargets from "./AnalystTargets";
 import Select from "./Select";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
+import { requestUpdate } from "../lib/updateRequest";
 const stamp = (v) =>
   v
     ? new Date(v).toLocaleString("en-GB", {
@@ -272,6 +273,7 @@ export default function ValuationPanel({
   quote,
   visible = true,
   initialRead,
+  revision,
 }) {
   const performance = currentPerformance?.recorded_basis || currentPerformance;
   const [context, setContext] = useState(initialRead?.data || null);
@@ -292,12 +294,15 @@ export default function ValuationPanel({
   const [message, setMessage] = useState("");
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const preloaded = useRef(initialRead);
+  const loadedRevision = useRef(revision);
   useEffect(() => {
     if (!visible) {
       preloaded.current = null;
       return;
     }
-    if (preloaded.current) return;
+    // A finished Update data run makes the preloaded read out of date.
+    if (preloaded.current && loadedRevision.current === revision) return;
+    loadedRevision.current = revision;
     let active = true;
     readableLoad(api.valuationContext(instrument.id), context ? 0 : 280)
       .then((v) => {
@@ -312,7 +317,7 @@ export default function ValuationPanel({
     return () => {
       active = false;
     };
-  }, [instrument.id, visible]);
+  }, [instrument.id, visible, revision]);
   useEffect(() => {
     if (!base && performance?.status === "available") setBase(performance);
   }, [performance, base]);
@@ -452,13 +457,7 @@ export default function ValuationPanel({
       <AnalystTargets
         value={context?.analyst_targets}
         quote={quote}
-        onRefresh={async () => {
-          try {
-            await api.refreshAnalystTargets(instrument.id);
-          } finally {
-            setContext(await api.valuationContext(instrument.id));
-          }
-        }}
+        onRefresh={requestUpdate}
       />
       <span className="section-label">WHAT WOULD HAVE TO BE TRUE?</span>
       <h2>Explore the assumptions</h2>

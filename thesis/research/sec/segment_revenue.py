@@ -33,6 +33,21 @@ LIMITATIONS = [
 ]
 
 
+# Display names for SEC country-taxonomy members (ISO 3166 alpha-2). The
+# original member tag stays on every input; unknown codes keep a labelled code.
+COUNTRY_NAMES = {
+    'AE': 'United Arab Emirates', 'AR': 'Argentina', 'AT': 'Austria', 'AU': 'Australia', 'BE': 'Belgium',
+    'BR': 'Brazil', 'CA': 'Canada', 'CH': 'Switzerland', 'CL': 'Chile', 'CN': 'China', 'CO': 'Colombia',
+    'CZ': 'Czech Republic', 'DE': 'Germany', 'DK': 'Denmark', 'ES': 'Spain', 'FI': 'Finland', 'FR': 'France',
+    'GB': 'United Kingdom', 'GR': 'Greece', 'HK': 'Hong Kong', 'HU': 'Hungary', 'ID': 'Indonesia',
+    'IE': 'Ireland', 'IL': 'Israel', 'IN': 'India', 'IT': 'Italy', 'JP': 'Japan', 'KR': 'South Korea',
+    'LU': 'Luxembourg', 'MX': 'Mexico', 'MY': 'Malaysia', 'NL': 'Netherlands', 'NO': 'Norway',
+    'NZ': 'New Zealand', 'PH': 'Philippines', 'PL': 'Poland', 'PR': 'Puerto Rico', 'PT': 'Portugal',
+    'RU': 'Russia', 'SA': 'Saudi Arabia', 'SE': 'Sweden', 'SG': 'Singapore', 'TH': 'Thailand', 'TR': 'Turkey',
+    'TW': 'Taiwan', 'US': 'United States', 'VN': 'Vietnam', 'ZA': 'South Africa',
+}
+
+
 def contents(element):
     # ix:exclude is not part of an Inline XBRL fact's value.
     text = element.text or ''
@@ -304,7 +319,7 @@ def extract(raw, cik, include_comparatives=False, all_concepts=False):
             label = re.sub(r'(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])', ' ', name)
             label = re.sub(r'(?<=[a-z])(including|and|of)(?= [A-Z])', r' \1', label)
             if re.fullmatch(r'https?://xbrl\.sec\.gov/country/20\d\d(?:-\d\d-\d\d)?',member_name[0]):
-                label = {'US':'United States','SG':'Singapore','TW':'Taiwan'}.get(name, f'{name} (filing country code)')
+                label = COUNTRY_NAMES.get(name, f'{name} (filing country code)')
             members.append(dict(member=member, label=label, value=value, reason=reason, inputs=facts, percentage=None))
         with localcontext() as ctx:
             ctx.prec = 40

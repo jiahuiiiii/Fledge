@@ -45,6 +45,7 @@ export function sourceCoverage(analysis) {
       unrelated: classified.filter((item) => item.relevance === "unrelated")
         .length,
       unclear: classified.filter((item) => item.relevance === "unclear").length,
+      quickSkipped: classified.filter((item) => item.prefilter).length,
       excluded,
       excludedCount,
       unanalysed: Number.isInteger(candidates)
@@ -64,6 +65,7 @@ export function sourceCoverage(analysis) {
     relevant: total("relevant"),
     unrelated: total("unrelated"),
     unclear: total("unclear"),
+    quickSkipped: total("quickSkipped"),
     excluded: total("excludedCount"),
     unanalysed: total("unanalysed"),
   };

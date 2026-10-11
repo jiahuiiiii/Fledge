@@ -186,7 +186,7 @@ export default function FinancialPosition({ performance, debt }) {
               {performance.source_status?.last_error
                 ? "The latest check failed; these are retained figures."
                 : old
-                  ? "The source check is over 24 hours old. Refresh research to check for newer reports."
+                  ? "The source check is over 24 hours old. Use Update data to check for newer reports."
                   : "Selecting a date uses saved figures."}
             </p>
           </div>
