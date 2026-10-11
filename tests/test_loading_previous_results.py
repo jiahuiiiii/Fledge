@@ -7,6 +7,8 @@ from thesis.config import OWNER
 from thesis.db import transaction,one
 from thesis.research import loading
 from test_market import prepare
+from thesis.research.sec.service import add_company
+import pytest
 
 
 def journal(owner,iid,minutes,steps,days=7):
@@ -71,3 +73,43 @@ def test_optional_x_off_is_distinct_from_enabled_connection_failure(owner,monkey
     assert loading.latest(owner,iid)['steps'][0]['optional_source_off'] is True
     monkeypatch.setattr(settings,'settings',lambda:dict(THESIS_X_ENABLED='true'))
     assert 'optional_source_off' not in loading.latest(owner,iid)['steps'][0]
+
+
+def filing_check(iid, minutes, outcome):
+    at = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+    with transaction(admin=True) as conn:
+        return one(conn, """INSERT INTO source_checks(id,stage,instrument_id,source_id,checked_at,outcome,error)
+                   VALUES(%s,0,%s,'sec-companyfacts',%s,%s,%s) RETURNING *""",
+                   (uuid4(), iid, at, outcome, None if outcome=='success' else 'SEC connection failed.'))
+
+
+@pytest.mark.parametrize('outcome,status', [('success','ready'),('failed','failed'),('denied','failed')])
+def test_cached_filings_use_newer_direct_or_watch_source_check(owner, outcome, status):
+    iid = add_company('MSFT')['instrument_id']
+    old = journal(owner,iid,5,[('filings','failed','Old loading failure.')])
+    check = filing_check(iid,3,outcome)
+    current = journal(owner,iid,1,[('filings','cached','Skipped recent request.')])
+    visible = loading.latest(owner,iid)['steps'][0]
+    assert visible['previous_check']['source_check_id'] == str(check['id'])
+    assert visible['previous_check']['status'] == status
+    assert visible['previous_check']['message'] == ('Filing data checked successfully.' if outcome=='success' else 'SEC connection failed.')
+    with transaction(owner,consistent=True) as conn:
+        for run in [old,current]:
+            assert one(conn,'SELECT steps FROM research_loads WHERE id=%s',(run['id'],))['steps']==run['steps']
+
+
+@pytest.mark.parametrize('case', ['later','older','other_company','withdrawn','current_failure'])
+def test_source_checkpoint_does_not_override_wrong_period_scope_or_current_failure(owner, case):
+    iid = add_company('MSFT')['instrument_id']
+    old = journal(owner,iid,5,[('filings','failed','Old loading failure.')])
+    other = add_company('AAPL')['instrument_id'] if case=='other_company' else iid
+    filing_check(other, 0 if case=='later' else 8 if case=='older' else 3, 'success')
+    current = journal(owner,iid,1,[('filings','failed' if case=='current_failure' else 'cached','Current result.')])
+    if case=='withdrawn':
+        with transaction(admin=True) as conn:
+            conn.execute("UPDATE sources SET entitlement='fictional' WHERE id='sec-companyfacts'")
+    visible = loading.latest(owner,iid)['steps'][0]
+    if case=='current_failure':
+        assert 'previous_check' not in visible
+    else:
+        assert visible['previous_check']['run_id'] == old['id']

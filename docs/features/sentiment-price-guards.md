@@ -21,6 +21,31 @@ direction wording or null. News returns an empty list. Amounts/direction extract
 must exist in the same original passage. Decimal parsing and arithmetic are code
 operations. The model never receives the historical price capture.
 
+## Unsupported optional price extraction — 12 October 2026
+
+NVIDIA's batch 22 of 54 returned the original token `220s` as a price amount.
+The response was complete, but the exact-dollar parser rejected it and stopped
+the reading. Optional price syntax now fails at the affected field: when the
+amount and any direction wording genuinely belong to the cited own passage but
+the amount is not an exact supported dollar token, omit that price extraction
+and comparison. Record `guard.ignored_price_claims` with the original passage ID,
+token and fixed reason. Do not infer a currency, point value or range. A relevant
+affected item's directional or neutral label is conservatively downgraded to
+unclear; an already unclear label stays unchanged. All sources remain counted.
+
+Invented amounts, wrong passage IDs, invented direction wording, out-of-range
+exact dollar amounts, missing source classifications and other evidence failures
+still reject the batch. Valid extracted amounts retain their existing comparison
+checks. The immutable raw response retains the unsupported extraction; derived
+items contain only accepted price claims.
+
+The model request, schema, prompt, batching and request identities are unchanged.
+An unpublished saved response that failed only this optional syntax check can now
+be reused without a paid retry when its exact inputs match. Published saved
+readings and historical stopped-run messages remain unchanged. This correction
+does not start a refresh, retry or acquisition; normal publication still requires
+every batch and the combined result to pass all remaining checks.
+
 ## Price comparison boundaries
 
 Preparation reads retained Yahoo daily captures for the same company, only if

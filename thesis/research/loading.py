@@ -149,6 +149,23 @@ def add_previous_results(conn, run):
     for step in run['steps']:
         if step['key'] in by_key and step['status']=='cached':
             step['previous_check'] = by_key[step['key']]
+    # A direct filing refresh or daily filing watch may recover after an older
+    # loading run failed. Use the actual source checkpoint, bounded to this run,
+    # rather than carrying that stale failure into a skipped repeat attempt.
+    if 'filings' in keys:
+        check = one(conn, """SELECT c.id,c.checked_at,c.outcome,c.error
+                    FROM source_checks c JOIN sources s ON s.id=c.source_id
+                    WHERE c.instrument_id=%s AND c.source_id='sec-companyfacts'
+                      AND s.entitlement='sec-public' AND c.checked_at<=%s
+                    ORDER BY c.checked_at DESC,c.id DESC LIMIT 1""",
+                    (run['instrument_id'], run['created_at']))
+        prior = by_key.get('filings')
+        if check and (not prior or check['checked_at'] > datetime.fromisoformat(prior['finished_at'])):
+            step = next(s for s in run['steps'] if s['key']=='filings' and s['status']=='cached')
+            step['previous_check'] = dict(
+                status='ready' if check['outcome']=='success' else 'failed',
+                message='Filing data checked successfully.' if check['outcome']=='success' else check['error'] or 'The SEC filing check failed.',
+                finished_at=check['checked_at'].isoformat(), source_check_id=str(check['id']))
 
 
 def explain_saved_failure(conn, run):

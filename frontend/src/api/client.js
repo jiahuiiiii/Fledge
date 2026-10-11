@@ -11,9 +11,10 @@ export class ApiError extends Error {
     this.code = code;
   }
 }
-async function request(path, { method = "GET", body } = {}) {
+async function request(path, { method = "GET", body, signal } = {}) {
   const res = await fetch(`${BASE}${path}`, {
     method,
+    signal,
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
@@ -41,7 +42,8 @@ async function request(path, { method = "GET", body } = {}) {
   let parsed = null;
   try {
     parsed = await res.json();
-  } catch {
+  } catch (error) {
+    if (signal?.aborted || error.name === "AbortError") throw error;
     /* Preserve a useful failure for non-JSON responses. */
   }
   if (!res.ok) {
@@ -74,6 +76,17 @@ async function request(path, { method = "GET", body } = {}) {
   return result;
 }
 export const api = {
+  financialRecovery: (id, documentId) =>
+    request(
+      `/companies/${id}/financial-recovery${documentId ? `?document_id=${encodeURIComponent(documentId)}` : ""}`,
+    ),
+  generateFinancialRecovery: (id, body) =>
+    request(`/companies/${id}/financial-recovery`, { method: "POST", body }),
+  reviewFinancialRecovery: (id, readingId, body) =>
+    request(`/companies/${id}/financial-recovery/${readingId}/review`, {
+      method: "POST",
+      body,
+    }),
   fmp: (id) => request(`/companies/${id}/fmp`),
   sectorPosition: (id, peers) =>
     request(
@@ -166,9 +179,10 @@ export const api = {
     request(`/companies/${id}/sentiment/${analysisId}/discussion-themes`, {
       method: "POST",
     }),
-  expectationHistory: (id, before = null) =>
+  expectationHistory: (id, before = null, options) =>
     request(
       `/companies/${id}/expectations${before ? `?before=${encodeURIComponent(before)}` : ""}`,
+      options,
     ),
   extractExpectations: (id) =>
     request(`/companies/${id}/expectations`, { method: "POST" }),
@@ -177,11 +191,15 @@ export const api = {
       `/companies/${id}/questions${before ? `?before=${encodeURIComponent(before)}` : ""}`,
     ),
   researchAnswer: (id) => request(`/research-answers/${id}`),
-  priceHistory: (id) => request(`/companies/${id}/price-history`),
+  priceHistory: (id, options) =>
+    request(`/companies/${id}/price-history`, options),
+  workspaceFinancials: (id, options) =>
+    request(`/companies/${id}/workspace-financials`, options),
   financialStory: (id) => request(`/companies/${id}/financial-story`),
   refreshPriceHistory: (id) =>
     request(`/companies/${id}/price-history/refresh`, { method: "POST" }),
-  valuationContext: (id) => request(`/companies/${id}/valuation`),
+  valuationContext: (id, options) =>
+    request(`/companies/${id}/valuation`, options),
   refreshAnalystTargets: (id) =>
     request(`/companies/${id}/analyst-targets/refresh`, { method: "POST" }),
   refreshMultiples: (id) =>
@@ -259,16 +277,17 @@ export const api = {
   addSecCompany: (symbol) =>
     request("/sec/companies", { method: "POST", body: { symbol } }),
   refreshSec: (id) => request(`/sec/${id}/refresh`, { method: "POST" }),
-  session: () => request("/session"),
-  modelStatus: () => request("/model-status"),
+  session: (options) => request("/session", options),
+  modelStatus: (options) => request("/model-status", options),
   selectPassages: (expected_stage, instrument_id) =>
     request("/research/selection", {
       method: "POST",
       body: { expected_stage, instrument_id },
     }),
-  workspace: (instrument_id) =>
+  workspace: (instrument_id, { includeFinancials = true, signal } = {}) =>
     request(
-      `/workspace${instrument_id ? `?instrument_id=${encodeURIComponent(instrument_id)}` : ""}`,
+      `/workspace?include_financials=${includeFinancials}${instrument_id ? `&instrument_id=${encodeURIComponent(instrument_id)}` : ""}`,
+      { signal },
     ),
   save: (body, instrument_id) =>
     request("/idea", {

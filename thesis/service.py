@@ -566,11 +566,27 @@ def history(conn, owner, thesis_id):
     return versions
 
 
-def state(owner, instrument_id=INSTRUMENT):
+def financial_sections(conn, instrument_id, mode):
+    """One consistent reading for the deferred financial panels."""
+    from .research.sec import financial_depth, income_flow, segment_revenue
+
+    flow = income_flow.present(conn, instrument_id) if mode == "sec" else None
+    return dict(
+        financial_depth=financial_depth.present(conn, instrument_id) if mode == "sec" else None,
+        income_flow=flow,
+        segment_revenue=segment_revenue.present(conn, instrument_id, flow) if mode == "sec" else None,
+        financials_pending=False,
+    )
+
+
+def financial_workspace(owner, instrument_id):
+    with transaction(owner, consistent=True) as conn:
+        info = stage_info(conn, instrument_id)
+        return dict(instrument_id=str(instrument_id), **financial_sections(conn, instrument_id, info["mode"]))
+
+
+def state(owner, instrument_id=INSTRUMENT, *, include_financials=True):
     from .research.sec.disclosures import present as disclosures_present
-    from .research.sec.financial_depth import present as financial_depth_present
-    from .research.sec.income_flow import present as income_flow_present
-    from .research.sec.segment_revenue import present as segment_revenue_present
     from .research.sec.guidance import present as guidance_present
     from .research.market import workspace as market_workspace
     from .research.market_brief import packet_for, cached_brief, ordered_news
@@ -735,9 +751,9 @@ def state(owner, instrument_id=INSTRUMENT):
                 else None
             ),
             disclosures=disclosures_present(conn, instrument_id) if info['mode']=='sec' else None,
-            financial_depth=financial_depth_present(conn, instrument_id) if info['mode']=='sec' else None,
-            income_flow=(income_flow_view := income_flow_present(conn, instrument_id) if info['mode']=='sec' else None),
-            segment_revenue=segment_revenue_present(conn, instrument_id, income_flow_view) if info['mode']=='sec' else None,
+            **(financial_sections(conn, instrument_id, info['mode']) if include_financials else dict(
+                financial_depth=None, income_flow=None, segment_revenue=None, financials_pending=info['mode']=='sec',
+            )),
             management_outlook=guidance_present(conn, instrument_id) if info['mode']=='sec' else None,
             filing_calculations=rows(
                 conn,

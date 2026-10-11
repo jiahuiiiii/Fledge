@@ -46,3 +46,11 @@ Microsoft 10-K accession `0001193125-26-323660`, filed 2026-07-29, covers 2025-0
 | Operating income | 155,237,000,000 | 155,237 |
 
 Code-computed growth is 17.78868679984665843165651490%; operating margin is 46.78081840892722073053498835%. The UI displays 17.79% and 46.78%. This verifies these selected figures for one filing; it is not validation of every issuer, filing type or accounting concept. A permitted repeat refresh at 18:14:19Z returned unchanged and preserved facts, source versions and the cached market briefing. Broader issuer coverage remains separately checkable. No additional paid API call was needed for the reconciliation.
+
+## Filing failures and recovered checks — 12 October 2026
+
+Known structured-data failures now retain safe categories for timeouts, connection errors, unreadable responses, size limits, HTTP statuses and a busy shared connection. The UI explains which stage failed: the filing list or reported financial figures. Only fixed app-authored wording and validated numeric response codes are exposed; raw exception text, response bodies and contact identities remain excluded. Unknown exceptions retain the generic failure, and older records are never retroactively assigned a cause. Existing pacing, fifteen-minute cooldown, size/host bounds, no automatic retries, denied status and transaction rollback are unchanged.
+
+Original-document acquisition requires a successfully saved, recent filing list. Its dependency message now explains that missing or stale filing details prevented the check. A failed structured check and blocked originals can therefore be the same underlying failure, not two independent missing datasets.
+
+A skipped filing step can now display a newer successful or failed source checkpoint recorded by a direct filing update or the daily filing watch, instead of repeating an older loading-run error. The checkpoint must match the company, remain permitted and predate the current run. Newer failures stay visible; current failures/running steps never borrow success; the immutable loading/source records are unchanged.

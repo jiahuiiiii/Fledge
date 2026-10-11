@@ -88,12 +88,71 @@ def test_repeat_reuses_settled_quick_check_and_unknown_charge_blocks(owner):
             B.run(other, transport=lambda _: pytest.fail("retry"), prefilter=True)
 
 
-def test_budget_includes_quick_check_before_any_dispatch(owner):
+def leave_allowance(nano):
+    """Represent earlier spending only in the disposable test ledger."""
+    with transaction(admin=True) as c:
+        cap = one(c, "SELECT cap_nano_usd FROM model_budget WHERE singleton")["cap_nano_usd"]
+        spent = cap - nano
+        c.execute(
+            """INSERT INTO model_calls(id,request_key,request_hash,purpose,model,
+            price_version,request_body,reserved_nano_usd,status,charged_nano_usd)
+            VALUES(%s,%s,'test','test',%s,'test','{}',%s,'settled',%s)""",
+            (uuid4(), 'earlier-spend-' + str(uuid4()), R.MODEL, spent, spent),
+        )
+
+
+@pytest.mark.parametrize("prefilter", [False, True])
+def test_reading_can_finish_when_whole_plan_maximum_exceeds_allowance(owner, prefilter):
     p = packet()
-    needed = (R.maximum_nano(p) + sum(ledger.estimate(S.request_for(x)) for x in B.plan(p))) / ledger.NANO
-    with patch.object(ledger, "snapshot", return_value=dict(remaining_usd=str(needed * 0.99))):
-        with pytest.raises(ledger.BudgetBlocked, match="maximum allowance"):
-            B.run(p, transport=lambda _: pytest.fail("sent"), prefilter=True)
+    maxima = [ledger.estimate(S.request_for(part)) for part in B.plan(p)]
+    remaining = max(maxima) + 1_000_000
+    assert remaining < sum(maxima)
+    leave_allowance(remaining)
+    transport, seen = quick()
+    with patch.object(B, "check_access"):
+        result, calls = B.run(p, transport=transport, prefilter=prefilter)
+    assert seen["quick"] == int(prefilter) and seen["full"] == len(maxima)
+    assert len(result["items"]) == len(p["sources"])
+    assert sum(c["charged_nano_usd"] for c in calls) < remaining
+    assert float(ledger.snapshot()["remaining_usd"]) > 0
+
+
+@pytest.mark.parametrize("prefilter", [False, True])
+def test_exhaustion_preserves_completed_requests_without_exceeding_cap(owner, prefilter):
+    p = packet()
+    parts = B.plan(p)
+    remaining = ledger.estimate(S.request_for(parts[0])) + 1_000_000
+    leave_allowance(remaining)
+    normal, seen = quick()
+    progress = []
+
+    def transport(body):
+        answer = normal(body)
+        if body["text"]["format"]["name"] != "relevance_prefilter":
+            answer["usage"]["output_tokens"] = body["max_output_tokens"]
+        return answer
+
+    with patch.object(B, "check_access"):
+        with pytest.raises(ledger.BudgetBlocked, match="cannot cover this request"):
+            B.run(p, transport=transport, prefilter=prefilter, progress=progress.append)
+        assert seen["quick"] == int(prefilter) and seen["full"] == 1
+        assert progress[-1]["completed"] == 1 and progress[-1]["failed"] == 2
+        before = ledger.snapshot()
+        assert before["unresolved"] == 0 and float(before["reserved_usd"]) == 0
+        assert 0 < float(before["remaining_usd"]) < ledger.estimate(S.request_for(parts[1])) / ledger.NANO
+        with pytest.raises(ledger.BudgetBlocked, match="cannot cover this request"):
+            B.run(p, transport=lambda _: pytest.fail("paid again"), prefilter=prefilter)
+        assert ledger.snapshot() == before
+
+
+def test_quick_check_still_requires_allowance_for_its_own_request(owner):
+    p = packet()
+    leave_allowance(ledger.estimate(R.plan(p)[0]) - 1)
+    before = ledger.snapshot()
+    with patch.object(B, "check_access"):
+        with pytest.raises(ledger.BudgetBlocked, match="cannot cover this request"):
+            B.run(p, transport=lambda _: pytest.fail("over budget"), prefilter=True)
+    assert ledger.snapshot() == before
 
 
 def test_generate_saves_quick_check_and_reuses_earlier_full_reading(owner, monkeypatch):

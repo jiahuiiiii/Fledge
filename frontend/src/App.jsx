@@ -18,6 +18,7 @@ import LoadingSkeleton from "./components/LoadingSkeleton";
 import RemovalNotice from "./components/RemovalNotice";
 import RetainedView from "./components/RetainedView";
 import { readableLoad } from "./lib/loading";
+import { createReadLane } from "./lib/readLane";
 import { preferPriceRead } from "./lib/priceRefresh";
 import {
   hiddenCompaniesKey,
@@ -359,6 +360,8 @@ function ResearchApp({ signOut, session }) {
     />
   );
 }
+const pendingPriceRead = { data: null, error: "" };
+
 function CompanyWorkspace({
   signOut,
   instrumentId,
@@ -424,7 +427,6 @@ function CompanyWorkspace({
   const setView = (next) => onChoose(selectedCompanyId, next);
   const [data, setData] = useState(null),
     [priceRead, setPriceRead] = useState(null),
-    [panelRead, setPanelRead] = useState(null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false),
@@ -450,13 +452,19 @@ function CompanyWorkspace({
   }, []);
   // Changes when an Update data run finishes, so open panels re-read saved data.
   const updatedAt =
-    loadingRun && !loadingRun.active ? loadingRun.updated_at : null;
+    loadingRun && !loadingRun.active ? loadingRun.updated_at || null : null;
   async function startLoading(options = {}) {
     const token = scope;
     setLoadingError("");
     try {
       const run = await api.startResearchLoading(instrumentId, options);
-      if (activeScope.current === token) setLoadingRun(run);
+      if (activeScope.current === token) {
+        setLoadingRun(run);
+        lastLoadingRevision.current = JSON.stringify([
+          run?.id,
+          run?.steps?.map((s) => s.status),
+        ]);
+      }
     } catch (e) {
       if (activeScope.current === token) setLoadingError(e.message);
     }
@@ -489,7 +497,10 @@ function CompanyWorkspace({
         setModelStatus(status);
         setLoadingRun(run);
         setLoadingError("");
-        const revision = JSON.stringify(run?.steps.map((s) => s.status));
+        const revision = JSON.stringify([
+          run?.id,
+          run?.steps?.map((s) => s.status),
+        ]);
         if (revision !== lastLoadingRevision.current) {
           lastLoadingRevision.current = revision;
           await refresh();
@@ -511,39 +522,30 @@ function CompanyWorkspace({
   function chooseCompany(id) {
     onChoose(id, !id && view === "idea" ? "workspace" : view);
   }
-  async function readCompany() {
-    const [next, model] = await Promise.all([
-      api.workspace(instrumentId),
-      api.modelStatus().catch(() => null),
-    ]);
-    if (next.empty) return { next, model, prices: null, panel: null };
-    const settle = (request) =>
-      request.then(
-        (data) => ({ data, error: "" }),
-        (error) => ({ data: null, error: error.message }),
-      );
-    const [prices, panel] = await Promise.all([
-      selectedCompanyId && next.instrument.mode !== "recorded"
-        ? settle(api.priceHistory(instrumentId))
-        : null,
-      selectedCompanyId && tab === "expectations"
-        ? settle(api.expectationHistory(instrumentId))
-        : selectedCompanyId && tab === "valuation"
-          ? settle(api.valuationContext(instrumentId))
-          : null,
-    ]);
-    return { next, prices, model, panel: panel && { ...panel, tab } };
-  }
-  async function refresh() {
-    const { next, prices, model, panel } = await readableLoad(
-      readCompany(),
-      companyLoading ? 280 : 0,
+  const workspaceLane = useRef(createReadLane());
+  const [financialError, setFinancialError] = useState("");
+  const needsFinancials =
+    sourcesOpen ||
+    (view === "workspace" &&
+      !!selectedCompanyId &&
+      ["business", "fundamentals"].includes(tab));
+  const includeFinancials = useRef(false);
+  includeFinancials.current =
+    !companyLoading && !data?.financials_pending && needsFinancials;
+  async function readCompany(initial = false) {
+    return workspaceLane.current.read(scope, (signal) =>
+      api.workspace(instrumentId, {
+        signal,
+        includeFinancials: !initial && includeFinancials.current,
+      }),
     );
+  }
+  async function refresh({ fresh = false } = {}) {
+    if (activeScope.current !== scope) return;
+    if (fresh) workspaceLane.current.cancel();
+    const next = await readableLoad(readCompany(), companyLoading ? 280 : 0);
     if (activeScope.current === scope) {
       setData(next);
-      setPriceRead((old) => preferPriceRead(old, prices));
-      setPanelRead(panel);
-      setModelStatus(model);
       if (loadedScope !== scope)
         setQuestion(
           next.question_library?.selected_question ||
@@ -556,14 +558,75 @@ function CompanyWorkspace({
     }
     return next;
   }
+  // Secondary reads never hold the company page behind a single slow endpoint.
+  useEffect(() => {
+    if (
+      companyLoading ||
+      !selectedCompanyId ||
+      data?.instrument?.mode === "recorded"
+    )
+      return;
+    const controller = new AbortController();
+    const options = { signal: controller.signal };
+    api.priceHistory(instrumentId, options).then(
+      (result) => {
+        if (!controller.signal.aborted && activeScope.current === scope)
+          setPriceRead((old) =>
+            preferPriceRead(old, { data: result, error: "" }),
+          );
+      },
+      (error) => {
+        if (!controller.signal.aborted && activeScope.current === scope)
+          setPriceRead((old) =>
+            preferPriceRead(old, { data: null, error: error.message }),
+          );
+      },
+    );
+    api
+      .modelStatus(options)
+      .then((result) => {
+        if (!controller.signal.aborted && activeScope.current === scope)
+          setModelStatus(result);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [scope, companyLoading, updatedAt]);
+  useEffect(() => {
+    if (companyLoading || !data?.financials_pending || !needsFinancials) return;
+    const controller = new AbortController();
+    const base = data;
+    setFinancialError("");
+    api
+      .workspaceFinancials(instrumentId, { signal: controller.signal })
+      .then((result) => {
+        if (
+          !controller.signal.aborted &&
+          activeScope.current === scope &&
+          result.instrument_id === instrumentId
+        )
+          setData((old) => (old === base ? { ...old, ...result } : old));
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted && activeScope.current === scope)
+          setFinancialError(error.message);
+      });
+    return () => controller.abort();
+  }, [scope, companyLoading, data, needsFinancials]);
+  function retryFinancials() {
+    setData((old) => ({ ...old }));
+  }
   function retryWorkspace() {
     setLoadError("");
     refresh().catch((e) => {
-      if (activeScope.current === scope) setLoadError(e.message);
+      if (e.name !== "AbortError" && activeScope.current === scope)
+        setLoadError(e.message);
     });
   }
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
+    setPriceRead(null);
+    setFinancialError("");
     setLoadError("");
     setError("");
     setNotice("");
@@ -582,15 +645,12 @@ function CompanyWorkspace({
     setAddingCompany(false);
     setModelStatus(null);
     api
-      .session()
-      .then(() => (active ? readableLoad(readCompany()) : null))
+      .session({ signal: controller.signal })
+      .then(() => (active ? readableLoad(readCompany(true)) : null))
       .then((packet) => {
         if (active && packet && activeScope.current === scope) {
-          const { next: d, prices, model, panel } = packet;
+          const d = packet;
           setData(d);
-          setPriceRead(prices);
-          setPanelRead(panel);
-          setModelStatus(model);
           setLoadedScope(scope);
           setQuestion(
             d.question_library?.selected_question ||
@@ -606,6 +666,8 @@ function CompanyWorkspace({
       );
     return () => {
       active = false;
+      controller.abort();
+      workspaceLane.current.cancel();
     };
   }, [scope]);
   useEffect(() => {
@@ -626,7 +688,8 @@ function CompanyWorkspace({
     const refreshVisible = () => {
       if (!document.hidden)
         refresh().catch((e) => {
-          if (activeScope.current === scope) setError(e.message);
+          if (e.name !== "AbortError" && activeScope.current === scope)
+            setError(e.message);
         });
     };
     const id = setInterval(refreshVisible, pending ? 700 : 30000);
@@ -642,7 +705,7 @@ function CompanyWorkspace({
     try {
       await fn();
       if (activeScope.current !== scope) return;
-      await refresh();
+      await refresh({ fresh: true });
       if (message && activeScope.current === scope) setNotice(message);
     } catch (e) {
       if (activeScope.current !== scope) return;
@@ -1887,11 +1950,6 @@ function CompanyWorkspace({
                             visible={
                               view === "workspace" && tab === "expectations"
                             }
-                            initialRead={
-                              panelRead?.tab === "expectations"
-                                ? panelRead
-                                : null
-                            }
                             enabled={modelStatus?.briefing_enabled}
                             onSource={setSource}
                             onView={setTab}
@@ -1966,6 +2024,8 @@ function CompanyWorkspace({
                                 />
                               }
                               data={data}
+                              financialError={financialError}
+                              onRetryFinancials={retryFinancials}
                               instrumentId={instrumentId}
                               onView={(next, destination) => {
                                 setTab(next);
@@ -1999,7 +2059,7 @@ function CompanyWorkspace({
                                   <HistoricalPrices
                                     key={`prices-${instrumentId}`}
                                     instrumentId={instrumentId}
-                                    initialRead={priceRead}
+                                    initialRead={priceRead || pendingPriceRead}
                                     visible={
                                       priceChartOpen &&
                                       view === "workspace" &&
@@ -2031,9 +2091,6 @@ function CompanyWorkspace({
                             </Suspense>
                           )}
                           <ValuationPanel
-                            initialRead={
-                              panelRead?.tab === "valuation" ? panelRead : null
-                            }
                             visible={
                               view === "workspace" && tab === "valuation"
                             }
@@ -2062,16 +2119,27 @@ function CompanyWorkspace({
                         <>
                           {isRecorded ? (
                             renderFinancialReports()
+                          ) : data.financials_pending ? (
+                            <p role="status">
+                              {financialError || "Loading saved financials…"}{" "}
+                              {financialError && (
+                                <button onClick={retryFinancials}>
+                                  Try again
+                                </button>
+                              )}
+                            </p>
                           ) : (
                             <Suspense fallback={<p>Loading financials…</p>}>
                               <FinancialsPage
                                 key={`financials-${instrumentId}`}
+                                revision={updatedAt}
                                 instrumentId={instrumentId}
                                 workspace={data}
                                 visible={
                                   view === "workspace" && tab === "fundamentals"
                                 }
                                 onCompare={() => setTab("valuation")}
+                                onRefresh={refresh}
                               >
                                 {renderFinancialReports()}
                               </FinancialsPage>

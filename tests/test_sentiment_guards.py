@@ -139,6 +139,45 @@ def test_invented_price_extraction_is_rejected(change):
         G.apply(item(price_claims=[claim() | change]), source("AVGO to $340"), COMPANY)
 
 
+@pytest.mark.parametrize("amount", ["220s", "220", "$220s", "$220.5k", "$220–$225", "around $220"])
+def test_unsupported_original_amount_is_omitted_without_inventing_a_price(amount):
+    original = item(price_claims=[claim(amount)])
+    before = original.model_dump()
+    value = G.apply(original, source("AVGO in its " + amount), COMPANY)
+    assert value["price_claims"] == value["price_comparisons"] == []
+    assert value["sentiment"] == value["basis"] == "unclear"
+    assert value["guard"]["rule"] == "unsupported_price_amount"
+    assert value["guard"]["ignored_price_claims"] == [dict(
+        passage_id="p1", amount_text=amount, reason="not_exact_dollar_amount")]
+    assert original.model_dump() == before
+
+
+def test_unsupported_extraction_keeps_valid_price_details_and_already_unclear_label():
+    original = item(sentiment="unclear", basis="unclear", price_claims=[claim("220s"), claim("$340")])
+    value = G.apply(original, source("AVGO in its 220s, with a target of $340"), COMPANY)
+    assert value["guard"]["model_sentiment"] == "unclear" and value["guard"]["rule"] is None
+    assert "sentiment" not in value  # No override of the already unclear label.
+    assert value["price_claims"] == [claim("$340")]
+    assert [p["amount"] for p in value["price_comparisons"]] == ["340"]
+
+
+@pytest.mark.parametrize("change", [dict(amount_text="221s"), dict(passage_id="p2"), dict(direction_text="rise")])
+def test_unsupported_amount_cannot_bypass_original_evidence_checks(change):
+    with pytest.raises(ValueError):
+        G.apply(item(price_claims=[claim("220s") | change]), source("AVGO in its 220s"), COMPANY)
+
+
+@pytest.mark.parametrize("amount", ["$0", "$10000000000001"])
+def test_out_of_range_exact_dollars_still_fail(amount):
+    with pytest.raises(ValueError, match="outside the supported range"):
+        G.apply(item(price_claims=[claim(amount)]), source("AVGO to " + amount), COMPANY)
+
+
+def test_optional_extraction_recovery_does_not_relax_the_dollar_parser():
+    with pytest.raises(ValueError, match="exact dollar amount"):
+        G.number("220s")
+
+
 def test_reference_never_uses_future_capture_provisional_close_or_stale_price():
     s = source("AVGO to $340", ref=False)
     assert G.reference(snapshot(retrieved_at=AT+timedelta(seconds=1)), s, COMPANY)["status"] == "no_compatible_saved_price"

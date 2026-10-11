@@ -129,12 +129,36 @@ export default function SentimentPanel({
   ].join(", ");
   return (
     <section className="sentiment-panel" aria-label="News and social sentiment">
-      <div className="market-section-head">
+      <div className="market-section-head sentiment-heading">
         <div>
           <h2>What’s the tone?</h2>
         </div>
-        <div className="sentiment-analyse-action">
+        <div className="sentiment-heading-actions">
+          <label className="sentiment-window">
+            <span>Discussion window</span>
+            <Select
+              aria-label="Discussion window"
+              value={days}
+              disabled={!!loadingRun?.active}
+              onChange={(e) => setDays(Number(e.target.value))}
+            >
+              <option value={1}>Past 24 hours</option>
+              <option value={7}>Past 7 days</option>
+              <option value={30}>Past 30 days</option>
+            </Select>
+          </label>
           <button
+            type="button"
+            className="sentiment-watch-button"
+            data-enabled={!!watch?.enabled}
+            aria-haspopup="dialog"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <span className="sentiment-watch-dot" aria-hidden="true" />
+            Watch · {watch?.enabled ? "on" : "off"}
+          </button>
+          <button
+            className="sentiment-analyse-button"
             aria-describedby={
               disabledReason ? "sentiment-disabled-reason" : undefined
             }
@@ -152,13 +176,17 @@ export default function SentimentPanel({
                 : "Fetching sources · analysis queued…"
               : "Refresh & analyse"}
           </button>
-          {disabledReason && (
-            <p id="sentiment-disabled-reason" role="status">
-              {disabledReason}
-            </p>
-          )}
         </div>
       </div>
+      {disabledReason && (
+        <p
+          id="sentiment-disabled-reason"
+          className="sentiment-disabled-reason"
+          role="status"
+        >
+          {disabledReason}
+        </p>
+      )}
       {batchProgress && analysisStep.status !== "ready" && (
         <div className="sentiment-batch-progress">
           <p className="fine" role="status">
@@ -186,50 +214,18 @@ export default function SentimentPanel({
           )}
         </div>
       )}
-      <details className="sentiment-reading-settings">
-        <summary>
-          Reading settings{" "}
-          <span>
-            News 7 days · Discussion {days} days · Watch{" "}
-            {watch?.enabled ? "on" : "off"}
-          </span>
-        </summary>
-        <div className="sentiment-controls sentiment-toolbar">
-          <label>
-            Discussion window{" "}
-            <Select
-              aria-label="Discussion window"
-              value={days}
-              disabled={!!loadingRun?.active}
-              onChange={(e) => setDays(Number(e.target.value))}
-            >
-              <option value={1}>Past 24 hours</option>
-              <option value={7}>Past 7 days · default</option>
-              <option value={30}>Past 30 days</option>
-            </Select>
-          </label>
-          <button
-            type="button"
-            className="source-link"
-            aria-haspopup="dialog"
-            onClick={() => setSettingsOpen(true)}
-          >
-            Watch · {watch?.enabled ? "on" : "off"}
-          </button>
-        </div>
-        {(a || watch?.enabled) && (
-          <p className="fine sentiment-meta" role="status">
-            {a &&
-              `AI reading saved ${stamp(a.created_at)} · news 7 days · discussion ${a.social_lookback_days || 7} days`}
-            {a && watch?.enabled && " · "}
-            {watch?.enabled &&
-              `watch on, next check ${stamp(watch.next_check_at)}`}
-            {a?.social_lookback_days && a.social_lookback_days !== 7
-              ? ". This exploratory window does not publish watch alerts."
-              : ""}
-          </p>
-        )}
-      </details>
+      {(a || watch?.enabled) && (
+        <p className="fine sentiment-meta" role="status">
+          {a &&
+            `AI reading saved ${stamp(a.created_at)} · news 7 days · discussion ${a.social_lookback_days || 7} days`}
+          {a && watch?.enabled && " · "}
+          {watch?.enabled &&
+            `watch on, next check ${stamp(watch.next_check_at)}`}
+          {a?.social_lookback_days && a.social_lookback_days !== 7
+            ? ". This exploratory window does not publish watch alerts."
+            : ""}
+        </p>
+      )}
       <NewsStatus
         data={data}
         availability={availability}

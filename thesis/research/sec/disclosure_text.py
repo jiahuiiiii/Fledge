@@ -18,6 +18,8 @@ class FilingHTML(HTMLParser):
         self.stack=[]
         self.ignored=0
         self.anchor=None
+        self.table_row=None
+        self.exhibit_links=[]
 
     def boundary(self):
         if self.parts and self.parts[-1]!='\n':self.parts.append('\n')
@@ -29,12 +31,22 @@ class FilingHTML(HTMLParser):
             self.stack.append((tag,hidden))
             if hidden:self.ignored+=1
         if self.ignored:return
+        if tag=='tr':self.table_row=dict(parts=[],hrefs=[])
         if tag in BLOCKS:self.boundary()
-        elif tag in {'td','th'}:self.parts.append(' | ')
-        if tag=='a':self.anchor=(attrs.get('href',''),[])
+        elif tag in {'td','th'}:
+            self.parts.append(' | ')
+            if self.table_row is not None:self.table_row['parts'].append(' ')
+        if tag=='a':
+            self.anchor=(attrs.get('href',''),[])
+            if self.table_row is not None:self.table_row['hrefs'].append(attrs.get('href',''))
 
     def handle_endtag(self,tag):
         if not self.ignored:
+            if tag=='tr' and self.table_row is not None:
+                label=' '.join(''.join(self.table_row['parts']).split())
+                if re.match(r'^99(?:\.\d+)?\b',label) and re.search(r'press\s+release|earnings|financial\s+results',label,re.I):
+                    self.exhibit_links.extend((href,'Exhibit '+label) for href in self.table_row['hrefs'])
+                self.table_row=None
             if tag in BLOCKS:self.boundary()
             if tag=='a' and self.anchor:
                 self.links.append((self.anchor[0],''.join(self.anchor[1]).strip()))
@@ -50,6 +62,7 @@ class FilingHTML(HTMLParser):
         if not self.ignored:
             self.parts.append(text)
             if self.anchor:self.anchor[1].append(text)
+            if self.table_row is not None:self.table_row['parts'].append(text)
 
 
 def parse(raw, *, form, cik):
@@ -87,7 +100,7 @@ def parse(raw, *, form, cik):
         if item in titles and length>=500 and length>sections.get(item,{}).get('characters',0):
             sections[item]=dict(title=titles[item],first_passage=f'p{start+1}',last_passage=f'p{end}',characters=length)
     return dict(method=METHOD,body=body,passages=passages,sections=list(sections.values()),
-                text_hash=hashlib.sha256(body.encode()).hexdigest(),links=reader.links,
+                text_hash=hashlib.sha256(body.encode()).hexdigest(),links=reader.links,exhibit_links=reader.exhibit_links,
                 limitations=['Text is extracted from the retained original HTML; table cells are separated with |.',
                              'Section detection is best effort. Unrecognized sections remain in the full text.',
                              'Publication time is the filing acceptance time, not a separately verified earnings-announcement time.'])
@@ -104,7 +117,7 @@ def exhibits(data, url):
     """Only explicit Exhibit 99 links within this exact issuer/accession."""
     root=url.rsplit('/',1)[0]+'/'
     links=[]
-    for href,label in data['links']:
+    for href,label in data['links']+data.get('exhibit_links',[]):
         if not re.search(r'ex(?:hibit)?[\s._-]*99|(?:^|[_.-])ex99',label+' '+href,re.I):continue
         candidate=urljoin(url,href);parsed=urlsplit(candidate)
         if parsed.scheme!='https' or parsed.netloc!='www.sec.gov' or parsed.query or parsed.fragment or parsed.username or parsed.password:continue

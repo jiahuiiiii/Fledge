@@ -9,7 +9,7 @@ from .performance import collect, select, decimal_text
 from .financial_depth import trailing, total_debt, capital_spending, reported
 from .disclosure_text import archive_url
 
-METHOD = 'sec-financial-story-2'
+METHOD = 'sec-financial-story-4'
 MISSING = 'No compatible whole-company USD fact in the selected filing.'
 BALANCES = {
     'assets': ('Total assets', ('Assets',)),
@@ -66,6 +66,11 @@ def income_period(bundle, filings, filing, kind, resolver=None):
     ]:
         rows[key] = dict(key=key, label=label, unit='USD', **trailing(bundle, filings, filing, tags,resolver))
     rows['capital_spending']=dict(key='capital_spending',unit='USD',**capital_spending(bundle,filings,filing,resolver))
+    if not reported(bundle,filing,('InterestExpenseNonoperating',)):
+        alternate=trailing(bundle,filings,filing,('InterestExpenseDebt',),resolver)
+        if alternate['value'] is not None:
+            rows['interest']=dict(key='interest',label='Interest expense on debt',unit='USD',**alternate,
+                                 explanation='Reported interest on debt; this may differ from total non-operating interest expense.')
     revenue = rows['revenue']
     for key, row in rows.items():
         if key != 'revenue' and revenue['start'] is not None and row['value'] is not None and (row['start'], row['end']) != (revenue['start'], revenue['end']):
@@ -84,6 +89,8 @@ def income_period(bundle, filings, filing, kind, resolver=None):
     rows['net_margin'] = calculation('net_margin', 'Net result / revenue', rows['net_income'], rows['revenue'], 'ratio', 'Selected net result / matching revenue × 100', percent=True)
     rows['operating_margin'] = calculation('operating_margin', 'Operating margin', rows['operating_income'], rows['revenue'], 'ratio', 'Operating income / matching revenue × 100', percent=True)
     rows['interest_coverage'] = calculation('interest_coverage', 'Operating profit / non-operating interest expense', rows['operating_income'], rows['interest'], 'ratio', 'Operating profit / matching non-operating interest expense')
+    if rows['interest']['label']=='Interest expense on debt':
+        rows['interest_coverage'].update(label='Operating profit / interest on debt',formula='Operating profit / matching interest expense on debt')
     return dict(id=f'{kind}:{filing["accessionNumber"]}', kind=kind, end=filing['end'].isoformat(),
                 start=rows['revenue']['start'], accession=filing['accessionNumber'], form=filing['form'],
                 filed=filing['filingDate'], accepted_at=filing['accepted_at'], metrics=list(rows.values()))
@@ -156,6 +163,8 @@ def normalize_story(bundle, cik, now,resolver=None):
     annual = list(annual_by_end.values())[-12:]
     annual_rows = [income_period(bundle, filings, filing, 'annual',resolver) for filing in annual]
     trailing_rows = [income_period(bundle, filings, filing, 'trailing',resolver) for filing in chosen]
+    from .quarterly_history import period as quarter_period
+    quarterly_rows = [quarter_period(bundle, filings, filing, resolver) for filing in chosen]
     balances = [balance_period(bundle, filing) for filing in chosen]
     if resolver:
         for period,filing in zip(balances,chosen):
@@ -166,13 +175,14 @@ def normalize_story(bundle, cik, now,resolver=None):
         accession = filing['accessionNumber']
         try: urls[accession] = archive_url(cik, accession, filing['primaryDocument'])
         except ValueError: urls[accession] = f'https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accession.replace("-", "")}/{accession}-index.html'
-    for period in annual_rows + trailing_rows + balances:
+    for period in annual_rows + trailing_rows + quarterly_rows + balances:
         period['filing_url'] = urls[period['accession']]
         for metric in period['metrics']:
             for fact in metric['inputs']: fact['filing_url'] = urls.get(fact['accession'])
-    return dict(method=METHOD, annual=annual_rows, trailing=trailing_rows, balances=balances,
+    return dict(method=METHOD, annual=annual_rows, trailing=trailing_rows, quarterly=quarterly_rows, balances=balances,
                 limitations=['Saved recent filing coverage only; missing years and values stay unknown.',
                              'Annual and trailing periods remain separate. Trailing bridges follow the existing fiscal-date and same-concept checks.',
+                             'Fourth quarters use reported quarter values first, otherwise a matching fiscal year minus its first nine months. Quarterly cash flow is not inferred.',
                              'Net results including non-controlling interests and parent-only income are different definitions.',
                              'Borrowing excludes lease obligations under the existing definition; liabilities are not debt.',
                              'Book equity is assets minus liabilities including non-controlling interests, not market value.',
@@ -187,8 +197,10 @@ def present(conn, iid):
         return dict(status='empty', reason='Collect company filings to see financial history.', method=METHOD)
     from .amendments import retained_resolver
     try:
+        from .filing_facts import enrich
+        saved['payload']=enrich(conn,iid,saved['payload'],saved['cik'],saved['checked_at'])
         resolver=retained_resolver(conn,iid,saved['payload'],saved['cik'],saved['checked_at'])
         result = normalize_story(saved['payload'], saved['cik'], saved['checked_at'],resolver)
     except (ValueError, KeyError, TypeError, OverflowError):
         return dict(status='unavailable', reason='The saved filing facts are unsupported for this financial view.', method=METHOD)
-    return dict(status='available', payload_id=str(saved['id']), amendment_basis=resolver.basis_id, first_recorded_at=saved['retrieved_at'], checked_at=saved['checked_at'], **result)
+    return dict(status='available', payload_id=str(saved['id']), amendment_basis=resolver.basis_id, recovery_basis=saved['payload'].get('_recovery_basis'), ai_reviewed_figures=saved['payload'].get('_ai_recovery_count',0), first_recorded_at=saved['retrieved_at'], checked_at=saved['checked_at'], **result)

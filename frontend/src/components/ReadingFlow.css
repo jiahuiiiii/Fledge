@@ -404,14 +404,55 @@
 .app-shell[data-view="idea"] .company-header {
   display: none;
 }
-.sentiment-analyse-action {
-  max-width: 380px;
-  display: grid;
-  justify-items: end;
-  gap: var(--space-2);
+.app-shell .sentiment-heading {
+  align-items: end;
+  margin-bottom: var(--space-3);
 }
-.app-shell .sentiment-analyse-action p {
+.app-shell .sentiment-heading h2 {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
   margin: 0;
+}
+.sentiment-heading-actions {
+  display: grid;
+  grid-template-columns: minmax(160px, 180px) auto auto;
+  align-items: end;
+  gap: var(--space-2);
+  max-width: 100%;
+  min-width: 0;
+}
+.app-shell .sentiment-window {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+.app-shell .sentiment-heading-actions :is(select, button) {
+  min-height: 44px;
+  font-size: var(--text-sm);
+}
+.app-shell .sentiment-watch-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+.sentiment-watch-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-faint);
+}
+.sentiment-watch-button[data-enabled="true"] .sentiment-watch-dot {
+  background: var(--color-positive);
+}
+.app-shell .sentiment-panel .sentiment-disabled-reason {
+  max-width: 55ch;
+  text-align: right;
+  margin: 0 0 var(--space-3) auto;
   color: var(--color-muted);
   font-size: var(--text-xs);
   line-height: 1.5;
@@ -482,10 +523,15 @@
   .balance-summary-pair {
     padding: var(--space-4);
   }
-  .sentiment-analyse-action {
-    max-width: none;
+  .sentiment-heading-actions {
+    grid-template-columns: minmax(0, 1fr) auto;
     width: 100%;
-    justify-items: start;
+  }
+  .sentiment-analyse-button {
+    grid-column: 1 / -1;
+  }
+  .app-shell .sentiment-panel .sentiment-disabled-reason {
+    text-align: left;
   }
   .news-section-status > summary {
     flex-wrap: wrap;
@@ -516,21 +562,6 @@
   background: transparent;
 }
 
-.app-shell .sentiment-reading-settings {
-  margin-block: var(--space-3);
-}
-.app-shell .sentiment-reading-settings > summary {
-  min-height: 44px;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  flex-wrap: wrap;
-}
-.sentiment-reading-settings > summary > span {
-  font-size: var(--text-xs);
-  color: var(--color-muted);
-  font-weight: 400;
-}
 .app-shell .news-section-status > summary {
   display: grid;
   grid-template-columns: 14px minmax(0, 1fr) auto;

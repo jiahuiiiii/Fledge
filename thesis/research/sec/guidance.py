@@ -12,8 +12,9 @@ from thesis.db import one, rows
 from .disclosures import SOURCE, present as disclosures_present
 from .performance import decimal_text
 from .normalize import REVENUE
+from . import guidance_formats as formats
 
-METHOD = 'sec-management-outlook-1'
+METHOD = 'sec-management-outlook-2'
 MONTHS = 'January February March April May June July August September October November December'.split()
 DATE = r'(?:' + '|'.join(MONTHS) + r') \d{1,2},? \d{4}'
 HEADING = re.compile(r'^(?:(?:first|second|third|fourth|Q[1-4]|full|fiscal|year|quarter|202\d|203\d|[ /–—-])\s*)*(?:(?:business|financial)\s+)?(?:outlook|guidance)(?: for [\w ,/–—-]+)?$', re.I)
@@ -23,7 +24,7 @@ MONEY = re.compile(r'^(?:' + PERIOD + r')?(?:consolidated )?(?:(?P<basis>non-GAA
 MARGIN = re.compile(r'^(?:' + PERIOD + r')?(?P<basis>non-GAAP|GAAP|adjusted) operating (?:income|margin) (?:guidance|outlook)(?: (?:of|is|at)|:)\s+(?P<approx>approximately |about )?(?P<low>' + NUMBER + r')(?:\s*(?:to|–|-)\s*(?P<high>' + NUMBER + r'))? (?:percent|%)(?: of (?:projected |expected )?revenue)?[;.]?$', re.I)
 LIMITATIONS = [
     'Management guidance is the company’s own outlook, separate from analyst consensus and reported results.',
-    'This bounded reader recognizes selected prose outlook sections. Tables, complex ranges, segment forecasts and other wording may require the original release.',
+    'This reader supports whole-company revenue statements and bounded guidance tables. Unsupported layouts and segment-only forecasts remain explicit gaps.',
     'A dollar sign alone does not establish currency. An unlabeled revenue forecast does not establish GAAP accounting.',
     'Comparisons use retained SEC filing results, not necessarily the earliest earnings announcement. No alert or research condition is created.',
 ]
@@ -59,83 +60,133 @@ def typed(quote):
 
 
 def extract(record):
-    """Exact source-offset excerpts, with no fallback from nearby actual results."""
+    """Read explicit outlook sections, keeping exact original passage evidence."""
     data = record['data']
     body, passages = data['body'], data['passages']
     if not isinstance(body, str) or len(body) > 2_000_000 or len(passages) > 40_000:
         raise ValueError('Unsupported release size.')
     if any(body[p['start']:p['end']] != p['quote'] for p in passages):
         raise ValueError('The saved release contains inconsistent passage offsets.')
-    sections = []
-    for i, passage in enumerate(passages):
-        if len(passage['quote']) > 140 or not HEADING.fullmatch(passage['quote']):
-            continue
-        chosen, characters, truncated = [], 0, False
-        for item in passages[i + 1:]:
-            text = item['quote']
-            if text.isdigit():
-                continue  # Printed page number, not a guidance statement.
-            # Stop at a short following heading, preserving complete sentences
-            # and bullet statements. Table fragments remain unsupported.
-            if len(text) < 100 and not re.search(r'[.;:]$|^[•*\-]|[|%$]|\b(?:guidance|outlook|expected|expect|will|ending)\b', text, re.I):
-                break
-            if len(chosen) == 14 or characters + len(text) > 7000:
-                truncated = True
-                break
-            chosen.append(item)
-            characters += len(text)
-        if not chosen:
-            continue
-        # Period metadata comes only from the heading and opening context,
-        # before the first metric. Two periods cannot be silently collapsed.
-        lead = []
-        for p in chosen:
-            if re.search(r'^[•*\-]|\b(?:revenue|operating income|earnings per share) (?:guidance|outlook)\b', p['quote'], re.I):
-                break
-            lead.append(p['quote'])
-        context = passage['quote'] + '\n' + '\n'.join(lead[:2])
-        ends = set()
-        for value in re.findall(r'\bending\s+(' + DATE + r')\b', context, re.I):
-            try:
-                ends.add(calendar(value))
-            except ValueError:
-                pass
-        quarter = bool(re.search(r'\bquarter\b|\bQ[1-4]\b', context, re.I))
-        annual = bool(re.search(r'\bfull year\b|\byear ending\b', context, re.I))
-        period_type = 'quarter' if quarter and not annual else 'annual' if annual and not quarter else None
-        forecasts = []
-        for p in chosen:
-            text = p['quote']
-            if re.search(r'\b(?:guidance|outlook|expect(?:s|ed)?|project(?:s|ed)?)\b', text, re.I) and re.search(r'\d|\$|%', text) and re.search(r'\b(?:revenue|income|margin|EPS|earnings|cash flow)\b', text, re.I):
-                forecasts.append(dict(p, **typed(text)))
-        if forecasts:
-            scope = context + '\n' + '\n'.join(f['quote'] for f in forecasts)
-            quarters = {m.group(0).lower() for m in re.finditer(r'\b(?:first|second|third|fourth) quarter\b|\bQ[1-4]\b', scope, re.I)}
-            quarter_names = {'q1': 'first quarter', 'q2': 'second quarter', 'q3': 'third quarter', 'q4': 'fourth quarter'}
-            quarters = {quarter_names.get(q, q) for q in quarters}
-            years = set(re.findall(r'\bfiscal year (20\d{2})\b', scope, re.I))
-            conflicting = len(quarters) > 1 or len(years) > 1
-            review_status = bool(re.search(r'\b(?:withdraw\w*|suspend\w*|previous|prior|no longer|not provid\w*)\b', '\n'.join(p['quote'] for p in chosen), re.I))
-            sections.append(dict(id=passage['id'], heading=passage['quote'], heading_evidence=passage,
-                                 period_end=next(iter(ends)) if len(ends) == 1 and not conflicting else None,
-                                 period_type=period_type if not conflicting else None, review_status=review_status,
-                                 forecasts=forecasts, passages=chosen, truncated=truncated))
-        if len(sections) == 4:
-            break
-    datelines = []
+    names=[record.get('company_name',''),record.get('symbol','')]
+    sections=[]
+    for i, heading in enumerate(passages):
+        prefix=[]
+        if formats.DATE_HEADING.fullmatch(heading['quote']):
+            parent=next((j for j in range(i-1,max(-1,i-18),-1) if formats.HEAD.fullmatch(passages[j]['quote'])),None)
+            if parent is None or any(formats.STOP.fullmatch(p['quote']) for p in passages[parent+1:i]):continue
+            prefix.extend(p for p in passages[max(0,parent-3):parent] if re.search(r'in (?:millions|billions|thousands)',p['quote'],re.I))
+            for p in passages[parent:i]:
+                if formats.DATE_HEADING.fullmatch(p['quote']):break
+                prefix.append(p)
+        elif len(heading['quote'])>140 or not formats.HEAD.fullmatch(heading['quote']):continue
+        else:
+            # Nested outlook/reconciliation headings can supply scale and fiscal
+            # label; only the bounded adjacent heading block is inherited.
+            parent=next((j for j in range(i-1,max(-1,i-5),-1) if formats.HEAD.fullmatch(passages[j]['quote'])),None)
+            if heading['quote'].lower().startswith('outlook for three months') and parent is not None and all(not re.search(r'\$|revenues?\b',p['quote'],re.I) for p in passages[parent:i]):prefix=passages[parent:i]
+        chosen=[];characters=0;truncated=False
+        for item in passages[i+1:]:
+            text=item['quote']
+            if text.isdigit():continue
+            if len(text)<200 and (formats.HEAD.fullmatch(text) or formats.DATE_HEADING.fullmatch(text) or formats.STOP.fullmatch(text)):break
+            if len(chosen)>=60 or characters+len(text)>16000:
+                truncated=True;break
+            chosen.append(item);characters+=len(text)
+        if not chosen:continue
+        forecasts=[];first_metric=None
+        for j,p in enumerate(chosen):
+            text=p['quote']
+            table=formats.table_forecast(chosen,j,prefix)
+            f=table or formats.prose(text,names)
+            if not f['metric']:
+                old=typed(text)
+                if old['metric']:f=old
+            if table or (re.search(r'\b(?:guidance|outlook|expect(?:s|ed)?|project(?:s|ed)?|anticipate(?:s|d)?)\b',text,re.I) and re.search(r'\d|\$|%',text) and re.search(r'\b(?:revenues?|income|margin|EPS|earnings|cash flow)\b',text,re.I)):
+                evidence=f.pop('evidence', [p])
+                # Quote is a contiguous original slice, including split rows.
+                quote=body[evidence[0]['start']:evidence[-1]['end']]
+                forecasts.append(dict(p,**f,quote=quote,end=evidence[-1]['end'],evidence=evidence))
+                if first_metric is None:first_metric=j
+        if not forecasts:continue
+        # Metric-specific periods may live in the first sentence. Do not take
+        # annual tax-rate horizons or later unrelated metrics as revenue dates.
+        lead=chosen[:first_metric if first_metric is not None else 2]
+        first_revenue=next((f for f in forecasts if f['metric']=='revenue'),forecasts[0])
+        first_sentence=re.split(r'(?<=[.;])\s+(?=[A-Z])',first_revenue['quote'],maxsplit=1)[0]
+        context='\n'.join(p['quote'] for p in prefix)+'\n'+heading['quote']+'\n'+'\n'.join(p['quote'] for p in lead)+'\n'+first_sentence
+        metadata=formats.period(context)
+        ends=set()
+        for value in re.findall(r'\b(?:ending|ended)\s+('+DATE+r')\b',context,re.I):
+            try:ends.add(calendar(value))
+            except ValueError:pass
+        review=bool(re.search(r'\b(?:withdraw\w*|suspend\w*|previous guidance|prior guidance|no longer provid\w*.{0,30}guidance|not provid\w*.{0,30}guidance)\b','\n'.join(p['quote'] for p in chosen),re.I))
+        values={(f['low'],f['high'],f['unit']) for f in forecasts if f['metric']=='revenue'}
+        review_message='This section refers to earlier or withdrawn guidance. Read the original context.' if review else None
+        if len(values)>1:review=True;review_message='This section contains different revenue ranges. Read the original context before choosing a figure.'
+        if metadata['period_conflict']:review=True;review_message='More than one forecast period is mentioned. A single period could not be identified reliably.'
+        sections.append(dict(id=heading['id'],heading=heading['quote'],heading_evidence=heading,
+            **metadata,period_end=next(iter(ends)) if len(ends)==1 and not metadata['period_conflict'] else None,
+            review_status=review,review_message=review_message,forecasts=forecasts,passages=chosen,context_evidence=prefix,truncated=truncated))
+        if len(sections)>=12:break
+    # Repeated reconciliation tables remain evidence but must not produce a
+    # second, conflicting display point for the identical stated forecast.
+    for section in sections:
+        if section['period_end'] or section['review_status'] or section['period_conflict']:continue
+        numeric={(f['low'],f['high'],f['unit']) for f in section['forecasts'] if f['metric']=='revenue'}
+        matches=[s for s in sections if s is not section and s['period_type']==section['period_type'] and s['period_end']
+                 and not s['review_status'] and not s['period_conflict'] and not s['truncated']
+                 and numeric and numeric=={(f['low'],f['high'],f['unit']) for f in s['forecasts'] if f['metric']=='revenue'}]
+        ends={s['period_end'] for s in matches}
+        # Quarter/year labels must not contradict the reconciliation's named period.
+        matches=[s for s in matches if not s.get('period_label') or s['period_label']==section.get('period_label')]
+        peers=[s for s in sections if s is not section and not s['period_end'] and s['period_type']==section['period_type'] and s.get('period_label')!=section.get('period_label') and numeric=={(f['low'],f['high'],f['unit']) for f in s['forecasts'] if f['metric']=='revenue'}]
+        if len(ends)==1 and matches and not peers:
+            section['period_end']=next(iter(ends))
+            section['period_evidence']=[dict(heading=s['heading_evidence'],passages=s['passages'],context=s['context_evidence']) for s in matches]
+    unique=[]
+    for section in sections:
+        revenues=[f for f in section['forecasts'] if f['metric']=='revenue']
+        identity=(section.get('period_label'),section.get('period_end'),tuple(sorted({(f['low'],f['high'],f['unit']) for f in revenues},key=str)))
+        if revenues and identity[0] and any(s.get('_identity')==identity for s in unique):continue
+        if revenues and any(s['period_type']==section['period_type'] and s['period_end'] and s['period_end']==section['period_end'] and s.get('_identity',())[2]==identity[2] for s in unique):continue
+        section['_identity']=identity;unique.append(section)
+    for section in unique:section.pop('_identity')
+    datelines=[]
     for p in passages:
-        if p['start'] > 6000:
-            break
-        found = re.search(r'[–—]\s*(' + DATE + r')\s*[–—]', p['quote'], re.I)
+        if p['start']>6000:break
+        found=re.search(r'[–—]\s*('+DATE+r')\s*[–—]',p['quote'],re.I)
         if found:
             try:
-                value = calendar(found[1])
-                if value <= timestamp(record['published_at']).date().isoformat():
-                    datelines.append(dict(date=value, **p))
-            except ValueError:
-                pass
-    stated_date = datelines[0] if len({d['date'] for d in datelines}) == 1 else None
-    return dict(method=METHOD, sections=sections, stated_release_date=stated_date)
+                value=calendar(found[1])
+                if value<=timestamp(record['published_at']).date().isoformat():datelines.append(dict(date=value,**p))
+            except ValueError:pass
+    stated_date=datelines[0] if len({d['date'] for d in datelines})==1 else None
+    return dict(method=METHOD,sections=unique,stated_release_date=stated_date)
+
+
+def availability(releases, source, today=None):
+    """Reasons for the current overview; saved historical readings stay readable."""
+    today=today or datetime.now(timezone.utc).date().isoformat()
+    def result(code,message):return dict(code=code,message=message)
+    if source.get('status')=='unavailable':return result('source_unavailable',source['message'])
+    current=[r for r in releases if r['current']]
+    if not current:
+        state=source.get('source_status') or {}
+        if state.get('last_error'):return result('collection_failed','The latest earnings-release check failed. Saved older releases remain available; use Update data to try again.')
+        coverage=state.get('coverage') or []
+        missing=next((c for c in coverage if c.get('slot','').startswith('earnings_release') and c['status']!='available'),None)
+        return result('release_missing',('The results filing is saved, but its linked earnings release has not been collected. Use Update data.' if missing else 'No current earnings release is saved. Use Update data to collect it.'))
+    if any(r.get('read_error') for r in current):return result('extraction_failed','The saved release could not be read reliably. Open the original release or use Update data to check the source.')
+    sections=[s for r in current for s in r['sections']]
+    numeric=[s for s in sections if any(f['metric']=='revenue' for f in s['forecasts'])]
+    usable=[s for s in numeric if not s['review_status'] and not s['truncated'] and not s.get('period_conflict')]
+    if any(s['period_end'] and s['period_end']>=today for s in usable):return result('available','Revenue guidance is available from the latest saved earnings release.')
+    if any(not s['period_end'] and s.get('period_label') for s in usable):return result('named_period','The latest release gives revenue guidance for a named fiscal period, but no exact ending date. Read the stated period before treating it as current.')
+    if usable and all(s['period_end'] and s['period_end']<today for s in usable):return result('expired','The latest saved revenue guidance covers a period that has ended. It remains available as historical guidance.')
+    if numeric:return result('needs_review','Revenue guidance was found, but its period, withdrawal wording or incomplete context needs review. Read the original wording below.')
+    if any(f['metric']=='revenue_growth' for s in sections for f in s['forecasts']):return result('growth_only','The latest release gives a revenue growth rate, but no whole-company revenue amount. Read the percentage guidance below.')
+    if sections:return result('unsupported_format','An outlook was found, but a whole-company revenue amount could not be extracted reliably. Read the original wording below.')
+    return result('not_in_release','No numerical revenue outlook was found in the saved earnings release. Guidance given only in earnings calls or other documents is not covered here.')
 
 
 def compare(forecast, section, release, reports):
@@ -195,12 +246,12 @@ def compare(forecast, section, release, reports):
 def present(conn, iid):
     source = disclosures_present(conn, iid)
     if source['status'] == 'unavailable':
-        return dict(status='unavailable', message=source['message'], releases=[], limitations=LIMITATIONS)
+        return dict(status='unavailable', message=source['message'], releases=[], availability=availability([],source), limitations=LIMITATIONS)
     current = {str(d['id']) for d in source['documents'] if d['slot'].startswith('earnings_release')}
     # Historical releases require their retained parent results filing. A stale
     # current exhibit is not relabeled as the latest company's outlook.
-    records = rows(conn, """SELECT d.id,d.accession,d.url,d.headline,d.published_at,d.available_at,d.data
-      FROM disclosure_documents d WHERE d.instrument_id=%s AND d.form='earnings-release'
+    records = rows(conn, """SELECT d.id,d.accession,d.url,d.headline,d.published_at,d.available_at,d.data,i.name company_name,i.symbol
+      FROM disclosure_documents d JOIN instruments i ON i.id=d.instrument_id WHERE d.instrument_id=%s AND d.form='earnings-release'
       AND EXISTS(SELECT 1 FROM disclosure_documents p WHERE p.instrument_id=d.instrument_id AND p.accession=d.accession AND p.slot='earnings_filing')
       ORDER BY d.published_at DESC,d.available_at DESC,d.id LIMIT 21""", (iid,))
     actuals = []
@@ -218,7 +269,7 @@ def present(conn, iid):
         try:
             extracted = extract(item)
         except (ValueError, KeyError, TypeError):
-            extracted = dict(method=METHOD, sections=[], stated_release_date=None)
+            extracted = dict(method=METHOD, sections=[], stated_release_date=None, read_error=True)
         release = {k: v for k, v in item.items() if k != 'data'}
         release.update(extracted, current=str(item['id']) in current)
         for section in release['sections']:
@@ -226,5 +277,5 @@ def present(conn, iid):
                 forecast['comparison'] = compare(forecast, section, release, actuals)
         releases.append(release)
     return dict(status='available' if releases else 'empty', method=METHOD, releases=releases,
-                history_limited=len(records) > 20, source_status=source.get('source_status'),
+                history_limited=len(records) > 20, source_status=source.get('source_status'), availability=availability(releases,source),
                 message='Read the dated outlook from saved original earnings releases. Unrecognized sections remain in the original document.', limitations=LIMITATIONS)

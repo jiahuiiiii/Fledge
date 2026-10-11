@@ -1,9 +1,10 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import EvidenceButton from "./EvidenceButton";
 import FinancialEvidence from "./FinancialEvidence";
 import RevenueFlow from "./RevenueFlow";
 import RevenueBreakdown from "./RevenueBreakdown";
+import FinancialRecovery from "./FinancialRecovery";
 import Select from "./Select";
 import PeerContext from "./PeerContext";
 import TermHelp from "./TermHelp";
@@ -20,8 +21,9 @@ import {
   balanceBlocks,
   borrowingTrend,
   blockLayout,
-  historyPath,
 } from "../lib/financialStory";
+import FinancialHistory from "./FinancialHistory";
+import RevenueHistory from "./RevenueHistory";
 import "./FinancialsPage.css";
 
 function Evidence({
@@ -91,244 +93,7 @@ const balanceSeries = [
   { key: "equity", label: "Book equity", tone: "revenue" },
   { key: "cash", label: "Cash & equivalents", tone: "earnings" },
 ];
-function HistoryChart({ rows, series, active, onSelect, label }) {
-  const id = useId();
-  const [enabled, setEnabled] = useState(() =>
-    series.slice(0, 3).map((row) => row.key),
-  );
-  const values = rows
-    .flatMap((period) =>
-      enabled.map((key) => number(metric(period, key)?.value)),
-    )
-    .filter((v) => v != null && Math.abs(v) <= 1e15);
-  const min = Math.min(0, ...values),
-    max = Math.max(0, ...values),
-    span = max - min || 1;
-  const first = Date.parse(rows[0]?.end),
-    last = Date.parse(rows.at(-1)?.end);
-  const x = (row) =>
-    94 + ((Date.parse(row.end) - first) / (last - first || 1)) * 738;
-  const y = (value) => 22 + ((max - value) / span) * 252;
-  return (
-    <div className="financial-history-chart">
-      <div
-        className="financial-chart-legend"
-        role="group"
-        aria-label={`${label} measures`}
-      >
-        {series.map((s) => (
-          <button
-            key={s.key}
-            className={`story-series series-${s.tone}`}
-            aria-pressed={enabled.includes(s.key)}
-            onClick={() =>
-              setEnabled((old) =>
-                old.includes(s.key)
-                  ? old.filter((key) => key !== s.key)
-                  : [...old, s.key],
-              )
-            }
-          >
-            <i aria-hidden="true" />
-            {s.label}
-          </button>
-        ))}
-      </div>
-      {rows.length ? (
-        <>
-          <p className="story-swipe-hint">
-            Swipe across the chart on a small screen. Choose a date below to
-            inspect the figures.
-          </p>
-          <div
-            className="story-chart-viewport"
-            tabIndex={0}
-            role="region"
-            aria-label={`${label} chart`}
-          >
-            <svg
-              className="story-history-svg"
-              viewBox="0 0 870 322"
-              role="img"
-              aria-labelledby={`${id}-chart-title`}
-            >
-              <title id={`${id}-chart-title`}>
-                {label}. Reported values on one shared dollar scale,{" "}
-                {day(rows[0].end)} to {day(rows.at(-1).end)}. Missing values and
-                changes in reporting basis break the lines.
-              </title>
-              {[0, 0.25, 0.5, 0.75, 1].map((f) => (
-                <g key={f} className="story-grid">
-                  <line
-                    x1="94"
-                    x2="832"
-                    y1={y(min + span * f)}
-                    y2={y(min + span * f)}
-                  />
-                  <text x="82" y={y(min + span * f) + 4} textAnchor="end">
-                    {money(min + span * f)}
-                  </text>
-                </g>
-              ))}
-              <line
-                className="story-zero"
-                x1="94"
-                x2="832"
-                y1={y(0)}
-                y2={y(0)}
-              />
-              {series
-                .filter((s) => enabled.includes(s.key))
-                .map((s) => (
-                  <g key={s.key} className={`story-series series-${s.tone}`}>
-                    <path d={historyPath(rows, s.key, x, y)} />
-                    {rows.map((row) => {
-                      const value = number(metric(row, s.key)?.value);
-                      return value != null && Math.abs(value) <= 1e15 ? (
-                        <circle
-                          key={row.id}
-                          cx={x(row)}
-                          cy={y(value)}
-                          r={row.id === active?.id ? 5 : 3}
-                        />
-                      ) : null;
-                    })}
-                  </g>
-                ))}
-              {active && (
-                <line
-                  className="story-selection"
-                  x1={x(active)}
-                  x2={x(active)}
-                  y1="16"
-                  y2="276"
-                />
-              )}
-              {rows.map((row, index) => (
-                <g key={row.id}>
-                  {(index === 0 ||
-                    index === rows.length - 1 ||
-                    (rows.length < 8 && index % 2 === 0)) && (
-                    <text
-                      className="story-date"
-                      x={x(row)}
-                      y="308"
-                      textAnchor={
-                        index === 0
-                          ? "start"
-                          : index === rows.length - 1
-                            ? "end"
-                            : "middle"
-                      }
-                    >
-                      {day(row.end)}
-                    </text>
-                  )}
-                  <rect
-                    className="story-chart-hit"
-                    x={x(row) - 12}
-                    y="14"
-                    width="24"
-                    height="266"
-                    onPointerEnter={() => onSelect(row.id)}
-                    onClick={() => onSelect(row.id)}
-                  >
-                    <title>{day(row.end)}</title>
-                  </rect>
-                </g>
-              ))}
-            </svg>
-          </div>
-          <label className="story-date-slider">
-            Inspect reporting date{" "}
-            <input
-              aria-label={`${label} reporting date`}
-              type="range"
-              min="0"
-              max={rows.length - 1}
-              value={Math.max(
-                0,
-                rows.findIndex((row) => row.id === active?.id),
-              )}
-              aria-valuetext={day(active?.end)}
-              onChange={(e) => onSelect(rows[Number(e.target.value)].id)}
-            />
-            <strong>{day(active?.end)}</strong>
-          </label>
-          <div className="story-selected-values" aria-live="polite">
-            {series
-              .filter((s) => enabled.includes(s.key))
-              .map((s) => {
-                const row = metric(active, s.key);
-                const netScope =
-                  s.key !== "net_income"
-                    ? null
-                    : row?.label ===
-                        "Net result including non-controlling interests"
-                      ? {
-                          caption:
-                            "Whole group, including other owners’ share.",
-                          explanation:
-                            "This figure includes the profit or loss belonging to other owners of subsidiaries, as well as the parent company. The filing calls those other owners’ share ‘non-controlling interests’.",
-                        }
-                      : row?.label === "Net income attributable to parent"
-                        ? {
-                            caption: "Parent company’s share.",
-                            explanation:
-                              "This figure is the profit or loss attributable to the parent company. It excludes the share belonging to other owners of subsidiaries.",
-                          }
-                        : null;
-                return (
-                  <article
-                    className={`story-series series-${s.tone}`}
-                    key={s.key}
-                  >
-                    <span className="story-stat-label">
-                      {s.label}
-                      <TermHelp term={s.key} context={netScope?.explanation} />
-                    </span>
-                    <Evidence
-                      rows={[row]}
-                      title={`${s.label} · ${day(active?.end)}`}
-                      label={<strong>{money(row?.value)}</strong>}
-                    />
-                    <small>
-                      {row?.start
-                        ? `${day(row.start)} – ${day(row.end)}`
-                        : row?.end
-                          ? `At ${day(row.end)}`
-                          : "No matching figure"}
-                    </small>
-                    {s.key === "net_income" && (
-                      <>
-                        <small>After expenses, interest and taxes.</small>
-                        <small>{netScope?.caption || row?.label}</small>
-                      </>
-                    )}
-                    {s.key === "free_cash_flow" &&
-                      row?.spending_basis === "productive_assets" && (
-                        <small>
-                          Includes cash spending on software and intangible
-                          assets
-                        </small>
-                      )}
-                    {row?.value == null && row?.reason && (
-                      <small>{row.reason}</small>
-                    )}
-                  </article>
-                );
-              })}
-          </div>
-        </>
-      ) : (
-        <p>No compatible saved history is available.</p>
-      )}
-      <p className="story-footnote">
-        Shared scale · Fiscal reporting dates · Gaps mean unavailable data.
-      </p>
-    </div>
-  );
-}
+
 function Heading({ number: n, title, children }) {
   return (
     <header className="financial-story-heading">
@@ -461,6 +226,8 @@ export default function FinancialsPage({
   visible,
   children,
   onCompare,
+  onRefresh,
+  revision,
 }) {
   const [attempt, setAttempt] = useState(0);
   const [story, setStory] = useState(null),
@@ -492,6 +259,7 @@ export default function FinancialsPage({
     workspace.financial_depth?.payload_id,
     workspace.financial_depth?.status,
     workspace.financial_depth?.amendment_basis,
+    workspace.financial_depth?.recovery_basis,
     attempt,
   ]);
   const depth = workspace.financial_depth;
@@ -501,7 +269,8 @@ export default function FinancialsPage({
       : story?.status === "available" &&
           depth?.payload_id &&
           (depth.payload_id !== story.payload_id ||
-            depth.amendment_basis !== story.amendment_basis)
+            depth.amendment_basis !== story.amendment_basis ||
+            depth.recovery_basis !== story.recovery_basis)
         ? null
         : story;
   const incomeRows = safe?.status === "available" ? safe[mode] || [] : [];
@@ -536,7 +305,7 @@ export default function FinancialsPage({
     debtReadings.push({
       tone: number(coverage.value) >= 0 ? "neutral" : "caution",
       title: "Operating profit compared with interest expense",
-      text: `${number(coverage.value).toFixed(1)} times the reported non-operating interest expense over ${day(coverage.start)} – ${day(coverage.end)}.`,
+      text: `${number(coverage.value).toFixed(1)} times the reported interest expense over ${day(coverage.start)} – ${day(coverage.end)}.`,
       detail:
         "Operating profit is not cash available for interest payments; this is not a credit assessment.",
       rows: [coverage],
@@ -545,7 +314,7 @@ export default function FinancialsPage({
     debtReadings.push({
       tone: "unknown",
       title: "Interest comparison unavailable",
-      text: "Matching operating profit and non-operating interest expense are needed.",
+      text: "Matching operating profit and reported interest expense are needed.",
       rows: [coverage].filter(Boolean),
     });
   const basisLabel = mode === "annual" ? "Fiscal year" : "Past 12 months";
@@ -573,6 +342,20 @@ export default function FinancialsPage({
   ];
   return (
     <div className="financials-story financial-main-flow">
+      <FinancialRecovery
+        key={instrumentId}
+        instrumentId={instrumentId}
+        onApplied={async () => {
+          await onRefresh?.();
+          setAttempt((n) => n + 1);
+        }}
+      />
+      {safe?.ai_reviewed_figures > 0 && (
+        <p className="figure-help">
+          Includes AI-assisted figure mappings you reviewed. Open a figure to
+          inspect its original cells, or change your choices in Missing figures.
+        </p>
+      )}
       <PeerContext
         instrumentId={instrumentId}
         visible={visible}
@@ -664,17 +447,13 @@ export default function FinancialsPage({
             className="financial-story-section"
             aria-label="Earnings and cash-flow history"
           >
-            <Heading title="Sales over time">
-              {basisLabel} · select a reporting date to inspect sales, profit
-              and cash flow.
-            </Heading>
-            <HistoryChart
-              key={mode}
-              rows={incomeRows}
+            <RevenueHistory
+              revision={revision}
+              instrumentId={instrumentId}
+              workspace={workspace}
+              story={safe}
+              visible={visible}
               series={incomeSeries}
-              active={active}
-              onSelect={setIncomeId}
-              label="Sales, earnings and cash flow"
             />
           </section>
           <section
@@ -724,7 +503,7 @@ export default function FinancialsPage({
           aria-label="Borrowing and equity history"
         >
           <Heading title="Borrowing, cash & equity over time" />
-          <HistoryChart
+          <FinancialHistory
             rows={balances}
             series={balanceSeries}
             active={balance}

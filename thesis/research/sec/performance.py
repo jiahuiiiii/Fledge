@@ -137,6 +137,16 @@ def collect(bundle, filing, tags):
                     filed=row["filed"],
                 )
             )
+    # Read-time original-statement calculations are confined to research views
+    # that explicitly attach them. A reported value in any currency blocks a
+    # replacement for the same tag family and period, including conflicts.
+    for tag in tags:
+        for recovered in bundle.get('_original_facts', {}).get(tag, []):
+            if recovered['accession'] != filing['accessionNumber']: continue
+            present = any(
+                (r.get('accn'),r.get('start'),r.get('end')) == (recovered['accession'],recovered['start'],recovered['end'])
+                for t in tags for values in bundle['companyfacts'].get('facts',{}).get('us-gaap',{}).get(t,{}).get('units',{}).values() for r in values)
+            if not present: facts.append(dict(recovered))
     return facts
 
 

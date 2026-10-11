@@ -144,12 +144,12 @@ def test_complete_comment_body_survives_other_omitted_fragments(owner):
     B.plan(prepared)
 
 
-def test_full_plan_insufficient_budget_stops_before_dispatch(owner):
+def test_each_request_checks_its_own_allowance(owner):
     p = large_packet()
-    with patch.object(ledger, 'snapshot', return_value=dict(remaining_usd='0.01')), patch.object(ledger, 'execute') as execute:
-        with pytest.raises(ledger.BudgetBlocked, match='complete 66-source reading'):
+    with patch.object(B, 'check_access'), patch.object(ledger, 'snapshot', side_effect=AssertionError('No whole-plan preflight')), patch.object(ledger, 'execute', side_effect=ledger.BudgetBlocked('This request exceeds the remaining allowance')) as execute:
+        with pytest.raises(ledger.BudgetBlocked, match='This request exceeds'):
             B.run(p)
-        execute.assert_not_called()
+        execute.assert_called_once()
 
 
 def test_missing_or_duplicate_classification_in_later_batch_blocks_merge():

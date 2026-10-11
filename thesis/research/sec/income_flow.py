@@ -10,7 +10,7 @@ from .financial_depth import trailing
 from .disclosure_text import archive_url
 from thesis.db import one
 
-METHOD = 'sec-income-flow-2'
+METHOD = 'sec-income-flow-3'
 DEFINITIONS = {
     'revenue': ('Revenue', REVENUE),
     'cost': ('Cost of revenue', ('CostOfRevenue', 'CostOfGoodsAndServicesSold')),
@@ -148,6 +148,8 @@ def present(conn, iid):
         return dict(status='empty', periods=[], reason='Collect company filings to see the revenue and expense flow.', method=METHOD)
     from .amendments import retained_resolver
     try:
+        from .filing_facts import enrich
+        saved['payload']=enrich(conn,iid,saved['payload'],saved['cik'],saved['checked_at'])
         resolver=retained_resolver(conn,iid,saved['payload'],saved['cik'],saved['checked_at'])
         result = normalize_flow(saved['payload'], saved['cik'], saved['checked_at'],resolver)
     except (ValueError, KeyError):

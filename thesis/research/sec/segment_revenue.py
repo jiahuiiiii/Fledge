@@ -17,7 +17,7 @@ from .normalize import REVENUE
 from .performance import decimal_text
 from .disclosures import SOURCE
 
-METHOD = 'sec-segment-revenue-3'
+METHOD = 'sec-segment-revenue-4'
 XI = 'http://www.xbrl.org/2003/instance'
 XD = 'http://xbrl.org/2006/xbrldi'
 IX = 'http://www.xbrl.org/2013/inlineXBRL'
@@ -25,10 +25,10 @@ ISO = 'http://www.xbrl.org/2003/iso4217'
 VOID = '{http://www.w3.org/2001/XMLSchema-instance}nil'
 LIMITATIONS = [
     'These are the company’s reported categories, not standardized peer segments.',
-    'Only supported single-dimension US-GAAP USD revenue facts are read. Nested dimensions, custom revenue concepts and IFRS remain outside this view.',
+    'Supported US-GAAP USD revenue facts are read, including explicit segment reconciliations and supported geographical qualifiers. Other nested dimensions, custom revenue concepts and IFRS remain outside this view.',
     'Geographies can overlap; this view does not infer a country/region hierarchy. Shipping destination, customer location and economic exposure are not interchangeable. Read the filing for its attribution basis.',
     'Category labels expand the filing’s member tags; they are not independently verified business descriptions.',
-    'Percentages are shown only when every retained category is usable and nonnegative, and their sum exactly matches consolidated revenue for the same concept and period.',
+    'Percentages are shown only when every retained category is usable and nonnegative, and their sum exactly matches consolidated revenue for the same period and an explicitly reconciled revenue definition.',
     'Quarter, fiscal year to date and annual periods stay separate. Missing facts are not zero; this does not change saved research or monitoring rules.',
 ]
 
@@ -81,14 +81,16 @@ def value_of(element, namespaces, units):
     if element.get('continuedAt') or element.get('target') or element.get('tupleRef'):
         return None, raw, 'This Inline XBRL fact structure is unsupported.'
     form = qname(element.get('format'), namespaces)
-    if element.get('format') and not (form and form[1] in ('num-dot-decimal', 'numdotdecimal') and
+    if element.get('format') and not (form and form[1] in ('num-dot-decimal', 'numdotdecimal', 'fixed-zero', 'zerodash') and
             form[0] in ('http://www.xbrl.org/inlineXBRL/transformation/2010-04-20',
                         'http://www.xbrl.org/inlineXBRL/transformation/2011-07-31',
                         'http://www.xbrl.org/inlineXBRL/transformation/2015-02-26',
                         'http://www.xbrl.org/inlineXBRL/transformation/2020-02-12',
                         'http://www.xbrl.org/inlineXBRL/transformation/2022-02-16')):
         return None, raw, 'The numeric transformation is unsupported.'
-    digits = raw.replace(' ', '')
+    # A dash only means zero when the filing explicitly declares the standard
+    # zero transformation. An untagged dash or nil remains unknown.
+    digits = '0' if form and form[1] in ('fixed-zero', 'zerodash') else raw.replace(' ', '')
     if not re.fullmatch(r'(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?', digits):
         return None, raw, 'The displayed numeric value is unsupported.'
     try:
@@ -336,6 +338,26 @@ def extract(raw, cik, include_comparatives=False, all_concepts=False):
         group.update(members=members, total=total, total_inputs=total_facts,
                      component_sum=decimal_text(sum_value) if sum_value is not None else None, chartable=not reason, reason=reason)
         groups.extend(geography_views(group, scopes))
+    # An explicit complete segment reconciliation can establish how differently
+    # tagged operating segments relate to the consolidated revenue definition.
+    from .revenue_tables import extract as recovered_tables
+    recovered = recovered_tables(raw,cik)
+    recovered = [g for g in recovered if g['end'] <= report_end and (include_comparatives or g['end']==report_end)]
+    for g in recovered:
+        groups=[old for old in groups if (old['start'],old['end'],old['kind'],old['concept'])!=(g['start'],g['end'],g['kind'],g['concept'])]
+        groups.append(g)
+    # Original printed row labels establish a narrow case-only tag continuity
+    # proof; display-name guesses alone never authorize joining categories.
+    from .filing_facts import read as original_facts
+    labels={}
+    for table in original_facts(raw,cik)['tables']:
+        for row in table['rows']:
+            for f in row['facts']:
+                if f['fact_id'] and row['label']: labels.setdefault(f['fact_id'],set()).add(row['label'])
+    for g in groups:
+        for m in g['members']:
+            names=set().union(*(labels.get(f.get('fact_id'),set()) for f in m['inputs']))
+            if len(names)==1:m['reported_label']=next(iter(names))
     # Never combine or substitute revenue definitions; keep the preferred
     # reported standard concept for each exact axis/period, including its gaps.
     chosen = {}
@@ -376,12 +398,20 @@ def trailing_groups(period, groups):
                 for values in matches[1:]]
         if any(len(values) != 1 for values in rest): continue
         parts = [first, rest[0][0], rest[1][0]]
-        member_sets = [{m['member']: m for m in g['members']} for g in parts]
+        def identity(member):
+            # Permit only capitalization differences with the same explicit
+            # printed label. Keep full original member tags in the evidence.
+            printed=member.get('reported_label')
+            if printed and re.sub(r'[^a-z0-9]','',printed.lower()) == re.sub(r'member$','',member['member'].split(':')[-1].lower()):
+                return member['member'].lower()
+            return member['member']
+        member_sets = [{identity(m): m for m in g['members']} for g in parts]
+        if any(len(mapping)!=len(g['members']) for mapping,g in zip(member_sets,parts)):continue
         if not all(set(m) == set(member_sets[0]) for m in member_sets): continue
         members = []
         for key, member in member_sets[0].items():
             rows = [m[key] for m in member_sets]
-            if len({r['label'] for r in rows}) != 1: break
+            if len({r['label'] for r in rows}) != 1 and not (all(r.get('reported_label') for r in rows) and len({r['reported_label'] for r in rows})==1): break
             with localcontext() as ctx:
                 ctx.prec = 110
                 value = Decimal(rows[0]['value']) + Decimal(rows[1]['value']) - Decimal(rows[2]['value'])

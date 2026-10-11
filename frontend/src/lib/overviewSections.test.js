@@ -197,3 +197,52 @@ test("empty and withdrawn datasets remain missing", () => {
   withdrawn.financial_depth.status = "unavailable";
   assert.equal(overviewModel(withdrawn).cashRatio, null);
 });
+
+test("named fiscal guidance remains readable without inventing an ending date", async () => {
+  const { guidanceReason, guidancePeriod } = await import(
+    "./overviewSections.js"
+  );
+  const source = {
+    releases: [
+      {
+        current: true,
+        sections: [
+          {
+            period_type: "quarter",
+            period_label: "Q3 FY2027",
+            period_end: null,
+            forecasts: [
+              {
+                metric: "revenue",
+                low: "1000000",
+                high: "2000000",
+                unit: null,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  const g = currentGuidance(source, "2026-10-12");
+  assert.equal(guidancePeriod(g.section), "Q3 FY2027");
+  assert.equal(guidanceAmount(g), "$1m–$2m");
+  assert.match(guidanceReason(source), /does not state its exact ending date/);
+  source.releases[0].sections[0].period_end = "2025-10-31";
+  assert.equal(currentGuidance(source, "2026-10-12"), null);
+  assert.match(guidanceReason(source, "2026-10-12"), /period that has ended/);
+  assert.equal(
+    guidanceReason({
+      availability: { message: "The linked release is missing." },
+    }),
+    "The linked release is missing.",
+  );
+  assert.equal(
+    guidanceReason({
+      status: "unavailable",
+      message: "Access withdrawn",
+      ...source,
+    }),
+    "Access withdrawn",
+  );
+});

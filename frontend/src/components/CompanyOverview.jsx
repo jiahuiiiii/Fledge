@@ -39,6 +39,7 @@ export default function CompanyOverview({
   const membership = catalogue.map((company) => company.id).join(",");
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     const { catalogue: companies, initialWorkspace: initial } = current.current;
     setReadings({});
     let index = 0;
@@ -47,11 +48,13 @@ export default function CompanyOverview({
       while (active && index < companies.length) {
         const company = companies[index++];
         const [workspace, prices] = await Promise.allSettled([
-          !refresh && initial?.instrument?.id === company.id
+          !refresh &&
+          !initial?.financials_pending &&
+          initial?.instrument?.id === company.id
             ? Promise.resolve(initial)
-            : api.workspace(company.id),
+            : api.workspace(company.id, { signal: controller.signal }),
           company.mode === "sec"
-            ? api.priceHistory(company.id)
+            ? api.priceHistory(company.id, { signal: controller.signal })
             : Promise.resolve(null),
         ]);
         if (!active) return;
@@ -81,6 +84,7 @@ export default function CompanyOverview({
     );
     return () => {
       active = false;
+      controller.abort();
     };
   }, [membership, refresh]);
   const loading = catalogue.some((company) => !readings[company.id]);
@@ -297,12 +301,20 @@ export function AllHistory({
   useEffect(() => {
     if (!visible) return;
     let active = true;
+    const controller = new AbortController();
     const existing = state.membership === membership;
     if (!existing)
       setState({ records: [], errors: [], loading: true, membership: null });
     const companies = catalogue.filter((company) => company.status);
     readableLoad(
-      Promise.allSettled(companies.map((company) => api.workspace(company.id))),
+      Promise.allSettled(
+        companies.map((company) =>
+          api.workspace(company.id, {
+            includeFinancials: false,
+            signal: controller.signal,
+          }),
+        ),
+      ),
       existing ? 0 : 280,
     ).then((results) => {
       if (!active) return;
@@ -322,6 +334,7 @@ export function AllHistory({
     });
     return () => {
       active = false;
+      controller.abort();
     };
   }, [membership, refresh, visible]);
   return (

@@ -161,11 +161,20 @@ export default function CompanySnapshot({
   onSaveView,
   onAsk,
   onUpdate,
+  financialError,
+  onRetryFinancials,
 }) {
   const { sentences, growth } = snapshot(data);
   return (
     <section className="glance" aria-label="Company summary">
-      {sentences.length ? (
+      {data.financials_pending ? (
+        <p className="glance-summary muted" role="status">
+          {financialError || "Loading saved financials…"}
+          {financialError && (
+            <button onClick={onRetryFinancials}>Try again</button>
+          )}
+        </p>
+      ) : sentences.length ? (
         <p className="glance-summary">
           {growth && (
             <span className="glance-growth">
@@ -204,15 +213,17 @@ export default function CompanySnapshot({
         onView={onView}
       />
       {chart}
-      <OverviewSections
-        data={data}
-        instrumentId={instrumentId}
-        visible={visible}
-        onView={onView}
-        onSource={onSource}
-        businessPanel={businessPanel}
-        focusTopic={focusTopic}
-      />
+      {!data.financials_pending && (
+        <OverviewSections
+          data={data}
+          instrumentId={instrumentId}
+          visible={visible}
+          onView={onView}
+          onSource={onSource}
+          businessPanel={businessPanel}
+          focusTopic={focusTopic}
+        />
+      )}
     </section>
   );
 }

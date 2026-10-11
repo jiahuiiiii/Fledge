@@ -6,6 +6,14 @@ Phase 19 adds [explicit comparisons of news coverage](news-coverage.md). Related
 
 The main pitch workflow is now source → separate news/social labels → grouped change alert → exact evidence → saved-idea review. The collection/classification mechanisms adapt Deus; the workspace and review patterns extend the existing Kestrel adaptation. This is the new implementation priority requested by the user, ahead of extra valuation breadth.
 
+## Visible reading controls — 11 October 2026
+
+**What’s the tone?** keeps **Discussion window** and **Watch · on/off** directly to the left of **Refresh & analyse**. They are always visible, without opening a Reading settings disclosure. On narrow screens the window and watch share a row above the refresh button. Controls retain labelled keyboard interaction and at least 44px touch targets.
+
+The watch button opens the existing settings dialog; it does not switch monitoring on or off by itself. Window choices remain 24 hours, seven days and thirty days; selecting one changes the next manual reading, not the displayed saved result or the automatic seven-day watch. Saved-reading dates/window and the next watch check stay below the header. Existing disabled-action reasons remain linked to the refresh button. No acquisition, analysis, scheduling or accounting behavior changes.
+
+[Implementation and verification](../reviews/2026-10-11/tone-header.md).
+
 ## User flow
 
 Choose Microsoft, Apple or Alphabet. Refresh market data and social posts, then choose **Analyse sentiment**. Company news and Reddit discussion have separate counts, explanations and exact cited passages. Open the original source from any item. Missing coverage is not neutral sentiment; a directional summary requires at least three interpretable text groups and a strict majority in that direction. Identical substantive news bodies count once even when titles differ; conflicting labels within a group become mixed or unclear. Social coverage shows represented authors, three communities and the absence of comments/other platforms.

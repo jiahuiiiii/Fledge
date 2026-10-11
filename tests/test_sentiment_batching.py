@@ -84,6 +84,50 @@ def test_partial_failure_saves_valid_batch_and_explicit_retry_only_resends_faile
         assert result2==result
 
 
+def test_unsupported_price_recovery_reuses_original_paid_batches_without_retry(owner):
+    from hashlib import sha256
+    from thesis.research import sentiment_guards as G
+    from thesis.research.citations import source_passages
+    p = packet()
+    p["guard_policy"] = G.POLICY
+    source = p["sources"][9]
+    source["text"] = "Lumen Devices in its 220s."
+    source["passages"], _ = source_passages(source["title"], source["text"])
+    source["content_hash"] = sha256(source["text"].encode()).hexdigest()
+
+    def add_unsupported(items):
+        for item in items:
+            if item["id"] == source["label"]:
+                item["price_claims"] = [dict(passage_id="p1", amount_text="220s",
+                    kind="other", direction_text=None)]
+        return items
+
+    checked_prices = G.price_details
+
+    def previous_validator(item, source, company):
+        for claim in item.price_claims:
+            G.number(claim.amount_text)
+        return checked_prices(item, source, company)
+
+    with patch.object(B, "check_access"):
+        with patch.object(G, "price_details", side_effect=previous_validator):
+            with pytest.raises(ValueError, match="Batch 2"):
+                B.run(p, transport=provider("neutral", mutate=add_unsupported))
+        before = ledger.snapshot()
+        parts = B.plan(p)
+        with transaction() as conn:
+            original = one(conn, "SELECT * FROM model_calls WHERE request_key=%s", (B.part_identity(parts[1]),))
+        result, calls = B.run(p, transport=lambda _: pytest.fail("must reuse the paid response"))
+        assert ledger.snapshot() == before and len(calls) == 2
+        assert calls[1] == original and not calls[1]["request_key"].endswith(":retry:1")
+        recovered = next(i for i in result["items"] if i["id"] == source["label"])
+        assert recovered["sentiment"] == "unclear"
+        assert recovered["price_claims"] == recovered["price_comparisons"] == []
+        assert recovered["guard"]["ignored_price_claims"][0]["amount_text"] == "220s"
+        with transaction() as conn:
+            assert one(conn, "SELECT * FROM model_calls WHERE id=%s", (original["id"],)) == original
+
+
 def test_unknown_charge_cannot_be_retried_even_explicitly(owner):
     p=packet()
     def broken(body):raise TimeoutError()

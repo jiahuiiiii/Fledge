@@ -1,0 +1,33 @@
+# Financial history gaps — 11 October 2026
+
+The owner reported disconnected revenue points after Broadcom’s 4 November 2018 result and similar breaks for Micron and other companies. The audit covers all nine saved companies: AAPL, AMD, AVGO, FN, INTU, MRVL, MU, NVDA and QCOM. This repair reads saved filings; it does not refresh providers or invoke AI.
+
+## Findings and changes
+
+1. **Available annual revenue was incorrectly disconnected.** `historyPath` used the raw SEC concept as a line identity. AVGO’s 2018 revenue is USD20.848bn under `Revenues`; its 2019 USD22.597bn uses `RevenueFromContractWithCustomerExcludingAssessedTax`. Both points were plotted, but a new SVG subpath hid their connecting segment. MU has two analogous label transitions. All nine saved companies have complete values in their retained annual revenue histories. The chart now connects the three recognised whole-company USD revenue concepts, while preserving labels, amounts, dates and original evidence. A chart note identifies each label transition and says accounting policies can differ. This is a reported-history presentation change, not a relaxed growth calculation or a declaration of accounting equivalence.
+2. **The quarterly chart omitted fourth quarters.** It previously reused the five most recent income-flow quarters, selected only from quarterly reports. Annual reports were never considered as quarterly sources. Financial story now provides up to 40 quarterly reporting dates, using a reported three-month figure first. Only an absent Q4 can be calculated as the fiscal-year total less its first nine months. The inputs must have an identical fiscal start, the correct nine-month and residual-quarter lengths, USD units, matching concepts and an eligible earlier filing. Exact dual-tagged facts can establish a common concept; names alone cannot. Conflicts, a reported non-USD quarter, missing inputs and unsupported amendment combinations remain unknown. Each calculated card says so and links both original inputs. No quarterly cash flow is inferred.
+3. **Some breaks are intentional.** MU’s profit changes between whole-group and parent-only income. These remain separate. Some rolling-year bridges still lack a matching annual filing or combine unproven revenue definitions. The repair retains their original missing values. It replaces the inaccurate blanket “Gaps mean unavailable data” caption with expandable, dated explanations of missing values, intervening periods and definition changes. Adjacent missing dates with the same reason are grouped. Their inputs remain inspectable. The quarterly/past-12-month paths also stop at a missing quarter rather than bridging most of a year.
+
+No issuer-specific overrides, zero filling, interpolation, later-vintage substitution, reporting-data rewrites, migrations, paid calls or provider retries are introduced. Existing annual, trailing and balance outputs are checked byte-for-byte after JSON serialization, apart from the new method/quarterly metadata at the top level.
+
+## Evidence and verification
+
+Evidence: `.local/live-tests/history-gaps-20261011/`. Backup: `.local/backups/history-gaps-20261011/`.
+
+Read-only replay finds **72 available fourth-quarter revenue points: 24 directly reported and 48 calculated**. One older NVDA Q4 remains unavailable because matching inputs have not been established. All original annual, trailing and balance values/inputs are exact across all nine companies. Examples of recovered fourth quarters include AVGO FY2025 USD18.015bn and MU FY2025 USD11.315bn.
+
+Authored regression cases cover reported-quarter precedence, exact decimal arithmetic, original filing URLs, absent or late nine-month filings, fiscal-start mismatches, conflicts, non-USD facts, changed concepts, exact dual-tag proof, amendments and whole-group/parent separation. Frontend checks cover the original AVGO/MU-style revenue transitions, retained growth restrictions, true missing periods, currency/unknown-definition refusal and grouped explanatory notes.
+
+The initial targeted command used a nonexistent amendment-test filename and ran no tests; preserve that diagnostic. The corrected focused financial suite passed 102 tests before the final dual-tag case. Final suite, browser and installation outcomes are appended after verification.
+
+## Review
+
+The visual line now represents successive reported sales, while exact comparability remains a separate calculation policy. Quarterly derived values are identified, reproducible and traceable. The repair does not conceal genuine gaps or mix profit ownership scopes. Existing source-access and amendment controls remain; old filing vintages do not move backwards from later comparative disclosures. Native disclosures and evidence dialogs retain keyboard access; chart height and contained phone scrolling remain bounded. This is one agent’s review, not independent accounting assurance.
+
+## Final verification and installation
+
+**1,894 backend tests pass, with 66 optional-corpus skips; 140 frontend checks, build, targeted formatting and diff checks pass.** Read-only candidate and installed browsers both pass all nine companies, annual and quarterly values, selected Q4 source/calculation dialogs, retained past-12-month gaps, MU’s distinct profit scopes, keyboard/focus and AVGO/MU 1440/390/320 layouts. Both browser reports contain 13 company/layout checks and no page errors. Desktop graphs and phone notes were inspected. Tall element screenshots include the app’s fixed navigation overlay; layout assertions and chart geometry are checked separately.
+
+The initial AMD candidate preview mixed a new-process financial-story response with the older running app’s financial-depth fingerprint. The source-consistency guard correctly kept it in a loading state. Candidate verification was corrected to supply both matching read-only responses; the guard was not disabled. Final installed browser checks use actual app responses with no financial-response substitution, and compare all four financial series to the verified replay. Preserve initial timeout/body/screenshot diagnostics.
+
+Installed index **630e58db**, all **39 candidate files** verified over HTTP; older assets retained. App-only restart to PID **36538**, PostgreSQL left running. The initial immediate worker-lease check ran before acquisition; the bounded follow-up confirmed the lease without another restart. All **116 tables**, schema **49**, environment fingerprint and complete budget ledger are exact across installation. No source collection, AI call, private research/watch change or external message by this task. Original annual/trailing/balance evidence and values remain intact. Remaining gaps are not claimed resolved universally.

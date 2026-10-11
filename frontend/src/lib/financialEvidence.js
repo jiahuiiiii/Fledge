@@ -100,7 +100,11 @@ export function inputLabel(row, input, index) {
     ][index];
   if (row.key === "revenue_growth" && row.inputs?.length === 2)
     return index === 0 ? "Current fiscal year" : "Previous fiscal year";
-  return concepts[input.concept] || "Reported figure";
+  return (
+    input.row_label ||
+    concepts[input.concept?.split(":").at(-1)] ||
+    "Reported figure"
+  );
 }
 export function evidenceFormula(row) {
   if (row.key === "revenue_growth")

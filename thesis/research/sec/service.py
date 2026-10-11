@@ -308,11 +308,7 @@ def refresh(iid, *, fetcher=None):
         return result
     except Exception as error:
         # No exception bodies/response text or contact identity are persisted.
-        message = (
-            "SEC access denied or rate-limited."
-            if isinstance(error, client.SourceFailure) and error.denied
-            else "SEC refresh failed; no new evidence committed."
-        )
+        message = client.failure_message(error)
         with transaction(source=True) as conn:
             collection_lock(conn)
             checked = datetime.now(timezone.utc)

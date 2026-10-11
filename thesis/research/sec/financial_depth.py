@@ -10,7 +10,7 @@ from .performance import collect,unique,select,decimal_text,duration
 from thesis.db import one
 from .disclosure_text import archive_url
 
-METHOD='sec-financial-depth-2'
+METHOD='sec-financial-depth-3'
 FLOW={
  'revenue':('Revenue',REVENUE),
  'operating_income':('Operating income',('OperatingIncomeLoss',)),
@@ -54,7 +54,7 @@ def capital_spending(bundle, filings, current, resolver=None):
         result=values[0];result.pop('key',None)
         return result
     tags=('PaymentsToAcquirePropertyPlantAndEquipment',)
-    broader=not reported(bundle,current,tags)
+    broader=not (reported(bundle,current,tags) or any(f['end']==current['end'].isoformat() for f in collect(bundle,current,tags)))
     if broader:tags=('PaymentsToAcquireProductiveAssets',)
     result=trailing(bundle,filings,current,tags,resolver)
     return dict(result,label='Cash spending on property, equipment, software & intangibles' if broader else 'Cash capital spending',
@@ -137,6 +137,12 @@ def total_debt(bundle,current):
     valid=short is not None and (long_total is not None or all(parts))
     value=None;reason=None
     if not valid:
+        recovered=bundle.get('_original_borrowing',{}).get((current['accessionNumber'],current['end'].isoformat()),[])
+        conflicting=any(reported(bundle,current,(tag,)) and instant((tag,)) is None for tag in ('LongTermDebtCurrent','LongTermDebtNoncurrent','ShortTermBorrowings','CommercialPaper','DebtCurrent','LongTermDebt'))
+        if recovered and not conflicting and len({r['value'] for r in recovered})==1:
+            r=recovered[0]
+            return dict(key='total_debt',label='Borrowing shown on the balance sheet',unit='USD',calculated=True,
+                        reason=None,**{k:r[k] for k in ('value','start','end','inputs','formula','explanation')})
         combined=instant(('DebtAndCapitalLeaseObligations',))
         leases=instant(('FinanceLeaseLiability',))
         if combined and leases and Decimal(combined['value'])>=Decimal(leases['value'])>=0:
@@ -216,7 +222,9 @@ def present(conn,iid):
     if not saved:return dict(status='empty',reason='Refresh filings to prepare trailing results and borrowing information.')
     from .amendments import retained_resolver
     try:
+        from .filing_facts import enrich
+        saved['payload']=enrich(conn,iid,saved['payload'],saved['cik'],saved['checked_at'])
         resolver=retained_resolver(conn,iid,saved['payload'],saved['cik'],saved['checked_at'])
         values=normalize_depth(saved['payload'],saved['cik'],saved['checked_at'],resolver)
     except ValueError:return dict(status='unavailable',reason='Retained SEC facts could not be normalized for these additional measures. The existing financial reports remain available.')
-    return dict(status='available',payload_id=str(saved['id']),amendment_basis=resolver.basis_id,first_recorded_at=saved['retrieved_at'],checked_at=saved['checked_at'],**values)
+    return dict(status='available',payload_id=str(saved['id']),amendment_basis=resolver.basis_id,recovery_basis=saved['payload'].get('_recovery_basis'),first_recorded_at=saved['retrieved_at'],checked_at=saved['checked_at'],**values)

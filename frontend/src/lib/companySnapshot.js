@@ -104,6 +104,7 @@ export function revenueOutlook(outlook) {
           high: num(forecast.high ?? forecast.low),
           approximate: !!forecast.approximate,
           periodEnd: section.period_end,
+          periodLabel: section.period_label,
           periodType: section.period_type,
           publishedAt: release.published_at,
           compared: forecast.comparison?.status === "compared",
@@ -172,9 +173,10 @@ export function snapshot(data) {
       outlook.low === outlook.high
         ? `${outlook.approximate ? "about " : ""}${outlookMoney(outlook.low)}`
         : `${outlookMoney(outlook.low)} to ${outlookMoney(outlook.high)}`;
-    sentences.push(
-      `Management expects ${range} of revenue for the ${outlook.periodType || "period"} ending ${day(outlook.periodEnd)}.`,
-    );
+    const period = outlook.periodEnd
+      ? `the ${outlook.periodType || "period"} ending ${day(outlook.periodEnd)}`
+      : outlook.periodLabel || "the stated forecast period";
+    sentences.push(`Management expects ${range} of revenue for ${period}.`);
   }
   if (position?.cash > 0 && position?.debt != null) {
     const ratio = position.debt / position.cash;

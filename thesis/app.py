@@ -306,12 +306,17 @@ def logout(request: Request):
 
 
 @app.get("/api/v1/workspace")
-def workspace(instrument_id: UUID = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")):
-    result = service.state(auth.current_owner(), str(instrument_id))
+def workspace(instrument_id: UUID = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"), include_financials: bool = True):
+    result = service.state(auth.current_owner(), str(instrument_id), include_financials=include_financials)
     from .db import transaction, one
     with transaction() as conn:
         result["workspace_reset_at"] = one(conn, "SELECT reset_at FROM workspace_settings WHERE singleton")["reset_at"]
     return {"result": result}
+
+
+@app.get("/api/v1/companies/{instrument_id}/workspace-financials")
+def workspace_financials(instrument_id: UUID):
+    return {"result": service.financial_workspace(auth.current_owner(), str(instrument_id))}
 
 
 @app.get("/api/v1/research-review")
@@ -922,8 +927,40 @@ def financial_story(instrument_id: UUID):
     from .research.sec.financial_story import present
     from .db import transaction
 
-    with transaction(consistent=True) as conn:
+    with transaction(auth.current_owner(),consistent=True) as conn:
         return {"result": present(conn, str(instrument_id))}
+
+
+@app.get('/api/v1/companies/{instrument_id}/financial-recovery')
+def financial_recovery_preview(instrument_id: UUID, document_id: UUID | None = None):
+    from .research.sec.financial_recovery import present
+    from .db import transaction
+    with transaction(auth.current_owner(),consistent=True) as conn:
+        return {'result':present(conn,str(instrument_id),str(document_id) if document_id else None)}
+
+
+class FinancialRecoveryRequest(BaseModel):
+    model_config=ConfigDict(extra='forbid',strict=True)
+    document_id: str
+    plan_id: str
+
+
+@app.post('/api/v1/companies/{instrument_id}/financial-recovery')
+def financial_recovery_generate(instrument_id: UUID, payload: FinancialRecoveryRequest):
+    from .research.sec.financial_recovery import generate
+    return {'result':generate(auth.current_owner(),str(instrument_id),str(UUID(payload.document_id)),payload.plan_id)}
+
+
+class FinancialRecoveryReview(BaseModel):
+    model_config=ConfigDict(extra='forbid',strict=True)
+    accepted: list[str]
+    expected_review: str | None
+
+
+@app.post('/api/v1/companies/{instrument_id}/financial-recovery/{reading_id}/review')
+def financial_recovery_review(instrument_id: UUID, reading_id: UUID, payload: FinancialRecoveryReview):
+    from .research.sec.financial_recovery import review
+    return {'result':review(auth.current_owner(),str(instrument_id),str(reading_id),payload.accepted,payload.expected_review)}
 
 
 @app.post("/api/v1/companies/{instrument_id}/price-history/refresh")

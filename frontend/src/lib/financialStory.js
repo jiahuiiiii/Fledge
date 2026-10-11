@@ -341,22 +341,104 @@ export function blockLayout(rows, width = 100, height = 100) {
   return place(items, 0, 0, width, height);
 }
 
-export function historyPath(rows, key, x, y) {
-  let path = "",
-    previous = null,
-    definition = "";
-  for (const row of rows) {
+const revenueTags = new Set([
+  "RevenueFromContractWithCustomerExcludingAssessedTax",
+  "Revenues",
+  "SalesRevenueNet",
+]);
+function historyDefinition(m, key) {
+  // Connecting reported company sales is not a growth calculation or permission
+  // to mix concepts in a trailing total. Keep those stricter checks unchanged.
+  const concepts = (m?.inputs || []).map((input) => input.concept);
+  const definition =
+    key === "revenue" &&
+    m?.unit === "USD" &&
+    concepts.length &&
+    concepts.every((concept) => revenueTags.has(concept))
+      ? "reported-company-revenue"
+      : basis(m);
+  return `${definition}|${m?.label}|${m?.unit}|${m?.spending_basis || ""}`;
+}
+export function historyPoints(rows, key, maxGapDays = 420) {
+  let previous = null;
+  return rows.map((row) => {
     const m = metric(row, key),
       value = number(m?.value);
+    const point = { row, metric: m, value, move: !previous, note: null };
     if (value == null || Math.abs(value) > 1e15) {
+      point.value = null;
+      point.note = {
+        kind: "missing",
+        text:
+          m?.reason || "A usable figure for this reporting date is not saved.",
+      };
       previous = null;
-      continue;
+      return point;
     }
-    const nextDefinition = basis(m) + m.label;
-    const gap = previous && daysBetween(row.end, previous.end);
-    path += `${!previous || nextDefinition !== definition || gap > 420 ? "M" : "L"}${x(row)},${y(value)} `;
-    previous = row;
-    definition = nextDefinition;
+    if (previous) {
+      point.from = previous.row.end;
+      point.before = previous.metric;
+      const gap = daysBetween(row.end, previous.row.end);
+      if (!Number.isFinite(gap) || gap <= 0 || gap > maxGapDays) {
+        point.move = true;
+        point.note = {
+          kind: "gap",
+          text: "An intervening reporting period is not saved. The line does not skip across it.",
+        };
+      } else if (
+        historyDefinition(m, key) !== historyDefinition(previous.metric, key)
+      ) {
+        point.move = true;
+        point.note = {
+          kind: "definition",
+          text:
+            key === "net_income"
+              ? "The profit definition changes between whole-group and parent-company figures. Both values are available, but the line stops at the change."
+              : "The reported measure changes definition. Both values are available, but the line stops at the change.",
+        };
+      } else if (key === "revenue" && basis(m) !== basis(previous.metric)) {
+        point.note = {
+          kind: "label",
+          text: "The filing’s revenue label changed. Both reported sales figures are connected; accounting policies may differ. This is not an adjusted growth comparison.",
+        };
+      }
+    }
+    previous = point;
+    return point;
+  });
+}
+export function historyNotes(rows, key, maxGapDays = 420) {
+  const notes = [];
+  for (const point of historyPoints(rows, key, maxGapDays)) {
+    if (!point.note) continue;
+    const previous = notes.at(-1);
+    // Consecutive missing periods with the same explanation form one readable
+    // range. Every original figure/input remains accessible in its date card.
+    if (
+      point.note.kind === "missing" &&
+      previous?.kind === "missing" &&
+      previous.text === point.note.text &&
+      previous.lastIndex === rows.indexOf(point.row) - 1
+    ) {
+      previous.end = point.row.end;
+      previous.lastIndex += 1;
+      previous.metrics.push(point.metric);
+    } else
+      notes.push({
+        ...point.note,
+        start: point.from || point.row.end,
+        end: point.row.end,
+        lastIndex: rows.indexOf(point.row),
+        metrics: [point.before, point.metric].filter(Boolean),
+      });
   }
-  return path;
+  return notes;
+}
+export function historyPath(rows, key, x, y, maxGapDays = 420) {
+  return historyPoints(rows, key, maxGapDays)
+    .filter((point) => point.value != null)
+    .map(
+      (point) => `${point.move ? "M" : "L"}${x(point.row)},${y(point.value)} `,
+    )
+    .join("");
 }

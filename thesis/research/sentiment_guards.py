@@ -124,12 +124,11 @@ def allowed(conn, packet):
 
 def price_details(item, source, company):
     passages = {p["id"]: p["quote"] for p in source["passages"]}
-    details = []
+    details, ignored = [], []
     for claim in item.price_claims:
         text = passages.get(claim.passage_id, "")
         if not text or claim.amount_text not in text:
             raise ValueError("Price claim does not match its own original passage.")
-        value = number(claim.amount_text)
         direction = "not_stated"
         if claim.direction_text is not None:
             if claim.direction_text not in text:
@@ -139,6 +138,13 @@ def price_details(item, source, company):
                 up, down = bool(UP.search(claim.direction_text)), bool(DOWN.search(claim.direction_text))
                 if up != down:
                     direction = "up" if up else "down"
+        if not MONEY.fullmatch(claim.amount_text.strip()):
+            # An exact source token such as "220s" is unsupported price
+            # evidence, not a fabricated citation. Omit this optional field
+            # without discarding the other complete source classifications.
+            ignored.append(claim)
+            continue
+        value = number(claim.amount_text)
         issuer = direct_target(text, company, claim.amount_text)
         ref = source.get("price_reference") or reference(None, source, company)
         if source.get("timestamp_basis") == "feed_updated":
@@ -162,13 +168,14 @@ def price_details(item, source, company):
         if match and price_only(text, company) and not any(d["passage_id"] == pid for d in details):
             from types import SimpleNamespace
             fallback = SimpleNamespace(price_claims=[SimpleNamespace(passage_id=pid, amount_text=match[0], kind="price_target" if re.search(r"\b(?:to|target|pt)\b", text, re.I) else "other", direction_text=text)], passages=[])
-            details.extend(price_details(fallback, source, company))
-    return details
+            fallback_prices, _ = price_details(fallback, source, company)
+            details.extend(fallback_prices)
+    return details, ignored
 
 
 def apply(item, source, company):
     quotes = [p["quote"] for p in source["passages"] if p["id"] in item.passages]
-    prices = price_details(item, source, company) if source["channel"] == "social" else []
+    prices, ignored = price_details(item, source, company) if source["channel"] == "social" else ([], [])
     reason = None
     if item.relevance == "relevant" and item.sentiment != "unclear":
         if all(bare_price(q, company) for q in quotes):
@@ -186,6 +193,8 @@ def apply(item, source, company):
             reason = "bare_ticker_or_number"
         elif all(q.rstrip().endswith("?") for q in quotes):
             reason = "question_only"
+        if not reason and ignored:
+            reason = "unsupported_price_amount"
     notes = {
         "bare_price_target": "A price target alone does not state whether the author expects a rise or a fall.",
         "price_direction_unstated": "The price wording does not establish the author's direction.",
@@ -194,9 +203,14 @@ def apply(item, source, company):
         "price_label_conflict": "The AI label conflicts with the explicit price direction. The item needs review.",
         "bare_ticker_or_number": "The selected wording contains only a company name, ticker or number.",
         "question_only": "The selected wording asks a question without a separate stated view.",
+        "unsupported_price_amount": "An extracted price is not an exact dollar amount. It was omitted and this item's attitude remains unclear.",
     }
     guard = dict(policy=POLICY, applied=bool(reason), rule=reason,
                  model_sentiment=item.sentiment, model_basis=item.basis,
                  explanation=notes.get(reason))
+    if ignored:
+        guard["ignored_price_claims"] = [dict(passage_id=c.passage_id,
+            amount_text=c.amount_text, reason="not_exact_dollar_amount") for c in ignored]
     return dict(guard=guard, price_comparisons=prices,
+                price_claims=[c.model_dump() for c in item.price_claims if c not in ignored],
                 **(dict(sentiment="unclear", basis="unclear", explanation=notes[reason]) if reason else {}))

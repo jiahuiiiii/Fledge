@@ -73,6 +73,13 @@ restart **when their exact request inputs are unchanged**. Sources refreshed in
 between may change those inputs and require a new analysis; this is not a frozen
 sample resume button. Saved output and failed attempts are never overwritten.
 
+The [12 October optional price-extraction correction](sentiment-price-guards.md#unsupported-optional-price-extraction--12-october-2026)
+omits source-matching unsupported amount syntax such as `220s` without rejecting
+the other complete classifications. This preserves request identities, so a
+previously rejected unpublished batch can pass the corrected validator and be
+reused without a new AI call. Fabricated source evidence still rejects the batch;
+normal source/access checks and all-or-nothing publication remain in force.
+
 Scheduled watches never retry a settled invalid batch. An explicit **Refresh &
 analyse** can retry a previously settled invalid request once with a separate
 attempt identity. A failed new request is not retried within that same action.
@@ -81,10 +88,15 @@ separately accounted. They retain the original ledger's review/continuation rule
 There is no separate allowance or new model provider. The low/12,000 setting has
 a new immutable pricing-profile version with the same standard token rates;
 historical request profiles and charges are not rewritten.
-The complete plan's maximum new allowance is checked before new dispatch, excluding
-valid cached requests. Insufficient budget blocks the full reading with an explicit
-explanation and no substituted smaller sample. Per-call atomic reservations still
-enforce the original cap when other work runs.
+Since the owner's 12 October 2026 request, there is no upfront allowance check for
+the complete reading, either before the quick relevance filter or after filtering.
+Each quick-check and full-reading request still reserves its own maximum against
+the original cumulative allowance. Settlement releases the unused reservation
+before the next request. A request that cannot fit stops before dispatch; completed
+requests remain saved and identical valid requests can be reused. This can leave
+a partly completed reading, with no substituted smaller sample or combined result
+until every batch finishes. Source/context bounds are still validated before any
+dispatch. Unknown charges, access checks and explicit-retry limits are unchanged.
 
 A per-company session lock serializes manual and scheduled sentiment generation
 without holding a transaction over external calls. Source access is rechecked

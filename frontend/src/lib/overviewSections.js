@@ -74,8 +74,8 @@ export function currentGuidance(
       if (
         section.review_status ||
         section.truncated ||
-        !section.period_end ||
-        section.period_end < today
+        (!section.period_end && !section.period_label) ||
+        (section.period_end && section.period_end < today)
       )
         continue;
       const forecast = section.forecasts?.find(
@@ -89,6 +89,54 @@ export function currentGuidance(
   }
   return null;
 }
+export function guidanceReason(
+  data,
+  today = new Date().toISOString().slice(0, 10),
+) {
+  if (data?.status === "unavailable")
+    return data.message || "Original earnings releases are unavailable.";
+  const current = currentGuidance(data, today);
+  if (current)
+    return current.section.period_end
+      ? null
+      : "The release names the forecast period but does not state its exact ending date.";
+  const dated = (data?.releases || [])
+    .filter((r) => r.current)
+    .flatMap((r) => r.sections || [])
+    .filter(
+      (s) =>
+        !s.review_status &&
+        !s.truncated &&
+        s.forecasts?.some((f) => f.metric === "revenue"),
+    );
+  if (dated.length && dated.every((s) => s.period_end && s.period_end < today))
+    return "The latest saved revenue guidance covers a period that has ended. Read it in Management outlook.";
+  return (
+    data?.availability?.message ||
+    "No current earnings release is saved. Use Update data to collect it."
+  );
+}
+export function guidanceStatusLabel(data) {
+  return (
+    {
+      not_in_release: "No forecast in release",
+      expired: "Period ended",
+      release_missing: "Release missing",
+      collection_failed: "Source check failed",
+      source_unavailable: "Source unavailable",
+      extraction_failed: "Could not read release",
+      unsupported_format: "Format needs review",
+      growth_only: "Growth rate only",
+      needs_review: "Needs review",
+    }[data?.availability?.code] || "See explanation"
+  );
+}
+export function guidancePeriod(section) {
+  if (section.period_end)
+    return `the ${section.period_type === "annual" ? "fiscal year" : "quarter"} ending ${day(section.period_end)}`;
+  return section.period_label || "a period whose date was not stated";
+}
+
 export function guidanceAmount(guidance) {
   if (!guidance) return null;
   const format = (value) =>

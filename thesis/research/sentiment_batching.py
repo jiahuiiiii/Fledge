@@ -1,6 +1,6 @@
 """Bounded whole-source requests, durable ledger reuse and all-or-nothing output.
 
-No source fetches, automatic retries, extra model stage or separate allowance.
+No source fetches, automatic retries or separate allowance.
 The original model ledger retains every response, including failed attempts.
 """
 from collections import Counter
@@ -174,33 +174,6 @@ def combine(packet, parts, calls):
     ]}}, packet)
 
 
-def preflight(parts, *, retry_failed=False, extra_nano=0):
-    """Check the complete plan; per-call reservations still enforce the cap."""
-    from .sentiment import render, request_for
-    needed = extra_nano
-    for part in parts:
-        previous, attempt = prior_attempt(part)
-        if previous:
-            if previous['status'] != 'settled':
-                raise ledger.BudgetBlocked('An earlier batch may already have been sent. No automatic retry; its charge needs review.')
-            try:
-                render(previous, part)
-            except ValueError:
-                if not retry_failed or attempt >= MAX_EXPLICIT_RETRIES:
-                    continue
-            else:
-                continue
-        needed += ledger.estimate(request_for(part))
-    budget = ledger.snapshot()
-    remaining = Decimal(budget['remaining_usd'])
-    maximum = Decimal(needed) / ledger.NANO
-    if maximum > remaining:
-        raise ledger.BudgetBlocked(
-            f'The complete {sum(len(p["sources"]) for p in parts)}-source reading needs a maximum allowance of US${maximum:.4f}; '
-            f'US${remaining:.4f} is available. No new batches were sent. Completed batches remain saved.')
-    return dict(maximum_new_usd=str(maximum), available_usd=str(remaining))
-
-
 def run(packet, *, transport=None, progress=None, retry_failed=False, prefilter=None):
     """Return (result, calls). A cheap quick check first drops only sources it
     calls clearly unrelated; everything else gets the full reading."""
@@ -210,14 +183,9 @@ def run(packet, *, transport=None, progress=None, retry_failed=False, prefilter=
     if prefilter is None:
         prefilter = relevance_prefilter.enabled()
     if prefilter and packet["sources"]:
-        # Worst case: the quick check skips nothing and every batch still runs.
-        try:
-            preflight(plan(packet), retry_failed=retry_failed,
-                      extra_nano=relevance_prefilter.maximum_nano(packet))
-        except ledger.BudgetBlocked as exc:
-            if progress:
-                progress(dict(completed=0, total=0, source_counts=[], failed=None, message=str(exc)))
-            raise
+        # Validate source/context bounds before spending. The ledger checks
+        # allowance separately for each quick or full-reading request.
+        plan(packet)
         with transaction() as conn:
             check_access(conn, packet)
         if progress:
@@ -250,11 +218,6 @@ def _run(packet, *, transport=None, progress=None, retry_failed=False):
                           **({'failure': failure} if failure else {})))
 
     report(f"0 of {len(parts)} batches complete · {len(packet['sources'])} eligible sources")
-    try:
-        preflight(parts, retry_failed=retry_failed)
-    except ledger.BudgetBlocked as exc:
-        report(str(exc))
-        raise
     for index, part in enumerate(parts):
         with transaction() as conn:
             check_access(conn, packet)

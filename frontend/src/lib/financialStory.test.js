@@ -9,6 +9,7 @@ import {
   balanceBlocks,
   blockLayout,
   historyPath,
+  historyNotes,
   borrowingTrend,
 } from "./financialStory.js";
 const row = (key, value, end = "2025-09-30", start = null) => ({
@@ -203,4 +204,111 @@ test("borrowing trend describes a compatible ratio change without assuming repay
   assert.match(borrowingTrend(current, prior).detail, /does not establish/);
   prior.metrics[0].value = null;
   assert.equal(borrowingTrend(current, prior), null);
+});
+
+test("reported revenue connects across standard filing tags without relaxing growth arithmetic", () => {
+  const rows = ["2017", "2018", "2019"].map((year, i) => {
+    const row = period(`${year}-11-04`, { revenue: String(100 + i) });
+    row.metrics[0].unit = "USD";
+    row.metrics[0].inputs = [
+      {
+        concept: [
+          "SalesRevenueNet",
+          "Revenues",
+          "RevenueFromContractWithCustomerExcludingAssessedTax",
+        ][i],
+      },
+    ];
+    return row;
+  });
+  const path = historyPath(
+    rows,
+    "revenue",
+    (_, i) => 0,
+    (v) => v,
+  );
+  assert.equal((path.match(/L/g) || []).length, 2);
+  assert.equal(
+    incomeInsights(rows[1], rows[0], "annual")[0].title,
+    "Revenue comparison unavailable",
+  );
+  rows[1].metrics[0].value = null;
+  assert.equal(
+    (
+      historyPath(
+        rows,
+        "revenue",
+        () => 0,
+        (v) => v,
+      ).match(/L/g) || []
+    ).length,
+    0,
+  );
+});
+
+test("history does not connect unknown revenue definitions, other currencies or absent quarters", () => {
+  const rows = ["2025-03-31", "2025-06-30"].map((end) =>
+    period(end, { revenue: "100" }),
+  );
+  for (const row of rows)
+    Object.assign(row.metrics[0], {
+      unit: "USD",
+      inputs: [{ concept: "Revenues" }],
+    });
+  rows[1].metrics[0].inputs[0].concept = "SegmentRevenue";
+  assert.doesNotMatch(
+    historyPath(
+      rows,
+      "revenue",
+      () => 0,
+      (v) => v,
+      110,
+    ),
+    /L/,
+  );
+  rows[1].metrics[0].inputs[0].concept = "Revenues";
+  rows[1].metrics[0].unit = "EUR";
+  assert.doesNotMatch(
+    historyPath(
+      rows,
+      "revenue",
+      () => 0,
+      (v) => v,
+      110,
+    ),
+    /L/,
+  );
+  rows[1].metrics[0].unit = "USD";
+  rows[1].end = "2025-09-30";
+  assert.doesNotMatch(
+    historyPath(
+      rows,
+      "revenue",
+      () => 0,
+      (v) => v,
+      110,
+    ),
+    /L/,
+  );
+});
+
+test("chart notes distinguish missing values from available figures with changed definitions", () => {
+  const rows = ["2021", "2022", "2023", "2024"].map((year) =>
+    period(`${year}-09-30`, { net_income: "10" }),
+  );
+  rows[1].metrics[0].label = "Parent income";
+  rows[2].metrics[0].value = null;
+  rows[3].metrics[0].value = null;
+  for (const r of rows.slice(2))
+    r.metrics[0].reason = "Earlier filing is not saved.";
+  const notes = historyNotes(rows, "net_income");
+  assert.deepEqual(
+    notes.map((n) => n.kind),
+    ["definition", "missing"],
+  );
+  assert.match(notes[0].text, /Both values are available/);
+  assert.equal(notes[1].start, "2023-09-30");
+  assert.equal(notes[1].end, "2024-09-30");
+  assert.equal(notes[1].metrics.length, 2);
+  assert.equal(notes[0].metrics[0], rows[0].metrics[0]);
 });

@@ -1,3 +1,4 @@
+import { guidanceReason } from "../lib/overviewSections";
 import { readableNote } from "../lib/readingNotes";
 import { useId, useState } from "react";
 import TermHelp from "./TermHelp";
@@ -24,7 +25,7 @@ function value(number, unit) {
   );
 }
 
-function Forecast({ forecast, release }) {
+function Forecast({ forecast, release, section }) {
   const compared = forecast.comparison;
   const range = forecast.low !== forecast.high;
   return (
@@ -57,6 +58,22 @@ function Forecast({ forecast, release }) {
             {forecast.unit || "dollars; currency unspecified"}.
           </p>
         )}
+        {forecast.calculation && (
+          <p>
+            Range calculated from the stated guidance: {forecast.calculation}.
+          </p>
+        )}
+        {section.period_evidence?.map((e, i) => (
+          <div key={i}>
+            <p>Forecast date is stated in the same release’s reconciliation:</p>
+            <blockquote>{e.heading.quote}</blockquote>
+            {e.passages
+              .filter((p) => /revenue|ending|ended|20\d{2}/i.test(p.quote))
+              .map((p) => (
+                <blockquote key={p.id}>{p.quote}</blockquote>
+              ))}
+          </div>
+        ))}
         <p>
           Passage {forecast.id} · SEC filing accepted{" "}
           {stamp(release.published_at)}.
@@ -148,6 +165,11 @@ export default function ManagementOutlook({ data }) {
           </label>
         )}
       </div>
+      {guidanceReason(data) && (
+        <p className="outlook-data-note" role="status">
+          {guidanceReason(data)}
+        </p>
+      )}
       {!release ? (
         <div className="outlook-empty">
           <h3>No saved company guidance</h3>
@@ -170,26 +192,24 @@ export default function ManagementOutlook({ data }) {
               Latest document check: {data.source_status.last_error}
             </p>
           )}
-          {!release.sections.length && (
-            <p>
-              No supported outlook section was identified in this release. Its
-              full text remains available below.
-            </p>
-          )}
           {release.sections.map((section) => (
             <section className="outlook-period" key={section.id}>
               <div className="outlook-period-heading">
                 <h3>{section.heading}</h3>
                 <span className="outlook-status">
-                  {release.current
-                    ? "Latest saved guidance"
-                    : "Historical guidance"}
+                  {!release.current ||
+                  (section.period_end &&
+                    section.period_end < new Date().toISOString().slice(0, 10))
+                    ? "Historical guidance"
+                    : section.period_end
+                      ? "Latest saved guidance"
+                      : "Latest release · exact date not stated"}
                 </span>
               </div>
               {section.review_status && (
                 <p className="outlook-data-note">
-                  This section refers to earlier or withdrawn guidance. Read the
-                  context before treating a figure as a current expectation.
+                  {section.review_message ||
+                    "This section refers to earlier or withdrawn guidance. Read the context before treating it as a current expectation."}
                 </p>
               )}
               <div className="outlook-dates">
@@ -206,7 +226,9 @@ export default function ManagementOutlook({ data }) {
                   <strong>
                     {section.period_end
                       ? day(section.period_end)
-                      : "Not established"}
+                      : section.period_label
+                        ? `${section.period_label} · exact date not stated`
+                        : "Period not identified"}
                   </strong>
                 </div>
               </div>
@@ -216,6 +238,7 @@ export default function ManagementOutlook({ data }) {
                     key={forecast.id}
                     forecast={forecast}
                     release={release}
+                    section={section}
                   />
                 ))}
               </div>
@@ -247,6 +270,9 @@ export default function ManagementOutlook({ data }) {
                 {release.stated_release_date && (
                   <blockquote>{release.stated_release_date.quote}</blockquote>
                 )}
+                {(section.context_evidence || []).map((passage) => (
+                  <p key={passage.id}>{passage.quote}</p>
+                ))}
                 {section.passages.map((passage) => (
                   <p key={passage.id}>{passage.quote}</p>
                 ))}

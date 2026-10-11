@@ -6,6 +6,9 @@ import {
   overviewModel,
   segmentEvidence,
   guidanceAmount,
+  guidanceReason,
+  guidancePeriod,
+  guidanceStatusLabel,
   multiple,
   number,
   yearLabel,
@@ -549,8 +552,11 @@ export default function OverviewSections({
             : "Comparable annual revenue growth is not available. "}
           {growthVsPeers && `${growthVsPeers} `}
           {guidance
-            ? `Management’s revenue outlook is ${guidanceAmount(guidance)} for the ${guidance.section.period_type} ending ${day(guidance.section.period_end)}.`
-            : "No current management revenue outlook is saved."}
+            ? `The latest saved release gives revenue guidance of ${guidanceAmount(guidance)} for ${guidancePeriod(guidance.section)}.`
+            : guidanceReason(data.management_outlook)}
+          {guidance &&
+            !guidance.section.period_end &&
+            ` ${guidanceReason(data.management_outlook)}`}
         </Reading>
         <div className="overview-section-grid">
           <KeyInformation
@@ -561,7 +567,9 @@ export default function OverviewSections({
                 term: "revenue_growth",
               },
               {
-                value: guidanceAmount(guidance),
+                value:
+                  guidanceAmount(guidance) ||
+                  guidanceStatusLabel(data.management_outlook),
                 label: "Management revenue outlook",
                 term: "guidance",
               },
@@ -579,7 +587,11 @@ export default function OverviewSections({
               },
               {
                 label: "Outlook period ends",
-                value: guidance ? day(guidance.section.period_end) : null,
+                value: guidance
+                  ? guidance.section.period_end
+                    ? day(guidance.section.period_end)
+                    : `${guidance.section.period_label} · exact date not stated`
+                  : "See explanation above",
               },
               {
                 label: "Analyst forecasts",

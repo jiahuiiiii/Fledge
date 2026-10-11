@@ -103,6 +103,37 @@ def revenue_history_plan(submissions, cik, now):
             for f in reversed(selected)]
 
 
+def cash_flow_history_plan(bundle, cik, now):
+    """Original statements needed by missing cash-flow chart inputs.
+
+    Use the chart's bounded dates plus their preceding annual bridge. This is
+    issuer-independent and retains historical documents without moving current
+    disclosure pointers. Already retained originals are reused by refresh.
+    """
+    from .normalize import filing_rows
+    from .financial_story import normalize_story
+    story = normalize_story(bundle, cik, now)
+    filings = filing_rows(bundle['submissions'], now)
+    needed = set()
+    for period in story['annual'] + story['trailing']:
+        if not any(m['key'] in ('operating_cash', 'capital_spending') and m['value'] is None for m in period['metrics']):
+            continue
+        needed.add(period['accession'])
+        prior = [f for f in filings if f['form'].startswith('10-K') and f['end'].isoformat() < period['end']
+                 and f['accepted_at'] <= period['accepted_at']]
+        if prior: needed.add(prior[-1]['accessionNumber'])
+    selected = []
+    for current in filings:
+        if current['accessionNumber'] not in needed: continue
+        chain = [f for f in filings if f['end'] == current['end'] and f['form'].split('/')[0] == current['form'].split('/')[0]
+                 and f['accepted_at'] <= current['accepted_at']]
+        selected.extend(chain if len(chain) <= 8 else [current])
+    unique = {f['accessionNumber']: f for f in selected}
+    return [dict(slot='cash_flow_history', history=True, form=f['form'], accession=f['accessionNumber'],
+                 published_at=f['accepted_at'], period_end=f['end'].isoformat(), filed_on=f['filingDate'],
+                 url=archive_url(cik, f['accessionNumber'], f['primaryDocument'])) for f in unique.values()]
+
+
 def refresh(iid, *, fetcher=None, submissions=None, history_only=False):
     if fetcher is None:client.identity()
     now=datetime.now(timezone.utc);attempt=uuid4()
@@ -115,13 +146,13 @@ def refresh(iid, *, fetcher=None, submissions=None, history_only=False):
         state=one(conn,'SELECT * FROM disclosure_refresh_state WHERE instrument_id=%s FOR UPDATE',(iid,))
         if state['last_attempt_at'] and now-state['last_attempt_at']<timedelta(minutes=15):
             raise Conflict('Original filings were checked recently. Wait 15 minutes between attempts.')
+        bundle=one(conn,'SELECT p.payload,c.checked_at FROM sec_payload_current c JOIN source_payloads p ON p.id=c.payload_id AND p.instrument_id=c.instrument_id WHERE c.instrument_id=%s',(iid,))
         if submissions is None:
-            bundle=one(conn,'SELECT p.payload,c.checked_at FROM sec_payload_current c JOIN source_payloads p ON p.id=c.payload_id AND p.instrument_id=c.instrument_id WHERE c.instrument_id=%s',(iid,))
             if not bundle or now-bundle['checked_at']>timedelta(hours=24):
-                raise ValueError('Refresh structured filings first to obtain current issuer metadata.')
+                raise ValueError('Original documents could not be checked because the company’s filing details have not loaded or need updating. Use Update data to check the filing connection first.')
             submissions=bundle['payload']['submissions']
         conn.execute('UPDATE disclosure_refresh_state SET attempt_id=%s,last_attempt_at=%s,lease_until=%s WHERE instrument_id=%s',(attempt,now,now+timedelta(minutes=3),iid))
-    coverage=[row for row in (state.get('coverage') or []) if row['slot'] != 'revenue_history'] if history_only else []
+    coverage=[row for row in (state.get('coverage') or []) if row['slot'] not in ('revenue_history', 'cash_flow_history')] if history_only else []
     saved=0
     try:
         items=[] if history_only else plan(submissions,company['cik'],now)
@@ -129,6 +160,9 @@ def refresh(iid, *, fetcher=None, submissions=None, history_only=False):
         # Structured history is supported only for domestic 10-K/10-Q filers.
         if history_only or any(item['form'].startswith(('10-K', '10-Q')) for item in items):
             items += [item for item in revenue_history_plan(submissions,company['cik'],now) if item['url'] not in current_urls]
+            if bundle and bundle['payload'].get('submissions') == submissions:
+                retained_urls = {item['url'] for item in items}
+                items += [item for item in cash_flow_history_plan(bundle['payload'], company['cik'], now) if item['url'] not in retained_urls]
         for slot in ('annual','quarter','earnings_filing'):
             if not history_only and slot not in {i['slot'] for i in items}:coverage.append(dict(slot=slot,status='missing',message='No supported filing in the retained metadata.'))
         read=fetcher or client.fetch_document

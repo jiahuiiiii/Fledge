@@ -11,6 +11,28 @@ import {
 
 const metric = (key, value, end = "2026-08-02") => ({ key, value, end });
 
+test("named fiscal guidance does not invent an ending date", () => {
+  const data = {
+    management_outlook: {
+      releases: [
+        {
+          sections: [
+            {
+              period_type: "quarter",
+              period_label: "Q3 FY2027",
+              forecasts: [{ metric: "revenue", low: "1000000000" }],
+            },
+          ],
+        },
+      ],
+    },
+  };
+  assert.equal(
+    snapshot(data).sentences[0],
+    "Management expects $1bn of revenue for Q3 FY2027.",
+  );
+});
+
 const workspace = {
   financial_depth: {
     trailing: [

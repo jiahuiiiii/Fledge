@@ -612,3 +612,57 @@
   overflow: hidden;
   clip-path: inset(50%);
 }
+.financial-recovery {
+  margin-bottom: 20px;
+}
+.financial-recovery > summary {
+  min-height: 44px;
+  cursor: pointer;
+  font-weight: 650;
+}
+.financial-recovery-body {
+  padding-top: 12px;
+}
+.financial-recovery-body > label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.financial-recovery-body button,
+.financial-recovery-item label {
+  min-height: 44px;
+}
+.financial-recovery-item {
+  border-top: 1px solid var(--border);
+  padding: 16px 0;
+}
+.financial-recovery-item label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 650;
+}
+.financial-recovery-item blockquote {
+  margin: 12px 0;
+  padding: 12px;
+  border-left: 2px solid var(--border);
+  overflow-wrap: anywhere;
+}
+
+.story-history-notes {
+  margin-top: 0.75rem;
+  color: var(--color-muted);
+}
+.story-history-notes > summary {
+  min-height: 44px;
+  align-content: center;
+  cursor: pointer;
+}
+.story-history-notes > article {
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--color-line);
+}
+.story-history-notes > article p {
+  margin: 0.4rem 0;
+}

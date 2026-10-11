@@ -42,6 +42,38 @@ export function FinancialEvidenceRow({ row, fallbackUrl, caption }) {
       {row.explanation && (
         <p className="financial-evidence-note">{row.explanation}</p>
       )}
+      {inputs
+        .filter((input) => input.recovery)
+        .map((input, index) => (
+          <details
+            className="financial-evidence-calculation"
+            key={`recovery-${index}`}
+          >
+            <summary>
+              {input.ai_assisted
+                ? "AI-assisted mapping reviewed by you"
+                : "Read from the original statement"}
+            </summary>
+            <p>{input.recovery.explanation}</p>
+            {input.recovery.formula && <p>{input.recovery.formula}</p>}
+            {input.recovery.inputs.map((source, n) => (
+              <div key={n}>
+                <a
+                  href={`${source.filing_url}${source.fact_id ? `#${encodeURIComponent(source.fact_id)}` : ""}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {source.row_label || source.label || source.concept} ·{" "}
+                  {evidenceValue(source.value, source.unit)} ↗
+                </a>
+                {(source.row_text || source.text) && (
+                  <p>{source.row_text || source.text}</p>
+                )}
+                <small>{evidencePeriod(source)}</small>
+              </div>
+            ))}
+          </details>
+        ))}
       {sources.length > 0 && (
         <div
           className="financial-evidence-sources"
