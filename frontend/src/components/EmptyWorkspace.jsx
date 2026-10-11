@@ -1,10 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import CompanyDialog from "./CompanyDialog";
 import TelegramSettings from "./TelegramSettings";
 import { companionPromise } from "../lib/companion";
+import { useProfile } from "../lib/profile";
+import DetailModeToggle from "./DetailModeToggle";
 
 export default function EmptyWorkspace({ view, onChoose }) {
   const [adding, setAdding] = useState(false);
+  const { home } = useProfile();
+  useEffect(() => {
+    const openAdd = () => setAdding(true);
+    if (window.fledgeOpenAddCompany) {
+      window.fledgeOpenAddCompany = false;
+      openAdd();
+    }
+    addEventListener("fledge:open-add-company", openAdd);
+    return () => removeEventListener("fledge:open-add-company", openAdd);
+  }, []);
+  const personal = home?.profile?.completed ? home : null;
   const copy = {
     workspace: ["Start with a company you’re curious about", companionPromise],
     ideas: [
@@ -20,7 +33,10 @@ export default function EmptyWorkspace({ view, onChoose }) {
       "Your saved questions, analysis and idea revisions will appear here as you explore.",
     ],
   };
-  const [title, description] = copy[view] || copy.workspace;
+  const [title, description] =
+    personal && (view === "workspace" || !copy[view])
+      ? [personal.headline, personal.next_step.label]
+      : copy[view] || copy.workspace;
   return (
     <div className="app-shell all-companies-view empty-app">
       <header className="topbar">
@@ -43,6 +59,7 @@ export default function EmptyWorkspace({ view, onChoose }) {
             </button>
           ))}
         </nav>
+        <DetailModeToggle />
         <TelegramSettings />
       </header>
       <main className="empty-workspace">
@@ -53,6 +70,20 @@ export default function EmptyWorkspace({ view, onChoose }) {
           Pick a company you own or want to understand. You don’t need a
           position to start.
         </p>
+        {personal?.interests?.length > 0 && (
+          <p className="fine personal-interests">
+            You told us you’re interested in{" "}
+            {personal.interests.map((item) => item.label).join(", ")}. Search
+            for a company in these areas, or anything else you’re curious
+            about.
+          </p>
+        )}
+        {personal && (
+          <p className="fine">
+            Your watchlist: {personal.watchlist.count} of{" "}
+            {personal.watchlist.limit} companies.
+          </p>
+        )}
         <button className="primary" onClick={() => setAdding(true)}>
           Add your first company <span aria-hidden="true">＋</span>
         </button>

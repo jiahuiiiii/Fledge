@@ -1083,12 +1083,13 @@ def catalogue(conn, owner):
     return rows(
         conn,
         """SELECT i.id,i.symbol,i.name,s.sector,s.mode,s.cutoff,t.status,t.revision,v.reasoning,v.question,
+      EXISTS(SELECT 1 FROM watchlist_companies w WHERE w.owner_id=%s AND w.instrument_id=i.id) watchlisted,
       ((SELECT count(*) FROM change_events c JOIN thesis_versions cv ON cv.id=c.version_id LEFT JOIN review_events r ON r.evaluation_id=c.evaluation_id AND r.owner_id=c.owner_id WHERE c.owner_id=%s AND cv.thesis_id=t.id AND r.id IS NULL)
        + (SELECT count(*) FROM research_alerts a LEFT JOIN research_alert_reviews r ON r.alert_id=a.id AND r.owner_id=a.owner_id WHERE a.owner_id=%s AND a.instrument_id=i.id AND r.alert_id IS NULL)
        + (SELECT count(*) FROM idea_alert_checks a JOIN idea_alert_publications p ON p.check_id=a.id AND p.owner_id=a.owner_id LEFT JOIN idea_alert_reviews r ON r.check_id=a.id AND r.owner_id=a.owner_id WHERE a.owner_id=%s AND a.instrument_id=i.id AND r.check_id IS NULL)) unread
       FROM instruments i JOIN instrument_state s ON s.instrument_id=i.id LEFT JOIN theses t ON t.instrument_id=i.id AND t.owner_id=%s
       LEFT JOIN thesis_versions v ON v.thesis_id=t.id AND v.owner_id=t.owner_id AND v.revision=t.revision ORDER BY i.symbol""",
-        (owner, owner, owner, owner),
+        (owner, owner, owner, owner, owner),
     )
 
 

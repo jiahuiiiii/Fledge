@@ -75,6 +75,10 @@ import { combineSuggestions } from "./lib/proposals";
 import ReviewDownload from "./components/ReviewDownload";
 import ReportingAge, { ageLabel } from "./components/ReportingAge";
 import IdeaEvidenceReview from "./components/IdeaEvidenceReview";
+import Onboarding from "./components/Onboarding";
+import PersonalHome from "./components/PersonalHome";
+import DetailModeToggle from "./components/DetailModeToggle";
+import { ProfileContext } from "./lib/profile";
 import ReportExpectationEditor, {
   ReportExpectationText,
 } from "./components/ReportExpectation";
@@ -330,7 +334,51 @@ function ResearchApp({ signOut, session }) {
       setInboxState((state) => ({ ...state, page: 0, cutoff: "" }));
     setDestination({ id, view, evaluation });
   }
+  const [home, setHome] = useState(null);
+  const [onboardingSkipped, setOnboardingSkipped] = useState(false);
+  useEffect(() => {
+    let active = true;
+    const load = () =>
+      api
+        .home()
+        .then((value) => active && setHome(value))
+        .catch(() => active && setHome({ unavailable: true }));
+    load();
+    addEventListener("fledge:home-changed", load);
+    return () => {
+      active = false;
+      removeEventListener("fledge:home-changed", load);
+    };
+  }, []);
+  const detailMode = home?.profile?.completed ? home.detail_mode : null;
+  useEffect(() => {
+    if (detailMode) document.documentElement.dataset.detailMode = detailMode;
+    else delete document.documentElement.dataset.detailMode;
+  }, [detailMode]);
+  const profileValue = {
+    home,
+    profile: home?.profile || null,
+    setDetailMode: (mode) =>
+      api
+        .saveDetailMode(mode)
+        .then((profile) =>
+          setHome((current) => ({ ...current, profile, detail_mode: profile.detail_mode })),
+        )
+        .catch(() => {}),
+  };
   return (
+    <ProfileContext.Provider value={profileValue}>
+    {home?.profile && !home.profile.completed && !onboardingSkipped ? (
+      <Onboarding
+        onSkip={() => setOnboardingSkipped(true)}
+        onDone={(profile) => {
+          // Next step after the questions: choose companies for the watchlist.
+          window.fledgeOpenAddCompany = true;
+          setHome((current) => ({ ...current, profile, detail_mode: profile.detail_mode }));
+          dispatchEvent(new Event("fledge:home-changed"));
+        }}
+      />
+    ) : (
     <CompanyWorkspace
       signOut={signOut}
       instrumentId={destination.id || defaultCompany}
@@ -358,6 +406,8 @@ function ResearchApp({ signOut, session }) {
         setHiddenCompanies((ids) => ids.filter((value) => value !== id))
       }
     />
+    )}
+    </ProfileContext.Provider>
   );
 }
 const pendingPriceRead = { data: null, error: "" };
@@ -442,6 +492,20 @@ function CompanyWorkspace({
     [modelStatus, setModelStatus] = useState(null),
     [companySearch, setCompanySearch] = useState(""),
     [addingCompany, setAddingCompany] = useState(false);
+  const [watchlistMessage, setWatchlistMessage] = useState("");
+  useEffect(() => {
+    // After the first-login questions, open the company search once the
+    // workspace has loaded (loading resets open dialogs).
+    if (data && window.fledgeOpenAddCompany) {
+      window.fledgeOpenAddCompany = false;
+      setAddingCompany(true);
+    }
+  }, [data]);
+  useEffect(() => {
+    const openAdd = () => setAddingCompany(true);
+    addEventListener("fledge:open-add-company", openAdd);
+    return () => removeEventListener("fledge:open-add-company", openAdd);
+  }, []);
   const [loadingRun, setLoadingRun] = useState(null);
   const [loadingError, setLoadingError] = useState("");
   const lastLoadingRevision = useRef(null);
@@ -797,8 +861,12 @@ function CompanyWorkspace({
         }}
       />
     );
+  // Once an account has a watchlist (max 5), the sidebar follows it.
+  const usesWatchlist = data.catalogue.some((company) => company.watchlisted);
   const visibleCompanies = data.catalogue.filter(
-    (company) => !hiddenCompanies.includes(company.id),
+    (company) =>
+      !hiddenCompanies.includes(company.id) &&
+      (!usesWatchlist || company.watchlisted),
   );
   const hiddenCatalogue = data.catalogue.filter((company) =>
     hiddenCompanies.includes(company.id),
@@ -806,6 +874,21 @@ function CompanyWorkspace({
   function removeCompany(company) {
     onHideCompany(company.id);
     setRemovedCompany(company);
+    api
+      .removeFromWatchlist(company.id)
+      .then(() => dispatchEvent(new Event("fledge:home-changed")))
+      .catch(() => {});
+  }
+  async function followCompany(id) {
+    try {
+      await api.addToWatchlist(id);
+      setWatchlistMessage("");
+      dispatchEvent(new Event("fledge:home-changed"));
+      return true;
+    } catch (failure) {
+      setWatchlistMessage(failure.message);
+      return false;
+    }
   }
   const displayInstrument = companyLoading
     ? data.catalogue.find((company) => company.id === instrumentId) || {
@@ -1425,14 +1508,24 @@ function CompanyWorkspace({
           ))}
         </nav>
         <div className="topbar-tools">
+          <DetailModeToggle />
           <TelegramSettings />
           {signOut}
         </div>
       </header>
+      {watchlistMessage && (
+        <p className="watchlist-notice" role="alert">
+          {watchlistMessage}{" "}
+          <button type="button" onClick={() => setWatchlistMessage("")}>
+            Dismiss
+          </button>
+        </p>
+      )}
       <RemovalNotice
         company={removedCompany}
         onUndo={() => {
           if (!removedCompany) return;
+          followCompany(removedCompany.id);
           onRestoreCompany(removedCompany.id);
           setRemovedCompany(null);
         }}
@@ -2223,8 +2316,12 @@ function CompanyWorkspace({
                       <LoadingSkeleton label="Loading your companies…" />
                     }
                   >
+                    <PersonalHome
+                      onAddCompany={() => setAddingCompany(true)}
+                      onOpenCompany={(id) => onChoose(id)}
+                    />
                     <CompanyOverview
-                      catalogue={data.catalogue}
+                      catalogue={visibleCompanies}
                       initialWorkspace={data}
                       onOpen={onChoose}
                     />
@@ -2921,11 +3018,14 @@ function CompanyWorkspace({
         hidden={hiddenCatalogue}
         onRemove={removeCompany}
         onRestore={(id) => {
+          followCompany(id);
           onRestoreCompany(id);
           setRemovedCompany(null);
         }}
-        onAdded={(id) => {
+        onAdded={async (id) => {
           if (activeScope.current !== scope) return;
+          // A full watchlist still opens the company; it just isn't added.
+          await followCompany(id);
           onRestoreCompany(id);
           setAddingCompany(false);
           onChoose(id);

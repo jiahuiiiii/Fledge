@@ -45,6 +45,10 @@ def configuration():
     values = settings()
     if values.get('THESIS_AUTH_ENABLED') == 'false':
         return None
+    if values.get('THESIS_AUTH_MODE', '').strip().casefold() == 'password':
+        # Test product: username/password accounts, no email verification.
+        owner = values.get('THESIS_OWNER_USERNAME', '').strip().casefold() or None
+        return dict(mode='password', owner_username=owner)
     url = values.get('SUPABASE_URL', '').rstrip('/')
     key = values.get('SUPABASE_PUBLISHABLE_KEY') or values.get('SUPABASE_ANON_KEY', '')
     email = values.get('THESIS_OWNER_EMAIL', '').strip().casefold()
@@ -108,6 +112,7 @@ def verified_user(config, token, *, transport=None):
 def send_link(email, *, transport=None):
     config=configuration()
     if not config:raise AuthFailure('Managed login has not been configured.',503)
+    if config.get('mode')=='password':raise AuthFailure('Sign in with your username and password.',409)
     email=email.strip().casefold()
     if not valid_email(email):raise AuthFailure('Enter a valid email address.',422)
     now=datetime.now(timezone.utc)
@@ -145,6 +150,7 @@ def token_pair(result):
 
 def complete(code, flow_token, *, transport=None):
     config=configuration()
+    if config and config.get('mode')=='password':raise AuthFailure('Sign in with your username and password.')
     if not config or not flow_token or not code or len(code)>2048:raise AuthFailure('Start sign-in in this browser, then open its newest email link.')
     now=datetime.now(timezone.utc)
     with transaction(admin=True) as conn:
@@ -180,6 +186,11 @@ def complete(code, flow_token, *, transport=None):
 def authenticate(cookie, *, transport=None):
     config=configuration()
     if not config: return None
+    if config.get('mode')=='password':
+        from . import password_auth
+        account=password_auth.authenticate(cookie)
+        if not account:raise AuthFailure()
+        return account
     if not cookie or len(cookie)>256:raise AuthFailure()
     now=datetime.now(timezone.utc)
     with transaction(admin=True) as conn:
@@ -203,6 +214,8 @@ def authenticate(cookie, *, transport=None):
 
 def logout(cookie):
     if not cookie:return
+    from . import password_auth
+    password_auth.logout(cookie)
     with transaction(admin=True) as conn:
         conn.execute('DELETE FROM auth_sessions WHERE token_hash=%s',(digest(cookie),))
 
@@ -211,6 +224,9 @@ def background_owners():
     # Private workers retain explicit owner scopes; public evidence is shared.
     config=configuration()
     if not config:return [OWNER]
+    if config.get('mode')=='password':
+        from . import password_auth
+        return sorted(set([OWNER]+password_auth.owners()))
     with transaction(admin=True) as conn:
         # Historical QA accounts are retained but must not be enrolled merely
         # because account support is installed.

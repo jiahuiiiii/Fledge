@@ -1,0 +1,110 @@
+.account-card.onboarding {
+  width: min(620px, calc(100vw - 32px));
+}
+.onboarding h3 {
+  margin: 4px 0 12px;
+  font-size: var(--text-lg, 1.15rem);
+}
+.onboarding-step {
+  color: var(--color-text-2);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+.onboarding-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+.onboarding-options button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px 14px;
+  text-align: left;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+.onboarding-options button span {
+  color: var(--color-text-2);
+  font-size: var(--text-sm);
+}
+.onboarding-options button.selected {
+  border-color: var(--color-accent, currentColor);
+  outline: 2px solid var(--color-accent, currentColor);
+  outline-offset: -1px;
+}
+.onboarding-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+.detail-mode {
+  display: inline-flex;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.detail-mode button {
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-2);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.detail-mode button.active {
+  background: var(--color-line-strong);
+  color: var(--color-text);
+}
+.watchlist-notice {
+  margin: 8px 16px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+.watchlist-notice button {
+  margin-left: 8px;
+}
+
+/* "Show me the data": hide beginner help; "Explain it to me" keeps it. */
+:root[data-detail-mode="data"] .term-help {
+  display: none;
+}
+.personal-home {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 0 0 20px;
+  padding: 18px 20px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.personal-home h2 {
+  margin: 6px 0;
+}
+.personal-home p {
+  margin: 4px 0;
+  color: var(--color-text-2);
+}
+.personal-home-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10px;
+}
+.personal-home-count strong {
+  color: var(--color-text);
+  font-size: 1.2em;
+}
