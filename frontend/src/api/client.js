@@ -103,6 +103,13 @@ export const api = {
     }),
   login: (email) => request("/auth/login", { method: "POST", body: { email } }),
   logout: () => request("/auth/logout", { method: "POST" }),
+  register: (username, password) =>
+    request("/auth/register", { method: "POST", body: { username, password } }),
+  passwordLogin: (username, password) =>
+    request("/auth/password-login", {
+      method: "POST",
+      body: { username, password },
+    }),
   businessHistory: (id, before = null) =>
     request(
       `/companies/${id}/business${before ? `?before=${encodeURIComponent(before)}` : ""}`,
@@ -278,6 +285,15 @@ export const api = {
     request("/sec/companies", { method: "POST", body: { symbol } }),
   refreshSec: (id) => request(`/sec/${id}/refresh`, { method: "POST" }),
   session: (options) => request("/session", options),
+  profile: () => request("/profile"),
+  saveProfile: (body) => request("/profile", { method: "PUT", body }),
+  saveDetailMode: (detail_mode) =>
+    request("/profile/detail-mode", { method: "PUT", body: { detail_mode } }),
+  home: () => request("/home"),
+  addToWatchlist: (instrument_id) =>
+    request("/watchlist", { method: "POST", body: { instrument_id } }),
+  removeFromWatchlist: (instrument_id) =>
+    request(`/watchlist/${instrument_id}`, { method: "DELETE" }),
   modelStatus: (options) => request("/model-status", options),
   selectPassages: (expected_stage, instrument_id) =>
     request("/research/selection", {

@@ -1,4 +1,6 @@
+import { useState } from "react";
 import "./ReadingNotes.css";
+import { useProfile } from "../lib/profile";
 
 export default function ReadingNotes({
   title = "About this reading",
@@ -9,6 +11,11 @@ export default function ReadingNotes({
   children,
   className = "",
 }) {
+  // Beginners ("Explain it to me") see these notes open by default.
+  const { home } = useProfile();
+  const [open, setOpen] = useState(
+    home?.profile?.completed && home.detail_mode === "explain",
+  );
   const status = [
     differentSources && "Different sources",
     stale && "Sources over a day old",
@@ -16,7 +23,11 @@ export default function ReadingNotes({
     omitted > 0 && `${omitted} ${omitted === 1 ? "topic" : "topics"} left out`,
   ].filter(Boolean);
   return (
-    <details className={`reading-notes ${className}`}>
+    <details
+      className={`reading-notes ${className}`}
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
       <summary>
         <span className="reading-notes-label">
           {title}

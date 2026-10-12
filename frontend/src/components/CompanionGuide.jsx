@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Modal from "./Modal";
 import { companionPromise, starterQuestions } from "../lib/companion";
+import { orderStarters, useProfile } from "../lib/profile";
 import "./Companion.css";
 
 export default function CompanionGuide({
@@ -10,6 +11,7 @@ export default function CompanionGuide({
   onReasoning,
 }) {
   const [open, setOpen] = useState(false);
+  const { home } = useProfile();
   return (
     <>
       <button
@@ -33,7 +35,7 @@ export default function CompanionGuide({
             will stay visible.
           </p>
           <div className="companion-questions">
-            {starterQuestions
+            {orderStarters(starterQuestions, home?.starter_order)
               .filter((item) => !recorded || item.section !== "expectations")
               .map((item) => (
                 <button

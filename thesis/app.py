@@ -156,7 +156,7 @@ async def local_session(request: Request, call_next):
             return error(403, "Use this app from its local window.")
         if request.headers.get("sec-fetch-site") in {"cross-site", "same-site"}:
             return error(403, "Cross-origin requests are not accepted.")
-        public = request.url.path in {"/api/v1/session", "/api/v1/auth/login", "/api/v1/auth/logout"}
+        public = request.url.path in {"/api/v1/session", "/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/auth/register", "/api/v1/auth/password-login"}
         try:
             managed = auth.configuration()
             if managed:
@@ -234,8 +234,9 @@ def bootstrap():
 
     managed = auth.configuration()
     owner = auth.account_context.get()
+    password_mode = bool(managed and managed.get("mode") == "password")
     if managed and not owner:
-        response = JSONResponse({"result": {"mode": "managed", "authenticated": False}})
+        response = JSONResponse({"result": {"mode": "password" if password_mode else "managed", "authenticated": False}})
         response.delete_cookie(auth.COOKIE)
         return response
     with transaction() as conn:
@@ -244,14 +245,19 @@ def bootstrap():
             "SELECT instrument_id FROM market_quotes ORDER BY retrieved_at DESC LIMIT 1",
         )
     email=None
-    if managed:
+    username=None
+    if password_mode:
+        from . import password_auth
+        username=password_auth.username(owner)
+    elif managed:
         with transaction(admin=True,consistent=True) as conn:
             identity=one(conn,'SELECT verified_email FROM auth_identities WHERE account_id=%s AND project_url=%s',(owner,managed['url']))
             email=identity['verified_email'] if identity else None
     response = JSONResponse(
         {
             "result": {
-                "mode": "managed" if managed else "local-pitch",
+                "mode": "password" if password_mode else "managed" if managed else "local-pitch",
+                "username": username,
                 "authenticated": True,
                 "account": "Research account" if managed else "Local demo",
                 "account_id": owner,
@@ -284,6 +290,42 @@ def login(payload: LoginRequest):
     return response
 
 
+class PasswordRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    username: str = Field(min_length=1, max_length=64)
+    password: str = Field(min_length=1, max_length=256)
+
+
+def password_session(action, payload):
+    from . import password_auth
+    config = auth.configuration()
+    if not config or config.get("mode") != "password":
+        return error(409, "Username sign-in is not enabled for this installation.")
+    try:
+        if action == "register":
+            cookie, lifetime = password_auth.register(payload.username, payload.password)
+        else:
+            cookie, lifetime = password_auth.login(payload.username, payload.password)
+    except password_auth.PasswordFailure as failure:
+        response = error(failure.status, str(failure))
+        if failure.retry_after:
+            response.headers["Retry-After"] = str(failure.retry_after)
+        return response
+    response = JSONResponse({"result": {"signed_in": True}})
+    response.set_cookie(auth.COOKIE, cookie, httponly=True, samesite="strict", max_age=lifetime)
+    return response
+
+
+@app.post("/api/v1/auth/register")
+def register_account(payload: PasswordRequest):
+    return password_session("register", payload)
+
+
+@app.post("/api/v1/auth/password-login")
+def password_login(payload: PasswordRequest):
+    return password_session("login", payload)
+
+
 @app.get("/auth/callback")
 def login_callback(request: Request, code: str | None = None):
     try:
@@ -303,6 +345,67 @@ def logout(request: Request):
     response.delete_cookie(auth.COOKIE)
     response.delete_cookie(auth.FLOW_COOKIE, path="/auth/callback")
     return response
+
+
+class InvestorProfile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    experience: str = Field(max_length=16)
+    interests: list[str] = Field(default_factory=list, max_length=9)
+    horizon: str = Field(max_length=16)
+    goal: str = Field(max_length=16)
+    detail_mode: str | None = Field(default=None, max_length=16)
+
+
+class DetailMode(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    detail_mode: str = Field(max_length=16)
+
+
+class WatchlistCompany(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    instrument_id: UUID
+
+
+@app.get("/api/v1/profile")
+def investor_profile():
+    from . import profile
+    return {"result": profile.get(auth.current_owner())}
+
+
+@app.put("/api/v1/profile")
+def save_investor_profile(payload: InvestorProfile):
+    from . import profile
+    return {"result": profile.save(auth.current_owner(), **payload.model_dump())}
+
+
+@app.put("/api/v1/profile/detail-mode")
+def save_detail_mode(payload: DetailMode):
+    from . import profile
+    return {"result": profile.set_mode(auth.current_owner(), payload.detail_mode)}
+
+
+@app.get("/api/v1/home")
+def personal_home():
+    from . import home
+    return {"result": home.build(auth.current_owner())}
+
+
+@app.get("/api/v1/watchlist")
+def get_watchlist():
+    from . import watchlist
+    return {"result": watchlist.summary(auth.current_owner())}
+
+
+@app.post("/api/v1/watchlist")
+def add_to_watchlist(payload: WatchlistCompany):
+    from . import watchlist
+    return {"result": watchlist.add(auth.current_owner(), str(payload.instrument_id))}
+
+
+@app.delete("/api/v1/watchlist/{instrument_id}")
+def remove_from_watchlist(instrument_id: UUID):
+    from . import watchlist
+    return {"result": watchlist.remove(auth.current_owner(), str(instrument_id))}
 
 
 @app.get("/api/v1/workspace")

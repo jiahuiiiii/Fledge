@@ -5,6 +5,9 @@ import "./AccountGate.css";
 export default function AccountGate({ children }) {
   const [session, setSession] = useState(null);
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [retryAt, setRetryAt] = useState(0);
@@ -42,7 +45,10 @@ export default function AccountGate({ children }) {
         if (active) setError(failure.message);
       });
     const expired = () => {
-      setSession({ mode: "managed", authenticated: false });
+      setSession((current) => ({
+        mode: current?.mode === "password" ? "password" : "managed",
+        authenticated: false,
+      }));
       setMessage("");
       setError(
         "Your session ended. Sign in again to open your saved research.",
@@ -103,12 +109,35 @@ export default function AccountGate({ children }) {
       setBusy(false);
     }
   }
+  async function sendPassword(event) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      if (creating) await api.register(username, password);
+      else await api.passwordLogin(username, password);
+      setPassword("");
+      setSession(await api.session());
+    } catch (failure) {
+      setError(failure.message);
+      if (failure.retryAfter) {
+        setNow(Date.now());
+        setRetryAt(Date.now() + failure.retryAfter * 1000);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
   async function signOut() {
     setBusy(true);
     setError("");
     try {
       await api.logout();
-      setSession({ mode: "managed", authenticated: false });
+      setSession((current) => ({
+        mode: current?.mode === "password" ? "password" : "managed",
+        authenticated: false,
+      }));
       setMessage("You are signed out. Your saved research is still here.");
     } catch (failure) {
       setError(failure.message);
@@ -119,13 +148,13 @@ export default function AccountGate({ children }) {
   if (session?.authenticated)
     return children(
       session,
-      session.mode === "managed" ? (
+      session.mode === "managed" || session.mode === "password" ? (
         <details className="account-menu">
           <summary>Account</summary>
           <div>
             <span className="section-label">SIGNED IN AS</span>
             <p className="account-identity">
-              {session.email || "Research account"}
+              {session.username || session.email || "Research account"}
             </p>
             <p>
               Company news and financial data are shared. Your saved questions,
@@ -154,6 +183,53 @@ export default function AccountGate({ children }) {
         </p>
         {!session && !error ? (
           <p role="status">Checking your session…</p>
+        ) : session?.mode === "password" ? (
+          <form onSubmit={sendPassword}>
+            <label htmlFor="account-username">Username</label>
+            <input
+              id="account-username"
+              autoComplete="username"
+              required
+              minLength={3}
+              maxLength={30}
+              pattern="[A-Za-z0-9_.\-]{3,30}"
+              title="3–30 letters, numbers, dots, dashes or underscores"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+            />
+            <label htmlFor="account-password">Password</label>
+            <input
+              id="account-password"
+              type="password"
+              autoComplete={creating ? "new-password" : "current-password"}
+              required
+              minLength={creating ? 8 : 1}
+              maxLength={128}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+            <button type="submit" disabled={busy || remaining > 0}>
+              {busy
+                ? "Please wait…"
+                : remaining > 0
+                  ? `Try again in ${remaining}s`
+                  : creating
+                    ? "Create account"
+                    : "Sign in"}
+            </button>
+            <button
+              type="button"
+              className="account-switch"
+              onClick={() => {
+                setCreating(!creating);
+                setError("");
+              }}
+            >
+              {creating
+                ? "Already have an account? Sign in"
+                : "New to Fledge? Create an account"}
+            </button>
+          </form>
         ) : (
           <form onSubmit={send}>
             <label htmlFor="account-email">Email address</label>
@@ -182,11 +258,18 @@ export default function AccountGate({ children }) {
             Retry connection
           </button>
         )}
+        {session?.mode === "password" ? (
+          <p className="financial-note">
+            Test version: there is no password reset yet, so keep your password
+            somewhere safe. Your work stays saved when you sign out.
+          </p>
+        ) : (
         <p className="financial-note">
           Open the newest email link in this browser. New sign-ins renew
           automatically for up to seven days. Your work stays saved when you
           sign out.
         </p>
+        )}
       </section>
     </main>
   );

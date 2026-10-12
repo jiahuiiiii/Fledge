@@ -43,3 +43,11 @@
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius-md);
 }
+.account-card .account-switch {
+  margin-top: 8px;
+  background: none;
+  border: 0;
+  color: var(--color-text-2);
+  text-decoration: underline;
+  cursor: pointer;
+}

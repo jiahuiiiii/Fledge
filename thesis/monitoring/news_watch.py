@@ -55,6 +55,22 @@ def configure(
         matched = (
             match_idea if match_idea is not None else bool(old and old["match_idea"])
         )
+        if enabled and not (old and old["enabled"]):
+            # Watches follow the five-company watchlist limit.
+            from ..watchlist import LIMIT
+            c.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s,0))",
+                (f"watch-limit:{owner}",),
+            )
+            active = one(
+                c,
+                "SELECT count(*) n FROM news_watches WHERE owner_id=%s AND enabled AND instrument_id<>%s",
+                (owner, iid),
+            )["n"]
+            if active >= LIMIT:
+                raise ValueError(
+                    f"You can watch up to {LIMIT} companies. Turn off another watch first."
+                )
         baseline = one(
             c,
             "SELECT * FROM sentiment_analyses WHERE instrument_id=%s ORDER BY (packet->>'cutoff')::timestamptz DESC,created_at DESC,id DESC LIMIT 1",
