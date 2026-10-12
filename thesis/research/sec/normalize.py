@@ -1,7 +1,8 @@
 """Normalize first-party SEC facts without pretending fiscal periods are calendar quarters.
 
-Only whole-entity US-GAAP USD revenue and operating income in one exact accession
-are used. No mixing current/comparative facts from different filing vintages.
+Domestic ratios retain whole-entity US-GAAP USD inputs. Foreign annual ratios
+use one explicit supported currency and standard taxonomy in one exact accession.
+No mixing current/comparative facts from different filing vintages.
 """
 
 from datetime import date, datetime, timezone, timedelta
@@ -16,6 +17,14 @@ REVENUE = (
 )
 CONCEPTS = REVENUE + ("OperatingIncomeLoss",)
 METHOD = "sec-fiscal-ratios-1"
+
+
+class UnsupportedFiling(ValueError):
+    """A known adapter coverage gap, safe to explain without raw exceptions."""
+
+
+def annual_form(form):
+    return form in ('10-K', '10-K/A', '20-F', '20-F/A')
 
 
 def filing_rows(submissions, now):
@@ -34,7 +43,7 @@ def filing_rows(submissions, now):
     result = []
     for values in zip(*(data[k] for k in keys)):
         r = dict(zip(keys, values))
-        if r["form"] not in ("10-Q", "10-K", "10-Q/A", "10-K/A"):
+        if r["form"] not in ("10-Q", "10-K", "10-Q/A", "10-K/A", "20-F", "20-F/A"):
             continue
         if not re.fullmatch(r"\d{10}-\d{2}-\d{6}", r["accessionNumber"]):
             raise ValueError("Invalid filing accession")
@@ -53,7 +62,7 @@ def filing_rows(submissions, now):
             raise ValueError("Invalid filing document path")
         result.append(r)
     if not result:
-        raise ValueError("No supported recent financial filing is available")
+        raise UnsupportedFiling("No supported recent financial filing is available")
     # New annual/quarter reports win; amendments of older periods do not move the
     # active period backwards. Amendments of the latest period are visible gaps if
     # they omit financial tables; never silently substitute an older accession.
@@ -70,10 +79,17 @@ def normalize(companyfacts, submissions, cik, now):
     ).lstrip("0") != str(cik):
         raise ValueError("SEC evidence belongs to another company")
     filing = filing_rows(submissions, now)[-1]
-    period_type = "annual" if filing["form"].startswith("10-K") else "quarter"
+    period_type = "annual" if annual_form(filing['form']) else "quarter"
     accession = filing["accessionNumber"]
+    foreign = filing['form'] in ('20-F', '20-F/A')
+    selected_basis = None
+    revenue_tags, income_tags = REVENUE, ('OperatingIncomeLoss',)
+    if foreign:
+        from .foreign_annual import basis, TAXONOMIES
+        selected_basis = basis(companyfacts, filing)
+        revenue_tags, income_tags = TAXONOMIES.get(selected_basis['namespace'], ((), ()))
     facts = []
-    for concept in CONCEPTS:
+    for concept in (() if foreign else CONCEPTS):
         for r in (
             companyfacts.get("facts", {})
             .get("us-gaap", {})
@@ -114,12 +130,16 @@ def normalize(companyfacts, submissions, cik, now):
                     frame=r.get("frame"),
                 )
             )
+    if foreign:
+        facts = selected_basis['facts']
     minimum, maximum = (350, 380) if period_type == "annual" else (70, 110)
 
     def duration(f):
         return (date.fromisoformat(f["end"]) - date.fromisoformat(f["start"])).days + 1
 
     def select(concepts, end=None, prior_to=None):
+        if selected_basis and selected_basis['reason']:
+            return None, selected_basis['reason']
         choices = [
             f
             for f in facts
@@ -137,12 +157,13 @@ def normalize(companyfacts, submissions, cik, now):
                 ).days
                 <= 373
                 and abs(duration(f) - duration(prior_to)) <= 7
+                and (not foreign or f['end'] < prior_to['start'])
             ]
         scopes = {(f["start"], f["end"], Decimal(f["value"])) for f in choices}
         if len(scopes) > 1:
             return None, "Conflicting values or fiscal periods in this filing"
         if not choices:
-            return None, "No compatible USD fact in the selected filing"
+            return None, f"No compatible {selected_basis['currency']} fact in the selected filing" if foreign else "No compatible USD fact in the selected filing"
         return (
             sorted(
                 choices,
@@ -154,10 +175,10 @@ def normalize(companyfacts, submissions, cik, now):
             None,
         )
 
-    revenue, rev_error = select(REVENUE, end=filing["end"])
-    income, inc_error = select(("OperatingIncomeLoss",), end=filing["end"])
+    revenue, rev_error = select(revenue_tags, end=filing["end"])
+    income, inc_error = select(income_tags, end=filing["end"])
     prior, prior_error = (
-        select(REVENUE, prior_to=revenue) if revenue else (None, rev_error)
+        select(revenue_tags, prior_to=revenue) if revenue else (None, rev_error)
     )
     calculations = []
     for metric, inputs, formula, error in (
@@ -204,7 +225,7 @@ def normalize(companyfacts, submissions, cik, now):
                 arithmetic="Decimal, 28 significant digits; no display rounding before evaluation",
             )
         )
-    return dict(
+    result = dict(
         cik=cik,
         name=submissions.get("name") or companyfacts.get("entityName"),
         accession=accession,
@@ -225,3 +246,7 @@ def normalize(companyfacts, submissions, cik, now):
             "Figures are structured filing data, not audited by this application. Consensus, price data and news coverage are not supplied by this source.",
         ],
     )
+    if foreign:
+        result['financial_basis'] = {k: v for k, v in selected_basis.items() if k != 'facts'}
+        result['limitations'][0] = '20-F annual ratios use one explicit supported currency and standard accounting taxonomy from the same filing; no conversion or custom/segment facts.'
+    return result

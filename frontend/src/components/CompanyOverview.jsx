@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { readableLoad } from "../lib/loading";
@@ -15,16 +16,7 @@ import {
 import { latestPriceQuote, quoteMovement } from "../lib/priceRefresh";
 import "./CompanyOverview.css";
 const stamp = (value) =>
-  value
-    ? new Date(value).toLocaleString("en-GB", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: "UTC",
-      }) + " UTC"
-    : "Date unavailable";
+  formatTimestamp(value, { fallback: "Date unavailable" });
 
 export default function CompanyOverview({
   catalogue,

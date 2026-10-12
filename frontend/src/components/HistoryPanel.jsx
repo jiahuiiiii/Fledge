@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 import Select from "./Select";
 import { roleLabel } from "../lib/conditionRoles";
 import { useState } from "react";
@@ -13,21 +14,7 @@ const names = {
   revenue_growth: "Revenue growth",
   operating_margin: "Operating margin",
 };
-const date = (value) =>
-  new Date(value).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-const time = (value) =>
-  new Date(value).toLocaleTimeString("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-    timeZone: "UTC",
-  });
+const stamp = (value) => formatTimestamp(value, { seconds: true });
 
 export default function HistoryPanel({
   versions,
@@ -171,11 +158,11 @@ export default function HistoryPanel({
               {filtered.map((record) => (
                 <option key={record.id} value={record.id}>
                   {record.eventReview
-                    ? `Revision ${record.version.revision} · Event evidence check ${record.eventNumber} · ${date(record.eventReview.created_at)} · ${time(record.eventReview.created_at)} UTC`
+                    ? `Revision ${record.version.revision} · Event evidence check ${record.eventNumber} · ${stamp(record.eventReview.created_at)}`
                     : record.comparison
-                      ? `Revision ${record.version.revision} · AI comparison ${record.comparisonNumber} · ${date(record.comparison.created_at)} · ${time(record.comparison.created_at)} UTC`
+                      ? `Revision ${record.version.revision} · AI comparison ${record.comparisonNumber} · ${stamp(record.comparison.created_at)}`
                       : record.evaluation
-                        ? `Revision ${record.version.revision} · ${date(record.evaluation.manifest.assessed_at || record.evaluation.manifest.cutoff)} · ${labels[record.evaluation.outcome]} · Assessment ${record.assessmentNumber} · ${time(record.evaluation.manifest.assessed_at || record.evaluation.manifest.cutoff)} UTC`
+                        ? `Revision ${record.version.revision} · ${stamp(record.evaluation.manifest.assessed_at || record.evaluation.manifest.cutoff)} · ${labels[record.evaluation.outcome]} · Assessment ${record.assessmentNumber}`
                         : `Revision ${record.version.revision} · ${record.version.status} · saved definition`}
                 </option>
               ))}

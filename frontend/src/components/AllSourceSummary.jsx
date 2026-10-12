@@ -3,6 +3,22 @@ import { sourceCoverage, sourceExclusionLabels } from "../lib/sourceCoverage";
 import "./AllSourceSummary.css";
 import { sentimentSummaryLabel } from "../lib/sentimentSummary";
 
+export function SourceToneSummary({ analysis }) {
+  const samples = sourceCoverage(analysis).scopes.filter(
+    (sample) => sample.analysed > 0,
+  );
+  return (
+    <div className="source-summary-list" aria-label="Saved tone by source">
+      {samples.map((sample) => (
+        <div key={sample.scope}>
+          <SourceLabel scope={sample.scope} />
+          <strong>{sentimentSummaryLabel(sample.sentimentSummary)}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function AllSourceSummary({
   analysis,
   providerStatus = [],
@@ -37,7 +53,7 @@ export default function AllSourceSummary({
       >
         {coverage.complete
           ? `All usable saved sources were analysed. ${coverage.excluded} left out before analysis; see the reasons below.`
-          : `This earlier reading covers ${coverage.analysed} sources${coverage.candidates == null ? "" : ` out of ${coverage.candidates} saved`}. A new analysis can include every usable saved source.`}
+          : `This saved reading covers ${coverage.analysed} sources${coverage.candidates == null ? "" : ` out of ${coverage.candidates} saved`}. Other usable sources may be outside this reading.`}
       </p>
       <div
         className="source-summary-list"
@@ -73,7 +89,8 @@ export default function AllSourceSummary({
               </dl>
               {sample.quickSkipped > 0 && (
                 <span className="fine">
-                  {sample.quickSkipped} skipped as unrelated by a quick check
+                  {sample.quickSkipped} judged unrelated in the initial AI
+                  review
                 </span>
               )}
               {sample.excludedCount > 0 && (

@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 import { readableNote, sourceTiming } from "../lib/readingNotes";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
@@ -6,10 +7,7 @@ import AnalystForecasts from "./AnalystForecasts";
 import TermHelp from "./TermHelp";
 import { requestUpdate } from "../lib/updateRequest";
 const PeerComparison = lazy(() => import("./PeerComparison"));
-const stamp = (value) =>
-  value
-    ? new Date(value).toLocaleString("en-GB", { timeZone: "UTC" }) + " UTC"
-    : "Not collected";
+const stamp = (value) => formatTimestamp(value, { fallback: "Not collected" });
 const figure = (value) =>
   value == null
     ? "Unavailable"

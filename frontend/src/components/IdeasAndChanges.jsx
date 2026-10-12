@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 import Select from "./Select";
 import { resultLabel } from "../lib/conditionRoles";
 import { useState } from "react";
@@ -9,14 +10,7 @@ const metrics = {
   operating_margin: "Operating margin",
 };
 const date = (value) =>
-  value
-    ? new Date(value).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        timeZone: "UTC",
-      })
-    : "Time unavailable";
+  formatTimestamp(value, { fallback: "Time unavailable" });
 export default function IdeasAndChanges({
   mode,
   catalogue,

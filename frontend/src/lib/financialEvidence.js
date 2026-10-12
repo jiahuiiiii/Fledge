@@ -7,26 +7,26 @@ export function evidenceValue(raw, unit = "USD") {
   const value = Number(raw);
   if (!Number.isFinite(value)) return "Unavailable";
   const abs = Math.abs(value);
-  const scale =
-    unit === "USD"
-      ? abs >= 1e12
-        ? 1e12
-        : abs >= 1e9
-          ? 1e9
-          : abs >= 1e6
-            ? 1e6
-            : 1
-      : 1;
+  const currency = /^[A-Z]{3}$/.test(unit);
+  const scale = currency
+    ? abs >= 1e12
+      ? 1e12
+      : abs >= 1e9
+        ? 1e9
+        : abs >= 1e6
+          ? 1e6
+          : 1
+    : 1;
   const amount = (abs / scale).toLocaleString(
     "en-GB",
     abs > 0 && abs / scale < 0.01
       ? { maximumSignificantDigits: 3 }
       : { maximumFractionDigits: 2 },
   );
-  const signed = `${value < 0 ? "−" : ""}${unit === "USD" ? "US$" : ""}${amount}`;
+  const signed = `${value < 0 ? "−" : ""}${unit === "USD" ? "US$" : currency ? `${unit} ` : ""}${amount}`;
   return (
     signed +
-    (unit === "USD"
+    (currency
       ? { 1000000000000: " tril", 1000000000: " bil", 1000000: " mil" }[
           scale
         ] || ""
@@ -51,6 +51,8 @@ const concepts = {
   Revenues: "Revenue",
   SalesRevenueNet: "Net sales",
   OperatingIncomeLoss: "Operating income",
+  Revenue: "Revenue",
+  ProfitLossFromOperatingActivities: "Operating profit",
   NetIncomeLoss: "Net income",
   ProfitLoss: "Net result",
   NetIncomeLossAvailableToCommonStockholdersBasic:

@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 import { readableNote, sourceTiming } from "../lib/readingNotes";
 import PublicForecasts from "./PublicForecasts";
 import ForecastRange from "./ForecastRange";
@@ -5,9 +6,7 @@ import LoadingSkeleton from "./LoadingSkeleton";
 import TermHelp from "./TermHelp";
 
 const stamp = (value) =>
-  value
-    ? new Date(value).toLocaleString("en-GB", { timeZone: "UTC" }) + " UTC"
-    : "Not established";
+  formatTimestamp(value, { fallback: "Not established" });
 const exact = (value) => (value == null ? "Unavailable" : String(value));
 
 export default function AnalystForecasts({

@@ -488,13 +488,13 @@ def get(iid, identity):
 def download(iid, identity):
     from html import escape
     from urllib.parse import urlsplit
-    from thesis.review_export import parent_context_html
+    from thesis.review_export import parent_context_html, stamp
 
     value = get(iid, identity)
     esc = lambda s: escape(str(s), quote=True)
     parts = [
         "<h1>Discussion themes — saved source reading</h1>",
-        f'<p>Source cutoff {esc(value["cutoff"])} · saved {esc(value["created_at"])}</p>',
+        f'<p>Source cutoff {esc(stamp(value["cutoff"]))} · saved {esc(stamp(value["created_at"]))}</p>',
         "<p>Shared company research; no private investment reasoning is included.</p>",
     ]
     if value["withheld"]:
@@ -546,7 +546,7 @@ def download(iid, identity):
                     if claim.get("source_id"):
                         source = sources[claim["source_id"]]
                         parts += [
-                            f'<p><strong>{esc(source["source"])}</strong> · {esc(source["published_at"])}</p>'
+                            f'<p><strong>{esc(source["source"])}</strong> · {esc(stamp(source["published_at"]))}</p>'
                         ]
                     parts += [f'<p>{esc(claim["text"])}</p>']
                     for cite in claim["citations"]:
@@ -554,7 +554,7 @@ def download(iid, identity):
                         if cite.get("role") == "source_title":
                             parts += ["<p>Source title · context</p>"]
                         parts += [
-                            f'<p><strong>{esc(source["title"])}</strong></p><blockquote>{esc(cite["quote"])}</blockquote><p>{esc(source["source"])} · {esc(source["published_at"])}</p>'
+                            f'<p><strong>{esc(source["title"])}</strong></p><blockquote>{esc(cite["quote"])}</blockquote><p>{esc(source["source"])} · {esc(stamp(source["published_at"]))}</p>'
                         ]
                         if urlsplit(source["url"]).scheme in {"http", "https"}:
                             parts += [

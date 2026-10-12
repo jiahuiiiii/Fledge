@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 // Kestrel's connect/disconnect notification flow, adapted for this local app.
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
@@ -21,13 +22,7 @@ const kinds = {
   condition: "Monitored condition",
   test: "Connection test",
 };
-const time = (value) =>
-  new Date(value).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+const time = (value) => formatTimestamp(value, { fallback: "Not recorded" });
 
 function TelegramIcon() {
   return (

@@ -1,19 +1,13 @@
+import { formatTimestamp } from "../lib/dateTime";
 import { modelAvailability } from "../lib/modelAvailability";
-import { mentionsCompany, savedDevelopments } from "../lib/companyHeadlines";
+import { currentCompanyHeadlines } from "../lib/companyHeadlines";
+import { newsSourceStatus } from "../lib/newsPresentation";
+import { requestUpdate } from "../lib/updateRequest";
 import Select from "./Select";
 import { useId, useState } from "react";
 import { latestPriceQuote, quoteMovement } from "../lib/priceRefresh";
 import PriceChange from "./PriceChange";
-export const stamp = (value) =>
-  value
-    ? new Date(value).toLocaleString("en-GB", {
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: "UTC",
-      }) + " UTC"
-    : "Not checked";
+export const stamp = formatTimestamp;
 const money = (value) =>
   value == null
     ? "—"
@@ -136,21 +130,10 @@ export default function MarketResearch({
   const [expanded, setExpanded] = useState(false);
   const [pointKind, setPointKind] = useState("all");
   const viewId = useId();
-  const superseded = new Set(data.documents.map((d) => d.supersedes_id));
-  const seen = new Set();
-  const order = new Map((data.market_news_ids || []).map((id, i) => [id, i]));
-  const all = data.documents
-    .filter((d) => d.kind === "news" && !superseded.has(d.id))
-    .sort(
-      (a, b) =>
-        (order.get(a.id) ?? 9999) - (order.get(b.id) ?? 9999) ||
-        new Date(b.published_at) - new Date(a.published_at),
-    );
-  const unique = all.filter((d) => {
-    if (seen.has(d.content_hash)) return false;
-    seen.add(d.content_hash);
-    return true;
-  });
+  const currentNews = currentCompanyHeadlines(data);
+  const latestNews = currentNews.slice(0, 3);
+  const previewIds = new Set(latestNews.map((d) => d.id));
+  const sourceStatus = newsSourceStatus(data);
   // Stories in the saved tone reading are listed once, with their label, in
   // the tone section below; this list carries the rest.
   const analysed = new Set(
@@ -160,8 +143,9 @@ export default function MarketResearch({
           .map((s) => s.id)
       : [],
   );
-  const unanalysed = unique.filter((d) => !analysed.has(d.id));
-  const news = unanalysed.filter((d) => mentionsCompany(d, data.instrument));
+  const news = currentNews.filter(
+    (d) => !analysed.has(d.id) && !previewIds.has(d.id),
+  );
   const availability = modelAvailability(modelStatus, "briefing_enabled");
   const brief = data.market_brief;
   const kinds = {
@@ -170,7 +154,6 @@ export default function MarketResearch({
     uncertainty: "Uncertainty",
   };
   const points = brief?.points || [];
-  const developments = savedDevelopments(data.sentiment).slice(0, 3);
   const matchingPoints = points.filter(
     (p) => pointKind === "all" || p.kind === pointKind,
   );
@@ -192,22 +175,13 @@ export default function MarketResearch({
         </summary>
         <p className="fine">
           Only headlines or supplied snippets that name {data.instrument.symbol}{" "}
-          or the company appear here.{" "}
-          {unanalysed.length - news.length > 0
-            ? `${unanalysed.length - news.length} without an explicit mention are hidden from this list. `
-            : ""}
-          These have no saved tone label.
+          or the company appear here. The latest three appear above. These
+          additional headlines have no saved tone label.
         </p>
         {!news.length && (
           <p className="fine">
             No additional unanalysed company headlines. Saved readings and the
             complete source sample remain available above.
-          </p>
-        )}
-        {all.length > unique.length && (
-          <p className="fine">
-            Duplicate supplied text is grouped. Multiple articles do not
-            necessarily provide independent confirmation.
           </p>
         )}
         <div className="news-list">
@@ -251,9 +225,50 @@ export default function MarketResearch({
         <div>
           <h2>What’s developing</h2>
         </div>
+        <button type="button" onClick={requestUpdate} disabled={busy}>
+          Update data
+        </button>
+      </div>
+      <p className="fine">
+        Latest saved headlines
+        {latestNews.length > 0 && (
+          <> · newest {stamp(latestNews[0].published_at)}</>
+        )}
+        .
+        {sourceStatus.latest && (
+          <> Latest source check {stamp(sourceStatus.latest)}.</>
+        )}{" "}
+        Original publisher headlines and snippets; no AI reading needed.
+      </p>
+      {latestNews.length > 0 ? (
+        <div className="development-headlines">
+          {latestNews.map((story) => (
+            <article key={story.id}>
+              <span className="fine">
+                {story.source} · {stamp(story.published_at)}
+              </span>
+              <button className="news-title" onClick={() => onSource(story.id)}>
+                {story.title} <span>↗</span>
+              </button>
+              {story.body && <p>{story.body}</p>}
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="fine">
+          No saved headlines naming {data.instrument.symbol} in the current
+          seven-day news sample. Use Update data to check for news.
+        </p>
+      )}
+      <details className="brief-unknowns current-news-summary">
+        <summary>{brief ? "Saved AI summary" : "Optional AI summary"}</summary>
         {!brief && (
           <button
-            disabled={busy || !unique.length || availability.blocked}
+            disabled={
+              busy ||
+              !(data.market_news_ids || []).length ||
+              availability.blocked
+            }
             onClick={onGenerate}
             aria-describedby={
               availability.blocked && availability.state !== "running"
@@ -264,117 +279,94 @@ export default function MarketResearch({
             {busy ? "Reading sources…" : "Summarise sources"}
           </button>
         )}
-      </div>
-      {brief ? (
-        <>
-          <p className="fine">
-            AI summary · {brief.included_news_count} supplied headlines/snippets
-            · latest news {stamp(brief.latest_news_at)}. Interpretation may omit
-            context.
-          </p>
-          <label className="field" htmlFor={viewId}>
-            Briefing view
-            <Select
-              id={viewId}
-              aria-label="Briefing view"
-              value={pointKind}
-              onChange={(e) => setPointKind(e.target.value)}
-              aria-controls={`${viewId}-points`}
-            >
-              <option value="all">All points ({points.length})</option>
-              {Object.entries(kinds).map(([kind, label]) => (
-                <option key={kind} value={kind}>
-                  {label} ({points.filter((p) => p.kind === kind).length})
-                </option>
+        {brief ? (
+          <>
+            <p className="fine">
+              AI summary · {brief.included_news_count} supplied
+              headlines/snippets · latest news {stamp(brief.latest_news_at)}.
+              Interpretation may omit context.
+            </p>
+            <label className="field" htmlFor={viewId}>
+              Briefing view
+              <Select
+                id={viewId}
+                aria-label="Briefing view"
+                value={pointKind}
+                onChange={(e) => setPointKind(e.target.value)}
+                aria-controls={`${viewId}-points`}
+              >
+                <option value="all">All points ({points.length})</option>
+                {Object.entries(kinds).map(([kind, label]) => (
+                  <option key={kind} value={kind}>
+                    {label} ({points.filter((p) => p.kind === kind).length})
+                  </option>
+                ))}
+              </Select>
+            </label>
+            <p className="fine" role="status">
+              {visiblePoints.length
+                ? `Showing ${visiblePoints.length} of ${matchingPoints.length} developments. Labels describe the kind of statement, not whether it is favourable.`
+                : `No points in this briefing are labelled ${kinds[pointKind]?.toLowerCase()}. This does not establish that no risks or uncertainty exist; inspect All points and the original sources.`}
+            </p>
+            <div className="market-brief-points" id={`${viewId}-points`}>
+              {visiblePoints.map((p, i) => (
+                <article key={i} className={`market-point ${p.kind}`}>
+                  <span className="section-label">
+                    {p.kind === "reported"
+                      ? "REPORTED"
+                      : p.kind === "interpretation"
+                        ? "AI INTERPRETATION"
+                        : "UNCERTAINTY"}
+                  </span>
+                  <h3>{p.title}</h3>
+                  <p>{p.text}</p>
+                  <div className="brief-citations">
+                    {p.citations.map((c, j) => (
+                      <button
+                        key={j}
+                        className="source-link"
+                        onClick={() => onSource(c.source_id)}
+                        title={c.quote}
+                        aria-label={`Inspect source ${j + 1}: ${data.documents.find((d) => d.id === c.source_id)?.title || "Source unavailable"}`}
+                      >
+                        {data.documents.find((d) => d.id === c.source_id)
+                          ?.source || "Source"}{" "}
+                        {j + 1} ↗
+                      </button>
+                    ))}
+                  </div>
+                </article>
               ))}
-            </Select>
-          </label>
-          <p className="fine" role="status">
-            {visiblePoints.length
-              ? `Showing ${visiblePoints.length} of ${matchingPoints.length} developments. Labels describe the kind of statement, not whether it is favourable.`
-              : `No points in this briefing are labelled ${kinds[pointKind]?.toLowerCase()}. This does not establish that no risks or uncertainty exist; inspect All points and the original sources.`}
-          </p>
-          <div className="market-brief-points" id={`${viewId}-points`}>
-            {visiblePoints.map((p, i) => (
-              <article key={i} className={`market-point ${p.kind}`}>
-                <span className="section-label">
-                  {p.kind === "reported"
-                    ? "REPORTED"
-                    : p.kind === "interpretation"
-                      ? "AI INTERPRETATION"
-                      : "UNCERTAINTY"}
-                </span>
-                <h3>{p.title}</h3>
-                <p>{p.text}</p>
-                <div className="brief-citations">
-                  {p.citations.map((c, j) => (
-                    <button
-                      key={j}
-                      className="source-link"
-                      onClick={() => onSource(c.source_id)}
-                      title={c.quote}
-                      aria-label={`Inspect source ${j + 1}: ${data.documents.find((d) => d.id === c.source_id)?.title || "Source unavailable"}`}
-                    >
-                      {data.documents.find((d) => d.id === c.source_id)
-                        ?.source || "Source"}{" "}
-                      {j + 1} ↗
-                    </button>
-                  ))}
-                </div>
-              </article>
-            ))}
-          </div>
-          {matchingPoints.length > 3 && (
-            <button
-              type="button"
-              className="news-more"
-              onClick={() => setExpanded(!expanded)}
-            >
-              {expanded
-                ? "Show fewer developments"
-                : `Read all ${matchingPoints.length} developments`}
-            </button>
-          )}
-          <details className="brief-unknowns">
-            <summary>About this AI summary</summary>
-            <p className="fine">{brief.limitation}</p>
-            {question && (
-              <p className="fine">
-                <strong>Reading focus:</strong> {focus}
-              </p>
+            </div>
+            {matchingPoints.length > 3 && (
+              <button
+                type="button"
+                className="news-more"
+                onClick={() => setExpanded(!expanded)}
+              >
+                {expanded
+                  ? "Show fewer developments"
+                  : `Read all ${matchingPoints.length} developments`}
+              </button>
             )}
-          </details>
-        </>
-      ) : developments.length ? (
-        <>
+            <details className="brief-unknowns">
+              <summary>About this AI summary</summary>
+              <p className="fine">{brief.limitation}</p>
+              {question && (
+                <p className="fine">
+                  <strong>Reading focus:</strong> {focus}
+                </p>
+              )}
+            </details>
+          </>
+        ) : (
           <p className="fine">
-            Latest reported developments from the saved reading ·{" "}
-            {stamp(data.sentiment.created_at)}. Headlines and snippets from the
-            original publishers.
+            An AI summary is optional and uses the existing allowance. The
+            headlines above update when sources are checked, even if an AI
+            reading is older or could not finish.
           </p>
-          <div className="development-headlines">
-            {developments.map((story) => (
-              <article key={story.id}>
-                <span className="fine">
-                  {story.source} · {stamp(story.published_at)}
-                </span>
-                <button
-                  className="news-title"
-                  onClick={() => onSource(story.id)}
-                >
-                  {story.title} <span>↗</span>
-                </button>
-                {story.body && <p>{story.body}</p>}
-              </article>
-            ))}
-          </div>
-        </>
-      ) : (
-        <p className="fine">
-          No reported developments in the saved reading yet. Read the tone and
-          original sources below, or summarise sources when AI is available.
-        </p>
-      )}
+        )}
+      </details>
     </section>
   );
 }

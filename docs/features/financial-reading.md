@@ -51,6 +51,11 @@ Point selection and publisher/date links open one evidence dialog with the origi
 
 Verification and scoped installation: [revenue forecast review](../reviews/2026-10-11/revenue-forecasts.md).
 
+### Forecast evidence layout and dates — 12 October 2026
+
+Analyst and management forecast evidence use padded, responsive dialog content with a sticky close/header and contained scrolling. Public analyst dates distinguish **Publisher page updated** from **Page checked & saved**. An earlier publisher date gets a short explanation; a fresh check cannot establish a newer underlying forecast vintage. Management keeps its release date, and FMP retains a separate known latest check when available. Missing dates and individual analyst forecast dates remain unknown. Source revenue conventions whose accounting definition is not established say **Not specified by the source**. Exact saved amounts/ranges, original source links, currency choices, contributor qualifications and source-error disclosures remain intact. See [verification](../reviews/2026-10-12/forecast-dialog.md).
+
+
 ## Reported-history continuity and fourth quarters — 11 October 2026
 
 Financial history connects successive whole-company USD revenue points across the recognised `SalesRevenueNet`, `Revenues` and `RevenueFromContractWithCustomerExcludingAssessedTax` labels. Exact evidence is unchanged; chart notes disclose transitions. This visual connection does not relax same-concept growth or past-12-month arithmetic. Different profit ownership scopes, cash-spending definitions, unknown concepts, currencies and missing periods still break paths.
@@ -76,3 +81,7 @@ A continuing-operations cash-flow tag is **not** a blanket alias for total opera
 Normal original-filing updates now include a bounded **cash-flow history** plan: selected chart dates with missing operating-cash/capital-spending inputs, their preceding annual bridge, and supported amendment dependencies. Existing originals are reused. Retrieval retains the original source pacing, denials, cooldown, lease and failure controls; historical documents never move the current disclosure pointers. Opening a chart still performs no collection or AI call. All annual and past-12-month calculations retain their existing compatible-period and same-definition checks. The separate quarterly view still does not infer quarterly cash flows from cumulative statements.
 
 [Investigation, recovered coverage and verification](../reviews/2026-10-12/cash-flow-history.md).
+
+## Aligned overview comparison bars — 12 October 2026
+
+Overview's balance and yearly-revenue bars share label, plot and value columns across each card. Previously every row independently sized its value column: differing formatted amounts shifted the plot origin and changed its available width, distorting comparisons despite identical percentage calculations. A parent grid with nested column subgrids now gives the four balance rows the same plotting bounds. Each balance pair still has its own numeric scale; yearly revenue retains its own shared scale. Values, zero/negative positioning, missing values, evidence actions and calculations are unchanged. Desktop and phone column sizing use the same shared structure.

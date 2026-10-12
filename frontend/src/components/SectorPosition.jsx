@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import Select from "./Select";
@@ -10,7 +11,8 @@ import {
   measures,
   peRows,
   peerAverage,
-  comparisonRows,
+  chartRows,
+  differentYearEnd,
   comparisonExclusion,
   reportedRow,
   forecastRow,
@@ -18,10 +20,11 @@ import {
   position,
   scale,
   managementRows,
+  peerStatus,
 } from "../lib/sectorPosition";
 import "./SectorPosition.css";
 const stamp = (value) =>
-  value ? new Date(value).toLocaleString("en-GB") : "Not established";
+  formatTimestamp(value, { fallback: "Not established" });
 const display = (value, unit) =>
   value == null
     ? "Unavailable"
@@ -30,12 +33,26 @@ const display = (value, unit) =>
       : unit === "multiple"
         ? `${value.toLocaleString("en-GB", { maximumFractionDigits: 1 })}×`
         : percent(value);
+const rowValue = (row) =>
+  row.value == null
+    ? {
+        loading: "Fetching…",
+        not_collected: "Not collected",
+        failed: "Fetch failed",
+        no_report: "No annual report",
+        unavailable: "Source unavailable",
+      }[row.dataStatus?.status] || "Not reported"
+    : display(row.value, row.unit);
 const rowPeriod = (row, expected) =>
   row.unit === "multiple"
     ? `Saved ${stamp(row.observed)}`
-    : expected
-      ? `Forecast year ends ${day(row.end)}`
-      : `${day(row.start)} – ${day(row.end)}`;
+    : !row.end
+      ? row.dataStatus?.message || "Period not available"
+      : expected
+        ? `Forecast year ends ${day(row.end)}`
+        : row.start
+          ? `${day(row.start)} – ${day(row.end)}${row.basisLabel ? ` · ${row.basisLabel}` : ""}`
+          : `Year ended ${day(row.end)}`;
 function EvidenceContents({ row, expected }) {
   if (row.unit === "multiple")
     return (
@@ -99,12 +116,14 @@ function EvidenceContents({ row, expected }) {
 
 function Bars({ rows, symbol, expected, label }) {
   const [evidence, setEvidence] = useState(null);
-  const plotted = comparisonRows(rows, symbol),
+  const plotted = chartRows(rows, symbol),
     own = rows.find((row) => row.symbol === symbol),
     range = scale(plotted),
     average = peerAverage(rows, symbol),
     multiple = rows[0]?.unit === "multiple",
     available = plotted.filter((row) => row.value != null),
+    references = plotted.filter((row) => differentYearEnd(row, own)),
+    unplotted = average.missing.filter((row) => !plotted.includes(row)),
     x = (value) => ((value - range.low) / range.span) * 100,
     ticks = !available.length
       ? []
@@ -121,7 +140,7 @@ function Bars({ rows, symbol, expected, label }) {
     : expected
       ? "annual forecasts"
       : "annual SEC figures";
-  const averageExplanation = `Equal-weight mean of ${average.peers.length} of ${Math.max(0, rows.length - 1)} peers. Excludes ${symbol} and unavailable figures${multiple ? "; saved dates may differ." : "; only fiscal ends within 120 days are included."}`;
+  const averageExplanation = `Average of ${average.peers.length} of ${Math.max(0, rows.length - 1)} peers${multiple ? "; saved dates may differ." : "; fiscal year ends within 120 days."}`;
   const reviewed = rows.filter(
     (row) => row.filingResolution?.status === "retained",
   );
@@ -133,7 +152,7 @@ function Bars({ rows, symbol, expected, label }) {
           <span>
             {multiple
               ? "Saved observations may be from different dates."
-              : "Bars, peer average and verdict use fiscal year ends within 120 days."}
+              : "Peer average and ranking use year-ends within 120 days."}
           </span>
         </p>
         <button
@@ -167,7 +186,7 @@ function Bars({ rows, symbol, expected, label }) {
               </span>
             ) : (
               <span className="position-average-unavailable">
-                Peer average unavailable
+                No comparable peer average
               </span>
             )}
           </div>
@@ -193,8 +212,8 @@ function Bars({ rows, symbol, expected, label }) {
                 <button
                   type="button"
                   key={row.symbol}
-                  className={`position-comparison-row${row.symbol === symbol ? " is-company" : ""}`}
-                  aria-label={`${row.symbol}: ${display(row.value, row.unit)}. ${row.value == null ? row.reason + " " : ""}Open comparison evidence.`}
+                  className={`position-comparison-row${row.symbol === symbol ? " is-company" : ""}${differentYearEnd(row, own) ? " is-different-year-end" : ""}`}
+                  aria-label={`${row.symbol}: ${rowValue(row)}. ${rowPeriod(row, expected)}. ${differentYearEnd(row, own) ? "Different year-end; outside peer average and ranking. " : ""}${row.value == null ? row.reason + " " : ""}Open comparison evidence.`}
                   aria-haspopup="dialog"
                   title={`${companyName(row)} · ${rowPeriod(row, expected)}`}
                   onClick={() => setEvidence({ symbol: row.symbol })}
@@ -218,11 +237,21 @@ function Bars({ rows, symbol, expected, label }) {
                   )}
                   <span className="position-row-label" aria-hidden="true">
                     <strong className={row.value == null ? "is-missing" : ""}>
-                      {display(row.value, row.unit)}
+                      {rowValue(row)}
                     </strong>
                     <span>
                       <b>{row.symbol}</b> {companyName(row)}
                     </span>
+                    {!multiple && row.end && (
+                      <small className="position-row-period">
+                        {expected ? "Year ending" : "Year ended"} {day(row.end)}
+                      </small>
+                    )}
+                    {differentYearEnd(row, own) && (
+                      <small className="position-period-badge">
+                        Different year-end
+                      </small>
+                    )}
                   </span>
                 </button>
               ))}
@@ -243,16 +272,23 @@ function Bars({ rows, symbol, expected, label }) {
           </div>
         </div>
       </div>
-      <p className="position-chart-hint">
-        {averageExplanation} Select a row for evidence.
-      </p>
-      {average.missing.length > 0 && (
-        <section
+      {references.length > 0 && (
+        <p className="position-period-note">
+          Dashed bars have different year-ends and are outside the peer average
+          and ranking.
+        </p>
+      )}
+      <p className="position-chart-hint">Select a row for evidence.</p>
+      {unplotted.length > 0 && (
+        <details
           className="position-excluded"
           aria-label="Not included in this comparison"
         >
-          <h4>Not included in this comparison</h4>
-          {average.missing.map((row) => (
+          <summary>
+            {unplotted.length} {unplotted.length === 1 ? "peer" : "peers"} not
+            plotted · evidence
+          </summary>
+          {unplotted.map((row) => (
             <button
               type="button"
               key={row.symbol}
@@ -264,13 +300,13 @@ function Bars({ rows, symbol, expected, label }) {
                 <b>
                   {row.symbol} · {companyName(row)}
                 </b>
-                <strong>{display(row.value, row.unit)}</strong>
+                <strong>{rowValue(row)}</strong>
               </span>
               <span>{rowPeriod(row, expected)}</span>
               <span>{comparisonExclusion(row, own)} Open evidence.</span>
             </button>
           ))}
-        </section>
+        </details>
       )}
       {reviewed.length > 0 && (
         <p className="position-chart-note">
@@ -297,16 +333,16 @@ function Bars({ rows, symbol, expected, label }) {
             <p>
               Included:{" "}
               {average.peers
-                .map((row) => `${row.symbol} (${display(row.value, row.unit)})`)
+                .map((row) => `${row.symbol} (${rowValue(row)})`)
                 .join(", ")}
               . The average uses unrounded values.
             </p>
           )}
           {average.missing.length > 0 && (
             <p>
-              Excluded: {average.missing.map((row) => row.symbol).join(", ")} ·
-              missing or incomparable figures. Dates and reasons are listed
-              below.
+              Outside the average and ranking:{" "}
+              {average.missing.map((row) => row.symbol).join(", ")}. Dates and
+              reasons are listed below.
             </p>
           )}
         </section>
@@ -326,11 +362,16 @@ function Bars({ rows, symbol, expected, label }) {
                   </strong>
                   <small>{rowPeriod(row, expected)}</small>
                 </span>
-                <strong>{display(row.value, row.unit)}</strong>
+                <strong>{rowValue(row)}</strong>
               </summary>
               <div className="position-evidence-content">
                 {average.missing.includes(row) && (
-                  <p>Not compared: {comparisonExclusion(row, own)}</p>
+                  <p>
+                    {differentYearEnd(row, own)
+                      ? "Shown for context; outside the peer average and ranking."
+                      : "Not plotted."}{" "}
+                    {comparisonExclusion(row, own)}
+                  </p>
                 )}
                 <EvidenceContents row={row} expected={expected} />
               </div>
@@ -348,7 +389,7 @@ function Map({ members, symbol }) {
     const element = viewport.current;
     if (!element) return;
     const observer = new ResizeObserver(([entry]) => {
-      setWidth(Math.max(540, Math.round(entry.contentRect.width)));
+      setWidth(Math.max(260, Math.round(entry.contentRect.width)));
     });
     observer.observe(element);
     return () => observer.disconnect();
@@ -357,19 +398,21 @@ function Map({ members, symbol }) {
     growth: reportedRow(member, "revenue_growth"),
     margin: reportedRow(member, "operating_margin"),
   }));
-  const comparable = comparisonRows(
+  const plotted = chartRows(
     rows.map((r) => r.growth),
     symbol,
   );
   const valid = rows.filter(
     (r) =>
-      comparable.includes(r.growth) &&
+      plotted.includes(r.growth) &&
       r.growth.value != null &&
       r.margin.value != null &&
       r.growth.start === r.margin.start &&
       r.growth.end === r.margin.end,
   );
-  const xs = scale(valid.map((r) => r.growth)),
+  const own = rows.find((r) => r.growth.symbol === symbol)?.growth,
+    references = valid.filter((r) => differentYearEnd(r.growth, own)),
+    xs = scale(valid.map((r) => r.growth)),
     ys = scale(valid.map((r) => r.margin));
   const plotWidth = width - 116;
   const x = (v) => 72 + ((v - xs.low) / xs.span) * plotWidth,
@@ -395,7 +438,7 @@ function Map({ members, symbol }) {
               width={width}
               height={320}
               role="img"
-              aria-label="Fiscal-year revenue growth against reported GAAP operating margin for the chosen competitors"
+              aria-label="Fiscal-year revenue growth against reported operating margin for the chosen competitors"
             >
               {[0, 0.5, 1].map((f) => (
                 <g key={f} className="position-grid">
@@ -433,16 +476,15 @@ function Map({ members, symbol }) {
               {valid.map((r) => (
                 <g
                   key={r.growth.symbol}
-                  className={
-                    r.growth.symbol === symbol
-                      ? "position-dot selected"
-                      : "position-dot"
-                  }
+                  className={`position-dot${r.growth.symbol === symbol ? " selected" : ""}${differentYearEnd(r.growth, own) ? " is-different-year-end" : ""}`}
                 >
                   <title>
                     {r.growth.symbol}: growth {percent(r.growth.value)},
                     operating margin {percent(r.margin.value)}, year ending{" "}
                     {r.growth.end}
+                    {differentYearEnd(r.growth, own)
+                      ? "; different year-end, outside peer average and ranking"
+                      : ""}
                   </title>
                   <circle
                     cx={x(r.growth.value)}
@@ -461,16 +503,24 @@ function Map({ members, symbol }) {
             </svg>
           </div>
           <p className="position-caption">
-            {valid.length} of {members.length} companies have both figures and
-            comparable fiscal year ends (within 120 days of {symbol}). Dates,
-            exclusions and exact sources are in the comparison below.
+            {valid.length} of {members.length} companies shown.
+            {references.length > 0 && (
+              <>
+                {" "}
+                Hollow markers have different year-ends:{" "}
+                {references
+                  .map((r) => `${r.growth.symbol} (${day(r.growth.end)})`)
+                  .join(", ")}
+                . They are outside the peer average and ranking.
+              </>
+            )}{" "}
+            Dates and sources are in the comparison below.
           </p>
         </>
       ) : (
         <p className="position-gap">
-          At least two companies need both annual growth and operating margin
-          with comparable fiscal year ends (within 120 days) to plot their
-          positions.
+          At least two companies need both annual growth and operating margin to
+          plot their positions.
         </p>
       )}
     </div>
@@ -481,23 +531,31 @@ export default function SectorPosition({
   visible,
   financials = false,
 }) {
-  const [data, setData] = useState(null),
+  const [savedData, setData] = useState(null),
     [draft, setDraft] = useState(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
+    [phase, setPhase] = useState(""),
+    [notice, setNotice] = useState(""),
+    [fetchStates, setFetchStates] = useState({}),
     [measure, setMeasure] = useState("revenue_growth"),
     [view, setView] = useState("reported"),
     [year, setYear] = useState(""),
     [search, setSearch] = useState(""),
     [searchResults, setSearchResults] = useState([]),
     [searched, setSearched] = useState(""),
-    [reasons, setReasons] = useState({});
+    [searchError, setSearchError] = useState(""),
+    [reasons, setReasons] = useState({}),
+    [known, setKnown] = useState({});
+  const data = savedData?.loadedFor === instrumentId ? savedData : null;
   const version = useRef(0),
     mounted = useRef(true),
     dirty = useRef(false),
     searchVersion = useRef(0),
-    acting = useRef(false),
-    applied = useRef(undefined);
+    acting = useRef(null),
+    readVersion = useRef(0),
+    company = useRef(instrumentId);
+  const active = (token) => mounted.current && token === version.current;
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -505,57 +563,96 @@ export default function SectorPosition({
       version.current++;
     };
   }, []);
-  async function load(peers, replaceDraft = false) {
-    const token = ++version.current;
-    setBusy(true);
+  async function load(replaceDraft = false) {
+    const token = version.current,
+      read = ++readVersion.current;
     try {
       const [next, valuation] = await Promise.all([
-        api.sectorPosition(instrumentId, peers),
+        api.sectorPosition(instrumentId),
         api
           .valuationContext(instrumentId)
           .then((value) => ({ references: value.references || [] }))
           .catch((failure) => ({ references: [], error: failure.message })),
       ]);
-      if (mounted.current && token === version.current) {
-        setData({
-          ...next,
-          references: valuation.references,
-          referenceError: valuation.error,
-        });
-        if (peers !== undefined) applied.current = peers;
-        if (replaceDraft || !dirty.current) {
-          setDraft(next.peers);
-          setReasons(
-            Object.fromEntries(
-              next.members
-                .filter((m) => m.symbol !== next.symbol)
-                .map((m) => [
-                  m.symbol,
-                  m.rationale ||
-                    "Compare whole-company growth and profitability; product mix may differ.",
-                ]),
-            ),
-          );
-          dirty.current = false;
-        }
-        setError("");
+      if (!active(token) || read !== readVersion.current) return null;
+      setData({
+        ...next,
+        loadedFor: instrumentId,
+        references: valuation.references,
+        referenceError: valuation.error,
+      });
+      if (replaceDraft || !dirty.current) {
+        setDraft(next.peers);
+        setReasons(
+          Object.fromEntries(
+            next.members
+              .filter((m) => m.symbol !== next.symbol)
+              .map((m) => [
+                m.symbol,
+                m.rationale || "Selected by the owner for comparison.",
+              ]),
+          ),
+        );
+        dirty.current = false;
       }
+      setError("");
+      return next;
     } catch (failure) {
-      if (mounted.current && token === version.current)
+      if (active(token) && read === readVersion.current)
         setError(failure.message);
-    } finally {
-      if (mounted.current && token === version.current) setBusy(false);
+      return null;
     }
   }
   useEffect(() => {
-    if (visible && !acting.current) load(applied.current);
+    if (company.current !== instrumentId) {
+      company.current = instrumentId;
+      dirty.current = false;
+      acting.current = null;
+      setData(null);
+      setDraft(null);
+      setSearch("");
+      setSearchResults([]);
+      setSearched("");
+      setReasons({});
+      setKnown({});
+      setFetchStates({});
+      setNotice("");
+      setBusy(false);
+      setPhase("");
+      searchVersion.current++;
+    }
+    if (visible) load();
     return () => {
       version.current++;
+      searchVersion.current++;
+      acting.current = null;
+      setFetchStates({});
+      setBusy(false);
+      setPhase("");
     };
   }, [instrumentId, visible]);
+  const waiting = data?.members.some(
+    (m) => m.filing_status?.status === "loading",
+  );
+  useEffect(() => {
+    if (!visible || !waiting || busy) return;
+    let canceled = false,
+      timer;
+    async function poll() {
+      await load();
+      if (!canceled) timer = setTimeout(poll, 3000);
+    }
+    timer = setTimeout(poll, 3000);
+    return () => {
+      canceled = true;
+      clearTimeout(timer);
+    };
+  }, [instrumentId, visible, waiting, busy]);
   async function searchPeers(value) {
     setSearch(value);
-    const token = ++searchVersion.current;
+    setSearchError("");
+    const token = ++searchVersion.current,
+      scope = version.current;
     if (!value.trim()) {
       setSearchResults([]);
       setSearched("");
@@ -563,30 +660,32 @@ export default function SectorPosition({
     }
     try {
       const result = await api.companyDirectory(value);
-      if (mounted.current && token === searchVersion.current) {
+      if (active(scope) && token === searchVersion.current) {
         setSearchResults(
           result.companies.filter(
-            (c) => c.available && c.symbol !== data.symbol,
+            (c) => c.available && c.symbol !== data?.symbol,
           ),
         );
         setSearched(value);
       }
     } catch (failure) {
-      if (mounted.current && token === searchVersion.current)
-        setError(failure.message);
+      if (active(scope) && token === searchVersion.current) {
+        setSearchResults([]);
+        setSearched(value);
+        setSearchError(failure.message);
+      }
     }
   }
-  // A found company goes straight into the first empty slot (or a new one),
-  // so searching visibly changes the draft instead of only the dropdowns.
-  function addPeer(symbol) {
+  function changePeers(next) {
     dirty.current = true;
-    setDraft((old) => {
-      const next = [...(old || [])];
-      const empty = next.indexOf("");
-      if (empty >= 0) next[empty] = symbol;
-      else next.push(symbol);
-      return next.slice(0, 8);
-    });
+    setDraft(next);
+    setNotice("Unsaved changes");
+  }
+  function addPeer(symbol) {
+    if (busy || draft?.includes(symbol) || (draft || []).length >= 8) return;
+    const found = searchResults.find((c) => c.symbol === symbol);
+    if (found) setKnown((old) => ({ ...old, [symbol]: found }));
+    changePeers([...(draft || []), symbol]);
     setSearch("");
     setSearchResults([]);
     setSearched("");
@@ -594,78 +693,154 @@ export default function SectorPosition({
   }
   async function save() {
     if (acting.current) return;
-    acting.current = true;
-    const token = ++version.current;
+    let selected = [...(draft || [])];
+    if (search.trim()) {
+      const choices =
+        searched === search
+          ? searchResults.filter((c) => !selected.includes(c.symbol))
+          : [];
+      const chosen =
+        choices.find((c) => c.symbol === search.trim().toUpperCase()) ||
+        (choices.length === 1 ? choices[0] : null);
+      if (!chosen || selected.length >= 8) {
+        setError("Choose a matching company before saving.");
+        return;
+      }
+      selected.push(chosen.symbol);
+      dirty.current = true;
+      setNotice("Unsaved changes");
+      setDraft(selected);
+      setKnown((old) => ({ ...old, [chosen.symbol]: chosen }));
+      setSearch("");
+      setSearchResults([]);
+      setSearched("");
+      searchVersion.current++;
+    }
+    const operation = {},
+      token = version.current;
+    acting.current = operation;
+    readVersion.current++;
     setBusy(true);
+    setPhase("saving");
+    setError("");
     try {
       await api.savePeers(
         instrumentId,
-        (draft || []).filter(Boolean).map((symbol) => ({
+        selected.map((symbol) => ({
           symbol,
-          rationale:
-            reasons[symbol] ||
-            "Compare whole-company growth and profitability; product mix may differ.",
+          rationale: reasons[symbol] || "Selected by the owner for comparison.",
         })),
       );
-      if (mounted.current && token === version.current) {
-        dirty.current = false;
-        applied.current = undefined;
-        await load(undefined, true);
-      }
-    } catch (failure) {
-      if (mounted.current && token === version.current)
-        setError(failure.message);
-    } finally {
-      acting.current = false;
-      if (mounted.current) setBusy(false);
-    }
-  }
-  async function checkReported() {
-    if (acting.current) return;
-    acting.current = true;
-    const token = ++version.current;
-    setBusy(true);
-    const failures = [];
-    try {
-      for (const member of data.members) {
-        if (!mounted.current || token !== version.current) break;
+      if (!active(token)) return;
+      setNotice("Saved");
+      dirty.current = false;
+      setFetchStates({});
+      let next = await load(true);
+      if (!next || !active(token)) return;
+      const needsDocuments = (member) =>
+        Object.values(member.performance?.reports || {}).some(
+          (report) => report?.amendment_resolution?.needs_documents,
+        );
+      const pending = next.members.filter(
+        (m) =>
+          m.filing_status?.status !== "loading" &&
+          (m.filing_status?.can_fetch || needsDocuments(m)),
+      );
+      setFetchStates(
+        Object.fromEntries(
+          pending.map((m) => [
+            m.symbol,
+            { status: "loading", message: "Waiting to fetch financial data…" },
+          ]),
+        ),
+      );
+      // Apply the saved group first. Each completed source updates the chart;
+      // navigation stops later dispatches, and no AI route is involved.
+      for (const planned of pending) {
+        if (!active(token)) break;
+        const member =
+          next?.members.find((m) => m.symbol === planned.symbol) || planned;
+        if (
+          member.filing_status?.status === "loading" ||
+          (!member.filing_status?.can_fetch && !needsDocuments(member))
+        ) {
+          setFetchStates((old) => {
+            const rest = { ...old };
+            delete rest[member.symbol];
+            return rest;
+          });
+          continue;
+        }
+        setPhase("fetching");
+        setFetchStates((old) => ({
+          ...old,
+          [member.symbol]: {
+            status: "loading",
+            message: "Fetching financial data…",
+          },
+        }));
+        let completed = false;
         try {
-          const company = await api.addSecCompany(member.symbol);
-          if (!mounted.current || token !== version.current) break;
-          try {
-            await api.refreshSec(company.instrument_id);
-          } catch (failure) {
-            failures.push(`${member.symbol}: ${failure.message}`);
+          const id =
+            member.instrument_id ||
+            (await api.addSecCompany(member.symbol)).instrument_id;
+          if (!active(token)) break;
+          if (member.filing_status?.can_fetch) await api.refreshSec(id);
+          if (!active(token)) break;
+          const saved = await api.sectorPosition(id, []);
+          if (!active(token)) break;
+          if (needsDocuments(saved.members[0])) {
+            setFetchStates((old) => ({
+              ...old,
+              [member.symbol]: {
+                status: "loading",
+                message: "Reading original filings…",
+              },
+            }));
+            const originals = await api.refreshDisclosures(id);
+            if (originals.coverage?.some((item) => item.status === "failed"))
+              throw new Error(originals.message);
           }
-          if (!mounted.current || token !== version.current) break;
-          const saved = await api.sectorPosition(company.instrument_id, []);
-          if (
-            Object.values(saved.members[0]?.performance?.reports || {}).some(
-              (report) => report?.amendment_resolution?.needs_documents,
-            )
-          ) {
-            if (!mounted.current || token !== version.current) break;
-            const originals = await api.refreshDisclosures(
-              company.instrument_id,
-            );
-            if (originals.coverage?.some((item) => item.status === "failed")) {
-              failures.push(`${member.symbol}: ${originals.message}`);
-            }
-          }
+          if (!active(token)) break;
+          completed = true;
         } catch (failure) {
-          failures.push(`${member.symbol}: ${failure.message}`);
+          if (!active(token)) break;
+          setFetchStates((old) => ({
+            ...old,
+            [member.symbol]: { status: "failed", message: failure.message },
+          }));
+        }
+        if (active(token)) {
+          next = await load();
+          if (completed && active(token))
+            setFetchStates((old) => {
+              const rest = { ...old };
+              if (next) delete rest[member.symbol];
+              else
+                rest[member.symbol] = {
+                  status: "failed",
+                  message:
+                    "Data was checked, but the saved results could not be loaded. Save & compare to try again.",
+                };
+              return rest;
+            });
         }
       }
-      if (mounted.current && token === version.current) {
-        await load(data.peers);
-        if (failures.length) setError(failures.join(" "));
-      }
+    } catch (failure) {
+      if (active(token)) setError(failure.message);
     } finally {
-      acting.current = false;
-      if (mounted.current) setBusy(false);
+      if (acting.current === operation) acting.current = null;
+      if (active(token)) {
+        setBusy(false);
+        setPhase("");
+      }
     }
   }
-  const candidates = [...(data?.candidates || []), ...searchResults].filter(
+  const candidates = [
+    ...(data?.candidates || []),
+    ...Object.values(known),
+    ...searchResults,
+  ].filter(
     (c, i, all) => all.findIndex((other) => other.symbol === c.symbol) === i,
   );
   const now = new Date().toISOString().slice(0, 10),
@@ -675,32 +850,36 @@ export default function SectorPosition({
       : years[0] || String(new Date().getFullYear() + 1);
   const expected = view === "expected",
     current = measures.find((m) => m.key === measure),
-    rows =
+    rows = (
       !expected && measure === "pe"
         ? peRows(data?.members || [], data?.references || [])
         : (data?.members || []).map((m) =>
             expected
               ? forecastRow(m, chosenYear, now)
               : reportedRow(m, measure),
-          ),
+          )
+    ).map((row) =>
+      !expected &&
+      measure !== "pe" &&
+      row.value == null &&
+      fetchStates[row.symbol]
+        ? {
+            ...row,
+            dataStatus: fetchStates[row.symbol],
+            reason: fetchStates[row.symbol].message,
+          }
+        : row,
+    ),
     reading = position(rows, data?.symbol),
-    excludedFigures = rows.filter(
-      (row) =>
-        row.symbol !== data?.symbol &&
-        row.value != null &&
-        comparisonExclusion(
-          row,
-          rows.find((own) => own.symbol === data?.symbol),
-        ),
-    );
+    ownRow = rows.find((row) => row.symbol === data?.symbol),
+    hasReferencePeers = rows.some((row) => differentYearEnd(row, ownRow)),
+    fetching =
+      Object.values(fetchStates).some((s) => s.status === "loading") || waiting;
   return (
     <section className="sector-position" aria-label="Competitor position">
       <header className="outlook-section-heading">
         <h2>Where {data?.symbol || "the company"} stands among competitors</h2>
-        <p>
-          Compare growth, profitability and scale. The highlighted company is
-          the one you’re researching.
-        </p>
+        <p>Compare saved growth, profitability and scale.</p>
       </header>
       {error && (
         <p role="alert" className="warning">
@@ -716,158 +895,131 @@ export default function SectorPosition({
       )}
       {data && (
         <>
-          <details className="position-group">
-            <summary>
-              Comparison group · {data.symbol}
-              {data.peers.length
-                ? `, ${data.peers.join(", ")}`
-                : " · choose peers"}
-            </summary>
-            <p>
-              {data.basis === "suggested"
-                ? "Default semiconductor comparison group. Broadcom’s software business and the peers’ different product mixes need context."
-                : data.basis === "saved"
-                  ? "Using your saved comparison companies."
-                  : "Using the comparison group chosen for this view."}{" "}
-              This is a selected group, not an average for the entire sector.
-            </p>
-            {data.suggestion_source && (
-              <a href={data.suggestion_source} target="_blank" rel="noreferrer">
-                Background: Broadcom’s disclosed semiconductor competitors ·
-                2024 annual report ↗
-              </a>
-            )}
+          <div className="position-group">
+            <h3>Peers</h3>
             <label className="position-search">
-              Find another peer
+              Peer ticker or company
               <input
                 value={search}
-                placeholder="Ticker or company name"
+                placeholder="Type a ticker or company name"
+                disabled={busy || (draft || []).length >= 8}
                 onChange={(event) => searchPeers(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" || searched !== search) return;
+                  const choices = searchResults.filter(
+                    (c) => !draft?.includes(c.symbol),
+                  );
+                  const exact = choices.find(
+                    (c) => c.symbol === search.trim().toUpperCase(),
+                  );
+                  if (exact || choices.length === 1) {
+                    event.preventDefault();
+                    addPeer((exact || choices[0]).symbol);
+                  }
+                }}
               />
             </label>
-            {search.trim() && searched === search && (
+            {search.trim() && (
               <div className="position-search-results" aria-live="polite">
-                {searchResults.filter((c) => !draft?.includes(c.symbol))
-                  .length ? (
+                {searchError ? (
+                  <p role="alert">{searchError}</p>
+                ) : searched !== search ? (
+                  <p>Searching…</p>
+                ) : searchResults.filter((c) => !draft?.includes(c.symbol))
+                    .length ? (
                   searchResults
                     .filter((c) => !draft?.includes(c.symbol))
                     .slice(0, 6)
                     .map((c) => (
                       <button
                         key={c.symbol}
-                        disabled={
-                          busy || (draft || []).filter(Boolean).length >= 8
-                        }
+                        disabled={busy}
                         onClick={() => addPeer(c.symbol)}
                       >
-                        + {c.symbol} · {companyName(c)}
+                        {c.symbol} · {companyName(c)}
                       </button>
                     ))
                 ) : (
                   <p>
                     {searchResults.length
-                      ? "Already in this comparison group."
-                      : "No supported company matches this search."}
+                      ? "Already selected."
+                      : "No matching company."}
                   </p>
                 )}
               </div>
             )}
-            <div className="position-peer-editor">
-              {Array.from(
-                { length: Math.max(1, draft?.length || 0) },
-                (_, i) => i,
-              ).map((index) => (
-                <label key={index}>
-                  Competitor {index + 1}
-                  <Select
-                    aria-label={`Sector competitor ${index + 1}`}
-                    value={draft?.[index] || ""}
-                    disabled={busy}
-                    onChange={(event) => {
-                      dirty.current = true;
-                      setDraft((old) => {
-                        const next = [...(old || [])];
-                        next[index] = event.target.value;
-                        return next;
-                      });
-                    }}
-                  >
-                    <option value="">None</option>
-                    {candidates
-                      .filter(
-                        (c) =>
-                          c.symbol === draft?.[index] ||
-                          !draft?.includes(c.symbol),
-                      )
-                      .map((c) => (
-                        <option key={c.symbol} value={c.symbol}>
-                          {c.symbol} · {c.name}
-                        </option>
-                      ))}
-                  </Select>
-                  {draft?.[index] && (
-                    <textarea
-                      aria-label={`Why compare ${draft[index]}`}
-                      value={
-                        reasons[draft[index]] ||
-                        "Compare whole-company growth and profitability; product mix may differ."
+            <ul
+              className="position-peer-list"
+              aria-label="Selected peers"
+              aria-live="polite"
+            >
+              {(draft || []).map((symbol) => {
+                const member = data.members.find((m) => m.symbol === symbol),
+                  row = rows.find((r) => r.symbol === symbol),
+                  status = peerStatus(
+                    member &&
+                      (expected || measure === "pe"
+                        ? { ...member, filing_status: null }
+                        : member),
+                    row,
+                    rows.find((r) => r.symbol === data.symbol),
+                    !expected && measure !== "pe" ? fetchStates[symbol] : null,
+                  );
+                return (
+                  <li key={symbol}>
+                    <div>
+                      <strong>
+                        {symbol}{" "}
+                        <span>
+                          {companyName(
+                            member ||
+                              candidates.find((c) => c.symbol === symbol) || {
+                                symbol,
+                              },
+                          )}
+                        </span>
+                      </strong>
+                      <small>{status.message}</small>
+                    </div>
+                    <span
+                      className={`position-peer-status is-${status.status}`}
+                    >
+                      {status.label}
+                    </span>
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={busy}
+                      aria-label={`Remove ${symbol}`}
+                      onClick={() =>
+                        changePeers(draft.filter((s) => s !== symbol))
                       }
-                      minLength={8}
-                      maxLength={600}
-                      onChange={(event) => {
-                        dirty.current = true;
-                        setReasons((old) => ({
-                          ...old,
-                          [draft[index]]: event.target.value,
-                        }));
-                      }}
-                    />
-                  )}
-                </label>
-              ))}
+                    >
+                      ×
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="position-save-row">
+              <button disabled={busy} onClick={save}>
+                {phase === "saving"
+                  ? "Saving…"
+                  : phase === "fetching"
+                    ? "Fetching data…"
+                    : "Save & compare"}
+              </button>
+              <span role="status">
+                {notice}
+                {(draft || []).length >= 8 ? " · 8-peer limit" : ""}
+              </span>
             </div>
-            <button
-              disabled={busy}
-              onClick={() => load((draft || []).filter(Boolean), true)}
-            >
-              {busy ? "Loading…" : "Apply comparison group"}
-            </button>
-            <button
-              disabled={busy || Math.max(1, draft?.length || 0) >= 8}
-              onClick={() => {
-                dirty.current = true;
-                // An empty group already shows one blank slot; keep it and
-                // add a second so the click is visible.
-                setDraft((old) => [...(old?.length ? old : [""]), ""]);
-              }}
-            >
-              Add peer
-            </button>
-            <button
-              disabled={
-                busy ||
-                (draft || [])
-                  .filter(Boolean)
-                  .some(
-                    (symbol) =>
-                      (
-                        reasons[symbol] ||
-                        "Compare whole-company growth and profitability; product mix may differ."
-                      ).trim().length < 8,
-                  )
-              }
-              onClick={save}
-            >
-              {(draft || []).some(Boolean)
-                ? "Save peers for this company"
-                : "Restore default peer group"}
-            </button>
-            <p className="position-caption">
-              Choose None to remove a peer. Apply previews saved data; Save
-              keeps this peer group and the reasons shown above for this
-              company. Clearing saved peers restores the default group.
-            </p>
-          </details>
+            {!draft?.length && data.suggestion_source && (
+              <p className="position-caption">
+                Saving with no peers restores the suggested group.
+              </p>
+            )}
+          </div>
           {!financials && (
             <div
               className="position-view"
@@ -927,23 +1079,19 @@ export default function SectorPosition({
           <div
             className={`position-reading ${reading.coverage ? "has-comparison" : "has-gap"}`}
           >
-            <strong>{reading.text}</strong>
-            {excludedFigures.map((row) => (
-              <p key={row.symbol}>
-                {row.symbol} is not compared:{" "}
-                {comparisonExclusion(
-                  row,
-                  rows.find((own) => own.symbol === data.symbol),
-                )}
-              </p>
-            ))}
+            <strong>
+              {fetching && !reading.coverage
+                ? "Fetching financial data…"
+                : !reading.coverage &&
+                    ownRow?.value != null &&
+                    hasReferencePeers
+                  ? "Different year-ends: figures shown for context."
+                  : reading.text}
+            </strong>
             {reading.coverage > 0 && (
               <p>
-                Based on {reading.coverage} of {data.peers.length} peers with
-                usable{" "}
-                {current.unit === "multiple" && !expected
-                  ? "saved Finnhub P/E figures. A lower P/E does not establish better value."
-                  : "figures and fiscal ends within 120 days."}
+                Average and ranking: {reading.coverage} of {data.peers.length}{" "}
+                peers.
               </p>
             )}
           </div>
@@ -967,15 +1115,6 @@ export default function SectorPosition({
             expected={expected}
             label={expected ? "Expected revenue growth" : current.label}
           />
-          {!expected && measure !== "pe" && (
-            <button
-              className="position-check"
-              disabled={busy}
-              onClick={checkReported}
-            >
-              {busy ? "Checking…" : "Check reported data for these companies"}
-            </button>
-          )}
           {expected && (
             <>
               <details className="position-forward-details">
@@ -1029,7 +1168,7 @@ export default function SectorPosition({
               ? ""
               : measure === "pe"
                 ? "P/E uses saved Finnhub trailing-earnings definitions; underlying quote times and GAAP versus adjusted conventions are not established."
-                : "Annual growth compares each company with its own prior year. Operating margin uses reported GAAP operating income and revenue, separate from management’s adjusted targets."}
+                : "Annual growth compares each company with its own prior year. Operating margin uses reported operating income and revenue in one currency and accounting basis, separate from management’s adjusted targets."}
           </p>
         </>
       )}

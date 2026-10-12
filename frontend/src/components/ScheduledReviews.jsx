@@ -107,15 +107,7 @@ export default function ScheduledReviews({ onSelect, selected }) {
         with the latest week once.
       </p>
       {data?.settings.next_due_at && (
-        <p className="fine">
-          Next review:{" "}
-          {new Intl.DateTimeFormat(undefined, {
-            dateStyle: "medium",
-            timeStyle: "short",
-            timeZone: data.settings.time_zone,
-          }).format(new Date(data.settings.next_due_at))}{" "}
-          ({data.settings.time_zone}).
-        </p>
+        <p className="fine">Next review: {stamp(data.settings.next_due_at)}.</p>
       )}
       {data?.settings.error_message && (
         <p className="warning" role="status">
@@ -153,7 +145,7 @@ export default function ScheduledReviews({ onSelect, selected }) {
                 </Select>
               </label>
               <label>
-                Local time
+                Time in schedule zone (24-hour)
                 <input
                   aria-label="Weekly review time"
                   type="time"

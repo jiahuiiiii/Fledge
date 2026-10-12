@@ -12,8 +12,9 @@ import os
 
 from thesis.providers import ledger
 from thesis.providers.settings import MODEL
+from . import reddit_thread_context
 
-POLICY = "relevance-prefilter-1"
+POLICY = "relevance-prefilter-2"
 MAX_BYTES = 44000
 # 2,000 output tokens fit roughly 120 short labels; keep a wide margin.
 MAX_SOURCES = 60
@@ -49,13 +50,17 @@ def entry(source):
                  platform=source.get("platform") or source.get("publisher"),
                  title=source.get("title") or "", text=source.get("text") or "")
     parent = source.get("conversation")
+    if reddit_thread_context.key(source):
+        value['title'] = next((p['quote'] for p in source['passages'] if p['id'] == 'p0'), '')
+        value['text'] = '\n'.join(p['quote'] for p in source['passages'] if p['id'] != 'p0')
+        value.update({k: source[k] for k in ('timestamp_basis', 'source_note') if k in source})
     if isinstance(parent, dict) and (parent.get("body") or parent.get("title")):
         value["parent_message"] = " ".join(
             x for x in (parent.get("title"), parent.get("body")) if x)[:1500]
     return value
 
 
-def request_for(company, sources):
+def request_for(company, sources, packet=None, *, extras=True):
     labels = [s["label"] for s in sources]
     schema = {"type": "object", "additionalProperties": False, "required": ["items"],
               "properties": {"items": {"type": "array", "items": {
@@ -64,11 +69,13 @@ def request_for(company, sources):
                   "properties": {"label": {"type": "string", "enum": labels},
                                  "relevance": {"type": "string",
                                                "enum": ["relevant", "unrelated", "unclear"]}}}}}}
-    user = json.dumps({"target_company": company, "sources": [entry(s) for s in sources]},
+    threads = reddit_thread_context.wire(packet or {}, sources, extras=extras)
+    user = json.dumps({"target_company": company, "sources": [entry(s) for s in sources],
+                      **({'reddit_threads': threads} if threads else {})},
                       ensure_ascii=False)
     return {"model": MODEL, "store": False, "service_tier": "default",
             "max_output_tokens": ledger.MAX_OUTPUT, "reasoning": {"effort": "none"},
-            "input": [{"role": "system", "content": INSTRUCTIONS},
+            "input": [{"role": "system", "content": INSTRUCTIONS + (' Read saved Reddit topics and comments together. Topic membership is not a verified reply parent. Context-only messages are not extra targets. Keep unclear replies for the full reading; do not drop a reply because its company referent is in the supplied topic or verified parent.' if threads else '')},
                       {"role": "user", "content": user}],
             "text": {"format": {"type": "json_schema", "name": "relevance_prefilter",
                                 "strict": True, "schema": schema}}}
@@ -76,17 +83,24 @@ def request_for(company, sources):
 
 def plan(packet):
     batches, part = [], []
-    for source in packet["sources"]:
+    def body(sources):
+        value = request_for(packet['company'], sources, packet)
+        if len(ledger.canonical(value).encode()) > MAX_BYTES:
+            value = request_for(packet['company'], sources, packet, extras=False)
+        return value
+    for source in reddit_thread_context.ordered(packet["sources"]):
         trial = part + [source]
-        too_big = len(ledger.canonical(request_for(packet["company"], trial)).encode()) > MAX_BYTES
+        too_big = len(ledger.canonical(body(trial)).encode()) > MAX_BYTES
         if part and (too_big or len(trial) > MAX_SOURCES):
             batches.append(part)
             part = [source]
         else:
             part = trial
+        if len(ledger.canonical(body(part)).encode()) > MAX_BYTES:
+            raise ValueError('One complete source and its topic exceed the quick-check limit. No quick check was sent.')
     if part:
         batches.append(part)
-    return [request_for(packet["company"], part) for part in batches]
+    return [body(part) for part in batches]
 
 
 def request_key(body):

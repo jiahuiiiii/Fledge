@@ -1,3 +1,4 @@
+import { formatTimestamp, formatReportingAgeExplanation } from "./lib/dateTime";
 import ResearchLoading, {
   ResearchProgressToggle,
 } from "./components/ResearchLoading";
@@ -177,13 +178,7 @@ function Icon({ name, ...props }) {
     </svg>
   );
 }
-const dateTime = (value) =>
-  new Date(value).toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+const dateTime = formatTimestamp;
 function lastSourceCheck(data) {
   return (data.source_checks || [])
     .map((c) => c.checked_at)
@@ -192,7 +187,7 @@ function lastSourceCheck(data) {
 }
 // Plain explanation of a failed source check; unknown errors are shown as-is.
 function sourceCheckProblem(check) {
-  const when = check.checked_at ? ` (${date(check.checked_at)})` : "";
+  const when = check.checked_at ? ` (${dateTime(check.checked_at)})` : "";
   if (/interrupted/i.test(check.error || ""))
     return `The last check${when} stopped before it finished, so newer information may be missing. Figures shown come from the last complete check. Use Update data to try again.`;
   return check.error
@@ -233,7 +228,7 @@ function SourceLibrary({ documents, instrument, filterMentions, onOpen }) {
           <span>
             {d.title}
             <small>
-              {d.source} · {date(d.published_at)}
+              {d.source} · {dateTime(d.published_at)}
             </small>
           </span>
           <Icon name="source" />
@@ -1192,11 +1187,13 @@ function CompanyWorkspace({
               <p className="fine">
                 {ageLabel(r)}
                 {age?.expires_at
-                  ? ` · ${age.state === "expired" ? "Expired" : "Expires"} ${age.expires_at.slice(0, 10)} at 00:00 UTC`
+                  ? ` · ${age.state === "expired" ? "Expired" : "Expires"} ${dateTime(age.expires_at)}`
                   : ""}
               </p>
               {(r.outcome === "unknown" || r.role === "risk") && (
-                <p className="fine">{r.explanation}</p>
+                <p className="fine">
+                  {formatReportingAgeExplanation(r.explanation, age)}
+                </p>
               )}
               <div className="row">
                 <small>
@@ -1230,7 +1227,7 @@ function CompanyWorkspace({
               {e.review_action === "reviewed"
                 ? "Marked reviewed"
                 : "Left unresolved"}{" "}
-              · {date(e.reviewed_at)}
+              · {dateTime(e.reviewed_at)}
             </span>
           ) : (
             <>
@@ -1268,8 +1265,9 @@ function CompanyWorkspace({
           <details className="audit">
             <summary>Evidence available at this assessment</summary>
             <p>
-              Source cutoff: {date(e.manifest.cutoff)} · Assessed:{" "}
-              {e.manifest.assessed_at || e.manifest.cutoff} · {e.manifest.mode}
+              Source cutoff: {dateTime(e.manifest.cutoff)} · Assessed:{" "}
+              {dateTime(e.manifest.assessed_at || e.manifest.cutoff)} ·{" "}
+              {e.manifest.mode}
             </p>
             {e.manifest.document_ids.map((id) => (
               <button
@@ -1919,8 +1917,8 @@ function CompanyWorkspace({
                                               openSource(p.document_id)
                                             }
                                           >
-                                            {p.source} · {date(p.published_at)}{" "}
-                                            ↗
+                                            {p.source} ·{" "}
+                                            {dateTime(p.published_at)} ↗
                                           </button>
                                         </li>
                                       ),
@@ -1976,7 +1974,7 @@ function CompanyWorkspace({
                                           ? "↘ Challenges"
                                           : "◌ Open question"}
                                     </span>
-                                    <small>{date(c.available_at)}</small>
+                                    <small>{dateTime(c.available_at)}</small>
                                   </div>
                                   <h3>{c.title}</h3>
                                   <p>{c.body}</p>
@@ -2641,7 +2639,7 @@ function CompanyWorkspace({
                         </div>
                         <small className="as-of">
                           Assessed{" "}
-                          {date(
+                          {dateTime(
                             evaluation.manifest.assessed_at ||
                               evaluation.manifest.cutoff,
                           )}{" "}
@@ -2915,7 +2913,7 @@ function CompanyWorkspace({
                     .map((c) => (
                       <li key={c.source_id}>
                         <span>{c.name}</span>
-                        <small>through {date(c.covered_through)}</small>
+                        <small>through {dateTime(c.covered_through)}</small>
                       </li>
                     ))}
                 </ul>
@@ -2955,9 +2953,9 @@ function CompanyWorkspace({
               {source.timestamp_basis === "feed_updated"
                 ? "feed updated"
                 : "published"}{" "}
-              {date(source.published_at)}
+              {dateTime(source.published_at)}
               <br />
-              First available here {date(source.available_at)}
+              First available here {dateTime(source.available_at)}
             </p>
             {source.timestamp_basis === "feed_updated" && (
               <p className="fine">

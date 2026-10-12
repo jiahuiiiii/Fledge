@@ -176,7 +176,15 @@ export function snapshot(data) {
     const period = outlook.periodEnd
       ? `the ${outlook.periodType || "period"} ending ${day(outlook.periodEnd)}`
       : outlook.periodLabel || "the stated forecast period";
-    sentences.push(`Management expects ${range} of revenue for ${period}.`);
+    sentences.push(
+      `Saved management guidance is ${range} of revenue for ${period}.` +
+        (!outlook.unit ? " Currency is not specified by the source." : "") +
+        (!outlook.periodEnd ? " Exact ending date is not stated." : "") +
+        (outlook.periodEnd &&
+        outlook.periodEnd < new Date().toISOString().slice(0, 10)
+          ? " This forecast period has ended."
+          : ""),
+    );
   }
   if (position?.cash > 0 && position?.debt != null) {
     const ratio = position.debt / position.cash;

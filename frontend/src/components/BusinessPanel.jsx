@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 import { readableNote } from "../lib/readingNotes";
 import { useEffect, useId, useRef, useState } from "react";
 import { api } from "../api/client";
@@ -14,18 +15,7 @@ const titles = {
   financial_position: "Cash and obligations",
   risks: "Key risks",
 };
-const day = (value) =>
-  new Date(value).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-const stamp = (value) => new Date(value).toLocaleString("en-GB");
-const sourceStamp = (value) =>
-  new Date(value).toLocaleString("en-GB", {
-    timeZone: "UTC",
-    timeZoneName: "short",
-  });
+const stamp = (value) => formatTimestamp(value, { fallback: "Not recorded" });
 
 export default function BusinessPanel({
   instrumentId,
@@ -155,7 +145,7 @@ export default function BusinessPanel({
             <p className="brief-meta">
               AI summary of the company’s own filings
               {forms.length ? ` (${forms.join(", ")})` : ""} · saved{" "}
-              {day(brief.created_at)}
+              {stamp(brief.created_at)}
             </p>
           )}
         </div>
@@ -371,7 +361,7 @@ function BusinessCitation({ citation, source }) {
     <section className="business-evidence-citation">
       <header className="business-evidence-source">
         <h3>{source?.title || "Source unavailable"}</h3>
-        {source && <p>SEC acceptance · {sourceStamp(source.published_at)}</p>}
+        {source && <p>SEC acceptance · {stamp(source.published_at)}</p>}
       </header>
       <p className="business-evidence-caption">
         {long && !expanded

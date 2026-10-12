@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 import { useId, useState } from "react";
 import Select from "./Select";
 import { FinancialEvidenceRow } from "./FinancialEvidence";
@@ -204,11 +205,7 @@ export default function RevenueBreakdown({ data }) {
               label="Inspect company total"
             />
             <p className="mix-note">
-              SEC accepted{" "}
-              {new Date(group.accepted_at).toLocaleString("en-GB", {
-                timeZone: "UTC",
-              })}{" "}
-              UTC ·{" "}
+              SEC accepted {formatTimestamp(group.accepted_at)} ·{" "}
               <a href={group.url} target="_blank" rel="noreferrer">
                 Read {group.form} ↗
               </a>

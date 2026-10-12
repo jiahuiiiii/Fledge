@@ -5,7 +5,7 @@ incompatible fiscal dates and incomplete borrowing components remain unknown.
 """
 from datetime import date, timedelta
 from decimal import Decimal,localcontext
-from .normalize import filing_rows,REVENUE
+from .normalize import filing_rows,REVENUE,annual_form
 from .performance import collect,unique,select,decimal_text,duration
 from thesis.db import one
 from .disclosure_text import archive_url
@@ -70,7 +70,7 @@ def trailing(bundle,filings,current,tags, resolver=None):
         result=resolved[0];result.pop('key',None)
         return result
     facts=collect(bundle,current,tags)
-    if current['form'].startswith('10-K'):
+    if annual_form(current['form']):
         value,error=select(facts,current,'annual','Business performance',tags)
         return dict(value=value['value'] if value else None,inputs=[value] if value else [],reason=error,
                     start=value['start'] if value else None,end=current['end'].isoformat(),formula='Reported fiscal-year value',calculated=False)
@@ -81,7 +81,7 @@ def trailing(bundle,filings,current,tags, resolver=None):
     ytd,error=unique(candidates,tags)
     if not ytd:return dict(value=None,inputs=[],reason=error,start=None,end=current['end'].isoformat(),formula=None,calculated=True)
     annual_end=date.fromisoformat(ytd['start'])-timedelta(days=1)
-    annuals=[f for f in filings if f['form'].startswith('10-K') and f['end']==annual_end and f['accepted_at']<=current['accepted_at']]
+    annuals=[f for f in filings if annual_form(f['form']) and f['end']==annual_end and f['accepted_at']<=current['accepted_at']]
     annual=annuals[-1] if annuals else None
     base,error=select(collect(bundle,annual,tags),annual,'annual','Business performance',tags) if annual else (None,'The preceding fiscal-year filing is unavailable.')
     base_resolution={}
@@ -189,7 +189,7 @@ def normalize_depth(bundle,cik,now,resolver=None):
         elif derived['value'] is not None:derived.update(evidence)
     trend=[]
     for filing in filings:
-        if not filing['form'].startswith('10-K'):continue
+        if not annual_form(filing['form']):continue
         projected=trailing(bundle,filings,filing,REVENUE,resolver)
         revenue=projected['inputs'][0] if projected['value'] is not None and len(projected['inputs'])==1 else None
         error=projected['reason']

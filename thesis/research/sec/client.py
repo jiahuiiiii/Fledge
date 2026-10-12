@@ -23,6 +23,9 @@ class SourceFailure(ValueError):
 
 def failure_message(error):
     """Explain known failures without exposing exception bodies or contact data."""
+    from .normalize import UnsupportedFiling
+    if isinstance(error, UnsupportedFiling):
+        return 'No supported 10-K, 10-Q or 20-F report was found in the SEC filing list. Other filing formats are not supported.'
     if not isinstance(error, SourceFailure):
         return "SEC refresh failed; no new evidence committed."
     if error.denied:

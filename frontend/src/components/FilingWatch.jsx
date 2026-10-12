@@ -1,14 +1,9 @@
+import { formatTimestamp } from "../lib/dateTime";
 import LoadingSkeleton from "./LoadingSkeleton";
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 
-const time = (value) =>
-  value
-    ? new Date(value).toLocaleString("en-GB", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })
-    : "Not scheduled";
+const time = (value) => formatTimestamp(value, { fallback: "Not scheduled" });
 const labels = {
   changed: "Filing inputs changed",
   unchanged: "Inputs unchanged",

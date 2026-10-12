@@ -29,7 +29,7 @@ test("named fiscal guidance does not invent an ending date", () => {
   };
   assert.equal(
     snapshot(data).sentences[0],
-    "Management expects $1bn of revenue for Q3 FY2027.",
+    "Saved management guidance is $1bn of revenue for Q3 FY2027. Currency is not specified by the source. Exact ending date is not stated.",
   );
 });
 
@@ -108,9 +108,20 @@ test("summary sentences use only saved figures", () => {
   const { sentences } = snapshot(workspace);
   assert.deepEqual(sentences, [
     "Revenue grew 23.9% in the fiscal year to 2 Nov 2025.",
-    "Management expects about $34.8bn of revenue for the quarter ending 1 Nov 2026.",
+    "Saved management guidance is about $34.8bn of revenue for the quarter ending 1 Nov 2026. Currency is not specified by the source.",
     "Its borrowing is about 2.5× the cash it holds.",
   ]);
+});
+
+test("historical guidance stays dated rather than sounding like a current forecast", () => {
+  const data = structuredClone(workspace);
+  data.management_outlook.releases[0].sections[0].period_end = "2001-11-01";
+  const outlook = revenueOutlook(data.management_outlook);
+  assert.match(snapshot(data).sentences[1], /This forecast period has ended\./);
+  assert.equal(outlook.low, 34800000000);
+  assert.equal(outlook.high, 34800000000);
+  assert.equal(outlook.periodEnd, "2001-11-01");
+  assert.equal(outlook.unit, undefined);
 });
 
 test("checks pass, fail or stay unknown from the data", () => {

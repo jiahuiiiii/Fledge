@@ -14,6 +14,7 @@ ATOM = rf'(?P<currency>{CURRENCY})?\s*(?P<number>{NUM})\s*(?P<scale>{SCALE})?'
 ATOM_RE = re.compile('^'+ATOM+'$', re.I)
 ORDINAL = r'(?:first|second|third|fourth)'
 PERIOD = rf'(?:(?:{ORDINAL}(?: fiscal)? quarter|full(?: fiscal)? year|fiscal year|Q[1-4])(?: (?:of )?(?:fiscal(?: year)? )?(?:20\d{{2}}))?)'
+REVENUE_LABEL = r'(?:(?:(?:total|net|consolidated) )?revenues?|(?:(?:total|consolidated) )?net sales)'
 HEAD = re.compile(rf'^(?:(?:Q[1-4]\s*FY\d{{2,4}}|FY\d{{2,4}})\s+)?(?:(?:{ORDINAL}(?: fiscal)? quarter|full(?: fiscal)? year|fiscal year|Q[1-4])(?: of)?(?: fiscal)?(?: year)?(?: 20\d{{2}})?\s+)?(?:(?:business|financial|current|forward-looking)\s+)?(?:outlook|guidance)(?: for (?:the )?[\w ,/–—-]+)?$', re.I)
 STOP = re.compile(r'^(?:.*(?:conference call|teleconference).*|supplemental revenue information|quarterly revenue trend.*|highlights|product highlights|quarterly dividends|dividends|about .+|forward-looking statements|cautionary statement.*|safe harbor.*|.*consolidated (?:statements|balance sheets).*)$', re.I)
 DATE_HEADING = re.compile(r'^(?:Three|Twelve) Months Ending (?:[A-Z][a-z]+) \d{1,2},? 20\d{2}$', re.I)
@@ -65,22 +66,56 @@ def money_range(text, scale=None):
     return dict(metric='revenue',label='Revenue',low=decimal_text(low),high=decimal_text(high),unit=unit,basis=None,approximate=approximate,calculation=formula)
 
 
-def prose(text, names=()):
-    text=text.lstrip('•*- ').strip()
+def first_sentence(text):
     # Whole first sentence, without splitting the decimal point. All qualifiers
     # and later sentences remain in the original forecast quotation.
-    first=re.split(r'(?<=[.;])\s+(?=[A-Z])',text,maxsplit=1)[0]
+    return re.split(r'(?<=[.;])\s+(?=[A-Z])',text.lstrip('•*- ').strip(),maxsplit=1)[0]
+
+
+def comparison_parts(text):
+    """Separate only a complete, explicit comparison from a forecast clause."""
+    match=re.search(rf',\s*(?:or to grow between (?P<low>{NUM})\s*(?:%|percent) and (?P<high>{NUM})\s*(?:%|percent)\s+)?compared (?:with|to)\s+(?P<comparison>.+?)[.;]?$',text,re.I)
+    if not match:return text,None
+    if match['low'] and Decimal(match['low'].replace(',',''))>Decimal(match['high'].replace(',','')):return text,None
+    comparison=re.fullmatch(rf'(?:(?P<amount>.+?) (?:in|for) )?(?:the )?(?P<period>{PERIOD})',match['comparison'],re.I)
+    if not comparison or (comparison['amount'] and not money_range(comparison['amount'])):return text,None
+    return text[:match.start()],comparison['period']
+
+
+def forecast_context(text, context):
+    """Omit a comparison from period detection only when it is explicitly older.
+
+    Named quarter/year conventions must agree. Unknown, same-period or future
+    comparisons keep the full context and require review.
+    """
+    sentence=first_sentence(text)
+    forecast,comparison=comparison_parts(sentence)
+    if not comparison:return sentence,False
+    def order(value):
+        label=value.get('period_label') or ''
+        match=re.fullmatch(r'Q([1-4]) (FY)?(20\d{2})|(FY|Year )(20\d{2})',label)
+        if not match or value['period_conflict']:return None
+        if match[1]:return ('quarter',bool(match[2]),int(match[3]),int(match[1]))
+        return ('annual',match[4]=='FY',int(match[5]),0)
+    target=order(period(context+'\n'+forecast));prior=order(period(comparison))
+    older=bool(target and prior and target[:2]==prior[:2] and prior[2:]<target[2:])
+    return (forecast,False) if older else (sentence,True)
+
+
+def prose(text, names=()):
+    first=first_sentence(text)
     first=re.sub(rf'^For (?:the )?{PERIOD},\s*','',first,flags=re.I)
     first=re.sub(rf'^{PERIOD}\s+','',first,flags=re.I)
     speakers=['we','the company',*[re.escape(n) for n in names if n]]
     speaker='(?:'+'|'.join(speakers)+')'
     first=re.sub(rf'^{speaker}\s+(?:expects?|anticipates?|projects?)\s+', '',first,flags=re.I)
     first=re.sub(rf'^(?:the )?{PERIOD}\s+','',first,flags=re.I)
-    growth=re.fullmatch(r'(?:(?:total|net|consolidated) )?revenue(?:s)? (?:is expected to grow|are expected to grow|growth (?:guidance|outlook) of) (?:approximately |about )?(' + NUM + r')(?:\s*(?:to|–|-)\s*(' + NUM + r'))?\s*(?:%|percent)(?: year[- ]over[- ]year)?[.;]?',first,re.I)
+    growth=re.fullmatch(REVENUE_LABEL+r' (?:is expected to grow|are expected to grow|growth (?:guidance|outlook) of) (?:approximately |about )?(' + NUM + r')(?:\s*(?:to|–|-)\s*(' + NUM + r'))?\s*(?:%|percent)(?: year[- ]over[- ]year)?[.;]?',first,re.I)
     if growth:
         low=Decimal(growth[1].replace(',',''));high=Decimal((growth[2] or growth[1]).replace(',',''))
         if 0<=low<=high:return dict(metric='revenue_growth',label='Revenue growth',low=decimal_text(low),high=decimal_text(high),unit='percent',basis=None,approximate=bool(re.search('approximately|about',first,re.I)))
-    m=re.fullmatch(r'(?:(GAAP|non-GAAP|adjusted) )?(?:(?:total|net|consolidated) )?revenues?\s+(?:(?:guidance|outlook)(?:\s+(?:of|is|at)|:)\s+|(?:is |are )?(?:expected|projected|anticipated) to be\s+|to be\s+|of\s+)(?:in the range of\s+|between\s+)?(.+)',first,re.I)
+    first,_=comparison_parts(first)
+    m=re.fullmatch(r'(?:(GAAP|non-GAAP|adjusted) )?'+REVENUE_LABEL+r'\s+(?:(?:guidance|outlook)(?:\s+(?:of|is|at)|:)\s+|(?:is |are )?(?:expected|projected|anticipated) to be\s+|to be\s+|of\s+)(?:in the range of\s+|between\s+)?(.+)',first,re.I)
     if not m:return dict(UNKNOWN)
     value=money_range(m[2])
     if value:
@@ -122,13 +157,13 @@ def table_forecast(passages,index, prefix=()):
     Unsupported multi-period layouts are retained as excerpts, never guessed.
     """
     p=passages[index];parts=[v.strip() for v in p['quote'].split('|') if v.strip()]
-    label=re.fullmatch(r'(?:(GAAP|non-GAAP) )?(?:(?:total|net|consolidated) )?revenues?',parts[0],re.I) if parts else None
+    label=re.fullmatch(r'(?:(GAAP|non-GAAP) )?'+REVENUE_LABEL,parts[0],re.I) if parts else None
     if not label:return None
     evidence=[p]; values=parts[1:]
     if not values and index+1<len(passages):
         evidence.append(passages[index+1]);values=[v.strip() for v in evidence[-1]['quote'].split('|') if v.strip()]
     context='\n'.join(p['quote'] for p in [*prefix,*passages])
-    if re.search(r'\b(?:segment(?:s)?|business unit|geographic|regional) (?:revenue|guidance|outlook)\b',context,re.I):return dict(UNKNOWN,evidence=evidence)
+    if re.search(r'\b(?:segment(?:s)?|business unit|geographic|regional) (?:revenues?|net sales|guidance|outlook)\b',context,re.I):return dict(UNKNOWN,evidence=evidence)
     scales={m.lower() for m in re.findall(r'\b(?:dollars are in|in) (millions|billions|thousands)\b',context,re.I)}
     scale=next(iter(scales))[:-1] if len(scales)==1 else None
     # Original reconciliation columns: GAAP From/To, adjustment, Non-GAAP

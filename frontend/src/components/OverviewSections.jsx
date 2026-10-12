@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { companyName } from "../lib/companyIdentity";
@@ -21,37 +22,12 @@ import { growthTakeaway, peTakeaway } from "../lib/overviewTakeaways";
 import "./OverviewSections.css";
 
 const fallback = (value) => value ?? "Not available";
-const stamp = (value) =>
-  value
-    ? new Date(value).toLocaleString("en-GB", {
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "Not checked";
-const check = (label, result) => ({
-  label,
-  state: result == null ? "unknown" : result ? "pass" : "fail",
-});
-function Reading({ checks, children, label = "Checks" }) {
+const stamp = (value) => formatTimestamp(value, { fallback: "Not checked" });
+function Reading({ children, limit }) {
   return (
     <div className="overview-reading">
-      <div className="overview-checks">
-        <strong>
-          {label} {checks.filter((c) => c.state === "pass").length}/
-          {checks.length}
-        </strong>
-        {checks.map((c) => (
-          <span key={c.label} className={`overview-check ${c.state}`}>
-            <span aria-hidden="true">
-              {c.state === "pass" ? "✓" : c.state === "fail" ? "×" : "–"}
-            </span>{" "}
-            {c.label}
-          </span>
-        ))}
-      </div>
       <p>{children}</p>
+      {limit && <p className="overview-limit">{limit}</p>}
     </div>
   );
 }
@@ -246,7 +222,9 @@ function Tone({ tone }) {
   if (!tone?.total || !tone.reconciled)
     return (
       <p className="overview-caption">
-        No reconciled news-tone breakdown is available.
+        {tone?.total && !tone.reconciled
+          ? "The saved tone totals do not agree, so a breakdown is not shown."
+          : "There are no counted news developments to show in a tone breakdown."}
       </p>
     );
   const parts = [
@@ -301,15 +279,29 @@ export default function OverviewSections({
   businessPanel,
   focusTopic,
 }) {
-  const [reads, setReads] = useState({}),
-    [errors, setErrors] = useState({}),
+  const [readState, setReadState] = useState({}),
+    [retry, setRetry] = useState(0),
     [evidence, setEvidence] = useState(null),
     [filter, setFilter] = useState("all"),
     [briefOpen, setBriefOpen] = useState(false);
   const briefRef = useRef(null);
+  // A new company or evidence version must never inherit another read's data
+  // or its empty/error state, even on the render before the effect starts.
+  const scope = JSON.stringify([
+    instrumentId,
+    data.snapshot_id,
+    data.disclosures?.source_status?.last_success_at,
+    retry,
+  ]);
+  const reads = readState.scope === scope ? readState.values : {};
+  const errors = readState.scope === scope ? readState.errors : {};
+  const loading = (key) =>
+    readState.scope !== scope || readState.loading[key] !== false;
+  const retryReads = () => setRetry((value) => value + 1);
   useEffect(() => {
     if (!visible) return;
     let active = true;
+    setReadState({ scope, values: {}, errors: {}, loading: {} });
     // These endpoints only read saved data. No source refresh, AI generation or peer save.
     for (const [key, read] of [
       ["valuation", api.valuationContext],
@@ -320,26 +312,35 @@ export default function OverviewSections({
       read(instrumentId)
         .then((result) => {
           if (active) {
-            setReads((old) => ({ ...old, [key]: result }));
-            setErrors((old) => ({ ...old, [key]: null }));
+            setReadState((old) =>
+              old.scope === scope
+                ? {
+                    ...old,
+                    values: { ...old.values, [key]: result },
+                    loading: { ...old.loading, [key]: false },
+                  }
+                : old,
+            );
           }
         })
-        .catch((error) => {
+        .catch(() => {
           if (active) {
-            setReads((old) => ({ ...old, [key]: null }));
-            setErrors((old) => ({ ...old, [key]: error.message }));
+            setReadState((old) =>
+              old.scope === scope
+                ? {
+                    ...old,
+                    errors: { ...old.errors, [key]: true },
+                    loading: { ...old.loading, [key]: false },
+                  }
+                : old,
+            );
           }
         });
     }
     return () => {
       active = false;
     };
-  }, [
-    instrumentId,
-    visible,
-    data.snapshot_id,
-    data.disclosures?.source_status?.last_success_at,
-  ]);
+  }, [instrumentId, visible, scope]);
   useEffect(() => {
     setEvidence(null);
   }, [
@@ -390,27 +391,13 @@ export default function OverviewSections({
   const sources = m.headlines
     .filter((s) => filter === "all" || s.kind === filter)
     .slice(0, 4);
-  const sourceChecks = [
-    ["news", "News"],
-    ["reddit", "Reddit"],
-    ["hackernews", "Hacker News"],
-    ["x", "X"],
-  ].map(([platform, label]) =>
-    check(
-      label +
-        (platform === "x" &&
-        data.provider_status?.some(
-          (p) => p.provider === "x" && p.status === "disabled",
-        )
-          ? " off"
-          : ""),
-      m.headlines.some(
-        (s) => (s.kind === "news" ? "news" : s.platform) === platform,
-      )
-        ? true
-        : null,
-    ),
-  );
+  const forecastStatus = loading("fmp")
+    ? "Loading saved forecasts…"
+    : errors.fmp
+      ? "Saved forecasts could not be loaded."
+      : m.forecasts
+        ? "Saved · see Outlook for dates and sources"
+        : "No usable saved forecasts";
   const briefText = m.brief?.result?.findings?.find(
     (f) => f.category === "business",
   )?.text;
@@ -420,8 +407,8 @@ export default function OverviewSections({
       <p>
         {guidance.unit || "Currency unspecified"} ·{" "}
         {guidance.basis?.toUpperCase() || "Accounting basis unspecified"}.
-        Target {guidance.section.period_type} ends{" "}
-        {day(guidance.section.period_end)}.
+        Forecast for {guidancePeriod(guidance.section)}.
+        {!guidance.section.period_end && " Exact ending date not stated."}
       </p>
       <a href={guidance.release.url} target="_blank" rel="noreferrer">
         Read original earnings release ↗
@@ -432,22 +419,11 @@ export default function OverviewSections({
     <div className="overview-sections">
       <Section number="1" title={`How ${name} makes money`}>
         <Reading
-          checks={[
-            check(
-              "Revenue split by business",
-              m.mix.some((g) => g.chartable) ? true : null,
-            ),
-            check(
-              "Quarterly report saved",
-              data.performance?.reports?.quarter ? true : null,
-            ),
-            check(
-              m.olderBrief
-                ? "Brief uses earlier documents"
-                : "Business brief saved",
-              m.brief ? (m.olderBrief ? null : true) : null,
-            ),
-          ]}
+          limit={
+            briefText && m.olderBrief
+              ? "This AI explanation uses earlier saved documents and may not reflect newer reports."
+              : null
+          }
         >
           {briefText ||
             (mix
@@ -456,6 +432,14 @@ export default function OverviewSections({
           {m.margin?.value != null &&
             ` Operating profit was ${percent(m.margin.value)} of revenue over the past 12 months.`}
         </Reading>
+        {errors.business && (
+          <p className="overview-caption" role="status">
+            The saved business explanation could not be loaded.{" "}
+            <button className="text-button" onClick={retryReads}>
+              Retry saved data
+            </button>
+          </p>
+        )}
         <div className="overview-section-grid">
           <KeyInformation
             figures={
@@ -532,21 +516,7 @@ export default function OverviewSections({
         </details>
       </Section>
       <Section number="2" title="Growth & outlook">
-        <Reading
-          checks={[
-            check(
-              "Revenue grew last fiscal year",
-              growthNumber == null ? null : growthNumber > 0,
-            ),
-            check("Management outlook available", guidance ? true : null),
-            check(
-              m.forecasts
-                ? "Analyst forecasts saved"
-                : "Analyst forecasts unavailable",
-              m.forecasts ? true : null,
-            ),
-          ]}
-        >
+        <Reading>
           {growthNumber != null
             ? `Revenue ${growthNumber >= 0 ? "grew" : "fell"} ${Math.abs(growthNumber).toFixed(1)}% to ${money(m.revenue?.value)} in the fiscal year ended ${day(m.revenue?.end)}. `
             : "Comparable annual revenue growth is not available. "}
@@ -557,7 +527,21 @@ export default function OverviewSections({
           {guidance &&
             !guidance.section.period_end &&
             ` ${guidanceReason(data.management_outlook)}`}
+          {guidance &&
+            !guidance.unit &&
+            " Currency is not specified by the source."}
+          {guidance &&
+            !guidance.basis &&
+            " Accounting basis is not specified by the source."}
         </Reading>
+        {errors.sector && (
+          <p className="overview-caption" role="status">
+            The saved peer comparison could not be loaded.{" "}
+            <button className="text-button" onClick={retryReads}>
+              Retry saved data
+            </button>
+          </p>
+        )}
         <div className="overview-section-grid">
           <KeyInformation
             figures={[
@@ -595,7 +579,17 @@ export default function OverviewSections({
               },
               {
                 label: "Analyst forecasts",
-                value: m.forecasts ? "Saved" : "Not available",
+                value: (
+                  <span role="status">
+                    {forecastStatus}
+                    {errors.fmp && (
+                      <>
+                        {" "}
+                        <button onClick={retryReads}>Retry saved data</button>
+                      </>
+                    )}
+                  </span>
+                ),
               },
             ]}
           />
@@ -627,7 +621,7 @@ export default function OverviewSections({
                 Outlook from{" "}
                 {guidance.release.stated_release_date
                   ? `the ${day(guidance.release.stated_release_date.date)} release`
-                  : `a filing accepted ${day(guidance.release.published_at)}`}
+                  : `a filing accepted ${stamp(guidance.release.published_at)}`}
                 . {!guidance.unit && "Currency unspecified. "}
                 {!guidance.basis && "Accounting basis unspecified. "}Management
                 guidance is separate from analyst forecasts.
@@ -653,24 +647,7 @@ export default function OverviewSections({
         </div>
       </Section>
       <Section number="3" title="Financial health">
-        <Reading
-          checks={[
-            check(
-              "Owns more than it owes",
-              number(m.assets?.value) != null &&
-                number(m.liabilities?.value) != null
-                ? number(m.assets.value) > number(m.liabilities.value)
-                : null,
-            ),
-            check(
-              "Cash covers borrowing",
-              number(m.cash?.value) != null &&
-                number(m.borrowing?.value) != null
-                ? number(m.cash.value) >= number(m.borrowing.value)
-                : null,
-            ),
-          ]}
-        >
+        <Reading>
           {m.assetsRatio != null
             ? `Reported assets are ${multiple(m.assetsRatio)} liabilities. `
             : "A matching assets-to-liabilities comparison is unavailable. "}
@@ -680,7 +657,9 @@ export default function OverviewSections({
                 number(m.borrowing?.value) != null
               ? `It has ${money(m.cash.value)} cash against ${money(m.borrowing.value)} borrowing.`
               : "Matching cash and borrowing figures are unavailable."}{" "}
-          These balances describe the company’s position at one reporting date.
+          These balances describe the company’s position at one reporting date.{" "}
+          These balances alone do not establish whether future repayments are
+          affordable.
         </Reading>
         <div className="overview-section-grid">
           <KeyInformation
@@ -757,17 +736,42 @@ export default function OverviewSections({
         </div>
       </Section>
       <Section number="4" title="News & discussion">
-        <Reading checks={sourceChecks} label="Saved sources">
+        <Reading
+          limit={
+            data.sentiment?.withheld
+              ? "The saved tone reading is hidden because source access changed. Permitted current sources remain readable."
+              : m.tone
+                ? [
+                    m.tone.stale
+                      ? "This reading uses a source sample captured over 24 hours ago; newer headlines may not be included."
+                      : null,
+                    data.sentiment?.earlier_method
+                      ? "It was saved with an earlier analysis method."
+                      : null,
+                    "News tone describes this sample, not investor consensus or future returns.",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")
+                : null
+          }
+        >
           {m.tone?.label
             ? `The saved company-news reading is ${m.tone.label.toLowerCase()}. `
-            : "There is no usable saved company-news tone yet. "}
+            : m.tone
+              ? "Too few news developments have a clear tone to describe the overall mood. "
+              : "There is no usable saved company-news tone yet. "}
           Read the headlines and original posts below. Each social platform has
           its own sample and tone.
         </Reading>
         <div className="overview-section-grid">
           <KeyInformation
             figures={[
-              { value: m.tone?.label, label: "Company-news tone" },
+              {
+                value:
+                  m.tone?.label ||
+                  (m.tone ? "Too little clear evidence" : null),
+                label: "Company-news tone",
+              },
               {
                 value: m.tone ? String(m.tone.selected) : null,
                 label: "News stories analysed",
@@ -790,7 +794,7 @@ export default function OverviewSections({
                 label: "News watch",
                 value: data.news_watch?.enabled
                   ? data.news_watch.error
-                    ? "On · check incomplete"
+                    ? "On · last update could not finish; saved research retained"
                     : `On · next ${stamp(data.news_watch.next_check_at)}`
                   : "Off",
               },
@@ -868,22 +872,14 @@ export default function OverviewSections({
         </div>
       </Section>
       <Section number="5" title="Value">
-        <Reading
-          label="Research steps"
-          checks={[
-            check(
-              m.peers.length ? `${m.peers.length} peers saved` : "Choose peers",
-              m.peers.length ? true : null,
-            ),
-            check(
-              m.scenarios.length ? "Scenario saved" : "Try your own scenario",
-              m.scenarios.length ? true : null,
-            ),
-          ]}
-        >
+        <Reading>
           {m.pe != null
             ? `The saved trailing P/E is ${multiple(m.pe)}: about $${m.pe.toFixed(0)} of share price for every $1 of annual earnings. `
-            : "A saved price-to-earnings multiple is not available. "}
+            : loading("valuation")
+              ? "Loading saved valuation ratios… "
+              : errors.valuation
+                ? "Saved valuation ratios could not be loaded. "
+                : "A usable saved price-to-earnings multiple is not available. "}
           {peVsPeers
             ? `${peVsPeers} ${peVsPeers.includes(" below ") ? "A lower multiple can mean the market expects slower growth or more risk, not only a bargain." : "A higher multiple can mean the market expects faster growth, which then has to arrive."}`
             : "Whether that is expensive depends on the company’s growth, risks and the peers or assumptions you compare it with."}
@@ -891,8 +887,23 @@ export default function OverviewSections({
         <div className="overview-section-grid">
           <KeyInformation
             figures={[
-              { value: multiple(m.pe), label: "Price to earnings", term: "pe" },
-              { value: multiple(m.ps), label: "Price to sales" },
+              {
+                value: loading("valuation")
+                  ? "Loading…"
+                  : errors.valuation
+                    ? "Could not load"
+                    : multiple(m.pe),
+                label: "Price to earnings",
+                term: "pe",
+              },
+              {
+                value: loading("valuation")
+                  ? "Loading…"
+                  : errors.valuation
+                    ? "Could not load"
+                    : multiple(m.ps),
+                label: "Price to sales",
+              },
             ]}
             rows={[
               {
@@ -904,17 +915,29 @@ export default function OverviewSections({
               },
               {
                 label: "Ratios from",
-                value: m.reference ? "Finnhub · past 12 months" : null,
+                value: loading("valuation")
+                  ? "Loading…"
+                  : m.reference
+                    ? "Finnhub · past 12 months"
+                    : null,
               },
               {
                 label: "Ratios saved",
-                value: m.reference ? stamp(m.reference.retrieved_at) : null,
+                value: loading("valuation")
+                  ? "Loading…"
+                  : m.reference
+                    ? stamp(m.reference.retrieved_at)
+                    : null,
               },
               {
                 label: "Saved peers",
-                value: m.peers.length
-                  ? m.peers.map((p) => p.symbol).join(", ")
-                  : "None yet",
+                value: loading("fmp")
+                  ? "Loading saved peers…"
+                  : errors.fmp
+                    ? "Could not load saved peers"
+                    : m.peers.length
+                      ? m.peers.map((p) => p.symbol).join(", ")
+                      : "None yet",
               },
             ]}
           />
@@ -942,9 +965,11 @@ export default function OverviewSections({
               forward estimates or an investment rating.
             </p>
             {errors.valuation && (
-              <p className="overview-caption">
-                Saved ratios could not be loaded. Open Compare &amp; value to
-                retry.
+              <p className="overview-caption" role="status">
+                Saved ratios could not be loaded.{" "}
+                <button className="text-button" onClick={retryReads}>
+                  Retry saved data
+                </button>
               </p>
             )}
           </article>

@@ -7,10 +7,34 @@ from thesis.research import fmp
 from thesis.research.sec.performance import present as performance
 from thesis.research.sec.guidance import present as guidance
 from thesis.research.public_forecasts import current as public_forecasts
+from datetime import datetime, timezone
 
 METHOD = 'competitor-position-1'
 SUGGESTED = {'AVGO': ['NVDA', 'AMD', 'MRVL', 'MU', 'QCOM']}
 SUGGESTION_URL = 'https://investors.broadcom.com/static-files/5975d33d-73b9-4e5f-9ded-c00bdee38d6e'
+
+
+def filing_status(conn, iid, saved):
+    """Explain collection independently of whether an annual metric is usable."""
+    def result(status, message, can_fetch=False):
+        return dict(status=status, message=message, can_fetch=can_fetch)
+    if saved and saved['status']=='unavailable':
+        return result('unavailable',saved['reason'])
+    if not iid:
+        if not one(conn,"SELECT 1 FROM sources WHERE id='sec-companyfacts' AND entitlement='sec-public'"):
+            return result('unavailable','Structured filing source access is unavailable.')
+        return result('not_collected','Financial data has not been collected.',True)
+    state=one(conn,'SELECT last_attempt_at,lease_until,last_error FROM sec_refresh_state WHERE instrument_id=%s',(iid,))
+    run=one(conn,'SELECT active,steps FROM research_loads WHERE instrument_id=%s ORDER BY created_at DESC,id DESC LIMIT 1',(iid,))
+    pending=run and run['active'] and any(s['key']=='filings' and s['status'] in ('queued','running') for s in run['steps'])
+    if pending or (state and state['lease_until'] and state['lease_until']>datetime.now(timezone.utc)):
+        return result('loading','Fetching financial data…')
+    annual=(saved or {}).get('reports',{}).get('annual')
+    if annual:return result('ready','Saved annual financials available.')
+    if state and state['last_error']:return result('failed',state['last_error'],True)
+    if state and state['lease_until']:return result('failed','The last financial-data check did not finish.',True)
+    if state and state['last_attempt_at']:return result('no_report','No supported annual report was found in the saved data.',True)
+    return result('not_collected','Financial data has not been collected.',True)
 
 
 def context(owner, iid, peers=None):
@@ -47,9 +71,10 @@ def context(owner, iid, peers=None):
         for symbol in [target['symbol']] + peers:
             company = catalogue.get(symbol)
             company_id = str(company['id']) if company else None
+            saved=performance(conn, company_id, resolve_amendments=True) if company_id else None
             members.append(dict(
                 symbol=symbol, name=company['name'] if company else listings.get(symbol, {}).get('name', symbol),
-                performance=performance(conn, company_id, resolve_amendments=True) if company_id else None,
+                instrument_id=company_id, performance=saved, filing_status=filing_status(conn,company_id,saved),
                 consensus=fmp.present(conn, 'estimates', symbol),
                 public_forecasts=public_forecasts(conn, company_id) if company_id else None,
                 management=guidance(conn, company_id) if company_id else None,

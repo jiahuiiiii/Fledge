@@ -1,14 +1,6 @@
+import { formatTimestamp } from "../lib/dateTime";
 const stamp = (value) =>
-  value
-    ? new Date(value).toLocaleString("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: "UTC",
-      }) + " UTC"
-    : "Date unavailable";
+  formatTimestamp(value, { fallback: "Date unavailable" });
 
 const relations = {
   supports: "May support your reasoning",

@@ -1,6 +1,7 @@
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE);
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const path = require("node:path");
 let browser;
 (async () => {
   browser = await chromium.launch({
@@ -22,6 +23,11 @@ let browser;
     const r = route.request(),
       url = r.url();
     if (url.startsWith(process.env.THESIS_TEST_URL)) {
+      if (process.env.THESIS_SECTOR_DIST && r.method() === "GET" && !new URL(url).pathname.startsWith("/api/")) {
+        const relative = new URL(url).pathname === "/" ? "index.html" : new URL(url).pathname.slice(1);
+        const file = path.join(process.env.THESIS_SECTOR_DIST, relative);
+        if (fs.existsSync(file) && fs.statSync(file).isFile()) return route.fulfill({path:file,contentType:relative.endsWith(".js")?"application/javascript":relative.endsWith(".css")?"text/css":relative.endsWith(".html")?"text/html":undefined});
+      }
       if (url.endsWith("/loading"))
         return route.fulfill({ json: { result: null } });
       if (r.method() !== "GET") {
@@ -56,23 +62,17 @@ let browser;
       exact: true,
     })
     .waitFor();
-  await panel.locator(".position-group > summary").click();
-  const peer = panel.getByLabel("Sector competitor 1");
-  await peer.focus();
-  await page.keyboard.press("n");
-  await page.keyboard.press("Enter");
-  assert.equal(await peer.inputValue(), "NVDA");
+  const peer = panel.getByLabel("Peer ticker or company");
+  await peer.fill("NVDA");
+  await panel.getByRole("button", {name:/NVDA · NVIDIA/}).waitFor();
   await panel
-    .getByLabel("Why compare NVDA")
-    .fill("Authored comparison of growth and margins; products differ.");
-  await panel
-    .getByRole("button", { name: "Apply comparison group", exact: true })
+    .getByRole("button", { name: "Save & compare", exact: true })
     .click();
   await panel
     .locator(".position-reading")
     .getByText("MSFT is below NVDA.", { exact: true })
     .waitFor();
-  assert.equal(writes.length, 0);
+  assert.equal(writes.length, 1);
   const rows = panel.locator(".position-comparison-row");
   assert.equal(await rows.count(), 2);
   assert.match(await rows.first().innerText(), /23.1%/);
@@ -117,12 +117,7 @@ let browser;
     });
   }
   await page.setViewportSize({ width: 1440, height: 1100 });
-  await panel
-    .getByRole("button", { name: "Save peers for this company", exact: true })
-    .click();
-  await panel
-    .getByText("Using your saved comparison companies.", { exact: false })
-    .waitFor();
+  await panel.locator(".position-save-row").getByText("Saved",{exact:true}).waitFor();
   assert.equal(writes.length, 1);
   await page.getByRole("tab", { name: "Financials", exact: true }).click();
   await page.locator(".financial-peer-context").waitFor();
@@ -131,15 +126,12 @@ let browser;
     0,
   );
   await page.getByRole("tab", { name: "Compare & value", exact: true }).click();
-  await panel.locator(".position-group > summary").click();
-  if (!(await panel.locator(".position-group").evaluate((e) => e.open)))
-    await panel.locator(".position-group > summary").click();
-  await panel.getByRole("button", { name: "Add peer", exact: true }).click();
-  assert.equal(await panel.getByLabel("Sector competitor 2").inputValue(), "");
+  await panel.getByRole("button", {name:"Remove NVDA",exact:true}).click();
+  assert.equal(await panel.locator(".position-peer-list > li").count(), 0);
   await page.getByRole("tab", { name: "Financials", exact: true }).click();
   await page.getByRole("tab", { name: "Compare & value", exact: true }).click();
-  await panel.getByLabel("Sector competitor 2").waitFor();
-  assert.equal(await panel.getByLabel("Sector competitor 2").inputValue(), "");
+  assert.equal(await panel.locator(".position-peer-list > li").count(), 0);
+  await panel.getByText("Unsaved changes",{exact:true}).waitFor();
   await panel.getByLabel("Competitor measure").focus();
   await page.keyboard.press("Home");
   await page.keyboard.press("Enter");
@@ -211,6 +203,7 @@ let browser;
   await rows.first().getByText("-25.0%", { exact: true }).waitFor();
   assert.equal(await rows.count(), 3);
   assert.equal(await panel.locator(".position-excluded-row").count(), 1);
+  await panel.locator(".position-excluded > summary").click();
   assert.match(await panel.locator(".position-excluded-row").innerText(), /GAP.*Authored missing/s);
   const geometry = await rows.evaluateAll((nodes) =>
     nodes.map((n) => {

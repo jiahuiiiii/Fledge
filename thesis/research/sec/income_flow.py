@@ -4,7 +4,7 @@ Exact decimal reconciliation precedes visualization. This is a new presentation
 method; existing financial calculations, snapshots and monitoring are unchanged.
 """
 from decimal import Decimal, localcontext
-from .normalize import REVENUE, filing_rows
+from .normalize import REVENUE, filing_rows, annual_form
 from .performance import collect, select, decimal_text
 from .financial_depth import trailing
 from .disclosure_text import archive_url
@@ -123,7 +123,7 @@ def normalize_flow(bundle, cik, now,resolver=None):
     filings = filing_rows(bundle['submissions'], now)
     chosen = {}
     for filing in filings:
-        kind = 'annual' if filing['form'].startswith('10-K') else 'quarter'
+        kind = 'annual' if annual_form(filing['form']) else 'quarter'
         chosen[(kind, filing['end'])] = filing
     periods = []
     for kind in ['annual', 'quarter']:

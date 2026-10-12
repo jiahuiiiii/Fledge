@@ -12,7 +12,7 @@ The API is free and does not need an API key, according to [SEC API documentatio
 
 ## What is calculated
 
-The latest recent 10-Q/10-K or amendment is selected by reporting end and acceptance time. An older/truncated response cannot move current fundamentals backwards. Only whole-entity US-GAAP USD values in that selected accession are used:
+The latest recent supported 10-Q/10-K/20-F or amendment is selected by reporting end and acceptance time. An older/truncated response cannot move current fundamentals backwards. Domestic calculations retain whole-entity US-GAAP USD values in the selected accession. Foreign annual ratios use the bounded single-currency rules below:
 
 - Revenue growth: `(current revenue / comparable prior revenue − 1) × 100`.
 - Operating margin: `operating income / revenue × 100`.
@@ -26,6 +26,18 @@ Transport parsing retains fractional numeric lexemes as strings rather than pass
 ## Evidence, security and identity
 
 Parsed companyfacts and submissions payloads are immutable. The source calculation stores its accession, original filing URL, selected inputs, formulas, method version, result/unknown reason and limitations. It is visibly an app calculation, not a verbatim filing excerpt. Availability is first committed retrieval in this installation, never backdated to publication. Older saved evaluations retain exact input identities.
+
+## General 20-F annual reports — 12 October 2026
+
+20-F and 20-F/A are annual reports throughout structured acquisition, performance selection, financial-history/depth/income classification and bounded original-history plans. 6-K is not treated as a standard quarterly report, and no new quarterly subtraction or conversion is inferred. There is no issuer allowlist.
+
+`sec-foreign-annual-1` calculates annual revenue growth and operating margin from recognized standard-taxonomy facts in one exact accession/form/filed date, accounting namespace and explicit currency. US GAAP uses the existing three revenue concepts plus `OperatingIncomeLoss`; IFRS uses `Revenue` and `ProfitLossFromOperatingActivities`. Supported monetary currency codes are bounded explicitly in the adapter. A unique complete annual revenue pair identifies the basis, so a current-only USD convenience translation cannot replace complete native-currency inputs. Multiple complete currency/taxonomy bases, conflicting totals, invalid precision, mismatched dates, absent standard concepts or incompatible prior periods stay withheld. Custom/segment facts and inferred zeros remain excluded. Actual periods, native inputs and calculation identities remain visible.
+
+Monetary cards and revenue-size comparisons retain their existing requirement for explicitly reported US-GAAP USD facts. An issuer's explicitly reported USD convenience amount may be shown with that source; the app performs no exchange-rate conversion. Native CNY/EUR amounts are never relabelled USD. Percentage comparisons accept the supported foreign annual basis, disclose the currency/accounting namespace and retain the existing 120-day fiscal-end rule. A 20-F amendment uses only its own reported figures; domestic unchanged-note proof cannot inherit an earlier foreign amount. Unknown reporting formats now have a fixed unsupported-format failure reason rather than a generic transport failure.
+
+One authorized normal BABA structured refresh succeeded on 12 October. Its [FY2026 20-F](https://www.sec.gov/Archives/edgar/data/1577552/000119312526231755/baba-20260331.htm) covers 1 April 2025–31 March 2026. Same-accession CNY revenue 1,023,670,000,000 versus 996,347,000,000 gives exact growth `2.742317686508816707432250000%`; CNY operating income 50,150,000,000 gives margin `4.899039729600359490851543955%`. The source also explicitly supplies USD148,401,000,000 current revenue. Its fiscal end is 90 days from AMZN's, so the existing comparison rule includes it. MSFT's 181-day exclusion remains. No model call or watch/private-peer action was required.
+
+[Verification](../reviews/2026-10-12/foreign-annual.md). This supports recognized 20-F annual patterns, not every issuer's taxonomy or complete native-currency financial statements. A subsequent [comparison display change](competitor-position.md#different-year-ends-remain-visible--12-october-2026) now plots MSFT as clearly labelled different-year-end context, while keeping its 181-day gap outside the peer average and ranking.
 
 Raw response ordering and unused YTD/historical facts do not change material source identity. Equivalent number spellings do not create new documents, assessments or alerts. Changed raw payloads remain stored for inspection. One restricted `thesis_source` role writes shared evidence and clock state; it cannot read private ideas or model accounting. Short shared collection transactions are serialized; HTTP occurs outside transactions. A request attempt has a lease and identity; interrupted/replaced attempts cannot later publish a result.
 

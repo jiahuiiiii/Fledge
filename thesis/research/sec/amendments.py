@@ -11,7 +11,7 @@ import json
 import re
 
 from thesis.db import one, rows
-from .normalize import filing_rows
+from .normalize import filing_rows, annual_form
 from .disclosure_text import FilingHTML, archive_url, METHOD as TEXT_METHOD
 
 METHOD = 'sec-amendment-resolution-2'
@@ -194,7 +194,7 @@ class Resolver:
             recent = selected['submissions']['filings']['recent']
             i = recent['accessionNumber'].index(accession)
             selected['submissions']['filings']['recent'] = {k: [v[i]] for k, v in recent.items()}
-            kind = 'annual' if filing['form'].startswith('10-K') else 'quarter'
+            kind = 'annual' if annual_form(filing['form']) else 'quarter'
             self.cache[accession] = normalize_performance(selected, self.cik, self.now)['reports'][kind]
         return self.cache[accession]
 
@@ -273,6 +273,10 @@ class Resolver:
     def resolve(self, filing, metrics, builder=None):
         if not filing['form'].endswith('/A'):
             return metrics, None
+        if filing['form'] == '20-F/A':
+            # Domestic amendment-note proof does not establish unchanged foreign
+            # statements. Keep only figures actually in this amended accession.
+            return metrics, dict(method=METHOD, retained=[], amended=[r['key'] for r in metrics if r['value'] is not None], unresolved=[r['key'] for r in metrics if r['value'] is None], needs_documents=False, missing_documents=[], message='20-F amendment: only figures reported in this amended filing are used; earlier values are not substituted.')
         chain = self.chain(filing)
         result = deepcopy(metrics)
         inherited, revised, unresolved = [], [], []

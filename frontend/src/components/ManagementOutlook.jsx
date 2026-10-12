@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 import { guidanceReason } from "../lib/overviewSections";
 import { readableNote } from "../lib/readingNotes";
 import { useId, useState } from "react";
@@ -7,11 +8,7 @@ import EvidenceButton from "./EvidenceButton";
 import { day, amount } from "./FinancialOverview";
 import "./ManagementOutlook.css";
 
-const stamp = (value) =>
-  new Date(value).toLocaleString("en-GB", {
-    timeZone: "UTC",
-    timeZoneName: "short",
-  });
+const stamp = (value) => formatTimestamp(value, { fallback: "Not recorded" });
 function value(number, unit) {
   if (number == null) return "Read original wording";
   const n = Number(number);
@@ -157,7 +154,7 @@ export default function ManagementOutlook({ data }) {
             >
               {releases.map((item) => (
                 <option key={item.id} value={item.id}>
-                  SEC {day(item.published_at)} UTC ·{" "}
+                  SEC {stamp(item.published_at)} ·{" "}
                   {item.current ? "latest saved release" : "history"}
                 </option>
               ))}

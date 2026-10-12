@@ -239,15 +239,30 @@
   font-size: var(--text-xs);
   line-height: 1.6;
 }
-.revenue-forecast-dialog {
-  max-width: min(720px, calc(100vw - 24px));
+.modal.revenue-forecast-dialog {
+  width: min(720px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
 }
 .revenue-forecast-evidence {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-5);
 }
 .revenue-forecast-evidence p {
   margin: 0;
+}
+.modal .revenue-forecast-evidence .forecast-type {
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+.modal .revenue-forecast-evidence .forecast-date-note {
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--color-info);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  font-size: var(--text-sm);
+  line-height: 1.6;
 }
 .forecast-evidence-value {
   font-size: var(--text-2xl);
@@ -274,6 +289,13 @@
   border-left: 2px solid var(--color-gold);
 }
 @media (max-width: 600px) {
+  .modal.revenue-forecast-dialog {
+    width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
+  }
+  .revenue-forecast-evidence {
+    padding: var(--space-4);
+  }
   .revenue-history-periods {
     width: 100%;
   }

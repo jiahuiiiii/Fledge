@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 import Select from "./Select";
 import { useState } from "react";
 import { eventWindows } from "../lib/eventWindows";
@@ -328,11 +329,8 @@ export default function EventAssessment({
       })}
       {review && (
         <p className="fine">
-          Saved evidence check ·{" "}
-          {new Date(review.created_at).toLocaleString("en-GB", {
-            timeZone: "UTC",
-          })}{" "}
-          UTC · source cutoff {review.cutoff}. Reopening makes no AI call.{" "}
+          Saved evidence check · {formatTimestamp(review.created_at)} · source
+          cutoff {formatTimestamp(review.cutoff)}. Reopening makes no AI call.{" "}
           {review.omitted_source_count || 0} other source versions and{" "}
           {review.omitted_fragment_count || 0} incomplete passages omitted.
         </p>

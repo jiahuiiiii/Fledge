@@ -1,18 +1,8 @@
+import { formatTimestamp } from "../lib/dateTime";
 import { useState } from "react";
 import { researchStep } from "../lib/researchProgress";
 import "./ResearchLoading.css";
-function checkDate(value) {
-  const parsed = new Date(value);
-  return Number.isFinite(parsed.getTime())
-    ? parsed.toLocaleString("en-GB", {
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZoneName: "short",
-      })
-    : null;
-}
+const checkDate = (value) => formatTimestamp(value, { fallback: null });
 export function ResearchProgressToggle({ run, error, onExpand }) {
   if (!run && !error) return null;
   const attention =

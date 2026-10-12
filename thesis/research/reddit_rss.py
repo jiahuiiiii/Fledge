@@ -3,6 +3,7 @@
 RSS is a separately verified capability. Legacy JSON/HTML denials stay intact.
 No redirects, credentials, browser impersonation or alternate hosts are used.
 """
+from thesis.display_time import stamp as display_stamp
 import hashlib
 import math
 import re
@@ -67,7 +68,7 @@ def _check_clock(row, now):
     if row['denied']:
         raise ValueError('Reddit RSS access was denied for this source. Collection is paused.')
     if row['blocked_until'] and row['blocked_until'] > now:
-        raise Conflict('Reddit RSS is cooling down after HTTP 429; next check after ' + row['blocked_until'].astimezone(timezone.utc).strftime('%d %b, %H:%M UTC') + '.')
+        raise Conflict('Reddit RSS is cooling down after HTTP 429; next check after ' + display_stamp(row['blocked_until']) + '.')
 
 
 def remember_reset(headers, now):
@@ -86,7 +87,7 @@ def remember_reset(headers, now):
 
 
 def wait_notice(next_at):
-    return 'Reddit RSS is waiting for its request window; next check after ' + next_at.astimezone(timezone.utc).strftime('%d %b, %H:%M UTC') + '.'
+    return 'Reddit RSS is waiting for its request window; next check after ' + display_stamp(next_at) + '.'
 
 
 def read(kind, value, *, transport=None, cache_only=False):
@@ -159,7 +160,7 @@ def read(kind, value, *, transport=None, cache_only=False):
                                           (until, PREFIX + 'all'))
                             else:
                                 c.execute('UPDATE provider_clocks SET denied=true WHERE provider=%s', (capability,))
-                        retry_notice = (' Next check after ' + until.astimezone(timezone.utc).strftime('%d %b, %H:%M UTC') + '.') if response.status_code == 429 else ''
+                        retry_notice = (' Next check after ' + display_stamp(until) + '.') if response.status_code == 429 else ''
                         raise ValueError(f'Reddit RSS {kind} returned HTTP {response.status_code}. Collection stopped; saved sources are retained.' + retry_notice)
                     if response.status_code != 200:
                         raise ValueError(f'Reddit RSS {kind} returned HTTP {response.status_code}; no redirect or retry was followed.')
@@ -300,9 +301,10 @@ def collect(company, days, enabled, now, fetcher=None, *, cache_only=False):
             reply, withdrawn = replies((get if live_allowed else cached)('comments', post), post, now, days)
             if not live_allowed:
                 checks['comments']['cached'] = True
-            # Without a verified immediate parent, only a comment's own
-            # company mention can admit it. Never borrow its thread title.
-            eligible=[p for p in reply if social.mentions(p,company['symbol'],company['name'])][:12]
+            # Preserve the bounded discussion, including short replies. The
+            # exact topic is supplied downstream; membership never invents an
+            # immediate parent or establishes a comment's company relevance.
+            eligible=reply[:12]
             comments.extend(eligible)
             removed.extend(withdrawn)
             checks['comments']['fetched'] += len(reply)

@@ -42,3 +42,45 @@ Phase 38 extends saved-parent inputs to standalone question research. It ranks o
 ## Source excerpts — phase 47
 
 New readings use `thesis-source-sentiment-10`: an exact selection of original wording replaces the freely generated per-item explanation. An earlier expressed attitude may be shown separately; the main selection may also retain earlier context or an antecedent. Parent context stays distinct and is not another vote. The model still chooses the source category and tone, and can misclassify them. Exact excerpts do not prove those judgments. Historical readings retain their original outputs. See [the implementation, actual-case failures and review](../reviews/2026-10-03/sentiment-extracts-phase-review.md).
+
+## Saved Reddit discussions together — 12 October 2026
+
+The owner requested that the topic and replies be read together rather than as
+isolated texts. New sentiment readings use `saved-reddit-thread-context-1`, prompt
+24 and `sentiment-whole-source-batches-6`; the quick relevance check is version 2.
+The model sees explicit message IDs, anonymous author references, the saved topic
+and available comments. Known immediate-parent IDs stay explicit; unknown RSS
+parents stay null. Feed order never supplies a reply depth. Topic membership
+neither establishes company relevance nor transfers another author's attitude.
+
+Targets from one thread stay adjacent. Each request keeps the topic and its
+target messages whole and can include other saved comments as context. Large
+threads repeat the topic across bounded requests; optional whole comments are
+omitted before a request exceeds its limit. Saved/supplied counts and the exact
+discussion context for each batch appear with label evidence. No summarising
+model rewrites or truncates originals. Existing complete-passage exclusions
+remain in force. Only the individual requested messages receive labels and count
+once; context repeats add no votes and sentiment arithmetic remains unchanged.
+
+RSS collection still inspects at most 50 entries and retains at most 12 comments
+from each of at most three company threads. Within that bound it now retains
+short replies without their own company mention. Such a reply requires the exact
+permitted topic in the selected date window before analysis. An absent topic
+excludes it as required context unavailable. RSS timestamps remain feed update
+times, and immediate-parent relationships are unavailable. The app explicitly
+calls these partial saved discussions; this change does not retrieve every
+Reddit comment or enable blocked JSON/HTML routes.
+
+The quick check receives discussion context too, and comments skipped there can
+remain context for other target messages. Context-only roots participate in
+permission and withdrawal checks before dispatch and when displaying any derived
+reading. Changed discussion context changes request identity and suppresses a
+false opinion-change alert. Old readings and model calls remain immutable;
+identical new requests reuse their settled results. Eight target originals,
+48,000-byte full requests, 44,000-byte quick requests, existing model/output,
+ledger, cap, unknown-charge, retry and watch controls remain in force. No paid
+analysis or source refresh is required to install this change.
+
+This is the sentiment/quick-check input contract. Optional discussion-theme and
+question research retain their separate source-selection contracts. Model
+interpretation accuracy has not been established by the packaging tests.

@@ -16,7 +16,13 @@ export function sentimentSummaryLabel(sample) {
     majority == null
       ? `${usable} clear readings`
       : `${majority} of ${usable} clear readings`;
-  return `${["mixed", "mixed / balanced"].includes(sample.tone) ? "Mixed tone" : sample.tone} · ${amount}${unclear ? ` · ${unclear} unclear` : ""}`;
+  const label =
+    sample.tone === "thin sample"
+      ? "Too little clear evidence for an overall tone"
+      : ["mixed", "mixed / balanced"].includes(sample.tone)
+        ? "Mixed tone"
+        : sample.tone || "No overall tone";
+  return `${label} · ${amount}${unclear ? ` · ${unclear} unclear` : ""}`;
 }
 
 export function priceComparisonText(value) {

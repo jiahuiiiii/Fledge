@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 import { useId, useState } from "react";
 import Select from "./Select";
 import { amount, day } from "./FinancialOverview";
@@ -6,13 +7,7 @@ import TermHelp from "./TermHelp";
 import { FinancialEvidenceRow } from "./FinancialEvidence";
 import "./PeerComparison.css";
 
-const stamp = (date) =>
-  date
-    ? new Date(date).toLocaleString("en-GB", {
-        timeZone: "UTC",
-        timeZoneName: "short",
-      })
-    : "Not recorded";
+const stamp = (value) => formatTimestamp(value, { fallback: "Not recorded" });
 function display(number, unit) {
   if (number == null) return "Unavailable";
   if (unit === "USD") return amount(number);

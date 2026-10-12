@@ -1,8 +1,9 @@
+import { formatTimestamp } from "../lib/dateTime";
 import ForecastRange from "./ForecastRange";
 import TermHelp from "./TermHelp";
 import "./PublicForecasts.css";
 
-const stamp = (value) => new Date(value).toLocaleString("en-GB");
+const stamp = (value) => formatTimestamp(value, { fallback: "Not checked" });
 
 export default function PublicForecasts({ source, busy, onRefresh }) {
   if (!source) return null;

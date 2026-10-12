@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 export const ageLabel = (c) =>
   c.max_report_age_days == null || String(c.max_report_age_days).trim() === ""
     ? "No age limit"
@@ -37,7 +38,7 @@ export default function ReportingAge({
       Period ended {fact.period_end} · {days} days ago
       {recorded ? " at the sample date" : " (UTC)"}.
       {valid
-        ? ` ${days > limit ? "Already too old under this limit." : "Within your limit."} ${days > limit ? "Became" : "Becomes"} too old on ${deadline} at 00:00 UTC.`
+        ? ` ${days > limit ? "Already too old under this limit." : "Within your limit."} ${days > limit ? "Became" : "Becomes"} too old on ${formatTimestamp(`${deadline}T00:00:00Z`)}.`
         : String(condition.max_report_age_days ?? "").trim()
           ? " Enter a whole number from 1 to 3650 days."
           : " No age limit selected."}

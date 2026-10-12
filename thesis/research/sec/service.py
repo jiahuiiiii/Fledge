@@ -155,7 +155,7 @@ def commit_bundle(conn, iid, bundle, now):
         for calculation in result["calculations"]:
             body += f"\n{calculation['metric']}: {calculation['value']+'%' if calculation['value'] is not None else calculation['reason']}\nFormula: {calculation['formula']}\n"
             for f in calculation["inputs"]:
-                body += f"{f['concept']}: USD {f['value']}, {f['start']} to {f['end']}, accession {f['accession']}\n"
+                body += f"{f['concept']}: {f['unit']} {f['value']}, {f['start']} to {f['end']}, accession {f['accession']}\n"
             if calculation["value"] is not None:
                 previous_fact = one(
                     conn,

@@ -18,7 +18,7 @@ from thesis.db import transaction, one
 from thesis.providers import ledger
 from thesis.service import Conflict
 
-POLICY = "sentiment-whole-source-batches-5"
+POLICY = "sentiment-whole-source-batches-6"
 MAX_SOURCES = 8
 # Conservative serialized-request bound, including prompt/schema/comparisons.
 # This is an input-size heuristic, not a prediction of reasoning/output tokens.
@@ -61,17 +61,21 @@ def part_for(packet, sources, *, max_bytes=None):
         # Reduce comparison context only; originals and parents stay whole.
         while part['comparison_sources'] and len(ledger.canonical(sentiment.request_for(part)).encode()) > max_bytes:
             part['comparison_sources'].pop()
+        if len(ledger.canonical(sentiment.request_for(part)).encode()) > max_bytes:
+            # Keep the topic and targets whole; optional saved siblings are the
+            # only discussion text that may be omitted, with an explicit count.
+            part['thread_extras'] = False
     part['comparison_selection'] = dict(available=before, supplied=len(part['comparison_sources']))
     return part
 
 
 def plan(packet, *, max_sources=MAX_SOURCES, max_bytes=MAX_BYTES):
     from .sentiment import request_for
-    from . import sentiment_context
+    from . import sentiment_context, reddit_thread_context
     max_bytes = min(max_bytes, ledger.MAX_REQUEST_BYTES)
     if type(max_sources) is not int or not 1 <= max_sources <= MAX_SOURCES:
         raise ValueError("Invalid sentiment batch size")
-    sources = packet["sources"]
+    sources = reddit_thread_context.ordered(packet["sources"])
     if not sources or len({s["id"] for s in sources}) != len(sources):
         raise ValueError("Sentiment batches require distinct complete sources.")
     parts, selected = [], []
@@ -103,9 +107,9 @@ def plan_identity(packet):
 
 
 def check_access(conn, packet):
-    from . import sentiment, sentiment_context, sentiment_guards
+    from . import sentiment, sentiment_context, sentiment_guards, reddit_thread_context
     allowed = sentiment.permitted_ids(conn, {"packet": packet, "instrument_id": packet["instrument_id"]})
-    if not sentiment_guards.allowed(conn, packet) or any(s["id"] not in allowed or not sentiment_context.allowed(conn, s)
+    if not sentiment_guards.allowed(conn, packet) or not reddit_thread_context.access_allowed(packet, allowed) or any(s["id"] not in allowed or not sentiment_context.allowed(conn, s)
            for s in packet["sources"] + packet.get("comparison_sources", [])):
         raise ValueError("Sentiment source access changed. Saved batches cannot be used for this sample.")
 
@@ -163,15 +167,22 @@ def combine(packet, parts, calls):
     if len(parts) != len(calls) or Counter(s["id"] for p in parts for s in p["sources"]) != Counter(s["id"] for s in packet["sources"]):
         raise ValueError("All sentiment batches must finish before combining results.")
     merged = dict(items=[], coverage_links=[])
+    contexts = {}
     for part, call in zip(parts, calls):
-        render(call, part)
+        checked = render(call, part)
+        if part.get('reddit_thread_context'):
+            contexts.update({item['source_id']: item['thread_context'] for item in checked['items'] if item.get('thread_context')})
         output = raw(call)
         merged["items"].extend(output["items"])
         merged["coverage_links"].extend(output["coverage_links"])
     # Recheck cross-batch relations and count groups once against all sources.
-    return render({"response_body": {"status": "completed", "output": [
+    result = render({"response_body": {"status": "completed", "output": [
         {"type": "message", "content": [{"type": "output_text", "text": json.dumps(merged)}]}
     ]}}, packet)
+    for item in result['items']:
+        if item['source_id'] in contexts:
+            item['thread_context'] = contexts[item['source_id']]
+    return result
 
 
 def run(packet, *, transport=None, progress=None, retry_failed=False, prefilter=None):

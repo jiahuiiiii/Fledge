@@ -1,36 +1,32 @@
+import { formatTimestamp } from "../lib/dateTime";
 import { day, snapshot } from "../lib/companySnapshot";
 import "./CompanySnapshot.css";
 import TermHelp from "./TermHelp";
 import OverviewSections from "./OverviewSections";
 import { companyName } from "../lib/companyIdentity";
 
-const when = (value) =>
-  new Date(value).toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+const when = (value) => formatTimestamp(value, { fallback: "Not checked" });
 
-// One freshness line for the whole page instead of a stale note per section.
+// Collection status is separate from the dates and limits of each conclusion.
 function Freshness({ data, onUpdate }) {
   const checks = (data?.source_checks || []).filter((c) => c.checked_at);
   if (!checks.length || !onUpdate) return null;
   const latest = checks
     .map((c) => c.checked_at)
     .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
-  const problems = (data.source_checks || []).filter(
-    (c) => c.state !== "fresh",
-  );
+  const states = (data.source_checks || []).map((c) => c.state);
   return (
     <p className="glance-freshness">
       <span>
-        Sources last checked {when(latest)}
-        {problems.length > 0 &&
-          ` · ${problems.map((c) => c.name).join(", ")} ${problems.length === 1 ? "needs" : "need"} another try`}
+        Data freshness · latest source check {when(latest)}
+        {states.includes("stale") && " · some coverage is over 24 hours old"}
+        {states.some(
+          (state) => !["fresh", "stale", "unknown"].includes(state),
+        ) && " · some source checks did not finish successfully"}
+        {states.includes("unknown") && " · some coverage is unknown"}
       </span>
       <button className="glance-link" onClick={onUpdate}>
-        Update {data.instrument?.symbol} →
+        Details &amp; update →
       </button>
     </p>
   );
@@ -100,7 +96,7 @@ function Activity({ data, instrumentId, onUpdates, onView }) {
         <span aria-hidden="true">{down ? "▼" : "▲"}</span>
         Share price {down ? "fell" : "rose"}{" "}
         {Math.abs(quote.change_percent).toFixed(1)}% in the session to{" "}
-        {day(quote.quoted_at)}
+        {when(quote.quoted_at)}
       </li>,
     );
   }
@@ -120,19 +116,16 @@ function Activity({ data, instrumentId, onUpdates, onView }) {
     items.push(
       <li key="watch" className="watch">
         <span aria-hidden="true">◎</span>
-        Your news watch last checked{" "}
-        {new Date(watch.last_check_at).toLocaleString("en-GB", {
-          day: "numeric",
-          month: "short",
-          hour: "2-digit",
-          minute: "2-digit",
-        })}
+        Your news watch last {watch.error
+          ? "attempted an update"
+          : "checked"}{" "}
+        {when(watch.last_check_at)}
         {watch.error && (
           <>
             {" "}
-            · check incomplete{" "}
+            · the update could not finish; saved research is still available{" "}
             <button className="glance-link" onClick={() => onView("evidence")}>
-              Feed status →
+              Source details →
             </button>
           </>
         )}

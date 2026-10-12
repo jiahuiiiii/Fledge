@@ -78,3 +78,39 @@ def test_forecasts_keep_their_source_permissions_and_identity(owner):
     assert result['data']['forecasts'][0]['metrics'][0]['average']=='120' and result['snapshot_id']
     with transaction(admin=True) as conn:conn.execute("UPDATE sources SET entitlement='fictional' WHERE id='fmp-estimates'")
     assert sector_position.context(owner,iid,[])['members'][0]['consensus']['data'] is None
+
+
+def test_collection_status_distinguishes_missing_running_failed_and_checked_without_report(owner):
+    directory();iid=add_company('NVDA')['instrument_id']
+    def status():return sector_position.context(owner,iid,[])['members'][0]['filing_status']
+    assert status()['status']=='not_collected' and status()['can_fetch']
+    with transaction(admin=True) as conn:
+        conn.execute('UPDATE sec_refresh_state SET last_attempt_at=now(),lease_until=now()+interval \'1 minute\' WHERE instrument_id=%s',(iid,))
+    assert status()['status']=='loading' and not status()['can_fetch']
+    with transaction(admin=True) as conn:
+        conn.execute("UPDATE sec_refresh_state SET lease_until=NULL,last_error='Authored connection failure.' WHERE instrument_id=%s",(iid,))
+    assert status()==dict(status='failed',message='Authored connection failure.',can_fetch=True)
+    with transaction(admin=True) as conn:
+        conn.execute('UPDATE sec_refresh_state SET last_error=NULL WHERE instrument_id=%s',(iid,))
+    assert status()['status']=='no_report'
+    with transaction(admin=True) as conn:
+        conn.execute('UPDATE sec_refresh_state SET lease_until=now()-interval \'1 minute\' WHERE instrument_id=%s',(iid,))
+    assert status()['status']=='failed' and 'did not finish' in status()['message']
+
+
+def test_queued_filing_work_is_loading_without_an_active_transport_lease(owner):
+    directory();iid=add_company('NVDA')['instrument_id']
+    with transaction(owner) as conn:
+        conn.execute('INSERT INTO research_loads(id,owner_id,instrument_id,lookback_days,steps) VALUES(%s,%s,%s,7,%s)',(uuid4(),owner,iid,Jsonb([dict(key='filings',status='queued')])))
+    state=sector_position.context(owner,iid,[])['members'][0]['filing_status']
+    assert state['status']=='loading' and not state['can_fetch']
+
+
+def test_ready_annual_data_is_reused_and_withdrawn_access_is_never_fetchable(owner):
+    directory();iid=add_company('MSFT')['instrument_id'];apply(iid,financial_bundle())
+    member=sector_position.context(owner,iid,[])['members'][0]
+    assert member['instrument_id']==iid and member['filing_status']['status']=='ready'
+    assert not member['filing_status']['can_fetch']
+    with transaction(admin=True) as conn:conn.execute("UPDATE sources SET entitlement='fictional' WHERE id='sec-companyfacts'")
+    hidden=sector_position.context(owner,iid,['AMD'])['members']
+    assert all(m['filing_status']['status']=='unavailable' and not m['filing_status']['can_fetch'] for m in hidden)

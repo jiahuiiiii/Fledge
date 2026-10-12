@@ -5,6 +5,7 @@ from decimal import Decimal, InvalidOperation
 from html import escape
 from urllib.parse import urlsplit
 
+from .display_time import stamp as display_stamp, reporting_age_explanation
 from . import service
 from .monitoring.evaluator import outcome_label
 from .db import transaction
@@ -28,15 +29,7 @@ def text(value):
 
 
 def stamp(value):
-    if not value:
-        return "Not recorded"
-    parsed = (
-        value
-        if isinstance(value, datetime)
-        else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    )
-    return parsed.astimezone(timezone.utc).strftime("%d %b %Y, %H:%M:%S UTC")
-
+    return display_stamp(value, seconds=True)
 
 def percentage(value):
     if value is None:
@@ -292,6 +285,11 @@ def render(record):
         )
         for r in e["results"]:
             observation = observations.get(str(r.get("observation_id")))
+            age = next(
+                (a for a in (e["manifest"].get("expiry") or [])
+                 if a["condition_id"] == r["condition_id"]),
+                None,
+            )
             parts.append(
                 f"<article><h3>{text(NAMES.get(r['metric'], r['metric']))}</h3>"
             )
@@ -301,7 +299,7 @@ def render(record):
                 )
             else:
                 parts.append(
-                    f"<p><strong>{text(outcome_label(r))}</strong> · figure {text(percentage(r.get('observed_value')))}</p><p>{text(r.get('explanation'))}</p>"
+                    f"<p><strong>{text(outcome_label(r))}</strong> · figure {text(percentage(r.get('observed_value')))}</p><p>{text(reporting_age_explanation(r.get('explanation'), age))}</p>"
                 )
                 if observation:
                     parts.append(

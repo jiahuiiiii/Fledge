@@ -18,7 +18,7 @@ test("leaning shows its usable denominator and the separate unclear count", () =
       tone: "thin sample",
       counts: { positive: 4, unclear: 1 },
     }),
-    "thin sample · 4 clear readings · 1 unclear",
+    "Too little clear evidence for an overall tone · 4 clear readings · 1 unclear",
   );
 });
 test("price display formats the server result without calculating a new return", () => {

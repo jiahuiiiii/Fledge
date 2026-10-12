@@ -1,14 +1,10 @@
+import { formatTimestamp } from "../lib/dateTime";
 import Checkbox from "./Checkbox";
 import { roleLabel, comparisonMeaning } from "../lib/conditionRoles";
 import { useState } from "react";
 import { EventSchedule } from "./EventConditions";
 import { ReportExpectationText } from "./ReportExpectation";
-const stamp = (value) =>
-  new Date(value).toLocaleString("en-GB", {
-    timeZone: "UTC",
-    dateStyle: "medium",
-    timeStyle: "short",
-  }) + " UTC";
+const stamp = (value) => formatTimestamp(value, { fallback: "Not recorded" });
 const metrics = {
   revenue_growth: "Revenue growth",
   operating_margin: "Operating margin",

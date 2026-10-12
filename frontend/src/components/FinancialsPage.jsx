@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import EvidenceButton from "./EvidenceButton";
@@ -542,8 +543,9 @@ export default function FinancialsPage({
               <p key={line}>{line}</p>
             ))}
             <p>
-              SEC filing data checked {day(safe.checked_at)}. First saved
-              observation: {day(safe.first_recorded_at)}. Method: {safe.method}.
+              SEC filing data checked {formatTimestamp(safe.checked_at)}. First
+              saved observation: {formatTimestamp(safe.first_recorded_at)}.
+              Method: {safe.method}.
             </p>
             {workspace.performance?.source_status?.last_error && (
               <p>The latest source check failed; these are retained figures.</p>

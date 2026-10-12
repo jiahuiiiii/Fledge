@@ -1,12 +1,9 @@
+import { formatTimestamp } from "../lib/dateTime";
 import { useRef, useState, useEffect } from "react";
 import { api } from "../api/client";
 import Modal from "./Modal";
 
-const day = (value) =>
-  new Date(value).toLocaleString("en-GB", {
-    timeZone: "UTC",
-    timeZoneName: "short",
-  });
+const day = (value) => formatTimestamp(value, { fallback: "Not recorded" });
 
 export default function OriginalFilings({
   instrumentId,

@@ -1,4 +1,5 @@
 """Bounded Deus-style news fan-in with independent, visible provider outcomes."""
+from thesis.display_time import stamp as display_stamp
 import json
 import re
 from threading import Lock
@@ -201,7 +202,7 @@ def alpha_error(body):
 def alpha_pause(conn, now):
     clock = one(conn, "SELECT blocked_until FROM provider_clocks WHERE provider='alpha_vantage'")
     if clock and clock['blocked_until'] and clock['blocked_until'] > now:
-        until = clock['blocked_until'].astimezone(timezone.utc).strftime('%d %b %Y, %H:%M UTC')
+        until = display_stamp(clock['blocked_until'])
         return f'Fledge has paused requests until {until}. This is the app’s cooldown, not a confirmed provider reset time.'
     return None
 

@@ -6,13 +6,80 @@ import {
   peerAverage,
   comparisonRows,
   comparisonExclusion,
+  chartRows,
+  differentYearEnd,
   forecastRow,
   position,
   scale,
   yearsFor,
   managementRows,
+  peerStatus,
 } from "./sectorPosition.js";
-test("one fiscal comparison set controls chart scale, mean and verdict without changing excluded values", () => {
+test("peer status separates unsaved, pending, uncollected and failed data without invented periods", () => {
+  assert.equal(peerStatus(null).label, "Not saved");
+  for (const [status, label] of [
+    ["loading", "Fetching…"],
+    ["not_collected", "Not collected"],
+    ["failed", "Fetch failed"],
+    ["no_report", "No annual report"],
+    ["unavailable", "Source unavailable"],
+  ]) {
+    const member = {
+      symbol: "PEER",
+      filing_status: { status, message: "Exact reason", can_fetch: false },
+    };
+    const row = reportedRow(member, "revenue_growth");
+    assert.equal(row.value, null);
+    assert.equal(row.reason, "Exact reason");
+    assert.equal(peerStatus(member, row).label, label);
+    assert.equal(peerStatus(member, row).message, "Exact reason");
+  }
+  const failed = {
+    filing_status: {
+      status: "failed",
+      message: "SEC refresh failed; no new evidence committed.",
+    },
+  };
+  assert.equal(
+    peerStatus(failed, reportedRow(failed, "revenue_growth")).message,
+    "The last filing check failed. Save & compare to retry.",
+  );
+  assert.equal(
+    failed.filing_status.message,
+    "SEC refresh failed; no new evidence committed.",
+  );
+});
+test("different year-end peers retain their figures as context, and pending updates keep saved values", () => {
+  const own = { symbol: "OWN", value: 12, end: "2025-12-31" },
+    row = { symbol: "MSFT", value: 17.8, end: "2026-06-30" },
+    member = { symbol: "MSFT", filing_status: { status: "ready" } };
+  const state = peerStatus(member, row, own);
+  assert.equal(state.label, "Different year-end");
+  assert.equal(state.status, "reference");
+  assert.match(state.message, /181 days/);
+  assert.match(state.message, /outside the average and ranking/);
+  assert.equal(row.value, 17.8);
+  assert.equal(
+    peerStatus(member, row, own, {
+      status: "loading",
+      message: "Fetching financial data…",
+    }).label,
+    "Fetching…",
+  );
+  assert.equal(
+    peerStatus(member, { ...row, end: "2026-01-01" }, own).label,
+    "Ready",
+  );
+  assert.equal(
+    peerStatus(
+      member,
+      { ...row, value: null, reason: "Missing compatible USD total." },
+      own,
+    ).message,
+    "Missing compatible USD total.",
+  );
+});
+test("different fiscal years extend the chart scale while the comparable mean and ranking stay exact", () => {
   const rows = [
     { symbol: "AVGO", value: 23.874432853763524, end: "2025-11-02" },
     { symbol: "AMD", value: 34.33779329067287, end: "2025-12-27" },
@@ -35,6 +102,9 @@ test("one fiscal comparison set controls chart scale, mean and verdict without c
   );
   assert.equal(scale(plotted).high, rows[4].value);
   assert.deepEqual(plotted.slice(1), average.peers);
+  assert.deepEqual(chartRows(rows, "AVGO"), rows);
+  assert.equal(scale(chartRows(rows, "AVGO")).high, rows[3].value);
+  assert.equal(differentYearEnd(rows[3], rows[0]), true);
   assert.equal(average.value.toFixed(1), "38.9");
   assert.deepEqual(average.missing, [rows[3]]);
   assert.equal(
@@ -51,6 +121,46 @@ test("one fiscal comparison set controls chart scale, mean and verdict without c
     rows[3],
     "exact original evidence is retained",
   );
+});
+test("context rows retain both date directions, negative and zero values without admitting missing periods", () => {
+  const own = {
+      symbol: "OWN",
+      value: 12.4,
+      end: "2025-12-31",
+      unit: "percent",
+    },
+    peer = (symbol, offset, value) => ({
+      ...own,
+      symbol,
+      value,
+      end: new Date(Date.parse(own.end) + offset * 86400000)
+        .toISOString()
+        .slice(0, 10),
+    });
+  const rows = [
+      own,
+      peer("BEFORE", -121, -5),
+      peer("AFTER", 121, 0),
+      peer("EDGE", 120, 3),
+      { ...peer("GAP", 181, null), reason: "Not reported" },
+      { ...peer("DATE", 181, 90), end: null },
+    ],
+    before = structuredClone(rows);
+  assert.deepEqual(chartRows(rows, "OWN"), rows.slice(0, 4));
+  assert.deepEqual(
+    rows.map((r) => differentYearEnd(r, own)),
+    [false, true, true, false, false, false],
+  );
+  assert.equal(peerAverage(rows, "OWN").value, 3);
+  assert.equal(position(rows, "OWN").text, "OWN is above EDGE.");
+  assert.deepEqual(scale(chartRows(rows, "OWN")), {
+    low: -5,
+    high: 12.4,
+    span: 17.4,
+  });
+  assert.deepEqual(rows, before);
+  const unknown = [{ ...own, end: null }, ...rows.slice(1)];
+  assert.deepEqual(chartRows(unknown, "OWN"), [unknown[0]]);
 });
 test("annual date limit includes both 120-day boundaries, zero and negative figures", () => {
   const own = { symbol: "OWN", value: 10, end: "2025-07-01" };
@@ -120,6 +230,7 @@ test("P/E comparison keeps differing saved dates and only usable Finnhub peers",
     { symbol: "ZERO", value: 0, unit: "multiple", source: "Finnhub" },
   ];
   assert.deepEqual(comparisonRows(rows, "OWN"), rows.slice(0, 2));
+  assert.deepEqual(chartRows(rows, "OWN"), rows.slice(0, 2));
   assert.equal(peerAverage(rows, "OWN").value, 100);
   assert.equal(position(rows, "OWN").text, "OWN is below PEER.");
 });
@@ -196,6 +307,72 @@ const forecast = (symbol = "AVGO") => ({
       ],
     },
   },
+});
+test("20-F annual ratios plot in their original single currency and standard accounting basis", () => {
+  for (const [namespace, currency] of [
+    ["us-gaap", "CNY"],
+    ["ifrs-full", "EUR"],
+  ]) {
+    for (const key of ["revenue_growth", "operating_margin"]) {
+      const m = member("FOREIGN", "20", key),
+        report = m.performance.reports.annual;
+      report.form = "20-F";
+      report.filed_on = "2026-02-01";
+      report.financial_basis = {
+        method: "sec-foreign-annual-1",
+        namespace,
+        currency,
+        reason: null,
+      };
+      for (const input of report.metrics[0].inputs) {
+        input.namespace = namespace;
+        input.unit = currency;
+        input.form = report.form;
+        input.filed = report.filed_on;
+        if (namespace === "ifrs-full")
+          input.concept =
+            input.concept === "OperatingIncomeLoss"
+              ? "ProfitLossFromOperatingActivities"
+              : "Revenue";
+      }
+      const original = structuredClone(m),
+        row = reportedRow(m, key);
+      assert.equal(row.value, 20);
+      assert.match(row.basisLabel, new RegExp(currency));
+      assert.equal(
+        comparisonRows(
+          [{ symbol: "AMZN", value: 12, end: "2026-03-01" }, row],
+          "AMZN",
+        ).length,
+        2,
+      );
+      for (const mutate of [
+        (r) => (r.metrics[0].inputs[0].unit = "USD"),
+        (r) => (r.metrics[0].inputs[0].namespace = "custom"),
+        (r) => (r.metrics[0].inputs[0].accession = "other"),
+        (r) => (r.metrics[0].inputs[0].form = "6-K"),
+        (r) => (r.metrics[0].inputs[0].filed = "2026-02-02"),
+        (r) => (r.financial_basis.currency = "XYZ"),
+        (r) => (r.financial_basis.reason = "Ambiguous currency"),
+      ]) {
+        const invalid = structuredClone(m);
+        mutate(invalid.performance.reports.annual);
+        assert.equal(reportedRow(invalid, key).value, null);
+      }
+      assert.deepEqual(m, original);
+    }
+  }
+});
+test("20-F native revenue is not relabelled USD for the revenue-size chart", () => {
+  const m = member("FOREIGN", "120", "revenue"),
+    report = m.performance.reports.annual;
+  report.form = "20-F";
+  report.metrics[0].unit = "CNY";
+  report.metrics[0].inputs[0].unit = "CNY";
+  assert.equal(reportedRow(m, "revenue").value, null);
+  report.metrics[0].unit = "USD";
+  report.metrics[0].inputs[0].unit = "USD";
+  assert.equal(reportedRow(m, "revenue").value, 120);
 });
 test("annual growth and margin reuse exact reported values and retain negative and zero", () => {
   for (const value of ["0", "-20", "20.012345"])

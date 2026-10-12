@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 import {
   priceComparisonText,
   priceUnavailableReasons,
@@ -32,7 +33,8 @@ export default function SentimentPriceContext({
                   {value.reference.close} × 100 ={" "}
                   {Number(value.difference_percent).toFixed(2)}%. Yahoo Finance
                   completed daily close; capture saved{" "}
-                  {value.reference.retrieved_at}. {value.reference.basis}
+                  {formatTimestamp(value.reference.retrieved_at)}.{" "}
+                  {value.reference.basis}
                 </p>
               )}
               <p className="fine">

@@ -14,7 +14,7 @@ from .performance import decimal_text
 from .normalize import REVENUE
 from . import guidance_formats as formats
 
-METHOD = 'sec-management-outlook-2'
+METHOD = 'sec-management-outlook-3'
 MONTHS = 'January February March April May June July August September October November December'.split()
 DATE = r'(?:' + '|'.join(MONTHS) + r') \d{1,2},? \d{4}'
 HEADING = re.compile(r'^(?:(?:first|second|third|fourth|Q[1-4]|full|fiscal|year|quarter|202\d|203\d|[ /–—-])\s*)*(?:(?:business|financial)\s+)?(?:outlook|guidance)(?: for [\w ,/–—-]+)?$', re.I)
@@ -101,7 +101,7 @@ def extract(record):
             if not f['metric']:
                 old=typed(text)
                 if old['metric']:f=old
-            if table or (re.search(r'\b(?:guidance|outlook|expect(?:s|ed)?|project(?:s|ed)?|anticipate(?:s|d)?)\b',text,re.I) and re.search(r'\d|\$|%',text) and re.search(r'\b(?:revenues?|income|margin|EPS|earnings|cash flow)\b',text,re.I)):
+            if table or (re.search(r'\b(?:guidance|outlook|expect(?:s|ed)?|project(?:s|ed)?|anticipate(?:s|d)?)\b',text,re.I) and re.search(r'\d|\$|%',text) and re.search(r'\b(?:revenues?|net sales|income|margin|EPS|earnings|cash flow)\b',text,re.I)):
                 evidence=f.pop('evidence', [p])
                 # Quote is a contiguous original slice, including split rows.
                 quote=body[evidence[0]['start']:evidence[-1]['end']]
@@ -112,8 +112,9 @@ def extract(record):
         # annual tax-rate horizons or later unrelated metrics as revenue dates.
         lead=chosen[:first_metric if first_metric is not None else 2]
         first_revenue=next((f for f in forecasts if f['metric']=='revenue'),forecasts[0])
-        first_sentence=re.split(r'(?<=[.;])\s+(?=[A-Z])',first_revenue['quote'],maxsplit=1)[0]
-        context='\n'.join(p['quote'] for p in prefix)+'\n'+heading['quote']+'\n'+'\n'.join(p['quote'] for p in lead)+'\n'+first_sentence
+        context='\n'.join(p['quote'] for p in prefix)+'\n'+heading['quote']+'\n'+'\n'.join(p['quote'] for p in lead)
+        first_sentence,comparison_review=(formats.forecast_context(first_revenue['quote'],context) if first_revenue['metric']=='revenue' else (formats.first_sentence(first_revenue['quote']),False))
+        context+='\n'+first_sentence
         metadata=formats.period(context)
         ends=set()
         for value in re.findall(r'\b(?:ending|ended)\s+('+DATE+r')\b',context,re.I):
@@ -122,6 +123,7 @@ def extract(record):
         review=bool(re.search(r'\b(?:withdraw\w*|suspend\w*|previous guidance|prior guidance|no longer provid\w*.{0,30}guidance|not provid\w*.{0,30}guidance)\b','\n'.join(p['quote'] for p in chosen),re.I))
         values={(f['low'],f['high'],f['unit']) for f in forecasts if f['metric']=='revenue'}
         review_message='This section refers to earlier or withdrawn guidance. Read the original context.' if review else None
+        if comparison_review:review=True;review_message='The comparison period could not be confirmed as earlier than the forecast. Read the original wording.'
         if len(values)>1:review=True;review_message='This section contains different revenue ranges. Read the original context before choosing a figure.'
         if metadata['period_conflict']:review=True;review_message='More than one forecast period is mentioned. A single period could not be identified reliably.'
         sections.append(dict(id=heading['id'],heading=heading['quote'],heading_evidence=heading,

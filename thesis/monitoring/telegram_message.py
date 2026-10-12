@@ -1,5 +1,5 @@
 """Deterministic, bounded alert cards; presentation never invokes a model."""
-from datetime import datetime, timezone
+from thesis.display_time import stamp
 from html import escape
 from html.parser import HTMLParser
 from urllib.parse import urlsplit
@@ -114,9 +114,6 @@ def visible_units(html):
     return len(parser.value.encode("utf-16-le")) // 2
 
 
-def stamp(value):
-    value = value if isinstance(value, datetime) else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    return value.astimezone(timezone.utc).strftime("%d %b %Y, %H:%M UTC")
 
 
 TEST_MESSAGE = "<b>Fledge · Connection test</b>\n\nYour private Telegram chat is connected.\n\nWhen delivery is enabled, new company, saved-idea and monitored-condition alerts will arrive here with evidence and context.\n\nThis is a test message, not a market event. Your research watches are unchanged."

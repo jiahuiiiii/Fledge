@@ -16,7 +16,7 @@ def identity(source):
 
 
 def context_key(source):
-    return (source.get("conversation") or {}).get("content_key")
+    return ((source.get("conversation") or {}).get("content_key"), source.get("thread_context_key"))
 
 
 def current(conn, iid, now=None):

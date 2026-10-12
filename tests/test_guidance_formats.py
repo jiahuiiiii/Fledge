@@ -149,3 +149,71 @@ def test_no_dollar_currency_invented_for_bare_amount_and_shared_currency_keeps_e
     s=read('<h2>FY2027 Guidance</h2><p>Dollars are in millions.</p><p>Revenue | 3,000 to 3,100</p>')['sections'][0]
     assert s['forecasts'][0]['low']=='3000000000' and s['forecasts'][0]['unit'] is None
     assert s['period_label']=='FY2027'
+
+
+@pytest.mark.parametrize('label',['Net sales','Total net sales','Consolidated net sales','Revenue'])
+def test_company_sales_range_with_prior_year_growth_comparison_keeps_exact_quote(label):
+    quote=f'{label} are expected to be between $197.0 billion and $202.0 billion, or to grow between 9% and 12% compared with third quarter 2025. Excluding an event in both 2025 and 2026, third quarter 2026 year-over-year growth would be nearly 400 basis points higher. This guidance anticipates an unfavorable impact of approximately 80 basis points from foreign exchange rates.'
+    s=read(f'<h2>Third Quarter 2026 Guidance</h2><p>•{quote}</p><p>Operating income is expected to be between $22.5 billion and $26.5 billion, compared with $17.4 billion in third quarter 2025.</p>')['sections'][0]
+    f=s['forecasts'][0]
+    assert (f['metric'],f['low'],f['high'],f['unit'],f['basis'])==('revenue','197000000000','202000000000',None,None)
+    assert f['quote']=='•'+quote and f['evidence'][0]['quote']==f['quote']
+    assert (s['period_label'],s['period_end'],s['review_status'],s['period_conflict'])==('Q3 2026',None,False,False)
+    assert guidance.availability([dict(current=True,sections=[s])],dict(status='available'))['code']=='named_period'
+
+
+@pytest.mark.parametrize('heading,comparison,label',[
+    ('Third Quarter 2026 Guidance','$150 billion in third quarter 2025','Q3 2026'),
+    ('Third Quarter 2026 Guidance','second quarter 2026','Q3 2026'),
+    ('Full Fiscal Year 2027 Guidance','full fiscal year 2026','FY2027'),
+])
+def test_only_explicit_older_matching_comparisons_are_separate_periods(heading,comparison,label):
+    s=read(f'<h2>{heading}</h2><p>Net sales are expected to be $200 billion, compared with {comparison}.</p>')['sections'][0]
+    assert s['period_label']==label and not s['review_status']
+    assert s['forecasts'][0]['low']==s['forecasts'][0]['high']=='200000000000'
+
+
+@pytest.mark.parametrize('comparison',[
+    'third quarter 2026','third quarter 2027','third fiscal quarter 2025','third quarter',
+])
+def test_nonprior_or_ambiguous_comparison_period_stays_withheld(comparison):
+    s=read(f'<h2>Third Quarter 2026 Guidance</h2><p>Net sales are expected to be $200 billion, compared with {comparison}.</p>')['sections'][0]
+    assert s['review_status']
+    assert guidance.availability([dict(current=True,sections=[s])],dict(status='available'))['code']=='needs_review'
+
+
+@pytest.mark.parametrize('text',[
+    'Segment net sales are expected to be $200 billion.',
+    'International net sales are expected to be $200 billion.',
+    'Another Company expects net sales to be $200 billion.',
+    'Net sales are expected to be $200 billion if a pending deal closes.',
+    'Net sales are expected to be $200 billion, compared with third quarter 2025 if a pending deal closes.',
+    'Net sales are expected to be $200 billion, or to grow between 12% and 9% compared with third quarter 2025.',
+    'Net sales are expected to be $200 billion in third quarter 2026 and $210 billion in fourth quarter 2026.',
+    'Net sales were $200 billion.',
+])
+def test_sales_alias_does_not_admit_segments_conditions_actuals_or_multiple_forecasts(text):
+    assert formats.prose(text,['Example Holdings'])['metric'] is None
+
+
+def test_net_sales_table_and_growth_only_keep_existing_amount_rules():
+    s=read('<h2>Third Quarter 2026 Guidance</h2><p>Net sales | US$197 to US$202 billion</p>')['sections'][0]
+    assert s['forecasts'][0]['low']=='197000000000' and s['forecasts'][0]['unit']=='USD'
+    s=read('<h2>Third Quarter 2026 Guidance</h2><p>Net sales are expected to grow 9 to 12 percent year-over-year.</p>')['sections'][0]
+    assert s['forecasts'][0]['metric']=='revenue_growth'
+    s=read('<h2>Third Quarter 2026 Guidance</h2><p>Segment net sales guidance</p><p>Net sales | US$197 to US$202 billion</p>')['sections'][0]
+    assert s['forecasts'][0]['metric'] is None
+
+
+def test_optional_saved_amazon_release_preserves_original_evidence_and_unstated_fields():
+    path=Path(__file__).resolve().parents[1]/'.local/live-tests/net-sales-guidance-20261012/AMZN-before.json'
+    if not path.exists():pytest.skip('Optional saved public Amazon release')
+    saved=json.loads(path.read_text())
+    doc=next(d for d in saved['originals'] if str(d['id'])==str(saved['guidance']['releases'][0]['id']))
+    view=guidance.extract(dict(doc,company_name=saved['company']['name'],symbol='AMZN'))
+    s=view['sections'][0];f=s['forecasts'][0]
+    assert (f['metric'],f['low'],f['high'])==('revenue','197000000000','202000000000')
+    assert f['unit'] is f['basis'] is s['period_end'] is None
+    assert s['period_label']=='Q3 2026' and not s['review_status']
+    for p in [s['heading_evidence'],*s['passages'],*f['evidence']]:
+        assert doc['data']['body'][p['start']:p['end']]==p['quote']

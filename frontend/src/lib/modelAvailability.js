@@ -3,21 +3,22 @@ export function modelAvailability(status, capability = "enabled") {
     return {
       blocked: true,
       state: "unknown",
-      message: "Checking the AI connection…",
+      message: "Checking whether AI analysis is available…",
     };
   if (!status[capability])
     return {
       blocked: true,
       state: "disabled",
       message:
-        "AI is switched off or its API key is not configured. Source loading still works.",
+        "AI analysis is switched off for this workspace. Saved research and source updates remain available.",
+      detail: "AI is disabled or its connection has not been configured.",
     };
   if (status.budget?.needs_attention > 0)
     return {
       blocked: true,
       state: "attention",
       message:
-        "New AI analysis is paused. An earlier interrupted request needs a spending decision. Collected sources and saved research remain available.",
+        "New AI analysis is paused pending a spending review. Saved research and source updates remain available.",
       detail:
         "An earlier AI request ended without a confirmed charge. It needs review before another paid request; no automatic confirmation is running.",
     };
@@ -33,7 +34,7 @@ export function modelAvailability(status, capability = "enabled") {
       blocked: true,
       state: "attention",
       message:
-        "New AI analysis is paused. An earlier interrupted request needs a spending decision. Collected sources and saved research remain available.",
+        "New AI analysis is paused pending a spending review. Saved research and source updates remain available.",
       detail:
         "An earlier AI request needs review before another paid request. Saved research remains available.",
     };
@@ -42,7 +43,7 @@ export function modelAvailability(status, capability = "enabled") {
       blocked: true,
       state: "budget",
       message:
-        "The AI testing allowance has been used. Source loading and saved research remain available.",
+        "The AI spending allowance has been used. Saved research and source updates remain available.",
     };
   return { blocked: false, state: "ready", message: "" };
 }

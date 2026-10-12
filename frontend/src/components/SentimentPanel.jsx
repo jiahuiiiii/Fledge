@@ -1,6 +1,7 @@
 import NewsStatus from "./NewsStatus";
 import { countedTone } from "../lib/newsPresentation";
 import { modelAvailability } from "../lib/modelAvailability";
+import { sourceCoverage } from "../lib/sourceCoverage";
 import Checkbox from "./Checkbox";
 import Select from "./Select";
 import SentimentLimits from "./SentimentLimits";
@@ -8,13 +9,16 @@ import SentimentBasis from "./SentimentBasis";
 import SentimentPriceContext from "./SentimentPriceContext";
 import { sentimentSummaryLabel } from "../lib/sentimentSummary";
 import DiscussionThemes from "./DiscussionThemes";
-import SentimentContext from "./SentimentContext";
+import SentimentContext, { RedditThreadContext } from "./SentimentContext";
 import OriginalSample from "./OriginalSample";
 import CurrentSentimentSources from "./CurrentSentimentSources";
 import WatchCheckHistory from "./WatchCheckHistory";
 import SentimentHistory from "./SentimentHistory";
 import SourceFilters, { SourceLabel, sourceScope } from "./SourceFilters";
-import AllSourceSummary, { SourceCountingDetails } from "./AllSourceSummary";
+import AllSourceSummary, {
+  SourceCountingDetails,
+  SourceToneSummary,
+} from "./AllSourceSummary";
 import ToneFilters, { toneNames as names } from "./ToneFilters";
 import { originalSample } from "../lib/originalSample";
 import { sourceHeadline } from "../lib/sourceHeadline";
@@ -71,6 +75,7 @@ export default function SentimentPanel({
       : a?.summary?.social_platforms?.[platform] ||
         (platform === "reddit" ? a?.summary?.social : null);
   const counts = countedTone(sample);
+  const coverage = a && !a.withheld ? sourceCoverage(a) : null;
   const disabledReason = loadingRun?.active
     ? "A research update is already running. Wait for it to finish."
     : availability.blocked && availability.state !== "running"
@@ -226,6 +231,20 @@ export default function SentimentPanel({
             : ""}
         </p>
       )}
+      {a && !a.withheld && (
+        <p className="fine sentiment-reading-limit">
+          {a.stale &&
+            "This AI reading uses a source sample captured over 24 hours ago; newer headlines may not be included. "}
+          {a.earlier_method && "It was saved with an earlier analysis method. "}
+          {coverage &&
+            !coverage.complete &&
+            (coverage.unanalysed > 0
+              ? "Some saved sources are outside this reading. "
+              : "Complete coverage of the saved sources is not established. ")}
+          News tone and social opinions describe their own samples, not investor
+          consensus or future returns.
+        </p>
+      )}
       <NewsStatus
         data={data}
         availability={availability}
@@ -264,11 +283,15 @@ export default function SentimentPanel({
           )}
           {tab === "all" ? (
             <>
-              <AllSourceSummary
-                analysis={a}
-                providerStatus={data.provider_status}
-                showDetails={false}
-              />
+              <SourceToneSummary analysis={a} />
+              <details className="secondary-details">
+                <summary>Source coverage</summary>
+                <AllSourceSummary
+                  analysis={a}
+                  providerStatus={data.provider_status}
+                  showDetails={false}
+                />
+              </details>
               <ToneFilters
                 selected={toneFilter}
                 onChange={filterTone}
@@ -497,6 +520,7 @@ export default function SentimentPanel({
                                 <blockquote key={j}>{c.quote}</blockquote>
                               ))}
                             <SentimentContext value={i.conversation} />
+                            <RedditThreadContext value={i.thread_context} />
                             <button
                               className="source-link"
                               onClick={() => onSource(i.source_id)}
@@ -588,6 +612,16 @@ export default function SentimentPanel({
                   ? `${a.coverage.platform_authors?.[platform] ?? a.coverage.selected_social_authors} distinct ${(a.coverage.platform_authors?.[platform] ?? a.coverage.selected_social_authors) === 1 ? "author" : "authors"} represented. Selected sources: ${sampledFeeds || "none"}. ${platform === "hackernews" ? "Tech-community comments, not investor consensus." : platform === "x" ? "Original X posts, not investor consensus." : "Public Reddit posts and available replies, not investor consensus."} ${a.coverage.parent_contexts || 0} parent messages supplied across this saved analysis as context, not extra votes. Each author's words are classified separately; ambiguous replies may remain unclear.`
                   : "Provider headlines/snippets, not full articles."}
               </p>
+              {channel === "social" &&
+                platform === "reddit" &&
+                a.coverage?.reddit_threads > 0 && (
+                  <p className="fine">
+                    Saved topics and comments were read together. Labels
+                    describe each author's own words. Only part of each Reddit
+                    discussion is available; unknown reply parents and omitted
+                    messages are shown with the label evidence.
+                  </p>
+                )}
               <p>
                 News framing and expressed social opinions are separate samples.
                 They do not measure all investors or predict returns.
@@ -636,8 +670,8 @@ export default function SentimentPanel({
       {data.sentiment_inputs?.status === "changed" && (
         <div className="evidence-summary-bar">
           <p>
-            New source selection available. Saved labels still describe the
-            earlier sample.
+            The saved sources have changed. This AI reading still describes its
+            earlier sample; new or changed sources have not been included in it.
           </p>
           <button
             className="source-link"
@@ -1008,6 +1042,7 @@ function AlertEvidence({ item, sources, onSource, comparison }) {
       </p>
       <SentimentBasis item={item} />
       <SentimentContext value={item.conversation} />
+      <RedditThreadContext value={item.thread_context} />
       {comparison && (
         <details className="coverage-comparison">
           <summary>

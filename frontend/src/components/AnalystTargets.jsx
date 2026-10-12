@@ -1,14 +1,10 @@
+import { formatTimestamp } from "../lib/dateTime";
 import { useState } from "react";
 import { targetRange, targetChange } from "../lib/targetRange";
 
 const price = (v) =>
   `USD ${Number(v).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const date = (v) =>
-  new Date(v).toLocaleString("en-GB", {
-    timeZone: "UTC",
-    dateStyle: "medium",
-    timeStyle: "short",
-  }) + " UTC";
+const date = (value) => formatTimestamp(value, { fallback: "Not recorded" });
 
 export default function AnalystTargets({ value, quote, onRefresh }) {
   const [busy, setBusy] = useState(false);

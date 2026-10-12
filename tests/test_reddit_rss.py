@@ -216,14 +216,40 @@ def test_comments_preserve_missing_parent_and_feed_date_basis(owner):
         assert 'does not identify the immediate reply parent' in context['unavailable_reason']
 
 
-def test_thread_title_does_not_make_contextless_reply_eligible(owner):
+def test_short_reply_is_retained_with_topic_but_no_invented_parent(owner):
     iid=prepare(owner);now=datetime.now(timezone.utc)
     def get(kind,value):
         if kind=='search':return feed()
         return comments_feed(value,now,body='This! They are completely wrong.')
     result=reddit_research.refresh(iid,collector='rss',fetcher=get,now=now)
-    assert result['comments']==0
-    with transaction() as c:assert len(social.documents(c,iid,now))==1
+    assert result['comments']==1
+    with transaction() as c:
+        assert len(social.documents(c,iid,now))==2
+        packet=sentiment.prepare(c,iid,now)
+        child=next(s for s in packet['sources'] if s.get('social_kind')=='comment')
+        assert child['discovery_match']=='thread' and 'conversation' not in child
+        from thesis.research import reddit_thread_context
+        thread=reddit_thread_context.wire(packet,packet['sources'])[0]
+        assert thread['topic_available'] and thread['complete_thread'] is False
+        assert all(m['parent_key'] is None for m in thread['messages'])
+        # The topic is a consumed dependency, not an invented immediate parent.
+        root=next(s for s in social.documents(c,iid,now) if s['social_kind']=='post')
+        with transaction(source=True) as source_conn:
+            source_conn.execute('INSERT INTO social_withdrawals VALUES(%s,%s)',(root['post_key'],now))
+        assert not any(s.get('platform')=='reddit' for s in sentiment.prepare(c,iid,now,allow_empty=True)['sources'])
+
+
+def test_thread_only_reply_requires_current_permitted_topic(owner):
+    iid=prepare(owner);now=datetime.now(timezone.utc)
+    def get(kind,value):
+        if kind=='search':return feed(date=(now-timedelta(days=2)).isoformat())
+        return comments_feed(value,now,body='This! They are completely wrong.')
+    reddit_research.refresh(iid,collector='rss',fetcher=get,now=now)
+    with transaction() as c:
+        # A topic outside the chosen one-day window is not borrowed from older storage.
+        packet=sentiment.prepare(c,iid,now,allow_empty=True,lookback_days=1)
+        assert not any(s.get('platform')=='reddit' for s in packet['sources'])
+        assert packet['selection']['scopes']['reddit']['excluded']['required_context_unavailable']==1
 
 
 @pytest.mark.parametrize('mutation',['thread','comment_link','date','future','deleted','missing_original'])
@@ -404,7 +430,7 @@ def test_new_community_disabled_during_fetch_is_not_saved(owner):
 
 def test_provider_rejection_includes_the_next_check_time(owner):
     prepare(owner);calls=[]
-    with pytest.raises(ValueError,match=r'HTTP 429.*Next check after .* UTC'):
+    with pytest.raises(ValueError,match=r'HTTP 429.*Next check after .* SGT'):
         rss.read('search',search_value(),transport=transport(calls,429))
     assert len(calls)==1
 

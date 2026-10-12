@@ -168,7 +168,7 @@ def compare(iid, before, after):
             ),
             comparison_context_changed=context(previous) != context(current),
             parent_context_changed=changed_common_context(
-                previous["packet"], current["packet"], "social", "hackernews"
+                previous["packet"], current["packet"], "social", None
             ),
             grouping_changed=links(previous) != links(current),
         )

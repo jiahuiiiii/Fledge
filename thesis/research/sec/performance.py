@@ -11,7 +11,7 @@ from decimal import Decimal, localcontext
 from uuid import NAMESPACE_URL, uuid5
 from psycopg.types.json import Jsonb
 from thesis.db import one
-from .normalize import REVENUE, filing_rows, normalize
+from .normalize import REVENUE, filing_rows, normalize, annual_form
 
 METHOD = "sec-performance-1"
 DEFINITIONS = {
@@ -244,7 +244,7 @@ def normalize_performance(bundle, cik, now):
     filings = filing_rows(bundle["submissions"], now)
     reports = {}
     for kind, form in (("annual", "10-K"), ("quarter", "10-Q")):
-        matches = [f for f in filings if f["form"].startswith(form)]
+        matches = [f for f in filings if annual_form(f['form'])] if kind == 'annual' else [f for f in filings if f['form'].startswith(form)]
         if not matches:
             reports[kind] = None
             continue
@@ -363,7 +363,10 @@ def normalize_performance(bundle, cik, now):
             filing_url=normalized["filing_url"],
             metrics=metrics,
         )
-    return dict(
+        if normalized.get('financial_basis'):
+            reports[kind]['financial_basis'] = normalized['financial_basis']
+            reports[kind]['limitations'] = ['Monetary cards require explicitly reported US-GAAP USD facts; native-currency annual ratios retain their own original inputs. No currency conversion is inferred.']
+    result = dict(
         method=METHOD,
         reports=reports,
         limitations=[
@@ -374,6 +377,10 @@ def normalize_performance(bundle, cik, now):
             "Reported inputs and comparisons come from the same accession. Amendments without usable facts remain unavailable.",
         ],
     )
+    if any(r and r['form'].startswith('20-F') for r in reports.values()):
+        result['limitations'][0] = 'Monetary cards require explicit US-GAAP USD facts. 20-F annual ratios use one supported standard taxonomy and explicit currency; no custom tags, conversion or segment estimates.'
+        result['limitations'][1] = 'Annual 10-K/20-F reports and direct-quarter 10-Q reports are separate; 6-K reports are not treated as standard quarters.'
+    return result
 
 
 def persist(conn, iid, pid, bundle, cik, now):

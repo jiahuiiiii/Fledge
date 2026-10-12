@@ -37,25 +37,16 @@ export default function NewsStatus({ data, availability, onCoverage }) {
     <details className="news-section-status">
       <summary>
         <span>
-          {!status.feeds.length
-            ? "No news feeds checked"
-            : status.failed.length === status.feeds.length
-              ? "No news feed could be reached at the last check · saved news is still shown"
-              : `${status.checked.length} of ${status.feeds.length} news feeds checked successfully`}
-          {status.failed.length > 0 &&
-            status.failed.length < status.feeds.length &&
-            ` · ${status.failed.length} ${status.failed.length === 1 ? "needs" : "need"} attention`}
-          {status.waiting.length > 0 && ` · ${status.waiting.length} deferred`}
-          {status.unchecked.length > 0 &&
-            ` · ${status.unchecked.length} not checked`}
-          {status.latest && ` · last check ${stamp(status.latest)}`}
-          {status.social.length > 0 &&
-            ` · ${status.social.length} discussion feeds unavailable`}
-          {data.news_watch?.error && " · watch incomplete"}
-          {analysis?.stale && " · older reading"}
-          {analysis?.earlier_method &&
-            !analysis.withheld &&
-            " · earlier method"}
+          Data freshness ·{" "}
+          {status.latest
+            ? `latest news source check ${stamp(status.latest)}`
+            : "no saved news source check"}
+          {status.failed.length > 0 && " · some news sources unavailable"}
+          {status.waiting.length > 0 &&
+            " · some sources waiting until their next allowed check"}
+          {status.unchecked.length > 0 && " · some sources not checked yet"}
+          {status.social.length > 0 && " · some discussion sources unavailable"}
+          {data.news_watch?.error && " · last watch update could not finish"}
         </span>
         <span className="status-details-label">Details</span>
       </summary>
@@ -70,7 +61,8 @@ export default function NewsStatus({ data, availability, onCoverage }) {
         {status.waiting.length > 0 && (
           <details>
             <summary>
-              {status.waiting.length} checks deferred by the refresh schedule
+              {status.waiting.length} sources waiting until their next allowed
+              check
             </summary>
             <p>
               These checks made no new request. Saved news is retained; this

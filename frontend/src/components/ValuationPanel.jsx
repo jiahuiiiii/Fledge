@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 import Checkbox from "./Checkbox";
 import { readableLoad } from "../lib/loading";
 import LoadingSkeleton from "./LoadingSkeleton";
@@ -6,17 +7,7 @@ import Select from "./Select";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { requestUpdate } from "../lib/updateRequest";
-const stamp = (v) =>
-  v
-    ? new Date(v).toLocaleString("en-GB", {
-        timeZone: "UTC",
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }) + " UTC"
-    : "Not checked";
+const stamp = (value) => formatTimestamp(value, { fallback: "Not recorded" });
 const cash = (v) =>
   v == null
     ? "Unavailable"

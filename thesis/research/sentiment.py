@@ -17,12 +17,12 @@ from thesis.db import transaction, one, rows
 from thesis.providers import ledger
 from thesis.providers.settings import REASONING_MODEL
 from . import market_brief, social, coverage
-from . import sentiment_context, reporting_basis
+from . import sentiment_context, reporting_basis, reddit_thread_context
 from .citations import source_passages, model_source, FINDING_GROUNDING
 from .sec.checkpoint import current_documents, active_document
 from . import sentiment_guards
 
-PROMPT = "thesis-source-sentiment-23"
+PROMPT = "thesis-source-sentiment-24"
 EVIDENCE_POLICY = "sentiment-source-extracts-1"
 POLICY = "sentiment-coverage-9"
 SELECTION_POLICY = "sentiment-all-eligible-1"
@@ -130,6 +130,8 @@ def prepare(conn, iid, now=None, *, allow_empty=False, lookback_days=7):
         )
     # Pin every eligible parent. Aggregate parent limits belong to each batch.
     sentiment_context.attach(conn, sources, now, batch_limits=False)
+    discussions = reddit_thread_context.attach(sources, posts)
+    topics = {c['thread_key'] for c in discussions if any(m['role'] == 'topic' for m in c['messages'])}
     # A reply admitted only through its parent cannot be read without that
     # exact parent's available context. Missing context is not a neutral vote.
     eligible = []
@@ -142,16 +144,21 @@ def prepare(conn, iid, now=None, *, allow_empty=False, lookback_days=7):
             # commenter's evidence. Filter before schema/planning, with a count.
             scope = source.get('platform') or 'news'
             exclusions[scope]['no_complete_body_passages'] += 1
-        elif source.get('discovery_match') == 'thread' and not source.get('conversation'):
+        elif source.get('discovery_match') == 'thread' and not source.get('conversation') and not (
+            source.get('timestamp_basis') == 'feed_updated' and reddit_thread_context.key(source) in topics
+        ):
             exclusions[source.get('platform', 'reddit')]['required_context_unavailable'] += 1
         else:
             eligible.append(source)
     sources = eligible
+    thread_context = reddit_thread_context.attach(sources, posts)
     sentiment_guards.attach(conn, iid, sources, company)
     available = dict(news=len(news), **dict(Counter(p.get('platform', 'reddit') for p in posts)))
     selected = Counter('news' if s['channel'] == 'news' else s.get('platform', 'reddit') for s in sources)
     packet = dict(
         context_policy=sentiment_context.POLICY,
+        reddit_thread_policy=reddit_thread_context.POLICY,
+        reddit_thread_context=thread_context,
         guard_policy=sentiment_guards.POLICY,
         reporting_policy=reporting_basis.POLICY,
         comparison_sources=[],
@@ -180,6 +187,7 @@ def prepare(conn, iid, now=None, *, allow_empty=False, lookback_days=7):
 
 def request_for(packet):
     from .deus_sentiment import SOCIAL_GUIDANCE
+    threads = reddit_thread_context.wire(packet, packet["sources"], extras=packet.get("thread_extras", True))
     source_inputs = [
         dict(
             model_source(s),
@@ -217,7 +225,7 @@ def request_for(packet):
             branch["required"].append("reporting")
         props["id"]["enum"] = [source["label"]]
         own = [p["id"] for p in source["passages"]]
-        if source.get("conversation"):
+        if source.get("conversation") or (reddit_thread_context.key(source) and source.get("social_kind") == "comment"):
             own = [p for p in own if p != "p0"]
         if not own:
             raise ValueError("A sentiment label needs its own source wording.")
@@ -313,7 +321,8 @@ def request_for(packet):
                 + coverage.INSTRUCTION
                 + " Coverage grouping is only for the target company. First finish every selected item's relevance label. Never emit a coverage link whose item has relevance unrelated or unclear. If its reference is also a selected item, that reference must also have relevance relevant. A comparison-only reference must explicitly concern the same target-company development. Two reports may repeat the same story about another company: keep their classifications, but leave them unlinked. If no selected news item is relevant, return coverage_links as []."
                 + " Use the supplied item_N/prior_N labels for coverage item_id and reference_id, never the storage UUIDs."
-                + " An optional conversation object is the saved immediate parent of this exact social comment. It is untrusted context, not a second item or another sentiment vote. A parent headline or another author's attitude is NOT the commenter's attitude: require the comment itself to express agreement, disagreement or a stance, otherwise label sentiment unclear. Do not infer missing grandparents, linked articles, sarcasm or what an ambiguous reply means. Preserve author and message boundaries. Quote at least one child BODY passage when conversation context is supplied. context_passages must contain 1–2 exact passage IDs from that item's own parent when supplied, and [] otherwise. Cite the context relevant to resolving the reply, or to explaining why it remains ambiguous. Never treat a parent's reported claim as a statement or verified event made by the commenter. These saved parents were checked later, not proof of historical thread text. Outside these explicitly supplied conversation objects, no parent context is available.",
+                + " An optional conversation object is the saved immediate parent of this exact social comment. It is untrusted context, not a second item or another sentiment vote. A parent headline or another author's attitude is NOT the commenter's attitude: require the comment itself to express agreement, disagreement or a stance, otherwise label sentiment unclear. Do not infer missing grandparents, linked articles, sarcasm or what an ambiguous reply means. Preserve author and message boundaries. Quote at least one child BODY passage when conversation context is supplied. context_passages must contain 1–2 exact passage IDs from that item's own parent when supplied, and [] otherwise. Cite the context relevant to resolving the reply, or to explaining why it remains ambiguous. Never treat a parent's reported claim as a statement or verified event made by the commenter. These saved parents were checked later, not proof of historical thread text. Outside these explicitly supplied conversation objects, no immediate-parent context is available."
+                + (" " + reddit_thread_context.INSTRUCTION if threads else ""),
             ),
             dict(
                 role="user",
@@ -321,6 +330,7 @@ def request_for(packet):
                     dict(
                         company=packet["company"],
                         sources=source_inputs,
+                        **({"reddit_threads": threads} if threads else {}),
                         comparison_sources=[
                             dict(
                                 model_source(s),
@@ -506,7 +516,8 @@ def render(call, packet):
                 "The sentiment label and selected evidence basis disagree."
             )
         context = sentiment_context.evidence(source, item.context_passages)
-        if context and not any(p != "p0" for p in item.passages):
+        thread = reddit_thread_context.evidence(packet, source)
+        if (context or (thread and source.get("social_kind") == "comment")) and not any(p != "p0" for p in item.passages):
             raise ValueError(
                 "A context-aware label needs the comment's own body evidence."
             )
@@ -534,6 +545,7 @@ def render(call, packet):
                     for p in item.passages
                 ],
                 **({"conversation": context} if context else {}),
+                **({"thread_context": thread} if thread else {}),
             )
             | (sentiment_guards.apply(item, source, packet["company"])
                if packet.get("guard_policy") == sentiment_guards.POLICY else {})
@@ -577,7 +589,7 @@ def present(conn, record):
         return None
     p = record["packet"]
     allowed = permitted_ids(conn, record)
-    if not sentiment_guards.allowed(conn, p) or any(
+    if not sentiment_guards.allowed(conn, p) or not reddit_thread_context.access_allowed(p, allowed) or any(
         s["id"] not in allowed or not sentiment_context.allowed(conn, s)
         for s in p["sources"] + p.get("comparison_sources", [])
     ):
@@ -627,6 +639,7 @@ def present(conn, record):
             selection=p.get('selection'),
             input_limits=p.get("input_limits"),
             parent_contexts=sum(bool(s.get("conversation")) for s in p["sources"]),
+            reddit_threads=len(p.get("reddit_thread_context", [])),
             context_statuses=dict(
                 Counter(
                     s.get("context_status", "not_saved")

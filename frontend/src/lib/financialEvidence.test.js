@@ -15,6 +15,8 @@ test("readable evidence amounts preserve units, signs, zero and small nonzero va
   assert.equal(evidenceValue("0.001"), "US$0.001");
   assert.equal(evidenceValue("34.33779329", "percent"), "34.34%");
   assert.equal(evidenceValue("46.611", "multiple"), "46.61×");
+  assert.equal(evidenceValue("500000000000", "CNY"), "CNY 500 bil");
+  assert.equal(evidenceValue("-3000000", "EUR"), "−EUR 3 mil");
   for (const invalid of [null, "", true, "NaN", "Infinity"])
     assert.equal(evidenceValue(invalid), "Unavailable");
 });

@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 import { useId, useState } from "react";
 import Select from "./Select";
 import { Evidence, amount, day } from "./FinancialOverview";
@@ -182,7 +183,8 @@ export default function FinancialPosition({ performance, debt }) {
               values follow accounting rules and may differ from resale values.
             </p>
             <p className="position-caption">
-              Saved filing data checked {day(performance.checked_at)}.{" "}
+              Saved filing data checked{" "}
+              {formatTimestamp(performance.checked_at)}.{" "}
               {performance.source_status?.last_error
                 ? "The latest check failed; these are retained figures."
                 : old

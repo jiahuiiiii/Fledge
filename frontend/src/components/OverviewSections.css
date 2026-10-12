@@ -30,38 +30,17 @@
   border: 1px solid var(--color-line);
   border-radius: var(--radius-lg);
 }
-.overview-checks {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.overview-checks > strong {
-  font-size: 13px;
-  margin-right: 4px;
-}
-.overview-check {
-  border-radius: 20px;
-  padding: 4px 9px;
-  font-size: 12px;
-  font-weight: 500;
-  background: var(--color-surface-2);
-  color: var(--color-muted);
-}
-.overview-check.pass {
-  background: var(--color-positive-soft);
-  color: var(--color-positive-light);
-}
-.overview-check.fail {
-  background: var(--color-caution-soft);
-  color: var(--color-caution-light);
-}
 .app-shell .overview-reading > p {
-  margin: 12px 0 0;
+  margin: 0;
   line-height: 1.65;
   color: var(--color-text-2);
   font-size: 15px;
   max-width: 110ch;
+}
+.app-shell .overview-reading > .overview-limit {
+  margin-top: 10px;
+  color: var(--color-muted);
+  font-size: 13px;
 }
 .overview-section-grid {
   display: grid;
@@ -255,16 +234,30 @@
   line-height: 1.65;
   margin: 0;
 }
+.overview-card:has(> .overview-bars) {
+  display: grid;
+  grid-template-columns: minmax(68px, 0.75fr) minmax(60px, 1.6fr) max-content;
+  column-gap: 12px;
+  align-content: start;
+}
+.overview-card:has(> .overview-bars) > * {
+  grid-column: 1 / -1;
+}
 .overview-bars {
   display: grid;
-  gap: 10px;
+  grid-template-columns: subgrid;
+  row-gap: 10px;
+}
+.overview-bars > h4 {
+  grid-column: 1 / -1;
 }
 .overview-bars + .overview-bars {
   margin-top: 14px;
 }
 .overview-bar-row {
   display: grid;
-  grid-template-columns: minmax(68px, 0.75fr) minmax(60px, 1.6fr) max-content;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
   gap: 12px;
   padding: 5px 0;
@@ -281,6 +274,7 @@
   color: var(--color-muted);
 }
 .overview-bar-row > strong {
+  justify-self: end;
   font-weight: 500;
   color: var(--color-text-2);
   font-variant-numeric: tabular-nums;
@@ -472,9 +466,12 @@
   .overview-brief > summary > span {
     display: none;
   }
-  .overview-bar-row {
+  .overview-card:has(> .overview-bars) {
     grid-template-columns: minmax(64px, 0.75fr) minmax(45px, 1fr) max-content;
-    gap: 8px;
+    column-gap: 8px;
+  }
+  .overview-bar-row {
+    column-gap: 8px;
     font-size: 12px;
   }
   .overview-facts > div {

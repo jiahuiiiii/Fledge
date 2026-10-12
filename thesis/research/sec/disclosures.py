@@ -83,18 +83,18 @@ def revenue_history_plan(submissions, cik, now):
     Retain originals separately: historical checks must never move the current
     disclosure pointers or feed old reports into current business/guidance reads.
     """
-    from .normalize import filing_rows
+    from .normalize import filing_rows, annual_form
     if int(submissions.get('cik', 0)) != int(cik):
         raise ValueError('Filing metadata belongs to another issuer.')
     filings = filing_rows(submissions, now)
     chosen = {}
     for filing in filings:
-        kind = 'annual' if filing['form'].startswith('10-K') else 'quarter'
+        kind = 'annual' if annual_form(filing['form']) else 'quarter'
         chosen[(kind, filing['end'])] = filing
     selected = []
     for kind in ('annual', 'quarter'):
         for (_, end), latest in [(key, f) for key, f in chosen.items() if key[0] == kind][-5:]:
-            chain = [f for f in filings if f['end'] == end and f['form'].startswith('10-K' if kind == 'annual' else '10-Q')]
+            chain = [f for f in filings if f['end'] == end and f['form'].removesuffix('/A') == latest['form'].removesuffix('/A')]
             # Never partially collect an unbounded amendment chain.
             selected.extend(chain if len(chain) <= 8 else [latest])
     return [dict(slot='revenue_history', history=True, form=f['form'], accession=f['accessionNumber'],
@@ -110,7 +110,7 @@ def cash_flow_history_plan(bundle, cik, now):
     issuer-independent and retains historical documents without moving current
     disclosure pointers. Already retained originals are reused by refresh.
     """
-    from .normalize import filing_rows
+    from .normalize import filing_rows, annual_form
     from .financial_story import normalize_story
     story = normalize_story(bundle, cik, now)
     filings = filing_rows(bundle['submissions'], now)
@@ -119,7 +119,7 @@ def cash_flow_history_plan(bundle, cik, now):
         if not any(m['key'] in ('operating_cash', 'capital_spending') and m['value'] is None for m in period['metrics']):
             continue
         needed.add(period['accession'])
-        prior = [f for f in filings if f['form'].startswith('10-K') and f['end'].isoformat() < period['end']
+        prior = [f for f in filings if annual_form(f['form']) and f['end'].isoformat() < period['end']
                  and f['accepted_at'] <= period['accepted_at']]
         if prior: needed.add(prior[-1]['accessionNumber'])
     selected = []

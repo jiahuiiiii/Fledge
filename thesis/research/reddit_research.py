@@ -3,6 +3,7 @@
 Uses the same public Reddit host throughout; denials stop enrichment. No mirror,
 cookie, proxy or user-agent disguise. Parent and reply authors stay separate.
 """
+from thesis.display_time import stamp as display_stamp
 import hashlib
 import re
 import time
@@ -30,7 +31,7 @@ def request(url, params=None, *, atom=False, html_page=False):
         if state['reason'] in {'Reddit returned HTTP 401.','Reddit returned HTTP 403.'}:
             raise ValueError('Reddit denied access. A supported, approved Reddit connection is needed before collection can resume.')
         if state['blocked_until'] and state['blocked_until'] > now:
-            raise Conflict('Reddit is cooling down after a provider rejection. Next check after ' + state['blocked_until'].strftime('%H:%M UTC') + '.')
+            raise Conflict('Reddit is cooling down after a provider rejection. Next check after ' + display_stamp(state['blocked_until']) + '.')
         start = max(now,state['next_at'])
         c.execute('UPDATE reddit_request_clock SET next_at=%s WHERE singleton',(start+timedelta(seconds=3),))
     time.sleep(max(0,(start-datetime.now(timezone.utc)).total_seconds()))
@@ -238,7 +239,7 @@ def refresh(iid, *, lookback_days=7, fetcher=None, now=None, collector=None):
             for kind,check in rss_result['checks'].items():
                 check['matched']=len(posts if kind=='posts' else comments)
                 message=(f'{check["matched"]} company posts retained from ticker/name search and any saved hot feeds.' if kind=='posts' else
-                        f'{check["matched"]} company-matched comments retained. RSS supplies update times; immediate reply parents are unavailable.' if posts else 'No matching posts in this feed sample; no comment requests were made.')
+                        f'{check["matched"]} comments retained from company discussion threads. RSS supplies update times; immediate reply parents are unavailable. The saved topic is required to analyse replies without their own company mention.' if posts else 'No matching posts in this feed sample; no comment requests were made.')
                 if check['errors']:
                     message += ' ' + ' '.join(dict.fromkeys(check['errors']))
                 if cache_only:

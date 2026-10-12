@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 import { modelAvailability } from "../lib/modelAvailability";
 import Checkbox from "./Checkbox";
 import { useEffect, useRef, useState } from "react";
@@ -5,12 +6,7 @@ import { api } from "../api/client";
 import Modal from "./Modal";
 import SentimentContext from "./SentimentContext";
 import QuestionSelector, { questionDefaults } from "./QuestionSelector";
-const stamp = (v) =>
-  new Date(v).toLocaleString("en-GB", {
-    timeZone: "UTC",
-    dateStyle: "medium",
-    timeStyle: "short",
-  }) + " UTC";
+const stamp = (value) => formatTimestamp(value, { fallback: "Not recorded" });
 const labels = {
   supported: "Answered within this sample",
   partial: "Partial answer",

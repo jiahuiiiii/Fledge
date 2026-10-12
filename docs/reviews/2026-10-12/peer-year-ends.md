@@ -1,0 +1,33 @@
+# Plot valid peers with different financial year-ends
+
+The owner requested including MSFT in AMZN's chart with an explicit financial year-end difference. This supersedes the earlier rule that hid every peer beyond the 120-day fiscal-end window. The window still controls the peer average, median and above/below reading.
+
+## Behavior
+
+`chartRows` adds validated annual rows outside that window to the plotted set without changing `comparablePeers`, `comparisonRows`, `peerAverage` or `position`. The common chart scale includes all plotted values. Different-year-end bars have a dashed amber edge, an explicit **Different year-end** label and an actual ending date. Every annual bar shows its ending date, making the researched company's period visible too. The map uses hollow amber markers and names affected companies/dates in its caption; it now fits phone widths without horizontal panning. Accessible row labels and marker titles carry the distinction.
+
+Average/ranking coverage is explicit. With only different-year-end peers, the chart still shows usable figures and says they are context; no average or ranking is invented. Missing/invalid/unavailable values remain unplotted and keep their original collection or evidence reason. Zero and negative context values remain visible. The evidence modal distinguishes **shown for context** from **not plotted**, retains exact values/periods and original links, and preserves keyboard focus. P/E keeps its existing Finnhub/saved-date behavior. Annual forecast charts share the same display treatment; forecast validation and definitions remain unchanged.
+
+No backend, extraction, ratio, source policy, private peer, watch or model-budget change was made. No refresh or paid call was invoked by this task. Browser writes and external browser requests were blocked; the existing full save journey ran only against an isolated fictional database.
+
+## Actual saved figures
+
+MSFT's [FY2026 10-K](https://www.sec.gov/Archives/edgar/data/789019/000119312526323660/msft-20260630.htm), accession `0001193125-26-323660`, covers 1 July 2025–30 June 2026. Saved revenue growth is `17.78868679984665843165651490%`, displayed **17.8%**; operating margin is `46.78081840892722073053498835%`, displayed **46.8%**. Its fiscal end is 181 days from AMZN's 31 December 2025. Both figures now plot, with the year-end distinction visible, while remaining outside AMZN's comparable average/ranking. BABA still supplies the displayed 2.7% growth and 4.9% margin averages in the selected BABA/MSFT group. No earlier MSFT year or fiscal-date adjustment is substituted.
+
+The change applies generally: MU's saved 256.3273% growth can now extend AVGO's chart scale with a different-year-end mark. Its 305-day gap still excludes it from the unchanged 38.9% comparable mean and existing peer reading.
+
+## Verification and installation
+
+The isolated frontend suite passes 164 tests. Relevant tests cover unchanged comparable statistics, context scale membership, both directions of the 120-day boundary, negative/zero values, missing dates/figures, immutable inputs, safe collection status and unchanged P/E eligibility. Build, scoped formatting and diff checks pass. No backend suite was needed for this frontend-only change.
+
+Candidate and installed browser suites each pass 18 checks using actual installed API data with explicit read-only peer parameters. They cover actual MSFT/BABA/AMZN growth, margin and explicit USD revenue; unchanged average/ranking; labels, sources and keyboard evidence/focus; bars/map at 1440/980/390/320; an MSFT-only group; authored zero/negative context figures; missing data with a fetch-failure reason; and P/E. The full map fits each viewport and screenshots were inspected. The existing isolated comparison journey passes saving, drafts/removal, reported figures, signed/zero/missing values, P/E, forecasts and evidence without source/model requests.
+
+An isolated baseline build exactly matches the installed `bc35c4c5` bundle. Concurrent Singapore-time work changed many shared files, including the comparison's timestamp helper and five unrelated backend modules. Those pending changes were preserved. The installation snapshot contains only this task's four frontend changes on the verified baseline; its timestamp helper retains the installed behavior, while the shared source retains the other task's pending helper. Two isolated builds match exactly, and all snapshot/shared scope hashes are recorded. The app was not restarted, so unrelated pending backend edits were not loaded by this task.
+
+Frontend index `cd0594a9` and all 30 candidate files were verified over HTTP, with prior assets retained. App PID 32699 and PostgreSQL stayed running; worker advisory lock, schema 49, environment and model ledger were verified. All 13 saved-company performance and filing-status projections remain exact. SEC financial tables and saved peer/idea tables remain exact through final verification.
+
+Normal concurrent source activity changed eight tables during installation: `hn_refresh_state`, `hn_request_clock`, `provider_checks`, `provider_clocks`, `public_feed_cache`, `reddit_company_checks`, `social_discovery` and `social_posts`. The initial all-table equality guard correctly failed after the frontend had been installed. The completed installer was not rerun or rolled back. By final verification, source/watch activity had changed 23 tables, recorded in `verification.json`; SEC financial tables, saved peer/idea tables and all 13 financial projections remain exact. The watch journal records AMZN starting10:17:06 and failing10:20:48, FN starting10:20:53 and completing10:21:03, and AVGO starting10:21:08 still active at the watch audit. No cause for AMZN’s failure or completion of AVGO is claimed. Subsequent verification checks the unaffected financial/peer/idea data, model ledger, assets and running app. Do not claim all 116 tables stayed unchanged.
+
+Evidence: `.local/live-tests/peer-year-ends-20261012/`; recoverable source/index backup: `.local/backups/peer-year-ends-20261012/`. Retain the initial preview before the phone-map fit, concurrent-source/backend guard diagnostics, missing pending-date-helper build diagnostics, earlier mixed candidates, and the post-install all-table equality failure. Only the final isolated successful build/browser reports and final installed verification support completion. The completed installer must not be rerun.
+
+Different year-ends are disclosed rather than normalized. Plotting them does not establish equivalent economic periods or accounting comparability, and extreme context figures can compress the shared scale as requested.

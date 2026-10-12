@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 import LoadingSkeleton from "./LoadingSkeleton";
 import Select from "./Select";
 import SentimentLimits from "./SentimentLimits";
@@ -14,7 +15,7 @@ const changes = {
   unchanged: "Same text · labels unchanged",
 };
 const title = (s, index) =>
-  `Sample ${index + 1} · ${stamp(s.cutoff)} · saved ${new Date(s.created_at).toLocaleTimeString("en-GB", { timeZone: "UTC", hour12: false })} UTC${s.earlier_method ? " · earlier method" : ""}${s.withheld ? " · unavailable" : ""}`;
+  `Sample ${index + 1} · ${stamp(s.cutoff)} · saved ${formatTimestamp(s.created_at, { seconds: true })}${s.earlier_method ? " · earlier method" : ""}${s.withheld ? " · unavailable" : ""}`;
 
 export default function SentimentHistory({ instrumentId, latestId }) {
   const [open, setOpen] = useState(false),
@@ -104,6 +105,7 @@ export default function SentimentHistory({ instrumentId, latestId }) {
               <blockquote key={i}>{c.quote}</blockquote>
             ))}
           <SentimentContext value={item.conversation} />
+          <RedditThreadContext value={item.thread_context} />
         </details>
         <button className="source-link" onClick={() => setSource(s)}>
           Inspect {label.toLowerCase()} source ↗
@@ -219,9 +221,9 @@ export default function SentimentHistory({ instrumentId, latestId }) {
             )}
             {comparison.parent_context_changed && (
               <p className="notice">
-                The saved parent context for a shared social comment changed. A
-                changed interpretation is not evidence of a new investor
-                opinion.
+                The saved discussion context for a shared social comment
+                changed. A changed interpretation is not evidence of a new
+                investor opinion.
               </p>
             )}
             {comparison.grouping_changed && (
@@ -374,4 +376,4 @@ export default function SentimentHistory({ instrumentId, latestId }) {
     </>
   );
 }
-import SentimentContext from "./SentimentContext";
+import SentimentContext, { RedditThreadContext } from "./SentimentContext";

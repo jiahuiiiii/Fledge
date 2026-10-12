@@ -108,7 +108,7 @@ def allowed(conn, source):
 def changed_common_context(previous, current, channel, platform):
     def selected(packet):
         return {
-            s["content_hash"]: (s.get("conversation") or {}).get("content_key")
+            s["content_hash"]: ((s.get("conversation") or {}).get("content_key"), s.get("thread_context_key"))
             for s in packet["sources"]
             if s["channel"] == channel
             and (not platform or s.get("platform", "reddit") == platform)

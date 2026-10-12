@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 import { useState } from "react";
 import { FinancialEvidenceRow } from "./FinancialEvidence";
 
@@ -78,7 +79,7 @@ export default function FinancialPerformance({ data }) {
         </div>
       </div>
       <p className="financial-coverage">
-        Filing data checked {day(data.checked_at)}.{" "}
+        Filing data checked {formatTimestamp(data.checked_at)}.{" "}
         {data.source_status?.last_error
           ? "The latest filing check failed; these are retained figures."
           : stale

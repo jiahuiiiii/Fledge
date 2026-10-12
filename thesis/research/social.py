@@ -245,7 +245,7 @@ def source_metadata(record):
     if record.get('discovery_method') != 'reddit-comment-rss-updated-1' and record.get('timestamp_basis') != 'feed_updated':
         return {}
     return dict(timestamp_basis='feed_updated',
-                source_note='The timestamp is the Reddit feed update time, not a verified original publication time. This comment names the company in its own text. Its immediate reply parent is unavailable; do not infer who it answers or an unstated referent.')
+                source_note='The timestamp is the Reddit feed update time, not a verified original publication time. Thread membership does not establish company relevance or agreement. Its immediate reply parent is unavailable; do not infer who it answers or an unstated referent.')
 
 
 def status(conn, iid=None):

@@ -1,3 +1,4 @@
+import { formatTimestamp } from "../lib/dateTime";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import FinancialHistory from "./FinancialHistory";
@@ -18,9 +19,7 @@ import {
 import "./RevenueHistory.css";
 
 const stamp = (value) =>
-  value
-    ? new Date(value).toLocaleString("en-GB", { timeZone: "UTC" }) + " UTC"
-    : "Date not supplied";
+  formatTimestamp(value, { fallback: "Date not supplied" });
 
 export default function RevenueHistory({
   instrumentId,
@@ -392,6 +391,20 @@ export default function RevenueHistory({
 
 function ForecastEvidence({ point, rows }) {
   const reported = metric(rows.at(-1), "revenue");
+  const publicPage = point.source === "public";
+  const earlierPageDate =
+    publicPage &&
+    point.updatedOn &&
+    point.observedAt &&
+    point.updatedOn < new Date(point.observedAt).toISOString().slice(0, 10);
+  const basis = [
+    "source revenue convention",
+    "Source revenue definition",
+  ].includes(point.basis)
+    ? "Not specified by the source"
+    : point.basis === "gaap"
+      ? "GAAP"
+      : point.basis;
   return (
     <div className="revenue-forecast-evidence">
       <p className="forecast-type">
@@ -427,13 +440,25 @@ function ForecastEvidence({ point, rows }) {
         </p>
       )}
       {point.reason && <p>{point.reason}</p>}
+      {earlierPageDate && (
+        <p className="forecast-date-note">
+          This page was checked on {stamp(point.observedAt)}. The publisher
+          still lists {day(point.updatedOn)} as its update date.
+        </p>
+      )}
       <dl>
         <div>
           <dt>Revenue definition</dt>
-          <dd>{point.basis === "gaap" ? "GAAP" : point.basis}</dd>
+          <dd>{basis}</dd>
         </div>
         <div>
-          <dt>Source date</dt>
+          <dt>
+            {publicPage
+              ? "Publisher page updated"
+              : point.kind === "management"
+                ? "Release date"
+                : "Forecast date"}
+          </dt>
           <dd>
             {point.publishedAt || point.updatedOn
               ? day(point.publishedAt || point.updatedOn)
@@ -441,12 +466,18 @@ function ForecastEvidence({ point, rows }) {
           </dd>
         </div>
         <div>
-          <dt>Saved</dt>
+          <dt>{publicPage ? "Page checked & saved" : "Saved"}</dt>
           <dd>
             {stamp(point.observedAt)}
             {point.stale ? " · over a day old" : ""}
           </dd>
         </div>
+        {point.kind === "analyst" && point.checkedAt && (
+          <div>
+            <dt>Latest source check</dt>
+            <dd>{stamp(point.checkedAt)}</dd>
+          </div>
+        )}
         {point.kind === "analyst" && (
           <div>
             <dt>Contributing analysts</dt>
@@ -461,8 +492,8 @@ function ForecastEvidence({ point, rows }) {
       </dl>
       {point.kind === "analyst" && (
         <p>
-          The source’s update date is separate from when each analyst made their
-          forecast. This is not a historical beat-or-miss comparison.
+          Dates for individual analysts’ forecasts are not supplied. These
+          figures cannot establish a historical beat-or-miss comparison.
         </p>
       )}
       {point.quote && <blockquote>{point.quote}</blockquote>}

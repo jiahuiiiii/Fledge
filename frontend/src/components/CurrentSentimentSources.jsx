@@ -8,7 +8,7 @@ import { sourceExclusionLabels } from "../lib/sourceCoverage";
 
 const states = {
   changed: "The inputs selected now differ from the saved sentiment reading.",
-  same: "The selected sources and parent context match the saved reading. Its original labels are unchanged.",
+  same: "The selected sources and discussion context match the saved reading. Its original labels are unchanged.",
   empty:
     "No complete recent passages are currently eligible for sentiment analysis.",
   no_saved_reading:
@@ -146,9 +146,9 @@ export default function CurrentSentimentSources({
               )}
               {!!data.parents_changed && (
                 <p className="fine">
-                  Saved parent context differs for {data.parents_changed}{" "}
-                  retained replies. This can reflect availability or age as well
-                  as changed wording.
+                  Saved discussion context differs for {data.parents_changed}{" "}
+                  retained messages. This can reflect availability or age as
+                  well as changed wording.
                 </p>
               )}
               {data.comparison_sources_changed && (

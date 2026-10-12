@@ -4,7 +4,7 @@ This presentation does not rewrite performance, monitoring or saved AI results.
 """
 from decimal import Decimal, localcontext
 from thesis.db import one
-from .normalize import filing_rows, REVENUE
+from .normalize import filing_rows, REVENUE, annual_form
 from .performance import collect, select, decimal_text
 from .financial_depth import trailing, total_debt, capital_spending, reported
 from .disclosure_text import archive_url
@@ -158,7 +158,7 @@ def normalize_story(bundle, cik, now,resolver=None):
     chosen = list(chosen.values())[-40:]
     annual_by_end = {}
     for filing in filings:
-        if filing['form'].startswith('10-K'):
+        if annual_form(filing['form']):
             annual_by_end[filing['end']] = filing
     annual = list(annual_by_end.values())[-12:]
     annual_rows = [income_period(bundle, filings, filing, 'annual',resolver) for filing in annual]
