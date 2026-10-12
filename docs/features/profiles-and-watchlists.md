@@ -4,13 +4,17 @@ Added 11–12 October 2026 (Ten: login and backend).
 
 ## Username and password sign-in (test product)
 
-Set `THESIS_AUTH_MODE=password` in `.env` (optionally `THESIS_OWNER_USERNAME`
-so that username keeps the existing owner research). The sign-in page then
+Set `THESIS_AUTH_MODE=password` in `.env`. Sign-up always creates a new,
+separate account; it never grants the installation owner's research. To sign
+in to that research, create the owner login from the server's own shell with
+`python -m thesis.password_auth owner <username>` (it asks for the password
+twice and refuses if the owner already has a login). The sign-in page then
 offers **Create account** / **Sign in** with a username and password; no email
 or Supabase is needed. Passwords are stored only as salted scrypt hashes;
 sessions are 7-day HTTP-only cookies whose hash is kept server-side; five wrong
 passwords for a username (or 50 installation-wide) pause attempts for 15
-minutes. There is no password reset yet. Without the setting, the email-link
+minutes. Each attempt is counted under a row lock before the password is
+checked, so simultaneous attempts cannot get past the limit. There is no password reset yet. Without the setting, the email-link
 sign-in and local demo behave exactly as before.
 Code: `migrations/051_password_accounts.sql`, `thesis/password_auth.py`, small
 hooks in `thesis/auth.py` and `thesis/app.py`, `AccountGate.jsx`;

@@ -17,9 +17,16 @@ def companies(owner, conn=None):
     return [dict(id=str(r['id']), symbol=r['symbol'], name=r['name'], added_at=r['added_at'].isoformat()) for r in found]
 
 
+def started(conn, owner):
+    """True once the account has followed any company, even if it later removed all."""
+    return bool(one(conn, 'SELECT 1 FROM watchlist_usage WHERE owner_id=%s', (owner,)))
+
+
 def summary(owner):
-    listed = companies(owner)
-    return dict(companies=listed, count=len(listed), limit=LIMIT, full=len(listed) >= LIMIT)
+    with transaction(owner) as conn:
+        listed = companies(owner, conn)
+        used = started(conn, owner)
+    return dict(companies=listed, count=len(listed), limit=LIMIT, full=len(listed) >= LIMIT, started=used)
 
 
 def add(owner, instrument_id):
@@ -29,6 +36,7 @@ def add(owner, instrument_id):
                 raise ValueError('Choose a company from the search first.')
             conn.execute('''INSERT INTO watchlist_companies(owner_id,instrument_id) VALUES(%s,%s)
                             ON CONFLICT DO NOTHING''', (owner, instrument_id))
+            conn.execute('INSERT INTO watchlist_usage(owner_id) VALUES(%s) ON CONFLICT DO NOTHING', (owner,))
     except psycopg.errors.CheckViolation as failure:
         if 'watchlist_limit' in str(failure):
             raise ValueError(FULL) from None

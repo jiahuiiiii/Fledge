@@ -47,8 +47,9 @@ def configuration():
         return None
     if values.get('THESIS_AUTH_MODE', '').strip().casefold() == 'password':
         # Test product: username/password accounts, no email verification.
-        owner = values.get('THESIS_OWNER_USERNAME', '').strip().casefold() or None
-        return dict(mode='password', owner_username=owner)
+        # The owner login is created from the server shell, never by sign-up:
+        # python -m thesis.password_auth owner <username>
+        return dict(mode='password')
     url = values.get('SUPABASE_URL', '').rstrip('/')
     key = values.get('SUPABASE_PUBLISHABLE_KEY') or values.get('SUPABASE_ANON_KEY', '')
     email = values.get('THESIS_OWNER_EMAIL', '').strip().casefold()

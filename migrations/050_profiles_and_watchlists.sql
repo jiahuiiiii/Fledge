@@ -31,6 +31,20 @@ CREATE POLICY account_scope ON watchlist_companies
  WITH CHECK(owner_id=nullif(current_setting('app.user_id',true),'')::uuid);
 GRANT SELECT,INSERT,DELETE ON watchlist_companies TO thesis_app;
 
+-- Whether an account has ever followed a company. Kept apart from the list
+-- itself so that removing the last company leaves an empty watchlist instead
+-- of falling back to showing every company.
+CREATE TABLE watchlist_usage (
+ owner_id uuid PRIMARY KEY REFERENCES accounts ON DELETE CASCADE,
+ started_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE watchlist_usage ENABLE ROW LEVEL SECURITY;
+ALTER TABLE watchlist_usage FORCE ROW LEVEL SECURITY;
+CREATE POLICY account_scope ON watchlist_usage
+ USING(owner_id=nullif(current_setting('app.user_id',true),'')::uuid)
+ WITH CHECK(owner_id=nullif(current_setting('app.user_id',true),'')::uuid);
+GRANT SELECT,INSERT ON watchlist_usage TO thesis_app;
+
 -- The limit is enforced in the database so concurrent requests cannot exceed it.
 CREATE FUNCTION enforce_watchlist_limit() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN

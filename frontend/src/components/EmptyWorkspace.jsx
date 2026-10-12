@@ -3,10 +3,12 @@ import CompanyDialog from "./CompanyDialog";
 import TelegramSettings from "./TelegramSettings";
 import { companionPromise } from "../lib/companion";
 import { useProfile } from "../lib/profile";
+import { api } from "../api/client";
 import DetailModeToggle from "./DetailModeToggle";
 
 export default function EmptyWorkspace({ view, onChoose }) {
   const [adding, setAdding] = useState(false);
+  const [notice, setNotice] = useState("");
   const { home } = useProfile();
   useEffect(() => {
     const openAdd = () => setAdding(true);
@@ -84,6 +86,11 @@ export default function EmptyWorkspace({ view, onChoose }) {
             {personal.watchlist.limit} companies.
           </p>
         )}
+        {notice && (
+          <p className="watchlist-notice" role="alert">
+            {notice}
+          </p>
+        )}
         <button className="primary" onClick={() => setAdding(true)}>
           Add your first company <span aria-hidden="true">＋</span>
         </button>
@@ -108,7 +115,15 @@ export default function EmptyWorkspace({ view, onChoose }) {
       <CompanyDialog
         open={adding}
         onClose={() => setAdding(false)}
-        onAdded={(id) => {
+        onAdded={async (id) => {
+          // Save the first company to the watchlist before opening it.
+          try {
+            await api.addToWatchlist(id);
+            setNotice("");
+          } catch (failure) {
+            setNotice(failure.message);
+          }
+          dispatchEvent(new Event("fledge:home-changed"));
           setAdding(false);
           onChoose(id);
         }}

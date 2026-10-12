@@ -119,3 +119,18 @@ def test_profile_watchlist_and_home_api(owner):
     catalogue = client.get('/api/v1/workspace').json()['result']['catalogue']
     assert [c['watchlisted'] for c in catalogue if c['id'] == INSTRUMENT] == [True]
     assert not any(c['watchlisted'] for c in catalogue if c['id'] != INSTRUMENT)
+
+
+def test_emptied_watchlist_stays_in_use(owner):
+    """Removing the last company must not bring back every other company."""
+    client = TestClient(app)
+    client.get('/api/v1/session')
+    assert client.get('/api/v1/workspace').json()['result']['watchlist_started'] is False
+    assert watchlist.summary(owner)['started'] is False
+    assert client.post('/api/v1/watchlist', json={'instrument_id': INSTRUMENT}, headers=HEADERS).status_code == 200
+    emptied = client.delete(f'/api/v1/watchlist/{INSTRUMENT}', headers=HEADERS).json()['result']
+    assert emptied['count'] == 0 and emptied['started'] is True
+    result = client.get('/api/v1/workspace').json()['result']
+    assert result['watchlist_started'] is True
+    assert not any(c['watchlisted'] for c in result['catalogue'])
+    assert client.get('/api/v1/home').json()['result']['watchlist']['started'] is True

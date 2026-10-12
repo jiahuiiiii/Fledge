@@ -73,7 +73,8 @@ def new_session(conn, account, now):
     return cookie, SESSION_DAYS * 86400
 
 
-def register(username, password, owner_username=None, *, now=None):
+def register(username, password, *, now=None):
+    """Public sign-up. Always creates a new, separate account."""
     name = normalize(username)
     check_password(password)
     now = now or datetime.now(timezone.utc)
@@ -82,30 +83,57 @@ def register(username, password, owner_username=None, *, now=None):
         conn.execute("SELECT pg_advisory_xact_lock(hashtext('fledge-password-register'))")
         if one(conn, 'SELECT 1 FROM password_credentials WHERE username=%s', (name,)):
             raise PasswordFailure('That username is taken. Choose another.', 409)
-        # The configured owner username keeps the installation's existing research.
-        if owner_username and name == owner_username and not one(
-                conn, 'SELECT 1 FROM password_credentials WHERE account_id=%s', (OWNER,)):
-            account = OWNER
-            conn.execute("INSERT INTO accounts VALUES(%s,'Installation owner') ON CONFLICT DO NOTHING", (OWNER,))
-        else:
-            account = str(uuid4())
-            conn.execute('INSERT INTO accounts VALUES(%s,%s)', (account, 'Research account'))
+        account = str(uuid4())
+        conn.execute('INSERT INTO accounts VALUES(%s,%s)', (account, 'Research account'))
         conn.execute('INSERT INTO password_credentials(account_id,username,password_hash) VALUES(%s,%s,%s)',
                      (account, name, hashed))
         return new_session(conn, account, now)
 
 
-def _limited(conn, name, now):
-    for scope, limit, seconds in LIMITS:
+def provision_owner(username, password):
+    """Give the installation owner a username and password.
+
+    Run only from the server's own shell (``python -m thesis.password_auth
+    owner <username>``), never through the web sign-up, so having shell access
+    to the machine is what proves ownership. Refuses if the owner already has a
+    login or the username belongs to someone else.
+    """
+    name = normalize(username)
+    check_password(password)
+    hashed = hash_password(password)
+    with transaction(admin=True) as conn:
+        conn.execute("SELECT pg_advisory_xact_lock(hashtext('fledge-password-register'))")
+        if one(conn, 'SELECT 1 FROM password_credentials WHERE account_id=%s', (OWNER,)):
+            raise PasswordFailure('The installation owner already has a login.', 409)
+        if one(conn, 'SELECT 1 FROM password_credentials WHERE username=%s', (name,)):
+            raise PasswordFailure('That username is taken. Choose another.', 409)
+        conn.execute("INSERT INTO accounts VALUES(%s,'Installation owner') ON CONFLICT DO NOTHING", (OWNER,))
+        conn.execute('INSERT INTO password_credentials(account_id,username,password_hash) VALUES(%s,%s,%s)',
+                     (OWNER, name, hashed))
+    return name
+
+
+def _admit(conn, name, now):
+    """Reserve one attempt against every limit, or return the wait in seconds.
+
+    The counter rows are locked and the attempt is counted *before* the
+    password is checked, all in one committed transaction. Concurrent requests
+    therefore queue on the row locks and each sees the attempts admitted
+    before it, so a burst cannot slip past the limit. A correct password gives
+    its reserved attempt back.
+    """
+    rows = []
+    for scope, limit, seconds in sorted(LIMITS, key=lambda item: item[0]):  # fixed lock order
         key = scope if scope == 'global' else 'user:' + name
         conn.execute('INSERT INTO password_attempts VALUES(%s,%s,0) ON CONFLICT DO NOTHING', (key, now))
         state = one(conn, 'SELECT * FROM password_attempts WHERE key=%s FOR UPDATE', (key,))
         if now - state['window_start'] >= timedelta(seconds=seconds):
             conn.execute('UPDATE password_attempts SET window_start=%s,failures=0 WHERE key=%s', (now, key))
-            continue
-        if state['failures'] >= limit:
-            wait = max(1, math.ceil((state['window_start'] + timedelta(seconds=seconds) - now).total_seconds()))
-            return wait
+        elif state['failures'] >= limit:
+            return max(1, math.ceil((state['window_start'] + timedelta(seconds=seconds) - now).total_seconds()))
+        rows.append(key)
+    for key in rows:
+        conn.execute('UPDATE password_attempts SET failures=failures+1 WHERE key=%s', (key,))
     return None
 
 
@@ -116,7 +144,7 @@ def login(username, password, *, now=None):
     except PasswordFailure:
         raise PasswordFailure('Username or password is incorrect.') from None
     with transaction(admin=True) as conn:
-        wait = _limited(conn, name, now)
+        wait = _admit(conn, name, now)
     if wait:
         raise PasswordFailure('Too many attempts. Try again after the countdown.', 429, wait)
     with transaction(admin=True) as conn:
@@ -124,13 +152,11 @@ def login(username, password, *, now=None):
     # Hash even for unknown usernames so timing does not reveal which exist.
     ok = verify(password or '', row['password_hash'] if row else DUMMY) and row is not None
     if not ok:
-        # Count the failure in its own committed transaction, then refuse.
-        with transaction(admin=True) as conn:
-            for key in ('global', 'user:' + name):
-                conn.execute('UPDATE password_attempts SET failures=failures+1 WHERE key=%s', (key,))
+        # The attempt was already counted when it was admitted.
         raise PasswordFailure('Username or password is incorrect.')
     with transaction(admin=True) as conn:
         conn.execute('UPDATE password_attempts SET failures=0 WHERE key=%s', ('user:' + name,))
+        conn.execute('UPDATE password_attempts SET failures=GREATEST(failures-1,0) WHERE key=%s', ('global',))
         return new_session(conn, str(row['account_id']), now)
 
 
@@ -160,3 +186,21 @@ def username(account):
 def owners():
     with transaction(admin=True) as conn:
         return [str(r['account_id']) for r in conn.execute('SELECT account_id FROM password_credentials ORDER BY account_id').fetchall()]
+
+
+if __name__ == '__main__':
+    import argparse
+    import getpass
+    import sys
+    parser = argparse.ArgumentParser(description='Manage username sign-in from the server shell.')
+    sub = parser.add_subparsers(dest='command', required=True)
+    owner_cmd = sub.add_parser('owner', help='Give the installation owner (existing research) a username and password.')
+    owner_cmd.add_argument('username')
+    args = parser.parse_args()
+    first = getpass.getpass('New password: ')
+    if first != getpass.getpass('Repeat password: '):
+        sys.exit('Passwords did not match.')
+    try:
+        print('Owner can now sign in as', provision_owner(args.username, first))
+    except PasswordFailure as failure:
+        sys.exit(str(failure))

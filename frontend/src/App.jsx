@@ -861,8 +861,12 @@ function CompanyWorkspace({
         }}
       />
     );
-  // Once an account has a watchlist (max 5), the sidebar follows it.
-  const usesWatchlist = data.catalogue.some((company) => company.watchlisted);
+  // Once an account has followed a company, the sidebar follows its watchlist
+  // (max 5), even after the last company is removed. Accounts that never used
+  // the watchlist keep seeing every company.
+  const usesWatchlist =
+    data.watchlist_started ||
+    data.catalogue.some((company) => company.watchlisted);
   const visibleCompanies = data.catalogue.filter(
     (company) =>
       !hiddenCompanies.includes(company.id) &&

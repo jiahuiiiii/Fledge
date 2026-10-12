@@ -716,6 +716,9 @@ def state(owner, instrument_id=INSTRUMENT, *, include_financials=True):
             ),
             active_document_id=active_id,
             catalogue=catalogue(conn, owner),
+            watchlist_started=bool(
+                one(conn, "SELECT 1 FROM watchlist_usage WHERE owner_id=%s", (owner,))
+            ),
             changes=changes(conn, owner),
             pending_work=bool(
                 one(

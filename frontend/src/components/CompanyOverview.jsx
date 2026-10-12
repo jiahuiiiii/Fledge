@@ -243,7 +243,11 @@ export default function CompanyOverview({
         })}
       </div>
       {!companies.length && (
-        <p className="company-overview-empty">No companies match “{query}”.</p>
+        <p className="company-overview-empty">
+          {query.trim()
+            ? `No companies match “${query}”.`
+            : "Your watchlist is empty. Add a company to follow it here."}
+        </p>
       )}
     </section>
   );

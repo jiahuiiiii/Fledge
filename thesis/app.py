@@ -303,7 +303,7 @@ def password_session(action, payload):
         return error(409, "Username sign-in is not enabled for this installation.")
     try:
         if action == "register":
-            cookie, lifetime = password_auth.register(payload.username, payload.password, config.get("owner_username"))
+            cookie, lifetime = password_auth.register(payload.username, payload.password)
         else:
             cookie, lifetime = password_auth.login(payload.username, payload.password)
     except password_auth.PasswordFailure as failure:

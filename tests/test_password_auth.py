@@ -11,7 +11,7 @@ HEADERS = {'X-Thesis-Request': 'local-ui'}
 
 @pytest.fixture
 def password_mode(owner, monkeypatch):
-    monkeypatch.setattr(auth, 'configuration', lambda: dict(mode='password', owner_username='ten'))
+    monkeypatch.setattr(auth, 'configuration', lambda: dict(mode='password'))
     with transaction(admin=True) as conn:
         conn.execute('TRUNCATE password_attempts')
     return owner
@@ -46,11 +46,42 @@ def test_wrong_passwords_are_limited(password_mode):
         password_auth.login('nobody', 'whatever')
 
 
-def test_owner_username_keeps_existing_research(password_mode):
-    cookie, _ = password_auth.register('Ten', 'owner password', 'ten')
-    assert password_auth.authenticate(cookie) == OWNER
-    other, _ = password_auth.register('ten2', 'owner password', 'ten')
-    assert password_auth.authenticate(other) != OWNER
+def test_concurrent_wrong_passwords_respect_the_limit(password_mode):
+    from concurrent.futures import ThreadPoolExecutor
+    password_auth.register('burst', 'right password')
+    for _ in range(4):
+        with pytest.raises(password_auth.PasswordFailure, match='incorrect'):
+            password_auth.login('burst', 'wrong password')
+
+    def attempt(_):
+        try:
+            password_auth.login('burst', 'wrong password')
+        except password_auth.PasswordFailure as failure:
+            return failure.status
+        return 200
+
+    with ThreadPoolExecutor(6) as pool:
+        statuses = sorted(pool.map(attempt, range(6)))
+    # Only the fifth attempt is checked; the other five are turned away.
+    assert statuses == [401, 429, 429, 429, 429, 429]
+    with transaction(admin=True) as conn:
+        assert one(conn, "SELECT failures FROM password_attempts WHERE key='user:burst'")['failures'] == 5
+
+
+def test_sign_up_never_claims_the_owner_account(password_mode):
+    # Even a username someone might configure for the owner gets a new account.
+    cookie, _ = password_auth.register('Ten', 'owner password')
+    assert password_auth.authenticate(cookie) != OWNER
+    with pytest.raises(password_auth.PasswordFailure, match='taken'):
+        password_auth.provision_owner('ten', 'owner password')
+    assert password_auth.provision_owner('Ten_Owner', 'owner password') == 'ten_owner'
+    assert password_auth.authenticate(password_auth.login('ten_owner', 'owner password')[0]) == OWNER
+    with pytest.raises(password_auth.PasswordFailure, match='already has a login'):
+        password_auth.provision_owner('someone', 'owner password')
+    client = TestClient(app)
+    response = client.post('/api/v1/auth/register', json={'username': 'ten_owner2', 'password': 'owner password'}, headers=HEADERS)
+    assert response.status_code == 200
+    assert client.get('/api/v1/session').json()['result']['is_installation_owner'] is False
 
 
 def test_api_sign_up_answers_and_sign_out(password_mode):
