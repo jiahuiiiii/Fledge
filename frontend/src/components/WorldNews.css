@@ -1,0 +1,160 @@
+.world-news {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 980px;
+  padding: var(--space-6) var(--space-5);
+}
+.world-news-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: flex-end;
+  justify-content: space-between;
+}
+.world-news-head h2 {
+  margin: var(--space-2) 0;
+  font-size: var(--text-2xl);
+}
+.world-news-head p {
+  margin: 0;
+  color: var(--color-muted);
+  max-width: 620px;
+}
+.world-news-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.world-news-actions button {
+  min-height: 44px;
+}
+.world-news-status {
+  margin: 0;
+}
+.world-news-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.world-news-filters button {
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border-radius: 999px;
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-surface);
+  color: var(--color-text-2);
+  font-size: var(--text-sm);
+}
+.world-news-filters button span {
+  color: var(--color-faint);
+  margin-left: var(--space-1);
+}
+.world-news-filters button.active {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-mid);
+  color: var(--color-accent-light);
+}
+.world-news-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.world-news-item {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
+}
+.world-news-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+.world-theme {
+  font-size: var(--text-xs);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-3);
+  color: var(--color-text-2);
+}
+.world-theme.theme-rates { background: var(--color-info-soft); color: var(--color-info-light); }
+.world-theme.theme-economy { background: var(--color-gold-soft); color: var(--color-gold); }
+.world-theme.theme-geopolitics { background: var(--color-negative-soft); color: var(--color-negative-light); }
+.world-theme.theme-trade { background: var(--color-caution-soft); color: var(--color-caution-light); }
+.world-theme.theme-energy { background: var(--color-cashflow-soft); color: var(--color-cashflow); }
+.world-theme.theme-regulation { background: var(--color-accent-soft); color: var(--color-accent-light); }
+.world-news-item h3 {
+  margin: var(--space-2) 0 var(--space-1);
+  font-size: var(--text-md);
+  line-height: 1.35;
+}
+.world-news-item h3 a {
+  color: var(--color-text);
+  text-decoration: none;
+}
+.world-news-item h3 a:hover,
+.world-news-item h3 a:focus-visible {
+  text-decoration: underline;
+}
+.world-news-summary {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.world-news-mentions {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-2);
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.world-news-links {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.world-news-links li {
+  font-size: var(--text-sm);
+  color: var(--color-text-2);
+  background: var(--color-surface-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+}
+.world-news-links li strong { color: var(--color-text); }
+.world-news-links li.effect-could_help strong { color: var(--color-positive-light); }
+.world-news-links li.effect-could_hurt strong { color: var(--color-negative-light); }
+.world-news-links q {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--color-faint);
+  font-style: italic;
+}
+.world-news-empty {
+  color: var(--color-muted);
+}
+.world-news-note {
+  margin-top: var(--space-2);
+}
+@media (max-width: 640px) {
+  .world-news {
+    padding: var(--space-5) var(--space-4);
+  }
+  .world-news-actions,
+  .world-news-actions button {
+    width: 100%;
+  }
+}

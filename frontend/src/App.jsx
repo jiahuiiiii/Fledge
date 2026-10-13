@@ -8,6 +8,7 @@ import {
 } from "./components/WorkspaceControls";
 import { modelAvailability } from "./lib/modelAvailability";
 import EmptyWorkspace from "./components/EmptyWorkspace";
+import WorldNews from "./components/WorldNews";
 import CompanyAvatar from "./components/CompanyAvatar";
 import CompanySidebar, { CompanyAddButton } from "./components/CompanySidebar";
 import Checkbox from "./components/Checkbox";
@@ -253,6 +254,7 @@ function readDestination() {
       "idea",
       "ideas",
       "updates",
+      "world",
       "history",
       "review",
     ].includes(view)
@@ -830,6 +832,7 @@ function CompanyWorkspace({
               ["workspace", "Workspace"],
               ["ideas", "My ideas"],
               ["updates", "Updates"],
+              ["world", "World"],
             ].map(([key, label]) => (
               <button
                 key={key}
@@ -1526,6 +1529,7 @@ function CompanyWorkspace({
             ["workspace", "Workspace"],
             ["ideas", "My ideas"],
             ["updates", "Updates"],
+            ["world", "World"],
           ].map(([key, label]) => (
             <button
               key={key}
@@ -2332,6 +2336,12 @@ function CompanyWorkspace({
                     </RetainedView>
                   </div>
                 </RetainedView>
+                <RetainedView active={view === "world"}>
+                  <WorldNews
+                    active={view === "world"}
+                    onOpenCompany={(id) => onChoose(id, "workspace")}
+                  />
+                </RetainedView>
                 <RetainedView active={!selectedCompanyId && view === "history"}>
                   <>
                     <Suspense
@@ -2393,7 +2403,7 @@ function CompanyWorkspace({
                       onCompanyChange={chooseCompany}
                     />
                   </Suspense>
-                ) : ["ideas", "updates"].includes(view) ? null : view ===
+                ) : ["ideas", "updates", "world"].includes(view) ? null : view ===
                   "idea" ? (
                   <section className="focus-page reasoning-page">
                     <span className="section-label">YOUR REASONING</span>
