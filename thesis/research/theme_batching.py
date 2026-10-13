@@ -125,10 +125,7 @@ def identity(packet, parts):
 
 def prior(key):
     with transaction() as conn:
-        call = one(conn, 'SELECT * FROM model_calls WHERE request_key=%s', (key,))
-    if call and call['status'] != 'settled':
-        raise ledger.BudgetBlocked('An earlier discussion request needs charge review. No automatic retry or new batch was sent.')
-    return call
+        return ledger.find(conn, key)
 
 
 def available_plan(packet):
@@ -188,10 +185,6 @@ def preflight(parts):
     budget = ledger.snapshot()
     maximum = Decimal(needed) / ledger.NANO
     available = Decimal(budget['remaining_usd'])
-    if maximum > available:
-        raise ledger.BudgetBlocked(
-            f'The complete discussion summary needs a maximum allowance of US${maximum:.4f}; '
-            f'US${available:.4f} is available. No new AI request was sent. Saved steps remain available.')
     return dict(batches=len(parts), sources=sum(len(p['sources']) for p in parts),
                 maximum_new_usd=str(maximum), available_usd=str(available),
                 saved_drafts=saved_drafts, normalized_title_references=normalized_titles)

@@ -9,10 +9,19 @@ import {
   guidanceAmount,
   guidanceReason,
   guidancePeriod,
+  guidanceScope,
   guidanceStatusLabel,
+  growthText,
   multiple,
+  revenueComparisons,
+  signedPercent,
   number,
   yearLabel,
+  previewable,
+  headlinesAfterReading,
+  analystRevenueForecast,
+  borrowingYears,
+  pastDayTone,
 } from "../lib/overviewSections";
 import FinancialEvidence from "./FinancialEvidence";
 import Modal from "./Modal";
@@ -87,39 +96,72 @@ function KeyInformation({ figures, rows, children }) {
     </article>
   );
 }
-function Bars({ title, rows, onEvidence }) {
-  const values = rows.map((r) => number(r.value)).filter((v) => v != null),
+function Bars({ title, note, rows, onEvidence, scale }) {
+  // A range row (low–high outlook) is drawn from its low to its high value.
+  const values = (scale || rows)
+      .flatMap((r) => [r.value, r.high])
+      .map(number)
+      .filter((v) => v != null),
     low = Math.min(0, ...values),
     high = Math.max(0, ...values),
     span = high - low || 1;
+  const at = (v) => ((v - low) / span) * 100;
   return (
     <div className="overview-bars">
-      <h4>{title}</h4>
-      {rows.map((row, i) => (
-        <button
-          className="overview-bar-row"
-          key={row.label}
-          onClick={() => onEvidence(row)}
-          aria-haspopup="dialog"
-        >
-          <span className="overview-bar-label">{row.label}</span>
-          <span className="overview-bar-track" aria-hidden="true">
-            <i style={{ left: `${(-low / span) * 100}%` }} />
-            {number(row.value) != null && (
-              <span
-                style={{
-                  left: `${((Math.min(0, number(row.value)) - low) / span) * 100}%`,
-                  width: `${(Math.abs(number(row.value)) / span) * 100}%`,
-                  background:
-                    row.color ||
-                    (i ? "var(--color-caution)" : "var(--color-positive)"),
-                }}
-              />
-            )}
-          </span>
-          <strong>{fallback(money(row.value))}</strong>
-        </button>
-      ))}
+      <h4>
+        {title}
+        {note && <span className="overview-bars-note">{note}</span>}
+      </h4>
+      {rows.map((row, i) => {
+        const value = number(row.value),
+          top = number(row.high);
+        return (
+          <button
+            className="overview-bar-row"
+            key={row.label}
+            onClick={() => onEvidence(row)}
+            aria-haspopup="dialog"
+          >
+            <span className="overview-bar-label">{row.label}</span>
+            <span className="overview-bar-track" aria-hidden="true">
+              <i style={{ left: `${at(0)}%` }} />
+              {value != null && top != null ? (
+                <>
+                  <span
+                    className="overview-bar-base"
+                    style={{
+                      left: `${at(Math.min(0, value))}%`,
+                      width: `${(Math.abs(value) / span) * 100}%`,
+                      background: row.color,
+                    }}
+                  />
+                  <span
+                    className="overview-bar-range"
+                    style={{
+                      left: `${at(value)}%`,
+                      width: `${Math.max(0, ((top - value) / span) * 100)}%`,
+                      "--range-color": row.color,
+                    }}
+                  />
+                </>
+              ) : (
+                value != null && (
+                  <span
+                    style={{
+                      left: `${at(Math.min(0, value))}%`,
+                      width: `${(Math.abs(value) / span) * 100}%`,
+                      background:
+                        row.color ||
+                        (i ? "var(--color-caution)" : "var(--color-positive)"),
+                    }}
+                  />
+                )
+              )}
+            </span>
+            <strong>{fallback(row.display || money(row.value))}</strong>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -389,15 +431,23 @@ export default function OverviewSections({
   const peVsPeers = peTakeaway(reads.sector, reads.valuation?.references);
   const borrowedRatio = m.cashRatio > 0 ? 1 / m.cashRatio : null;
   const sources = m.headlines
-    .filter((s) => filter === "all" || s.kind === filter)
+    .filter((s) => (filter === "all" || s.kind === filter) && previewable(s))
     .slice(0, 4);
+  const unread = headlinesAfterReading(data.sentiment, m.headlines);
+  const lastDay = pastDayTone(data.sentiment, m.headlines);
+  const analystForecast = analystRevenueForecast(reads.fmp);
   const forecastStatus = loading("fmp")
     ? "Loading saved forecasts…"
     : errors.fmp
       ? "Saved forecasts could not be loaded."
-      : m.forecasts
-        ? "Saved · see Outlook for dates and sources"
-        : "No usable saved forecasts";
+      : analystForecast
+        ? `${analystForecast.display} average · fiscal year to ${day(analystForecast.periodEnd)}${analystForecast.currencyStated ? "" : " (currency not stated)"}`
+        : m.forecasts
+          ? "Saved · see Outlook for details"
+          : "None saved";
+  const years = borrowingYears(m.borrowing, m.freeCash);
+  const peerBasis = reads.sector?.basis;
+  const peerList = reads.sector?.peers || [];
   const briefText = m.brief?.result?.findings?.find(
     (f) => f.category === "business",
   )?.text;
@@ -415,6 +465,30 @@ export default function OverviewSections({
       </a>
     </>
   );
+  const { latestQuarter, outlook } = revenueComparisons(data, guidance);
+  const quarterOutlook = outlook && guidance.section.period_type === "quarter";
+  const annualOutlook = outlook && guidance.section.period_type === "annual";
+  const outlookRow = guidance && {
+    label: `${guidance.section.period_label || "Fiscal year"} outlook`,
+    value: guidance.low,
+    high: guidance.high ?? guidance.low,
+    display: guidanceAmount(guidance),
+    color: "var(--color-caution)",
+    outlook: true,
+  };
+  // Both quarterly pairs share one scale so their bars compare directly.
+  const quarterScale = [
+    latestQuarter?.previous,
+    latestQuarter?.current,
+    quarterOutlook && outlook.previous,
+    quarterOutlook && outlookRow,
+  ].filter(Boolean);
+  const showOutlook = () =>
+    show(
+      `${guidance.section.period_label || "Outlook"} vs a year earlier · evidence`,
+      [outlook?.previous],
+      guidanceBody,
+    );
   return (
     <div className="overview-sections">
       <Section number="1" title={`How ${name} makes money`}>
@@ -517,8 +591,10 @@ export default function OverviewSections({
       </Section>
       <Section number="2" title="Growth & outlook">
         <Reading>
+          {latestQuarter &&
+            `In the latest quarter (to ${day(latestQuarter.current.end)}), revenue was ${money(latestQuarter.current.value)}, ${latestQuarter.growth >= 0 ? "up" : "down"} ${Math.abs(latestQuarter.growth).toFixed(1)}% from a year earlier. `}
           {growthNumber != null
-            ? `Revenue ${growthNumber >= 0 ? "grew" : "fell"} ${Math.abs(growthNumber).toFixed(1)}% to ${money(m.revenue?.value)} in the fiscal year ended ${day(m.revenue?.end)}. `
+            ? `For the fiscal year ended ${day(m.revenue?.end)}, revenue ${growthNumber >= 0 ? "grew" : "fell"} ${Math.abs(growthNumber).toFixed(1)}% to ${money(m.revenue?.value)}. `
             : "Comparable annual revenue growth is not available. "}
           {growthVsPeers && `${growthVsPeers} `}
           {guidance
@@ -545,20 +621,37 @@ export default function OverviewSections({
         <div className="overview-section-grid">
           <KeyInformation
             figures={[
-              {
-                value: percent(m.growth?.value),
-                label: "Revenue growth, fiscal year",
-                term: "revenue_growth",
-              },
+              latestQuarter
+                ? {
+                    value: signedPercent(latestQuarter.growth),
+                    label: "Revenue growth, latest quarter vs a year earlier",
+                    term: "revenue_growth",
+                  }
+                : {
+                    value: percent(m.growth?.value),
+                    label: "Revenue growth, fiscal year",
+                    term: "revenue_growth",
+                  },
               {
                 value:
                   guidanceAmount(guidance) ||
                   guidanceStatusLabel(data.management_outlook),
-                label: "Management revenue outlook",
+                label: guidance
+                  ? `Management revenue outlook · ${guidance.section.period_label || "stated period"}${guidanceScope(guidance.section) ? ` (${guidanceScope(guidance.section)})` : ""}`
+                  : "Management revenue outlook",
                 term: "guidance",
               },
             ]}
             rows={[
+              ...(latestQuarter
+                ? [
+                    {
+                      label: "Revenue growth, fiscal year",
+                      value: percent(m.growth?.value),
+                      onClick: figure(m.growth),
+                    },
+                  ]
+                : []),
               {
                 label: yearLabel(annualPrior),
                 value: money(annualPrior?.value),
@@ -578,7 +671,7 @@ export default function OverviewSections({
                   : "See explanation above",
               },
               {
-                label: "Analyst forecasts",
+                label: "Analyst revenue forecast",
                 value: (
                   <span role="status">
                     {forecastStatus}
@@ -596,6 +689,15 @@ export default function OverviewSections({
           <article className="overview-card">
             <Bars
               title="Yearly revenue"
+              note={[
+                growthNumber != null &&
+                  `${signedPercent(growthNumber)} year on year`,
+                annualOutlook &&
+                  outlook.growth &&
+                  `outlook ${growthText(outlook.growth)} implied`,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
               rows={[
                 {
                   label: annualPrior?.end
@@ -613,9 +715,51 @@ export default function OverviewSections({
                   row: m.revenue,
                   color: "var(--color-info)",
                 },
+                ...(annualOutlook ? [outlookRow] : []),
               ]}
-              onEvidence={(r) => figure(r.row)()}
+              onEvidence={(r) => (r.outlook ? showOutlook() : figure(r.row)())}
             />
+            {latestQuarter && (
+              <Bars
+                title="Latest quarter"
+                note={`${signedPercent(latestQuarter.growth)} year on year`}
+                scale={quarterScale}
+                rows={[
+                  {
+                    label: `Quarter to ${day(latestQuarter.previous.end)}`,
+                    value: latestQuarter.previous.value,
+                    row: latestQuarter.previous,
+                    color: "#6076a6",
+                  },
+                  {
+                    label: `Quarter to ${day(latestQuarter.current.end)}`,
+                    value: latestQuarter.current.value,
+                    row: latestQuarter.current,
+                    color: "var(--color-info)",
+                  },
+                ]}
+                onEvidence={(r) => figure(r.row)()}
+              />
+            )}
+            {quarterOutlook && (
+              <Bars
+                title={`${guidance.section.period_label} outlook vs a year earlier`}
+                note={outlook.growth && `${growthText(outlook.growth)} implied`}
+                scale={quarterScale}
+                rows={[
+                  {
+                    label: `Quarter to ${day(outlook.previous.end)}`,
+                    value: outlook.previous.value,
+                    row: outlook.previous,
+                    color: "#6076a6",
+                  },
+                  outlookRow,
+                ]}
+                onEvidence={(r) =>
+                  r.outlook ? showOutlook() : figure(r.row)()
+                }
+              />
+            )}
             {guidance && (
               <p className="overview-caption">
                 Outlook from{" "}
@@ -623,8 +767,10 @@ export default function OverviewSections({
                   ? `the ${day(guidance.release.stated_release_date.date)} release`
                   : `a filing accepted ${stamp(guidance.release.published_at)}`}
                 . {!guidance.unit && "Currency unspecified. "}
-                {!guidance.basis && "Accounting basis unspecified. "}Management
-                guidance is separate from analyst forecasts.
+                {!guidance.basis && "Accounting basis unspecified. "}
+                {outlook?.growth &&
+                  `Implied growth is calculated from the outlook range and the reported period to ${day(outlook.previous.end)}${guidance.unit ? "" : ", reading the release's $ as US dollars"}. `}
+                Management guidance is separate from analyst forecasts.
               </p>
             )}
             <div className="overview-actions">
@@ -657,15 +803,21 @@ export default function OverviewSections({
                 number(m.borrowing?.value) != null
               ? `It has ${money(m.cash.value)} cash against ${money(m.borrowing.value)} borrowing.`
               : "Matching cash and borrowing figures are unavailable."}{" "}
-          These balances describe the company’s position at one reporting date.{" "}
-          These balances alone do not establish whether future repayments are
-          affordable.
+          {years != null
+            ? `Its borrowing equals about ${years.toFixed(1)} years of free cash flow at the past 12 months’ pace (${money(m.freeCash.value)}). `
+            : "These balances alone do not establish whether future repayments are affordable. "}
+          Balances describe one reporting date.
         </Reading>
         <div className="overview-section-grid">
           <KeyInformation
             figures={[
               { value: multiple(m.assetsRatio), label: "Assets ÷ liabilities" },
-              { value: multiple(m.cashRatio), label: "Cash ÷ borrowing" },
+              years != null
+                ? {
+                    value: `${years.toFixed(1)} years`,
+                    label: "Borrowing ÷ yearly free cash flow",
+                  }
+                : { value: multiple(m.cashRatio), label: "Cash ÷ borrowing" },
             ]}
             rows={[
               ...[
@@ -742,9 +894,11 @@ export default function OverviewSections({
               ? "The saved tone reading is hidden because source access changed. Permitted current sources remain readable."
               : m.tone
                 ? [
-                    m.tone.stale
-                      ? "This reading uses a source sample captured over 24 hours ago; newer headlines may not be included."
-                      : null,
+                    unread.length
+                      ? `${unread.length} news ${unread.length === 1 ? "headline" : "headlines"} published after this reading ${unread.length === 1 ? "is" : "are"} not in its tone.`
+                      : m.tone.stale
+                        ? "This reading uses a source sample captured over 24 hours ago; newer headlines may not be included."
+                        : null,
                     data.sentiment?.earlier_method
                       ? "It was saved with an earlier analysis method."
                       : null,
@@ -755,11 +909,27 @@ export default function OverviewSections({
                 : null
           }
         >
-          {m.tone?.label
-            ? `The saved company-news reading is ${m.tone.label.toLowerCase()}. `
-            : m.tone
-              ? "Too few news developments have a clear tone to describe the overall mood. "
-              : "There is no usable saved company-news tone yet. "}
+          {m.tone?.label && unread.length
+            ? `The last AI reading (saved ${stamp(m.tone.savedAt)}) found the news ${m.tone.label.toLowerCase()}; newer headlines below are not included yet. `
+            : m.tone?.label
+              ? `The saved company-news reading is ${m.tone.label.toLowerCase()}. `
+              : m.tone
+                ? "Too few news developments have a clear tone to describe the overall mood. "
+                : "There is no usable saved company-news tone yet. "}
+          {lastDay &&
+            `Of ${lastDay.total} relevant news ${lastDay.total === 1 ? "story" : "stories"} in the day before the reading, ${[
+              "negative",
+              "positive",
+              "mixed",
+              "neutral",
+              "unclear",
+            ]
+              .filter((key) => lastDay.counts[key])
+              .map(
+                (key) =>
+                  `${lastDay.counts[key]} ${lastDay.counts[key] === 1 && lastDay.total > 1 ? "was" : "were"} ${key}`,
+              )
+              .join(", ")}. `}
           Read the headlines and original posts below. Each social platform has
           its own sample and tone.
         </Reading>
@@ -883,6 +1053,9 @@ export default function OverviewSections({
           {peVsPeers
             ? `${peVsPeers} ${peVsPeers.includes(" below ") ? "A lower multiple can mean the market expects slower growth or more risk, not only a bargain." : "A higher multiple can mean the market expects faster growth, which then has to arrive."}`
             : "Whether that is expensive depends on the company’s growth, risks and the peers or assumptions you compare it with."}
+          {peVsPeers &&
+            peerBasis === "suggested" &&
+            ` These are Fledge’s suggested peers (${peerList.join(", ")}) until you choose your own.`}
         </Reading>
         <div className="overview-section-grid">
           <KeyInformation
@@ -930,14 +1103,14 @@ export default function OverviewSections({
                     : null,
               },
               {
-                label: "Saved peers",
-                value: loading("fmp")
-                  ? "Loading saved peers…"
-                  : errors.fmp
-                    ? "Could not load saved peers"
-                    : m.peers.length
-                      ? m.peers.map((p) => p.symbol).join(", ")
-                      : "None yet",
+                label: "Peers compared",
+                value: loading("sector")
+                  ? "Loading peers…"
+                  : errors.sector
+                    ? "Could not load peers"
+                    : peerList.length
+                      ? `${peerBasis === "saved" ? "Yours" : "Suggested"}: ${peerList.join(", ")}`
+                      : "None chosen yet",
               },
             ]}
           />

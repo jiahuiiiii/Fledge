@@ -92,3 +92,41 @@ def test_cache_evicts_to_bounded_size(clear_overlay, monkeypatch):
     monkeypatch.setattr(F, '_OVERLAY_LIMIT', 1)
     assert F.cached_attach(*inputs())['_original_facts']
     assert not F._overlays and F._overlay_bytes == 0
+
+
+def test_warm_read_fingerprints_in_database_without_downloading_originals(owner, disclosure_scope, clear_overlay, monkeypatch):
+    from thesis.research.sec import segment_revenue as S
+    iid, _ = setup(owner)
+    first = service.financial_workspace(owner, iid)
+    loads = []
+    real = F.load_raw
+    monkeypatch.setattr(F, 'load_raw', lambda conn: (lambda docs: loads.append(len(docs)) or real(conn)(docs)))
+    monkeypatch.setattr(S, 'extract', S.extract)  # parse must come from the cache
+    monkeypatch.setattr(S.extract, '__wrapped__', lambda *_: pytest.fail('re-parsed an unchanged original'))
+    assert service.financial_workspace(owner, iid) == first and loads == []
+
+
+def test_database_fingerprint_change_reloads_and_reverifies(clear_overlay, monkeypatch):
+    bundle_, docs, cik, now = inputs()
+    raw = docs[0].pop('raw_html')
+    docs[0]['raw_sha'] = sha256(raw).hexdigest()
+    loads = []
+    load = lambda d: loads.append(1) or [dict(x, raw_html=raw) for x in d]
+    expected = F.cached_attach(bundle_, docs, cik, now, load)
+    assert loads == [1] and F.cached_attach(bundle_, docs, cik, now, load) == expected and loads == [1]
+    docs[0]['raw_sha'] = sha256(raw + b' ').hexdigest()  # damaged/changed original
+    F.cached_attach(bundle_, docs, cik, now, load)
+    assert loads == [1, 1]
+
+
+def test_parsed_original_caches_its_failure(monkeypatch):
+    from thesis.research.sec import segment_revenue as S
+    raw = b'<not-xbrl/>'
+    document = dict(id=str(uuid4()), content_hash=sha256(raw).hexdigest(), cik=1)
+    calls = []
+    monkeypatch.setattr(S, 'one', lambda conn, *_: (calls.append(1), dict(raw_html=raw))[1])
+    with S._parsed_lock: S._parsed.pop((document['content_hash'], 1), None)
+    for _ in range(2):
+        with pytest.raises(ValueError):
+            S.parsed(None, document)
+    assert len(calls) == 1

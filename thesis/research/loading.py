@@ -242,12 +242,14 @@ def recover(owner):
                     _write(conn,run,index,status='interrupted',message='The app stopped during this step. Review the saved result before refreshing.')
 
 
+COMPANY_BUSY = ('Waiting for another reading of this company to finish (a scheduled watch or '
+                'another refresh). This step starts automatically and reuses its saved batches.')
+
+
 def claim(owner):
-    from thesis.providers.ledger import snapshot
     with transaction(owner) as conn:
         conn.execute("SELECT pg_advisory_xact_lock(hashtextextended('research-loading-claims',0))")
         active = rows(conn, 'SELECT * FROM research_loads WHERE active ORDER BY created_at FOR UPDATE')
-        ai_running = any(s['key']=='analysis' and s['status']=='running' for r in active for s in r['steps'])
         for run in active:
             if all(s['status'] in TERMINAL for s in run['steps']):
                 conn.execute('UPDATE research_loads SET active=false,updated_at=now() WHERE id=%s', (run['id'],))
@@ -261,13 +263,13 @@ def claim(owner):
                     if any(s['status'] not in TERMINAL for s in run['steps'] if s['key']!='analysis'):
                         _write(conn,run,index,message='Waiting for news and discussions')
                         continue
-                    budget = snapshot(conn)
-                    if budget['running'] or ai_running:
-                        _write(conn,run,index,message='Queued behind the current AI request')
-                        continue
-                    if budget['needs_attention']:
-                        _write(conn,run,index,status='blocked',message='An earlier AI request needs charge review. No automatic confirmation or retry is running.')
-                        conn.execute('UPDATE research_loads SET active=false,updated_at=now() WHERE id=%s', (run['id'],))
+                    # Only a reading of this same company waits; other companies run in parallel.
+                    # The transaction lock conflicts with sentiment_batching.company_lock.
+                    free = one(conn, "SELECT pg_try_advisory_xact_lock(hashtextextended(%s,0)) ok",
+                               ('sentiment-company:' + str(run['instrument_id']),))['ok']
+                    if not free:
+                        if step.get('message') != COMPANY_BUSY:
+                            _write(conn,run,index,message=COMPANY_BUSY)
                         continue
                 fields = dict(status='running',started_at=datetime.now(timezone.utc).isoformat(),message='Fetching sources' if step['key']!='analysis' else 'Reading selected source passages')
                 _write(conn,run,index,**fields)
@@ -336,11 +338,16 @@ def work_once(owner, executor=None):
         message=str(exc)
         cooldown=any(t in message.lower() for t in ('recently','apart','between attempts','already running','already being checked','every 24 hours'))
         status='cached' if cooldown and key!='analysis' else 'blocked' if key=='analysis' else 'failed'
+        if key=='analysis' and 'already running for this company' in message:
+            status,message='queued',COMPANY_BUSY  # Lost a start race: wait, don't fail.
     except Exception:
         status,message='failed','This step could not finish. Saved results are retained; use Refresh research to try again.'
     with transaction(owner) as conn:
         current=one(conn,'SELECT * FROM research_loads WHERE id=%s FOR UPDATE',(run['id'],))
         if not current or current['steps'][index]['status'] != 'running' or current['steps'][index].get('started_at') != run['steps'][index].get('started_at'):
+            return True
+        if status=='queued':
+            _write(conn,current,index,status=status,message=message,started_at=None)
             return True
         _write(conn,current,index,status=status,message=message,finished_at=datetime.now(timezone.utc).isoformat())
         statuses=[status if i==index else s['status'] for i,s in enumerate(current['steps'])]

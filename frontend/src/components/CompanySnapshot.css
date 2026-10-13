@@ -347,3 +347,47 @@
     width: 100%;
   }
 }
+/* Company headlines from the past day, listed beside (not as the cause of) the price move. */
+.glance-activity li.headlines {
+  align-items: flex-start;
+  padding-block: var(--space-3);
+}
+.glance-activity li.headlines > span[aria-hidden] {
+  color: var(--color-info);
+  background: var(--color-info-soft);
+}
+.glance-activity li.headlines > div {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.glance-activity li.headlines > div > span {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+.glance-activity li.headlines li {
+  display: grid;
+  gap: 2px;
+  min-height: 0;
+  border: 0;
+}
+.glance-activity .glance-headline {
+  display: block;
+  justify-content: flex-start;
+  min-height: 44px;
+  padding: var(--space-1) 0;
+  background: none;
+  border: 0;
+  color: var(--color-text);
+  font-weight: 600;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.glance-activity .glance-headline:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
+}
+.glance-activity li.headlines small {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}

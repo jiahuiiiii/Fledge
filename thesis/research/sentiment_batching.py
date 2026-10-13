@@ -9,6 +9,7 @@ from copy import deepcopy
 import hashlib
 import json
 import re
+import threading
 from decimal import Decimal
 from pydantic import ValidationError
 
@@ -47,8 +48,9 @@ def part_for(packet, sources, *, max_bytes=None):
         if s["channel"] == "news" and s["id"] not in selected
     ]
     news = [s for s in sources if s['channel'] == 'news']
-    if news:
-        references = [ref for ref in references if any(coverage._order(ref) < coverage._order(s) for s in news)]
+    # Comparison reports only serve news coverage links, so a batch without
+    # news carries none (it used to repeat up to 16 unused reports).
+    references = [ref for ref in references if any(coverage._order(ref) < coverage._order(s) for s in news)]
     # Ranking selects comparison context, never source relevance or eligibility.
     words = lambda s: set(re.findall(r'[a-z0-9]{3,}', (s['title'] + ' ' + s['text']).lower()))
     targets = [words(s) for s in news]
@@ -119,7 +121,7 @@ def prior_attempt(part):
     with transaction() as conn:
         for attempt in range(MAX_EXPLICIT_RETRIES, -1, -1):
             key = base if not attempt else base + f":retry:{attempt}"
-            call = one(conn, "SELECT * FROM model_calls WHERE request_key=%s", (key,))
+            call = ledger.find(conn, key)
             if call:
                 return call, attempt
     return None, 0
@@ -143,6 +145,10 @@ def failure_details(call, error):
         else:
             if isinstance(error, ValidationError):
                 details.update(code="invalid_format", reason="The AI's response did not match the required result format.")
+            elif type(error) is ValueError and str(error).strip():
+                # Validators raise fixed sentences, never model text.
+                check = " ".join(str(error).split())[:200].rstrip(".")
+                details.update(check=check, reason=f"The AI's result did not pass the source and evidence checks ({check}).")
         charge = call.get('charged_nano_usd')
         if charge is not None:
             details['charged_usd'] = str(Decimal(charge) / ledger.NANO)
@@ -151,10 +157,10 @@ def failure_details(call, error):
     return details
 
 
-def failure_message(failed, total, completed, details, *, saved=False):
+def failure_message(failed, total, completed, details, *, saved=False, unsent=None):
     prefix = f"A saved batch (batch {failed} of {total}) needs attention." if saved else f"Batch {failed} of {total} stopped."
     message = f"{prefix} {details['reason']} {completed} completed batch{'es are' if completed != 1 else ' is'} saved."
-    later = total - failed
+    later = total - failed if unsent is None else unsent
     if later:
         message += f" {later} later batch{'es were' if later != 1 else ' was'} not sent in this run."
     if 'charged_usd' in details:
@@ -216,62 +222,171 @@ def run(packet, *, transport=None, progress=None, retry_failed=False, prefilter=
     return result, quick + calls
 
 
+def fully_saved(packet, *, prefilter=None):
+    """True when the quick check and every full-reading batch are settled and usable."""
+    from . import relevance_prefilter
+    from .sentiment import render
+    if prefilter is None:
+        prefilter = relevance_prefilter.enabled()
+    try:
+        if prefilter and packet["sources"]:
+            by_label = {s["label"]: s["id"] for s in packet["sources"]}
+            skip = set()
+            for body in relevance_prefilter.plan(packet):
+                with transaction() as conn:
+                    call = ledger.find(conn, relevance_prefilter.request_key(body))
+                if not call:
+                    return False
+                found = relevance_prefilter.labels(call, body) or {}
+                skip |= {by_label[label] for label, value in found.items() if value == "unrelated"}
+            packet = dict(packet, sources=[s for s in packet["sources"] if s["id"] not in skip])
+        for part in plan(packet) if packet["sources"] else []:
+            call, attempt = prior_attempt(part)
+            if not call or attempt:
+                return False
+            render(call, part)
+    except Exception:
+        return False
+    return True
+
+
+def run_reusing(packet, reused, *, transport=None, progress=None, retry_failed=False, prefilter=None):
+    """Send only sources without a saved label; reused labels keep their reading.
+
+    Earlier news still goes along as comparison context, so a new report can be
+    linked to an older one. Counts are recalculated over the whole sample.
+    """
+    from . import sentiment_reuse
+    from .sentiment import POLICY as SUMMARY_POLICY, PROMPT
+    from thesis.providers.settings import REASONING_MODEL
+    # When every request of the whole-sample reading is already saved (e.g. only
+    # the rendering policy changed), reading it again is free and keeps the new
+    # reading tied to the same paid calls.
+    if not reused or fully_saved(packet, prefilter=prefilter):
+        return run(packet, transport=transport, progress=progress,
+                   retry_failed=retry_failed, prefilter=prefilter)
+    fresh_sources = [s for s in packet["sources"] if s["id"] not in reused]
+    if fresh_sources:
+        sub = dict(packet, sources=fresh_sources, comparison_sources=[
+            deepcopy(s) for s in packet["sources"]
+            if s["channel"] == "news" and s["id"] in reused
+        ])
+        if progress:
+            progress(dict(completed=0, total=0, source_counts=[], failed=None,
+                          message=f"{len(reused)} sources already read · reading {len(fresh_sources)} new"))
+        fresh, calls = run(sub, transport=transport, progress=progress,
+                           retry_failed=retry_failed, prefilter=prefilter)
+    else:
+        with transaction() as conn:
+            check_access(conn, packet)
+        if progress:
+            progress(dict(completed=0, total=0, source_counts=[], failed=None,
+                          message=f"All {len(reused)} sources were already read · no AI request needed"))
+        fresh = dict(items=[], coverage_links=[], summary_policy=SUMMARY_POLICY,
+                     model=REASONING_MODEL, prompt_version=PROMPT,
+                     guard_policy=packet.get("guard_policy"),
+                     batching=dict(policy=POLICY, completed=0, total=0, source_counts=[],
+                                   comparison_limit=MAX_COMPARISONS,
+                                   comparison_context_bounded=False))
+        calls = []
+    return sentiment_reuse.merge(packet, reused, fresh), calls
+
+
+class BatchFailed(Exception):
+    """One batch's request or result failed; carries what failure_details needs."""
+
+    def __init__(self, index, call, error):
+        super().__init__(str(error))
+        self.index, self.call, self.error = index, call, error
+
+
 def _run(packet, *, transport=None, progress=None, retry_failed=False):
+    from . import parallel
     from .sentiment import request_for, render, PROMPT
     parts = plan(packet)
-    calls = []
+    total = len(parts)
+    calls = [None] * total
     sizes = [len(p["sources"]) for p in parts]
+    lock = threading.RLock()
+
+    def done():
+        return sum(call is not None for call in calls)
 
     def report(message, failed=None, failure=None):
         if progress:
-            progress(dict(completed=len(calls), total=len(parts), source_counts=sizes,
-                          failed=failed, message=message,
-                          **({'failure': failure} if failure else {})))
+            # Batches run in parallel; progress (and a watch's lease renewal) is serialized.
+            with lock:
+                progress(dict(completed=done(), total=total, source_counts=sizes,
+                              failed=failed, message=message,
+                              **({'failure': failure} if failure else {})))
 
-    report(f"0 of {len(parts)} batches complete · {len(packet['sources'])} eligible sources")
+    report(f"0 of {total} batches complete · {len(packet['sources'])} eligible sources")
+    # Saved batches are reused first (no network); only the rest are sent.
+    pending = []
     for index, part in enumerate(parts):
-        with transaction() as conn:
-            check_access(conn, packet)
         previous, attempt = prior_attempt(part)
         key = part_identity(part)
         if previous:
-            if previous["status"] != "settled":
-                report("An earlier batch needs charge review; completed batches are saved.", index + 1)
-                raise ledger.BudgetBlocked("An earlier batch may already have been sent. No automatic retry; its charge needs review.")
             try:
                 render(previous, part)
             except ValueError as exc:
                 if not retry_failed or attempt >= MAX_EXPLICIT_RETRIES:
                     details = failure_details(previous, exc)
-                    message = failure_message(index + 1, len(parts), len(calls), details, saved=True)
+                    message = failure_message(index + 1, total, done(), details, saved=True,
+                                              unsent=total - done() - 1)
                     message += " The one explicit retry has also been used." if attempt else " Refresh & analyse can retry this batch once if its inputs are unchanged; paid AI uses the existing allowance."
                     report(message, index + 1, details)
                     raise ValueError(message) from None
                 key += f":retry:{attempt + 1}"
             else:
-                calls.append(previous)
-                report(f"{len(calls)} of {len(parts)} batches complete · reused saved result")
+                calls[index] = previous
                 continue
-        report(f"{len(calls)} of {len(parts)} batches complete · reading batch {index + 1}")
-        call = None
-        try:
-            call = ledger.execute(key, PROMPT, request_for(part), transport=transport)
-            render(call, part)
-        except Exception as exc:
-            if isinstance(exc, ledger.BudgetBlocked):
-                report(str(exc), index + 1)
-                raise
-            details = failure_details(call, exc)
-            message = failure_message(index + 1, len(parts), len(calls), details)
-            report(message, index + 1, details)
-            raise ValueError(message) from None
-        calls.append(call)
-        report(f"{len(calls)} of {len(parts)} batches complete")
+        pending.append((index, part, key))
+    if done():
+        report(f"{done()} of {total} batches complete · reused saved results")
+
+    def task(index, part, key):
+        def send():
+            # A stopped watch or replaced run raises here, before anything is sent.
+            report(f"{done()} of {total} batches complete · reading batch {index + 1}")
+            with transaction() as conn:
+                check_access(conn, packet)
+            call = None
+            try:
+                call = ledger.execute(key, PROMPT, request_for(part), transport=transport)
+                render(call, part)
+            except Exception as exc:
+                raise BatchFailed(index, call, exc) from None
+            with lock:
+                calls[index] = call
+            report(f"{done()} of {total} batches complete")
+        return send
+
+    results, errors = parallel.run_all([task(*item) for item in pending])
+    if errors:
+        ordered = [errors[i] for i in sorted(errors)]
+        # Stops, replaced runs and withdrawn sources keep their own exception.
+        control = next((e for e in ordered if not isinstance(e, BatchFailed)), None)
+        if control is not None:
+            raise control
+        blocked = next((e for e in ordered if isinstance(e.error, ledger.BudgetBlocked)), None)
+        if blocked is not None:
+            report(str(blocked.error), blocked.index + 1)
+            raise blocked.error
+        first = ordered[0]
+        details = failure_details(first.call, first.error)
+        unsent = sum(result is parallel.SKIPPED for i, result in enumerate(results) if i not in errors)
+        message = failure_message(first.index + 1, total, done(), details, unsent=unsent)
+        if len(ordered) > 1:
+            others = len(ordered) - 1
+            message += f" {others} other batch{'es' if others != 1 else ''} running at the same time also stopped."
+        report(message, first.index + 1, details)
+        raise ValueError(message) from None
     with transaction() as conn:
         check_access(conn, packet)
     report("All batches complete · checking the combined result")
     result = combine(packet, parts, calls)
-    result["batching"] = dict(policy=POLICY, completed=len(parts), total=len(parts), source_counts=sizes,
+    result["batching"] = dict(policy=POLICY, completed=total, total=total, source_counts=sizes,
                              comparison_limit=MAX_COMPARISONS,
                              comparison_context_bounded=any(p['comparison_selection']['supplied'] < p['comparison_selection']['available'] for p in parts))
     return result, calls

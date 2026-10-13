@@ -618,36 +618,176 @@
 .financial-recovery > summary {
   min-height: 44px;
   cursor: pointer;
-  font-weight: 650;
+  font-weight: 600;
+}
+/* Title and gap note wrap together, beside the chevron. */
+.financial-recovery-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 12px;
+}
+.financial-recovery > summary small {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  font-weight: 400;
 }
 .financial-recovery-body {
-  padding-top: 12px;
+  display: grid;
+  gap: var(--space-4);
+  /* Line up with the summary text, past its chevron. */
+  padding: var(--space-3) 0 0 25px;
 }
-.financial-recovery-body > label {
+.financial-recovery-body p {
+  margin: 0;
+}
+.financial-recovery-body button {
+  min-height: 44px;
+}
+.recovery-report {
+  display: grid;
+  gap: var(--space-2);
+  max-width: 640px;
+}
+.recovery-report > span {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+.recovery-offer,
+.recovery-results {
+  display: grid;
+  gap: var(--space-3);
+}
+.recovery-run {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
-.financial-recovery-body button,
-.financial-recovery-item label {
+.recovery-run .muted {
+  font-size: var(--text-sm);
+}
+.recovery-results-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.recovery-results-head h4 {
+  margin: 0;
+  font-size: var(--text-base);
+}
+.recovery-results-head a {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+.recovery-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+.recovery-card.using {
+  border-color: var(--color-accent);
+}
+.recovery-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.recovery-card-head > div {
+  display: grid;
+  gap: 2px;
+}
+.recovery-card-head > div > span {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+.recovery-card-head strong {
+  font-size: var(--text-xl);
+}
+.recovery-card-head small {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+.recovery-use {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
 }
-.financial-recovery-item {
-  border-top: 1px solid var(--border);
-  padding: 16px 0;
+.recovery-sum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
 }
-.financial-recovery-item label {
+.recovery-part {
+  display: grid;
+  gap: 2px;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  text-decoration: none;
+}
+.recovery-part span {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+a.recovery-part:hover {
+  border-color: var(--color-accent);
+}
+.recovery-part.total {
+  border-color: var(--color-line-strong);
+  background: var(--color-surface);
+}
+.recovery-op {
+  color: var(--color-muted);
+  font-weight: 600;
+}
+.recovery-note {
+  color: var(--color-text-2);
+  font-size: var(--text-sm);
+}
+.recovery-rows > summary {
+  min-height: 44px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-weight: 650;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
 }
-.financial-recovery-item blockquote {
-  margin: 12px 0;
-  padding: 12px;
-  border-left: 2px solid var(--border);
-  overflow-wrap: anywhere;
+.recovery-rows table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.recovery-rows th,
+.recovery-rows td {
+  padding: var(--space-2);
+  border-top: 1px solid var(--color-line);
+  text-align: right;
+}
+.recovery-rows th {
+  text-align: left;
+  font-weight: 500;
+}
+.recovery-rows p {
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
 }
 
 .story-history-notes {

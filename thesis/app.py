@@ -58,8 +58,11 @@ async def lifespan(app):
             except Exception:
                 logging.getLogger("thesis").exception("Local research watch failed")
 
-    watch_thread = threading.Thread(target=watch_loop, daemon=True)
-    watch_thread.start()
+    # Two workers: different companies' scheduled checks no longer queue behind
+    # each other. Each claims a different watch through its lease.
+    watch_threads = [threading.Thread(target=watch_loop, daemon=True) for _ in range(2)]
+    for watch_thread in watch_threads:
+        watch_thread.start()
 
     def filing_loop():
         from .monitoring.filing_watch import run_once
@@ -116,10 +119,38 @@ async def lifespan(app):
     load_threads = [threading.Thread(target=load_loop, daemon=True) for _ in range(4)]
     for worker in load_threads:
         worker.start()
+
+    def warm_financials():
+        # Read-only: fill the parsed-filing caches so the first Financials open
+        # after a restart is not slow. Access checks still run on every real read.
+        from .db import transaction, rows
+        from .research.sec.financial_story import present as financial_story
+
+        if stop.wait(3):
+            return
+        try:
+            owner = next(iter(auth.background_owners()), None)
+            if owner is None:
+                return
+            with transaction(owner) as conn:
+                companies = [str(r["instrument_id"]) for r in rows(conn,
+                    "SELECT DISTINCT instrument_id FROM disclosure_documents WHERE source_id='sec-disclosures'")]
+            for iid in companies:
+                if stop.is_set():
+                    return
+                service.financial_workspace(owner, iid)
+                with transaction(owner, consistent=True) as conn:
+                    financial_story(conn, iid)
+        except Exception:
+            logging.getLogger("thesis").warning("Financial cache warm-up stopped early")
+
+    if os.environ.get("THESIS_TEST_OFFLINE") != "true":
+        threading.Thread(target=warm_financials, daemon=True).start()
     yield
     stop.set()
     thread.join(timeout=5)
-    watch_thread.join(timeout=5)
+    for watch_thread in watch_threads:
+        watch_thread.join(timeout=5)
     filing_thread.join(timeout=5)
     review_thread.join(timeout=5)
     telegram_thread.join(timeout=5)

@@ -7,7 +7,7 @@ import Select from "./Select";
 import SentimentLimits from "./SentimentLimits";
 import SentimentBasis from "./SentimentBasis";
 import SentimentPriceContext from "./SentimentPriceContext";
-import { sentimentSummaryLabel } from "../lib/sentimentSummary";
+import { sentimentSummaryParts } from "../lib/sentimentSummary";
 import DiscussionThemes from "./DiscussionThemes";
 import SentimentContext, { RedditThreadContext } from "./SentimentContext";
 import OriginalSample from "./OriginalSample";
@@ -276,6 +276,10 @@ export default function SentimentPanel({
         </>
       ) : sample || (tab === "all" && a) ? (
         <>
+          <p className="tone-reading-time">
+            Tone reading made {stamp(a.created_at)}
+            {a.cutoff && ` · covers sources saved up to ${stamp(a.cutoff)}`}
+          </p>
           {a.coverage?.input_limits?.notice && (
             <p className="fine">
               Some sources were omitted. Open Evidence to inspect the limits.
@@ -301,7 +305,10 @@ export default function SentimentPanel({
           ) : (
             <>
               <div className="sentiment-summary">
-                <strong>{sentimentSummaryLabel(sample)}</strong>
+                <strong>{sentimentSummaryParts(sample).label}</strong>
+                <small className="tone-detail">
+                  {sentimentSummaryParts(sample).detail}
+                </small>
                 <span className="sample-reconciliation">
                   {channel === "news"
                     ? `${sample.selected} stories → ${sample.relevant} relevant → ${counts.total} ${a.summary_policy?.startsWith("sentiment-coverage-") ? "distinct developments" : "text groups"}`
@@ -694,7 +701,7 @@ export default function SentimentPanel({
               disabled={busy}
               checked={!!watch?.enabled}
               onChange={(e) =>
-                onWatch(e.target.checked, watch?.interval_minutes || 60)
+                onWatch(e.target.checked, watch?.interval_minutes || 240)
               }
             />{" "}
             Watch news + social changes
@@ -783,7 +790,7 @@ export default function SentimentPanel({
                           onChange={(e) =>
                             onWatch(
                               !!watch?.enabled,
-                              watch?.interval_minutes || 60,
+                              watch?.interval_minutes || 240,
                               undefined,
                               e.target.checked,
                             )
@@ -919,8 +926,7 @@ export default function SentimentPanel({
                           : activeReasoning) ||
                         !a ||
                         a.withheld ||
-                        !modelStatus?.comparison_enabled ||
-                        modelStatus?.budget?.unresolved > 0
+                        !modelStatus?.comparison_enabled
                       }
                       onClick={() => onCheckIdea(checkPurpose)}
                     >

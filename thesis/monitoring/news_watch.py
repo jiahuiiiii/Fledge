@@ -1,12 +1,22 @@
 """Opt-in local news/social watch; immutable alerts, one shared model ledger."""
 
+import logging
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 from uuid import uuid4
 from psycopg.types.json import Jsonb
 from thesis.db import transaction, one, rows
 from thesis.research import sentiment, social, market, coverage, reporting_basis
 from thesis.research.sentiment_context import changed_common_context
 from . import watch_history
+
+logger = logging.getLogger(__name__)
+SGT = ZoneInfo("Asia/Singapore")
+# A failed scheduled check is tried again soon instead of waiting a full
+# interval: up to QUICK_RETRIES consecutive failures, then the normal schedule.
+QUICK_RETRIES = 2
+RETRY_MINUTES = 10
+BUSY_RETRY_MINUTES = 3  # the company's reading was running elsewhere
 
 
 class WatchStopped(Exception):
@@ -457,6 +467,29 @@ def review(owner, alert_id, action):
     return {"action": action}
 
 
+def failure_reason(exc):
+    """A short, readable reason that never echoes raw provider or exception text.
+
+    Only app-authored messages (spending blocks, conflicts) are shown verbatim.
+    """
+    from thesis.providers.ledger import BudgetBlocked
+    from thesis.providers.settings import ProviderConfigError
+    from thesis.service import Conflict
+
+    # Sentiment batching raises app-authored ValueErrors that say which batch
+    # stopped and why; pydantic ValidationError (also a ValueError) can echo
+    # model text, so only these known prefixes are shown verbatim.
+    batch = isinstance(exc, ValueError) and type(exc) is ValueError and str(exc).startswith(
+        ("Batch ", "A saved batch ")
+    )
+    if (isinstance(exc, (BudgetBlocked, Conflict, ProviderConfigError)) or batch) and str(exc).strip():
+        text = " ".join(str(exc).split())[:400]
+        return text if text.endswith((".", "!", "?")) else text + "."
+    if "timeout" in type(exc).__name__.lower():
+        return "a source or AI request timed out."
+    return f"an unexpected error ({type(exc).__name__})."
+
+
 def run_once(
     owner,
     *,
@@ -576,8 +609,11 @@ def run_once(
                     raise WatchStopped()
             stage = "sentiment analysis"
             watch_context.require_active(owner, iid, token, supplied_clock)
+            # retry_failed: like Refresh & analyse, a batch whose earlier answer
+            # failed the evidence checks may be sent once more.
             record = analyzer(iid) if analyzer else sentiment.generate(
-                iid, progress=lambda _: watch_context.require_active(owner, iid, token, supplied_clock, renew=True)
+                iid, progress=lambda _: watch_context.require_active(owner, iid, token, supplied_clock, renew=True),
+                retry_failed=True,
             )
             analysis_id = record["id"]
             details["analysis"] = "completed"
@@ -601,10 +637,18 @@ def run_once(
             status = "stopped"
     except WatchStopped:
         status = "stopped"
-    except Exception:
+    except Exception as exc:
         status = "failed"
+        busy = isinstance(exc, Conflict) and "already running" in str(exc)
         details["failed_stage"] = stage
-        message = "The scheduled source check or analysis did not complete. Check source coverage and the shared AI budget. No automatic paid retry was made."
+        # Keep the actual reason: a generic message hid a two-day AI block
+        # (12-13 Oct 2026) behind hourly "did not complete" results.
+        details["failure_reason"] = failure_reason(exc)
+        logger.exception("Scheduled watch check failed at %s", stage)
+        message = (
+            f"The scheduled update stopped at {stage}: {details['failure_reason']} "
+            "Saved research is still available. No automatic paid retry was made."
+        )
     with transaction(owner) as c:
         active = one(
             c,
@@ -618,8 +662,24 @@ def run_once(
         watch_history.finish(
             c, owner, token, status, details, analysis_id, idea_check_id, supplied_clock
         )
+        finished = supplied_clock or datetime.now(timezone.utc)
+        retry_at = None
+        if status == "failed" and active["enabled"] and active["claim_token"] == token:
+            recent = rows(
+                c,
+                "SELECT r.status FROM watch_check_results r JOIN watch_checks w ON w.id=r.check_id WHERE w.owner_id=%s AND w.instrument_id=%s ORDER BY w.started_at DESC LIMIT %s",
+                (owner, iid, QUICK_RETRIES + 1),
+            )
+            failures = next((n for n, r in enumerate(recent) if r["status"] != "failed"), len(recent))
+            if failures <= QUICK_RETRIES:
+                retry_at = finished + timedelta(minutes=BUSY_RETRY_MINUTES if busy else RETRY_MINUTES)
+                message = message.replace(
+                    "No automatic paid retry was made.",
+                    f"Trying again automatically at {retry_at.astimezone(SGT):%H:%M} SGT "
+                    "(saved batches are reused).",
+                )
         c.execute(
-            "UPDATE news_watches SET lease_until=NULL,last_check_at=%s,error=%s WHERE owner_id=%s AND instrument_id=%s AND claim_token=%s",
-            (supplied_clock or datetime.now(timezone.utc), message, owner, iid, token),
+            "UPDATE news_watches SET lease_until=NULL,last_check_at=%s,error=%s,next_check_at=LEAST(next_check_at,COALESCE(%s,next_check_at)) WHERE owner_id=%s AND instrument_id=%s AND claim_token=%s",
+            (finished, message, retry_at, owner, iid, token),
         )
     return True

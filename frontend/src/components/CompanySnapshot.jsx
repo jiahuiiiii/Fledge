@@ -4,13 +4,20 @@ import "./CompanySnapshot.css";
 import TermHelp from "./TermHelp";
 import OverviewSections from "./OverviewSections";
 import { companyName } from "../lib/companyIdentity";
+import {
+  currentGuidance,
+  headlinesAfterReading,
+  overviewNews,
+  recentHeadlines,
+  revenueComparisons,
+} from "../lib/overviewSections";
 
 const when = (value) => formatTimestamp(value, { fallback: "Not checked" });
 
 // Collection status is separate from the dates and limits of each conclusion.
-function Freshness({ data, onUpdate }) {
+function Freshness({ data }) {
   const checks = (data?.source_checks || []).filter((c) => c.checked_at);
-  if (!checks.length || !onUpdate) return null;
+  if (!checks.length) return null;
   const latest = checks
     .map((c) => c.checked_at)
     .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
@@ -25,15 +32,12 @@ function Freshness({ data, onUpdate }) {
         ) && " · some source checks did not finish successfully"}
         {states.includes("unknown") && " · some coverage is unknown"}
       </span>
-      <button className="glance-link" onClick={onUpdate}>
-        Details &amp; update →
-      </button>
     </p>
   );
 }
 
 // The product's core loop: save a view, then get told what supports or challenges it.
-function YourView({ data, savedView, onSaveView, onAsk }) {
+function YourView({ data, savedView, onSaveView }) {
   if (!onSaveView) return null;
   const name = companyName(data.instrument);
   if (!savedView)
@@ -50,9 +54,6 @@ function YourView({ data, savedView, onSaveView, onAsk }) {
           <button className="primary" onClick={onSaveView}>
             Save my view
           </button>
-          {onAsk && (
-            <button onClick={onAsk}>Not sure yet? Ask a question</button>
-          )}
         </div>
       </section>
     );
@@ -79,9 +80,12 @@ function YourView({ data, savedView, onSaveView, onAsk }) {
   );
 }
 
-function Activity({ data, instrumentId, onUpdates, onView }) {
+function Activity({ data, instrumentId, onUpdates, onView, onSource }) {
   const quote = data?.market?.quote?.quote;
   const watch = data?.news_watch;
+  const headlines = overviewNews(data);
+  const today = recentHeadlines(headlines).slice(0, 3);
+  const notInTone = headlinesAfterReading(data?.sentiment, headlines);
   const unread = [
     ...(data?.research_alerts || []),
     ...(data?.idea_alerts || []),
@@ -100,6 +104,44 @@ function Activity({ data, instrumentId, onUpdates, onView }) {
       </li>,
     );
   }
+  // Shown beside the price, not as its cause: a headline is not proof of why
+  // the price moved.
+  if (today.length)
+    items.push(
+      <li key="headlines" className="headlines">
+        <span aria-hidden="true">≡</span>
+        <div>
+          <span>Company headlines in the past day</span>
+          <ul>
+            {today.map((source) => (
+              <li key={source.id}>
+                <button
+                  className="glance-headline"
+                  onClick={() => onSource?.(source)}
+                >
+                  {source.headline}
+                </button>
+                <small>
+                  {source.source || "News"} · {when(source.published_at)}
+                </small>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </li>,
+    );
+  if (notInTone.length && data?.sentiment?.created_at)
+    items.push(
+      <li key="tone" className="watch">
+        <span aria-hidden="true">◎</span>
+        The AI tone reading was saved {when(data.sentiment.created_at)} and does
+        not include {notInTone.length} newer news{" "}
+        {notInTone.length === 1 ? "headline" : "headlines"}
+        <button className="glance-link" onClick={() => onView("evidence")}>
+          News & discussion →
+        </button>
+      </li>,
+    );
   if (unread)
     items.push(
       <li key="alerts" className="alert">
@@ -123,7 +165,7 @@ function Activity({ data, instrumentId, onUpdates, onView }) {
         {watch.error && (
           <>
             {" "}
-            · the update could not finish; saved research is still available{" "}
+            · {watch.error}{" "}
             <button className="glance-link" onClick={() => onView("evidence")}>
               Source details →
             </button>
@@ -152,12 +194,14 @@ export default function CompanySnapshot({
   focusTopic,
   savedView,
   onSaveView,
-  onAsk,
-  onUpdate,
   financialError,
   onRetryFinancials,
 }) {
   const { sentences, growth } = snapshot(data);
+  const { latestQuarter } = revenueComparisons(
+    data,
+    currentGuidance(data?.management_outlook),
+  );
   return (
     <section className="glance" aria-label="Company summary">
       {data.financials_pending ? (
@@ -169,20 +213,39 @@ export default function CompanySnapshot({
         </p>
       ) : sentences.length ? (
         <p className="glance-summary">
-          {growth && (
+          {latestQuarter ? (
             <span className="glance-growth">
               <span className="glance-growth-title">
                 <strong>
-                  Revenue {growth.growth >= 0 ? "grew" : "fell"}{" "}
-                  {Math.abs(growth.growth).toFixed(1)}% · last fiscal year
+                  Revenue {latestQuarter.growth >= 0 ? "up" : "down"}{" "}
+                  {Math.abs(latestQuarter.growth).toFixed(1)}% · latest quarter
+                  vs a year earlier
                 </strong>
                 <TermHelp term="revenue_growth" />
               </span>
               <small>
-                Year ended {day(growth.periodEnd)} vs year ended{" "}
-                {day(growth.previousEnd)}
+                Quarter to {day(latestQuarter.current.end)} vs quarter to{" "}
+                {day(latestQuarter.previous.end)}
+                {growth &&
+                  ` · fiscal year to ${day(growth.periodEnd)}: ${growth.growth >= 0 ? "+" : "−"}${Math.abs(growth.growth).toFixed(1)}%`}
               </small>
             </span>
+          ) : (
+            growth && (
+              <span className="glance-growth">
+                <span className="glance-growth-title">
+                  <strong>
+                    Revenue {growth.growth >= 0 ? "grew" : "fell"}{" "}
+                    {Math.abs(growth.growth).toFixed(1)}% · last fiscal year
+                  </strong>
+                  <TermHelp term="revenue_growth" />
+                </span>
+                <small>
+                  Year ended {day(growth.periodEnd)} vs year ended{" "}
+                  {day(growth.previousEnd)}
+                </small>
+              </span>
+            )
           )}
           {sentences.slice(growth ? 1 : 0).join(" ")}
         </p>
@@ -192,18 +255,14 @@ export default function CompanySnapshot({
           to load them.
         </p>
       )}
-      <Freshness data={data} onUpdate={onUpdate} />
-      <YourView
-        data={data}
-        savedView={savedView}
-        onSaveView={onSaveView}
-        onAsk={onAsk}
-      />
+      <Freshness data={data} />
+      <YourView data={data} savedView={savedView} onSaveView={onSaveView} />
       <Activity
         data={data}
         instrumentId={instrumentId}
         onUpdates={onUpdates}
         onView={onView}
+        onSource={onSource}
       />
       {chart}
       {!data.financials_pending && (

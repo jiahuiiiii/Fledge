@@ -65,6 +65,12 @@ Sentiment v19 constrains each news reporting citation to that source's passage
 IDs, closing the quotation-string failure exposed by the experiment. The runtime
 validator still checks evidence, author/context boundaries and reporting contracts.
 
+## Parallel batches, parallel watches and quick retries — 13 October 2026
+
+Owner found readings too slow. Batches and quick-check requests of one reading now run up to `THESIS_AI_CONCURRENCY` at once (default 4, 1–8; offline tests stay sequential unless set). Requests, prompts, ledger keys, validation and the combined result are unchanged; only waiting overlaps (`thesis/research/parallel.py`). Saved batches are still reused first. After a failure, batches not yet started are skipped; batches already in flight finish, are charged and stay saved for the next run, so a failure can cost up to three extra batches at that moment. Stops, replaced runs and withdrawn sources keep their own error; progress and lease renewal are serialized.
+
+Two scheduled-watch workers claim different watches through their leases, so companies no longer queue behind each other. A watch for a company whose reading is running elsewhere fails with the existing conflict and retries after 3 minutes. Other failed checks retry after 10 minutes, up to 2 consecutive failures, then return to the normal interval; the watch message shows the retry time. Scheduled watches now pass `retry_failed=True`, so a batch whose earlier answer failed the evidence checks is sent once more, as Refresh & analyse already did. The tone panel shows when the reading was made and its source cutoff; Data freshness includes the reading time.
+
 ## Saved work and recovery
 
 Every batch uses a deterministic request identity and the original durable model

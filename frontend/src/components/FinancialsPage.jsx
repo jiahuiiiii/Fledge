@@ -354,7 +354,8 @@ export default function FinancialsPage({
       {safe?.ai_reviewed_figures > 0 && (
         <p className="figure-help">
           Includes AI-assisted figure mappings you reviewed. Open a figure to
-          inspect its original cells, or change your choices in Missing figures.
+          inspect its original cells, or change your choices under Fill in
+          missing figures with AI.
         </p>
       )}
       <PeerContext
@@ -362,7 +363,14 @@ export default function FinancialsPage({
         visible={visible}
         onCompare={onCompare}
       />
+      {!safe && !error && (
+        <LoadingSkeleton
+          variant="financials"
+          label="Reading saved financial history…"
+        />
+      )}
       <div
+        hidden={!safe}
         className="story-period-controls"
         role="group"
         aria-label="Financial history period basis"
@@ -383,12 +391,6 @@ export default function FinancialsPage({
           </button>
         ))}
       </div>
-      {!safe && !error && (
-        <LoadingSkeleton
-          variant="chart"
-          label="Reading saved financial history…"
-        />
-      )}
       {error && (
         <p role="alert">
           {error}{" "}

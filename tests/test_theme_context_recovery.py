@@ -129,7 +129,7 @@ def test_legacy_invalid_parent_stops_entire_plan_before_new_dispatch(owner, monk
     assert D.history(iid, aid)['current'] is None
 
 
-def test_current_schema_changes_never_bypass_unresolved_legacy_charge(owner, monkeypatch):
+def test_unresolved_legacy_charge_no_longer_blocks_planning(owner, monkeypatch):
     iid, aid = setup(owner)
     monkeypatch.setattr(B, 'MAX_SOURCES', 1)
     first=B.plan(dict(packet_for(iid, aid), theme_legacy_request=True))[0]
@@ -138,6 +138,5 @@ def test_current_schema_changes_never_bypass_unresolved_legacy_charge(owner, mon
     with pytest.raises(Exception):
         ledger.execute(D.identity(first), D.LEGACY_PROMPT, D.request_for(first), transport=failed)
     before=ledger.snapshot()
-    with pytest.raises(ledger.BudgetBlocked, match='charge review'):
-        B.available_plan(packet_for(iid, aid))
+    assert B.available_plan(packet_for(iid, aid))
     assert ledger.snapshot() == before

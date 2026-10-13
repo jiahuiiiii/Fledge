@@ -6,7 +6,12 @@ from dataclasses import dataclass
 from uuid import uuid4
 from psycopg.types.json import Jsonb
 from thesis.db import transaction, one
-from .settings import MODEL, REASONING_MODEL
+from .settings import (
+    OPENAI_MODEL as MODEL,
+    OPENAI_REASONING_MODEL as REASONING_MODEL,
+    TWIN_PRICES,
+    provider_for,
+)
 
 NANO = 1_000_000_000
 # Official GPT-5.4 Mini standard pricing, checked 2026-10-01:
@@ -38,6 +43,8 @@ class PriceProfile:
     output_price: int
     max_output: int
     effort: str
+    # Anthropic bills 5-minute cache writes above the input rate.
+    cache_write_price: int | None = None
 
 
 # Keep historical profiles unchanged: a saved charge or recovery uses the
@@ -116,6 +123,37 @@ PROFILES = (
 )
 
 
+OPENAI_PROFILES = PROFILES
+
+
+def twin_version(provider, model, base):
+    return f"{provider}:{model}:{base}"
+
+
+def anthropic_version(model, base):
+    return twin_version("anthropic", model, base)
+
+
+# Each OpenAI request family has a twin per other priced model: same output
+# allowance and effort, that provider's token prices. OpenAI profiles stay
+# unchanged, and saved "anthropic:<model>:<family>" versions keep their names.
+PROFILES = OPENAI_PROFILES + tuple(
+    PriceProfile(
+        model,
+        twin_version(provider, model, base.version),
+        prices[0],
+        prices[1],
+        prices[3],
+        base.max_output,
+        base.effort,
+        prices[2],
+    )
+    for provider, table in TWIN_PRICES.items()
+    for model, prices in table.items()
+    for base in OPENAI_PROFILES
+)
+
+
 def price_profile(model, version=None):
     for profile in PROFILES:
         if profile.model == model and (version is None or profile.version == version):
@@ -123,53 +161,39 @@ def price_profile(model, version=None):
     raise ValueError("Unsupported model or price version")
 
 
-def request_profile(body):
-    if (
-        body.get("model") == REASONING_MODEL
-        and body.get("max_output_tokens") == SENTIMENT_LOW_MAX_OUTPUT
-        and body.get("reasoning") == {"effort": "low"}
-        and isinstance(body.get("text"), dict)
-        and isinstance(body["text"].get("format"), dict)
-        and body["text"]["format"].get("name") == "source_sentiment"
-    ):
-        return price_profile(REASONING_MODEL, SENTIMENT_LOW_PRICE_VERSION)
-    if (
-        body.get("model") == REASONING_MODEL
-        and body.get("max_output_tokens") == SENTIMENT_DEPTH_MAX_OUTPUT
-        and body.get("reasoning") == {"effort": "high"}
-        and isinstance(body.get("text"), dict)
-        and isinstance(body["text"].get("format"), dict)
-        and body["text"]["format"].get("name") == "source_sentiment_reasoning_eval"
-    ):
-        return price_profile(REASONING_MODEL, SENTIMENT_DEPTH_PRICE_VERSION)
-    if (
-        body.get("model") == REASONING_MODEL
-        and body.get("max_output_tokens") == IDEA_EVIDENCE_MAX_OUTPUT
-        and body.get("reasoning") == {"effort": "medium"}
-        and isinstance(body.get("text"), dict)
-        and isinstance(body["text"].get("format"), dict)
-        and body["text"]["format"].get("name") == "idea_answer_evidence"
-    ):
-        return price_profile(REASONING_MODEL, IDEA_EVIDENCE_PRICE_VERSION)
-    if (
-        body.get("model") == REASONING_MODEL
-        and body.get("max_output_tokens") == FINDING_CHECK_MAX_OUTPUT
-        and body.get("reasoning") == {"effort": "high"}
-        and isinstance(body.get("text"), dict)
-        and isinstance(body["text"].get("format"), dict)
-        and body["text"]["format"].get("name") == "finding_evidence_check"
-    ):
-        return price_profile(REASONING_MODEL, FINDING_CHECK_PRICE_VERSION)
+def _family(body):
+    """The OpenAI price version whose request contract this body follows."""
+    text = body.get("text")
+    fmt = text.get("format") if isinstance(text, dict) else None
+    name = fmt.get("name") if isinstance(fmt, dict) else None
+    limit, effort = body.get("max_output_tokens"), body.get("reasoning")
+    if limit == SENTIMENT_LOW_MAX_OUTPUT and effort == {"effort": "low"} and name == "source_sentiment":
+        return SENTIMENT_LOW_PRICE_VERSION
+    if limit == SENTIMENT_DEPTH_MAX_OUTPUT and effort == {"effort": "high"} and name == "source_sentiment_reasoning_eval":
+        return SENTIMENT_DEPTH_PRICE_VERSION
+    if limit == IDEA_EVIDENCE_MAX_OUTPUT and effort == {"effort": "medium"} and name == "idea_answer_evidence":
+        return IDEA_EVIDENCE_PRICE_VERSION
+    if limit == FINDING_CHECK_MAX_OUTPUT and effort == {"effort": "high"} and name == "finding_evidence_check":
+        return FINDING_CHECK_PRICE_VERSION
     # Only the named sentiment format opts into the larger finite output allowance.
-    if (
-        body.get("model") == REASONING_MODEL
-        and body.get("max_output_tokens") == SENTIMENT_MAX_OUTPUT
-        and isinstance(body.get("text"), dict)
-        and isinstance(body["text"].get("format"), dict)
-        and body["text"]["format"].get("name") == "source_sentiment"
-    ):
-        return price_profile(REASONING_MODEL, SENTIMENT_PRICE_VERSION)
-    return price_profile(body.get("model"))
+    if limit == SENTIMENT_MAX_OUTPUT and name == "source_sentiment":
+        return SENTIMENT_PRICE_VERSION
+    return None
+
+
+def request_profile(body):
+    model = body.get("model")
+    family = _family(body)
+    provider = provider_for(model)
+    if provider != "openai":
+        if family is None:
+            # Quick-check and other bounded routes keep their own allowance.
+            family = (PRICE_VERSION if body.get("max_output_tokens") == MAX_OUTPUT
+                      and body.get("reasoning") == {"effort": "none"} else REASONING_PRICE_VERSION)
+        return price_profile(model, twin_version(provider, model, family))
+    if family is not None and model == REASONING_MODEL:
+        return price_profile(REASONING_MODEL, family)
+    return price_profile(model)
 
 
 class BudgetBlocked(ValueError):
@@ -270,7 +294,22 @@ def snapshot(conn=None):
     )
 
 
+REDISPATCH = ":redispatch:"
+
+
+def find(conn, request_key):
+    """Return the saved result for this request, including a later resend of it."""
+    return one(
+        conn,
+        """SELECT * FROM model_calls WHERE status='settled' AND
+           (request_key=%s OR starts_with(request_key, %s)) ORDER BY created_at DESC LIMIT 1""",
+        (request_key, request_key + REDISPATCH),
+    )
+
+
 def reserve(request_key, purpose, body, *, owner=None):
+    # Owner decision 13 Oct 2026: no spending cap and no charge-review block.
+    # Every call is still recorded; a failed request can simply be sent again.
     maximum = estimate(body)
     profile = request_profile(body)
     digest = hashlib.sha256(canonical(body).encode()).hexdigest()
@@ -281,6 +320,7 @@ def reserve(request_key, purpose, body, *, owner=None):
         previous = one(
             conn, "SELECT * FROM model_calls WHERE request_key=%s", (request_key,)
         )
+        key = request_key
         if previous:
             price_profile(previous["model"], previous["price_version"])
             if previous["model"] != profile.model:
@@ -289,28 +329,30 @@ def reserve(request_key, purpose, body, *, owner=None):
                 raise ValueError(
                     "Request identity cannot be reused for different input"
                 )
-            if previous["status"] != "settled":
-                raise BudgetBlocked(
-                    "This request may already have been sent; reconciliation is required"
-                )
-            return previous, False
-        # Serial dispatch simplifies recovery and blocks all new spending after an
-        # interruption, including dispatched requests whose process was killed.
-        if one(conn, "SELECT unresolved FROM model_global_totals()")["unresolved"]:
-            raise BudgetBlocked("An earlier model request needs charge reconciliation")
-        budget = one(conn, "SELECT cap_nano_usd FROM model_budget WHERE singleton")
-        committed = one(conn, "SELECT spent+held n FROM model_global_totals()")["n"]
-        if committed + maximum > budget["cap_nano_usd"]:
-            raise BudgetBlocked(
-                "The remaining cumulative allowance cannot cover this request"
-            )
+            saved = find(conn, request_key)
+            if saved:
+                return saved, False
+            if one(
+                conn,
+                """SELECT 1 x FROM model_calls WHERE status='dispatched'
+                   AND created_at>now()-interval '15 minutes'
+                   AND (request_key=%s OR starts_with(request_key, %s))""",
+                (request_key, request_key + REDISPATCH),
+            ):
+                raise BudgetBlocked("This AI request is already running")
+            count = one(
+                conn,
+                "SELECT count(*) n FROM model_calls WHERE starts_with(request_key, %s)",
+                (request_key + REDISPATCH,),
+            )["n"]
+            key = f"{request_key}{REDISPATCH}{count + 1}"
         call = one(
             conn,
             """INSERT INTO model_calls(id,request_key,request_hash,purpose,model,price_version,
           request_body,reserved_nano_usd,status,owner_id) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,'dispatched',%s) RETURNING *""",
             (
                 uuid4(),
-                request_key,
+                key,
                 digest,
                 purpose,
                 profile.model,
@@ -320,7 +362,6 @@ def reserve(request_key, purpose, body, *, owner=None):
                 owner,
             ),
         )
-    # Commit before any HTTP request. A crash here intentionally blocks further spend.
     return call, True
 
 
@@ -349,8 +390,11 @@ def settle(call, response, *, owner=None):
         reasoning = integer(
             (usage.get("output_tokens_details") or {}).get("reasoning_tokens", 0)
         )
+        written = integer(
+            (usage.get("input_tokens_details") or {}).get("cache_write_tokens", 0)
+        )
         if (
-            cached > input_tokens
+            cached + written > input_tokens
             or output_tokens > profile.max_output
             or reasoning > output_tokens
         ):
@@ -363,8 +407,9 @@ def settle(call, response, *, owner=None):
         if not response.get("id"):
             raise ValueError("Provider response identity is missing")
         charge = (
-            (input_tokens - cached) * profile.input_price
+            (input_tokens - cached - written) * profile.input_price
             + cached * profile.cached_price
+            + written * (profile.cache_write_price or profile.input_price)
             + output_tokens * profile.output_price
         )
         if charge > current["reserved_nano_usd"]:
@@ -402,7 +447,14 @@ def execute(request_key, purpose, body, *, transport=None, owner=None):
     live = transport is None
     if live:
         from .settings import live_key
-        from .openai import send
+
+        provider = provider_for(body.get("model"))
+        if provider == "anthropic":
+            from .anthropic_messages import send
+        elif provider == "deepseek":
+            from .deepseek import send
+        else:
+            from .openai import send
 
         live_key(body.get("model"))  # Configuration failures never reserve a call.
     call, dispatch = reserve(request_key, purpose, body, owner=owner)
@@ -417,7 +469,7 @@ def execute(request_key, purpose, body, *, transport=None, owner=None):
         code = getattr(exc, "code", "interrupted_or_invalid_usage")
         unresolved(call, code, owner=owner)
         raise BudgetBlocked(
-            "Model request stopped; its reserved charge needs reconciliation"
+            "The AI request failed before a result was saved. Try again."
         ) from None
 
 

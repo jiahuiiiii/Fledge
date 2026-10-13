@@ -16,7 +16,21 @@ export default function LoadingSkeleton({
             <span className="skeleton-line short" />
           </div>
         )}
-        {["chart", "workspace"].includes(variant) && (
+        {variant === "financials" && (
+          <>
+            <span className="skeleton-line short skeleton-toggle" />
+            <div className="skeleton-tiles">
+              {[0, 1, 2].map((index) => (
+                <div className="skeleton-tile" key={index}>
+                  <span className="skeleton-line medium" />
+                  <span className="skeleton-line short" />
+                  <span className="skeleton-line medium" />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        {["chart", "workspace", "financials"].includes(variant) && (
           <div className="skeleton-chart-frame">
             <div className="skeleton-chart-toolbar">
               <span className="skeleton-line short" />
@@ -34,13 +48,19 @@ export default function LoadingSkeleton({
           </>
         )}
         {variant !== "chart" &&
-          Array.from({ length: variant === "idea" ? 2 : rows }, (_, index) => (
-            <div className="skeleton-card" key={index}>
-              <span className="skeleton-line short" />
-              <span className="skeleton-line" />
-              <span className="skeleton-line medium" />
-            </div>
-          ))}
+          Array.from(
+            {
+              length:
+                variant === "idea" ? 2 : variant === "financials" ? 1 : rows,
+            },
+            (_, index) => (
+              <div className="skeleton-card" key={index}>
+                <span className="skeleton-line short" />
+                <span className="skeleton-line" />
+                <span className="skeleton-line medium" />
+              </div>
+            ),
+          )}
       </div>
     </div>
   );

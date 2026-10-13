@@ -4675,6 +4675,31 @@ input[type="checkbox"] {
 .skeleton-panel {
   min-height: 240px;
 }
+.skeleton-toggle {
+  max-width: 220px;
+  height: 36px;
+  margin-top: 0;
+}
+.skeleton-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.skeleton-tile {
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+}
+.skeleton-tile .skeleton-line {
+  margin: var(--space-2) 0;
+}
+@media (max-width: 600px) {
+  .skeleton-tiles {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+}
 .skeleton-idea {
   min-height: 520px;
   padding-top: 0;
@@ -5721,6 +5746,9 @@ input[type="checkbox"] {
 .research-loading-clip {
   min-height: 0;
   overflow: hidden;
+  /* Without paint containment a collapsed (0px) panel still adds its full
+     height to a scrolling ancestor, leaving empty scroll space in dialogs. */
+  contain: paint;
 }
 .research-loading {
   grid-column: 1/-1;

@@ -208,7 +208,11 @@ export default function AccountGate({ children }) {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
             />
-            <button type="submit" disabled={busy || remaining > 0}>
+            <button
+              type="submit"
+              className="primary"
+              disabled={busy || remaining > 0}
+            >
               {busy
                 ? "Please wait…"
                 : remaining > 0
@@ -242,7 +246,11 @@ export default function AccountGate({ children }) {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
             />
-            <button type="submit" disabled={busy || !session || remaining > 0}>
+            <button
+              type="submit"
+              className="primary"
+              disabled={busy || !session || remaining > 0}
+            >
               {busy
                 ? "Sending…"
                 : remaining > 0

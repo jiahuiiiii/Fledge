@@ -2,7 +2,6 @@ import { formatTimestamp } from "../lib/dateTime";
 import { modelAvailability } from "../lib/modelAvailability";
 import { currentCompanyHeadlines } from "../lib/companyHeadlines";
 import { newsSourceStatus } from "../lib/newsPresentation";
-import { requestUpdate } from "../lib/updateRequest";
 import Select from "./Select";
 import { useId, useState } from "react";
 import { latestPriceQuote, quoteMovement } from "../lib/priceRefresh";
@@ -225,9 +224,6 @@ export default function MarketResearch({
         <div>
           <h2>What’s developing</h2>
         </div>
-        <button type="button" onClick={requestUpdate} disabled={busy}>
-          Update data
-        </button>
       </div>
       <p className="fine">
         Latest saved headlines

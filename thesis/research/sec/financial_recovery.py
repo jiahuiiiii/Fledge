@@ -20,7 +20,7 @@ from .performance import collect, select, decimal_text
 from .disclosure_text import archive_url
 from .filing_facts import read, attach
 
-METHOD='financial-cell-recovery-1'
+METHOD='financial-cell-recovery-2'
 TARGETS={
  'revenue':('Revenue',REVENUE),
  'cost':('Cost of revenue',('CostOfRevenue','CostOfGoodsAndServicesSold')),
@@ -34,9 +34,44 @@ TARGETS={
  'assets':('Total assets',('Assets',)),
  'liabilities':('Total liabilities',('Liabilities',)),
  'cash':('Cash and cash equivalents',('CashAndCashEquivalentsAtCarryingValue',)),
+ 'debt':('Borrowing (short- and long-term debt)',('DebtLongtermAndShorttermCombinedAmount',)),
+ 'interest':('Interest expense',('InterestExpenseNonoperating',)),
 }
-BALANCE={'assets','liabilities','cash'}
+BALANCE={'assets','liabilities','cash','debt'}
+# Chart rows that show each target. A target is only worth an AI reading when
+# the research charts actually lack it for that filing, and the reason is a
+# missing statement fact (not an amendment, conflict or bridge problem).
+CHART_ROWS={'revenue':('revenue',),'operating':('operating_income',),'net_income':('net_parent','net_consolidated','net_income'),
+ 'operating_cash':('operating_cash',),'capital_spending':('capital_spending',),'assets':('assets',),'liabilities':('liabilities',),
+ 'cash':('cash',),'debt':('debt',),'interest':('interest',)}
 MISSING='No compatible whole-company USD fact in the selected filing.'
+FIXABLE=(MISSING,'A complete reported borrowing total')
+
+
+def chart_gaps(conn,iid):
+    """Per filing accession: targets the charts show, and fixable targets they lack."""
+    from .financial_story import present as story
+    return gaps_from_story(story(conn,iid))
+
+
+def gaps_from_story(saved):
+    if saved.get('status')!='available':return {}
+    gaps={}
+    periods=saved['annual']+saved['balances']+[p for p in saved['quarterly'] if p.get('form','').startswith('10-Q')]
+    for period in periods:
+        metrics={m['key']:m for m in period['metrics']}
+        entry=gaps.setdefault(period['accession'],dict(shown=set(),missing=set()))
+        for target,keys in CHART_ROWS.items():
+            found=[metrics[k] for k in keys if k in metrics]
+            if not found:continue
+            if any(m.get('value') is not None for m in found):entry['shown'].add(target)
+            elif all((m.get('reason') or '').startswith(FIXABLE) for m in found):entry['missing'].add(target)
+    # Past-12-month figures built from a filing also count as shown for it.
+    for period in saved['trailing']:
+        entry=gaps.setdefault(period['accession'],dict(shown=set(),missing=set()))
+        entry['shown']|={t for t,keys in CHART_ROWS.items() for m in period['metrics'] if m['key'] in keys and m.get('value') is not None}
+    for entry in gaps.values():entry['missing']-=entry['shown']
+    return gaps
 
 
 def allowed(conn):
@@ -52,7 +87,12 @@ def prepare(conn,iid,document_id=None):
     documents=rows(conn,"SELECT DISTINCT ON (url) id,instrument_id,url,form,published_at,available_at,content_hash,raw_html FROM disclosure_documents WHERE instrument_id=%s AND source_id='sec-disclosures' AND form IN ('10-K','10-Q') ORDER BY url,available_at DESC",(iid,))
     documents=sorted([d for d in documents if d['url'] in urls],key=lambda d:d['published_at'],reverse=True)
     if not documents:raise ValueError('No supported original financial statement has been saved yet.')
-    doc=next((d for d in documents if str(d['id'])==str(document_id)),None) if document_id else documents[0]
+    gaps=chart_gaps(conn,iid)
+    def hinted(d):
+        found=set(gaps.get(urls[d['url']]['accessionNumber'],{}).get('missing',()))
+        return found-{'interest'} if d['form']=='10-Q' else found
+    # Open on the newest report whose charts actually have a gap.
+    doc=next((d for d in documents if str(d['id'])==str(document_id)),None) if document_id else next((d for d in documents if hinted(d)),documents[0])
     if not doc:raise ValueError('The selected saved filing is unavailable.')
     if hashlib.sha256(bytes(doc['raw_html'])).hexdigest()!=doc['content_hash']:raise ValueError('The original filing could not be verified.')
     filing=urls[doc['url']];kind='annual' if doc['form']=='10-K' else 'quarter'
@@ -67,7 +107,15 @@ def prepare(conn,iid,document_id=None):
     from .income_flow import build_period
     flow=build_period(bundle,filings,filing,kind,saved['cik'])
     usable={m['key'] for m in flow['metrics'] if m['value'] is not None}
-    missing=[m for m in missing if m['key'] not in usable]
+    chart=gaps.get(filing['accessionNumber'],dict(shown=set(),missing=set()))
+    # Skip lines the charts already show another way (e.g. a broader capital
+    # spending line, the other profit scope); add chart gaps such as borrowing.
+    missing=[m for m in missing if m['key'] not in usable and m['key'] not in chart['shown']]
+    listed={m['key'] for m in missing}
+    missing+=[dict(key=k,label=TARGETS[k][0]) for k in TARGETS if k in chart['missing'] and k not in listed and k not in usable]
+    # The interest chart uses annual and year-to-date figures; a quarter's
+    # three-month cell cannot fill it.
+    if kind=='quarter':missing=[m for m in missing if m['key']!='interest']
     parsed=read(bytes(doc['raw_html']),saved['cik']);candidates={}
     for table in parsed['tables']:
         for row in table['rows']:
@@ -89,7 +137,8 @@ def prepare(conn,iid,document_id=None):
     packet=dict(method=METHOD,instrument_id=iid,company=one(conn,'SELECT symbol,name FROM instruments WHERE id=%s',(iid,)),
                 document=dict(id=str(doc['id']),url=doc['url'],content_hash=doc['content_hash'],form=doc['form'],accession=filing['accessionNumber'],filed=filing['filingDate'],end=filing['end'].isoformat()),
                 kind=kind,missing=missing,cells=selected,omitted_cells=len(candidates)-len(selected))
-    return packet,[dict(id=str(d['id']),form=d['form'],end=urls[d['url']]['end'].isoformat()) for d in documents]
+    return packet,[dict(id=str(d['id']),url=d['url'],form=d['form'],end=urls[d['url']]['end'].isoformat(),
+                        gaps=[TARGETS[k][0] for k in TARGETS if k in (hinted(d) or ())]) for d in documents]
 
 
 def request_for(packet):
@@ -104,7 +153,10 @@ def request_for(packet):
         'Each item must use one reporting period, currency and consolidated company scope. Keep annual, quarter and year-to-date separate. '
         'reported means one directly reported cell. sum means mutually exclusive components; never count a subtotal with its components. '
         'subtract means first input minus second. Only derive gross profit as revenue minus cost of revenue, cost as revenue minus gross profit, '
-        'or operating expenses as gross profit minus operating profit. Do not infer missing amounts as zero, use liabilities as debt, '
+        'or operating expenses as gross profit minus operating profit. debt is balance-sheet borrowing: one reported total, or the sum of '
+        'mutually exclusive short-term borrowings, commercial paper, current portion of long-term debt and long-term debt; never include '
+        'lease liabilities, accounts payable or total liabilities. interest is one directly reported interest expense; never use net interest '
+        'or interest income. Do not infer missing amounts as zero, use liabilities as debt, '
         'replace operating cash flow with profit, or treat leases as borrowing. Explain the labels, scope and arithmetic in one short sentence. '
         'A person will review these suggestions before they are used. Omit unresolved targets.')
     return dict(model=MODEL,store=False,service_tier='default',max_output_tokens=ledger.MAX_OUTPUT,reasoning={'effort':'none'},
@@ -139,15 +191,16 @@ def render(call,packet):
                 if not low<=days<=high:raise ValueError()
             if not isinstance(item['explanation'],str) or not 1<=len(item['explanation'])<=500:raise ValueError()
             if op=='reported' and len(fs)!=1:raise ValueError()
+            if target=='interest' and op!='reported':raise ValueError()
             if op=='subtract' and (len(fs)!=2 or target not in ('gross','cost','expenses')):raise ValueError()
-            if op=='sum' and (len(fs)<2 or target not in ('cost','expenses','selling','assets','liabilities','revenue')):raise ValueError()
+            if op=='sum' and (len(fs)<2 or target not in ('cost','expenses','selling','assets','liabilities','revenue','debt')):raise ValueError()
             if op not in ('reported','sum','subtract'):raise ValueError()
             with localcontext() as ctx:
                 ctx.prec=110
                 numbers=[Decimal(f['value']) for f in fs]
                 if any(not n.is_finite() for n in numbers):raise ValueError()
                 value=numbers[0]-numbers[1] if op=='subtract' else sum(numbers,Decimal(0))
-            if target in ('cost','expenses','selling','assets','liabilities','cash','capital_spending') and value<0:raise ValueError()
+            if target in ('cost','expenses','selling','assets','liabilities','cash','capital_spending','debt','interest') and value<0:raise ValueError()
             # Canonical, same-definition facts with differing values must never
             # be reinterpreted into an answer; any ambiguity is withheld.
             signatures=[(f['concept'],f['start'],f['end']) for f in fs]
@@ -159,10 +212,27 @@ def render(call,packet):
     return dict(items=valid,rejected=rejected,unresolved=sorted(targets-{i['key'] for i in valid}))
 
 
+_STABLE={}
+
+
+def same_filing(conn,first,second):
+    """Two saved copies of one filing that differ only by SEC's injected script."""
+    if str(first)==str(second):return True
+    from .disclosures import stable_content
+    digests=[]
+    for doc_id in (str(first),str(second)):
+        if doc_id not in _STABLE:
+            saved=one(conn,'SELECT raw_html,content_hash FROM disclosure_documents WHERE id=%s',(doc_id,))
+            if not saved or hashlib.sha256(bytes(saved['raw_html'])).hexdigest()!=saved['content_hash']:return False
+            _STABLE[doc_id]=hashlib.sha256(stable_content(saved['raw_html'])).hexdigest()
+        digests.append(_STABLE[doc_id])
+    return digests[0]==digests[1]
+
+
 def visible(conn,row):
     doc=one(conn,'SELECT content_hash,url FROM disclosure_documents WHERE id=%s AND instrument_id=%s',(row['document_id'],row['instrument_id']))
     latest=one(conn,"SELECT id FROM disclosure_documents WHERE instrument_id=%s AND url=%s ORDER BY available_at DESC,id DESC LIMIT 1",(row['instrument_id'],doc['url'])) if doc else None
-    accessible=bool(allowed(conn) and doc and latest and str(latest['id'])==str(row['document_id']) and doc['content_hash']==row['packet']['document']['content_hash'])
+    accessible=bool(allowed(conn) and doc and latest and doc['content_hash']==row['packet']['document']['content_hash'] and same_filing(conn,latest['id'],row['document_id']))
     review=one(conn,'SELECT id,accepted FROM financial_recovery_reviews WHERE reading_id=%s ORDER BY created_at DESC,id DESC LIMIT 1',(row['id'],))
     return dict(id=str(row['id']),document=row['packet']['document'] if accessible else None,created_at=row['created_at'],withheld=not accessible,
                 result=row['result'] if accessible else None,review_id=str(review['id']) if review else None,accepted=review['accepted'] if accessible and review else [])
@@ -170,19 +240,28 @@ def visible(conn,row):
 
 def present(conn,iid,document_id=None):
     packet,documents=prepare(conn,iid,document_id);key=identity(packet)
+    # Reports this account already read with AI stay listed so choices can be revisited.
+    read={r['url'] for r in rows(conn,"SELECT DISTINCT packet->'document'->>'url' url FROM financial_recovery_readings WHERE instrument_id=%s",(iid,))}
+    for d in documents:d['saved']=d.pop('url') in read
     old=one(conn,'SELECT * FROM financial_recovery_readings WHERE instrument_id=%s AND request_key=%s',(iid,key))
+    if not old:
+        # A saved reading of the same filing (an earlier saved copy, or before
+        # its figures filled the chart) is shown instead of charging again.
+        for candidate in rows(conn,"SELECT * FROM financial_recovery_readings WHERE instrument_id=%s AND packet->'document'->>'url'=%s ORDER BY created_at DESC,id DESC",(iid,packet['document']['url'])):
+            if not visible(conn,candidate)['withheld']:old=candidate;break
     possible=bool(packet['missing'] and packet['cells']);maximum=ledger.estimate(request_for(packet)) if possible and not old else 0
     budget=ledger.snapshot(conn)
-    prior=one(conn,"SELECT c.* FROM model_calls c WHERE request_key=nullif(current_setting('app.user_id',true),'')||':'||%s",(key,))
+    prior=ledger.find(conn,(one(conn,"SELECT nullif(current_setting('app.user_id',true),'') u")['u'] or '')+':'+key)
     blocked=None
     if prior and not old:
         maximum=0
         try:render(prior,packet)
         except ValueError as error:blocked=str(error)
     return dict(plan_id=key,document=packet['document'],documents=documents,missing=packet['missing'],candidate_cells=len(packet['cells']),omitted_cells=packet['omitted_cells'],
-                maximum_cost_usd=maximum/ledger.NANO,can_run=possible and not old and not blocked and (bool(prior) or not budget['unresolved']) and Decimal(maximum)/ledger.NANO<=Decimal(budget['remaining_usd']),
+                has_gaps=bool(packet['missing'] or old or any(d['gaps'] for d in documents)),
+                maximum_cost_usd=maximum/ledger.NANO,can_run=possible and not old and not blocked,
                 reading=visible(conn,old) if old else None,
-                message=blocked or ('Review the saved suggestions below.' if old else 'The normal reader found these statement figures.' if not packet['missing'] else
+                message=blocked or ('Review the saved suggestions below.' if old else 'Nothing in this report is missing from your charts.' if not packet['missing'] else
                         'No suitable dated statement cells were found for an AI reading.' if not packet['cells'] else
                         'AI can suggest how these original cells match the missing figures. Review the meaning before using a suggestion.'))
 
@@ -220,11 +299,13 @@ def review(owner,iid,reading_id,accepted,expected_review):
 
 def apply_reviewed(conn,iid,bundle,documents):
     if not one(conn,"SELECT to_regclass('financial_recovery_readings') name")['name']:return bundle
-    current={str(d['id']):d['content_hash'] for d in documents}
     readings=rows(conn,'SELECT * FROM financial_recovery_readings WHERE instrument_id=%s ORDER BY created_at,id',(iid,))
-    result=dict(bundle);facts=deepcopy(bundle.get('_original_facts',{}));count=0
+    # The overlay is already an independent copy (filing_facts.cached_attach); copy
+    # only the lists this function appends to.
+    result=dict(bundle);facts={k:list(v) for k,v in bundle.get('_original_facts',{}).items()};count=0
     for row in readings:
-        if current.get(str(row['document_id']))!=row['packet']['document']['content_hash']:continue
+        # visible() checks the reading's filing is still the latest saved copy
+        # (ignoring SEC's injected script) and that access is permitted.
         record=visible(conn,row)
         if record['withheld']:continue
         doc=row['packet']['document']

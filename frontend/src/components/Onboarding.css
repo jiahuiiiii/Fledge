@@ -40,9 +40,11 @@
 }
 .onboarding-actions {
   display: flex;
-  justify-content: space-between;
   gap: 12px;
   margin-top: 8px;
+}
+.onboarding-actions .primary {
+  margin-left: auto;
 }
 .detail-mode {
   display: inline-flex;

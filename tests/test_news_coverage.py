@@ -108,7 +108,9 @@ def test_paraphrased_coverage_counts_once_but_retains_each_label_quote():
 @pytest.mark.parametrize(
     "fault", ["self", "cycle", "foreign", "social", "duplicate", "quote", "unrelated"]
 )
-def test_invalid_links_publish_no_rendered_group(fault):
+def test_invalid_links_are_dropped_not_rendered_and_never_reject_the_batch(fault):
+    # Links are optional grouping hints (13 Oct 2026): one invalid link used to
+    # reject every classification in its batch and stall whole readings.
     sources = pair()
     links = [relation()]
     if fault == "self":
@@ -124,20 +126,24 @@ def test_invalid_links_publish_no_rendered_group(fault):
     if fault == "quote":
         links[0]["reference_passages"] = ["p999"]
     if fault == "unrelated":
-        # Direct structural validator with a mismatched relevance claim.
-        items = [
-            dict(
-                source_id=s["id"],
-                relevance="unrelated",
-                statement="reported_development",
-            )
-            for s in sources
-        ]
-        with pytest.raises(ValueError):
-            coverage.render([coverage.Link(**links[0])], dict(sources=sources), items)
+        items = [dict(source_id=s["id"], relevance="unrelated", statement="reported_development")
+                 for s in sources]
+        ignored = []
+        assert coverage.render([coverage.Link(**links[0])], dict(sources=sources), items, ignored) == []
+        assert ignored[0]["reason"] == "unrelated_item"
         return
-    with pytest.raises(ValueError):
-        analyse(sources, links)
+    a = analyse(sources, links)
+    rendered = a["result"]["coverage_links"]
+    ignored = a["result"]["ignored_coverage_links"]
+    assert ignored and all(i["reason"] in coverage.IGNORED_REASONS for i in ignored)
+    if fault in ("cycle", "duplicate"):
+        # The valid first link survives; only the extra one is dropped.
+        assert len(rendered) == 1 and len(ignored) == 1
+        assert rendered[0]["reference_source_id"] == "item_1"
+    else:
+        assert rendered == []
+        if fault != "social":
+            assert a["result"]["summary"]["news"]["counted_groups"] == 2
 
 
 def test_conflicting_framing_is_mixed_not_two_votes_and_never_repeat_suppressed():
@@ -156,8 +162,9 @@ def test_matching_reports_with_unusable_company_relevance_stay_unlinked(relevanc
     items[which]['relevance'] = relevance
     packet = dict(sources=sources)
     # Exact matching event/citations cannot override either company's relevance.
-    with pytest.raises(ValueError, match='coverage group'):
-        coverage.render([coverage.Link(**relation())], packet, items)
+    ignored = []
+    assert coverage.render([coverage.Link(**relation())], packet, items, ignored) == []
+    assert ignored[0]["reason"] == ("unrelated_item" if which == 1 else "unrelated_reference")
     assert coverage.render([], packet, items) == []
 
 

@@ -8,7 +8,8 @@ from fastapi.testclient import TestClient
 import pytest
 from thesis.db import transaction, one
 from thesis import service
-from thesis.research import sentiment, sentiment_history as history
+from unittest.mock import patch
+from thesis.research import sentiment, sentiment_history as history, sentiment_reuse
 from thesis.providers import ledger
 from test_market import prepare, commit, news
 from test_sentiment import provider, add_social
@@ -79,7 +80,9 @@ def test_new_report_and_changed_labels_are_separate(owner):
             )
         ],
     )
-    second = sentiment.generate(iid, transport=provider("negative"))
+    # Without saved labels to reuse, an unchanged source can be relabelled.
+    with patch.object(sentiment_reuse, "find", return_value={}):
+        second = sentiment.generate(iid, transport=provider("negative"))
     compared = history.compare(iid, first["id"], second["id"])
     assert compared["channels"]["news"]["counts"] == dict(
         added=1, removed=0, relabeled=1, unchanged=0
@@ -93,6 +96,37 @@ def test_new_report_and_changed_labels_are_separate(owner):
         relabeled["before"]["item"]["sentiment"] == "neutral"
         and relabeled["after"]["item"]["sentiment"] == "negative"
     )
+
+
+def test_unchanged_sources_keep_their_saved_labels(owner):
+    iid, first = original(owner)
+    commit(
+        iid,
+        [
+            news(
+                id=2,
+                url="https://example.test/new",
+                headline="Microsoft reports margin decline",
+                summary="Microsoft reported lower margins.",
+            )
+        ],
+    )
+    sent = []
+    negative = provider("negative")
+
+    def transport(body):
+        sent.append(body)
+        return negative(body)
+
+    second = sentiment.generate(iid, transport=transport)
+    compared = history.compare(iid, first["id"], second["id"])
+    # Only the new report is read; the earlier report and post keep their labels.
+    assert compared["channels"]["news"]["counts"] == dict(
+        added=1, removed=0, relabeled=0, unchanged=1
+    )
+    assert compared["channels"]["social"]["counts"]["unchanged"] == 1
+    assert second["source_reuse"]["reused"] == 2 and second["source_reuse"]["new"] == 1
+    assert len(sent) == 1
 
 
 def test_new_reports_do_not_push_older_eligible_text_out_of_the_reading(owner):

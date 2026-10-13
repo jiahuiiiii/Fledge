@@ -68,7 +68,7 @@ def test_unknown_charge_retains_billing_review_instead_of_validation_feedback(ow
     def timeout(_):
         raise TimeoutError('private transport URL')
     with patch.object(B, 'check_access'):
-        with pytest.raises(ledger.BudgetBlocked, match='charge needs reconciliation') as error:
+        with pytest.raises(ledger.BudgetBlocked, match='failed before a result was saved') as error:
             B.run(packet(), transport=timeout, progress=progress.append)
     assert progress[-1]['message'] == str(error.value)
     assert 'failure' not in progress[-1] and 'private transport' not in str(error.value)
@@ -136,3 +136,21 @@ def test_new_failure_progress_is_not_replaced_by_legacy_diagnostic(owner):
         run = one(conn, 'SELECT * FROM research_loads WHERE instrument_id=%s', (iid,))
         run['steps'][-1]['batches']['failure'] = {'code': 'authored_diagnostic'}
         assert loading.explain_saved_failure(conn, run) == run
+
+
+def test_failed_evidence_check_is_named_without_model_text():
+    from pydantic import ValidationError as PydanticError
+    from thesis.research import sentiment_batching
+
+    call = dict(charged_nano_usd=1000, response_body=dict(status="completed", output=[dict(
+        type="message", content=[dict(type="output_text", text='{"secret": "model wording"}')])]))
+    details = sentiment_batching.failure_details(call, ValueError("A sentiment label needs its own source wording."))
+    assert details["check"] == "A sentiment label needs its own source wording"
+    assert "(A sentiment label needs its own source wording)." in details["reason"]
+    assert "model wording" not in str(details)
+    # Parser errors (which can quote model text) keep the generic wording.
+    try:
+        sentiment_batching.raw(dict(response_body=call["response_body"]))
+    except PydanticError as exc:
+        format_details = sentiment_batching.failure_details(call, exc)
+    assert "check" not in format_details and "model wording" not in str(format_details)

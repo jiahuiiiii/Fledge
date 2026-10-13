@@ -124,20 +124,21 @@ def test_concurrent_requests_cannot_both_dispatch():
     with ThreadPoolExecutor(2) as pool:
         first = pool.submit(ledger.execute, "first", "test", body(), transport=provider)
         assert entered.wait(5)
-        with pytest.raises(ledger.BudgetBlocked, match="reconciliation"):
+        with pytest.raises(ledger.BudgetBlocked, match="already running"):
             ledger.execute(
-                "second",
+                "first",
                 "test",
                 body(),
-                transport=lambda _: pytest.fail("concurrent call"),
+                transport=lambda _: pytest.fail("duplicate in-flight call"),
             )
+        ledger.execute("second", "test", body(), transport=lambda _: response())
         release.set()
         first.result()
-    assert ledger.snapshot()["calls"] == 1
+    assert ledger.snapshot()["calls"] == 2
 
 
 @pytest.mark.parametrize("failure", [TimeoutError(), KeyboardInterrupt()])
-def test_timeout_or_interrupt_keeps_reservation_and_blocks_new_requests(failure):
+def test_timeout_or_interrupt_is_recorded_without_blocking_new_requests(failure):
     def provider(_):
         raise failure
 
@@ -145,23 +146,20 @@ def test_timeout_or_interrupt_keeps_reservation_and_blocks_new_requests(failure)
         ledger.execute("ambiguous", "test", body(), transport=provider)
     state = ledger.snapshot()
     assert state["unresolved"] == 1 and float(state["reserved_usd"]) > 0
-    with pytest.raises(ledger.BudgetBlocked):
-        ledger.execute(
-            "fresh-key",
-            "test",
-            body(),
-            transport=lambda _: pytest.fail("automatic retry"),
-        )
+    ledger.execute("fresh-key", "test", body(), transport=lambda _: response())
+    again = ledger.execute("ambiguous", "test", body(), transport=lambda _: response())
+    assert again["status"] == "settled" and again["request_key"] == "ambiguous:redispatch:1"
+    assert ledger.execute("ambiguous", "test", body(), transport=lambda _: pytest.fail("cached"))["id"] == again["id"]
 
 
 def test_process_loss_and_idempotency_survive_new_connections():
     call, new = ledger.reserve("killed-before-http", "test", body())
     assert new
-    with pytest.raises(ledger.BudgetBlocked):
+    with pytest.raises(ledger.BudgetBlocked, match="already running"):
         ledger.reserve("killed-before-http", "test", body())
-    with pytest.raises(ledger.BudgetBlocked):
-        ledger.reserve("another-account-or-company", "test", body())
-    assert ledger.snapshot()["unresolved"] == 1
+    other, new = ledger.reserve("another-account-or-company", "test", body())
+    assert new
+    assert ledger.snapshot()["unresolved"] == 2
 
 
 def test_exhaustion_and_immutable_cap():
@@ -170,13 +168,9 @@ def test_exhaustion_and_immutable_cap():
             "INSERT INTO model_calls(id,request_key,request_hash,purpose,model,price_version,request_body,reserved_nano_usd,status,charged_nano_usd) VALUES(%s,'earlier-work','x','test',%s,'test','{}',39999999999,'settled',39999999999)",
             (uuid4(), MODEL),
         )
-    with pytest.raises(ledger.BudgetBlocked, match="allowance"):
-        ledger.execute(
-            "over-budget",
-            "test",
-            body(),
-            transport=lambda _: pytest.fail("over budget"),
-        )
+    # Owner removed the spending cap on 13 Oct 2026: past the cap still runs.
+    ledger.execute("over-budget", "test", body(), transport=lambda _: response())
+    assert float(ledger.snapshot()["remaining_usd"]) < 0
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         with transaction() as conn:
             conn.execute("UPDATE model_budget SET cap_nano_usd=30000000000")
@@ -408,18 +402,15 @@ def test_authorized_maximum_is_still_counted_without_inventing_usage():
             and row["response_id"] is None
         )
     with pytest.raises(ledger.BudgetBlocked):
-        ledger.reserve("known-timeout", "test", body())
-    with pytest.raises(ledger.BudgetBlocked):
         ledger.authorize_dispatch(call["id"], body())
-    # A new explicit request can run, but the held maximum reduces its allowance.
+    # The held maximum still counts in the totals; it no longer blocks anything.
     with transaction(admin=True) as conn:
         conn.execute(
             """INSERT INTO model_calls(id,request_key,request_hash,purpose,model,price_version,request_body,reserved_nano_usd,status,charged_nano_usd) VALUES(%s,'near-cap','x','test',%s,'test','{}',9999999999,'settled',%s)""",
             (uuid4(), MODEL, 40_000_000_000 - ledger.estimate(body())),
         )
-    with pytest.raises(ledger.BudgetBlocked, match="allowance"):
-        ledger.reserve("held-maximum-still-counts", "test", body())
-    assert ledger.snapshot()["calls"] == 2
+    ledger.reserve("held-maximum-still-counts", "test", body())
+    assert ledger.snapshot()["calls"] == 3
     with pytest.raises(psycopg.errors.RaiseException, match="immutable"):
         with transaction(admin=True) as conn:
             conn.execute("DELETE FROM model_accounting_decisions")
@@ -482,16 +473,15 @@ def test_profiles_share_totals_and_legacy_mini_cache_keeps_original_charge():
 @pytest.mark.parametrize(
     "reserved,new", [(body, reasoning_body), (reasoning_body, body)]
 )
-def test_unresolved_reservation_blocks_every_profile(reserved, new):
+def test_unresolved_reservation_does_not_block_other_profiles(reserved, new):
     ledger.reserve("first-profile", "test", reserved())
-    with pytest.raises(ledger.BudgetBlocked, match="reconciliation"):
-        ledger.execute(
-            "other-profile",
-            "test",
-            new(),
-            transport=lambda _: pytest.fail("Cross-profile retry"),
-        )
-    assert ledger.snapshot()["calls"] == 1 and ledger.snapshot()["unresolved"] == 1
+    ledger.execute(
+        "other-profile",
+        "test",
+        new(),
+        transport=lambda _: response() if new is body else reasoning_response(),
+    )
+    assert ledger.snapshot()["calls"] == 2 and ledger.snapshot()["unresolved"] == 1
 
 
 def test_settlement_uses_stored_profile_not_caller_supplied_prices():
@@ -579,31 +569,60 @@ def test_both_models_require_explicit_config_in_original_installation(monkeypatc
     module = importlib.import_module("thesis.providers.settings")
     monkeypatch.setattr(module, "ROOT", module.APPROVED_ROOT)
     monkeypatch.setattr(module, "DATA", module.APPROVED_ROOT / ".local")
+    monkeypatch.setattr(module, "PROVIDER", "openai")
+    monkeypatch.setattr(module, "MODEL", MODEL)
+    monkeypatch.setattr(module, "REASONING_MODEL", REASONING_MODEL)
     values = dict(
         THESIS_LIVE_MODELS_ENABLED="true",
         THESIS_MODEL_PROVIDER="openai",
-        THESIS_MODEL=MODEL,
-        THESIS_LIVE_TEST_BUDGET_USD="40",
+        # Leftover per-model lines from the old setup are ignored.
+        THESIS_REASONING_MODEL="claude-opus-5-5",
         OPENAI_API_KEY="mock-only-key",
     )
     monkeypatch.setattr(module, "settings", lambda: deepcopy(values))
     assert module.live_key() == "mock-only-key"
-    with pytest.raises(ValueError, match="priced"):
-        module.live_key(REASONING_MODEL)
-    values["THESIS_REASONING_MODEL"] = REASONING_MODEL
     assert module.live_key(REASONING_MODEL) == "mock-only-key"
-    values["THESIS_MODEL"] = REASONING_MODEL
-    with pytest.raises(ValueError, match="priced"):
-        module.live_key()
-    assert module.live_key(REASONING_MODEL) == "mock-only-key"
+    # No configured allowance figure is required any more.
     values["THESIS_LIVE_TEST_BUDGET_USD"] = "10"
-    with pytest.raises(ValueError, match="US\\$40"):
+    assert module.live_key(REASONING_MODEL) == "mock-only-key"
+    # Switching .env while the app runs needs a restart before any paid call.
+    values["THESIS_MODEL_PROVIDER"] = "anthropic"
+    values["ANTHROPIC_API_KEY"] = "other-key"
+    with pytest.raises(ValueError, match="restart the app"):
         module.live_key(REASONING_MODEL)
+    values["THESIS_MODEL_PROVIDER"] = "openai"
+    del values["OPENAI_API_KEY"]
+    with pytest.raises(ValueError, match="OPENAI_API_KEY"):
+        module.live_key()
+    values["THESIS_LIVE_MODELS_ENABLED"] = "false"
+    with pytest.raises(ValueError, match="disabled"):
+        module.live_key()
     monkeypatch.setattr(
         module, "settings", lambda: pytest.fail("Unknown model must not read keys")
     )
     with pytest.raises(ValueError, match="priced"):
         module.live_key("unpriced-model")
+
+
+def test_env_comments_and_one_line_provider_switch(tmp_path):
+    from thesis.providers import settings as module
+
+    env = tmp_path / ".env"
+    env.write_text(
+        "THESIS_MODEL_PROVIDER=deepseek   # one line to switch\n"
+        "QUOTED='keeps # inside quotes'\n"
+        "TOKEN=abc#def\n"
+    )
+    values = module.settings(env)
+    assert values["THESIS_MODEL_PROVIDER"] == "deepseek"
+    assert values["QUOTED"] == "keeps # inside quotes"
+    assert values["TOKEN"] == "abc#def"
+    assert module.select(values) == ("deepseek", "deepseek-flash", "deepseek-v4-pro")
+    assert module.select({}) == ("openai", module.OPENAI_MODEL, module.OPENAI_REASONING_MODEL)
+    assert module.select({"THESIS_MODEL_PROVIDER": "anthropic", "THESIS_MODEL": "gpt-5.4-mini-2026-03-17"}) == (
+        "anthropic", "claude-haiku-5-5", "claude-opus-5-5")
+    with pytest.raises(ValueError, match="must be one of"):
+        module.select({"THESIS_MODEL_PROVIDER": "gemini"})
 
 
 @pytest.mark.parametrize("model", [MODEL, REASONING_MODEL])
@@ -637,34 +656,6 @@ def test_disabled_reasoning_route_reserves_nothing(monkeypatch):
         ledger.execute("disabled-reasoning", "test", reasoning_body())
     assert selected == [REASONING_MODEL]
     assert ledger.snapshot()["calls"] == 0
-
-
-def test_stronger_profile_cannot_start_a_separate_allowance():
-    remaining = ledger.estimate(reasoning_body()) - 1
-    assert remaining > ledger.estimate(body())
-    with transaction(admin=True) as conn:
-        conn.execute(
-            """INSERT INTO model_calls(id,request_key,request_hash,purpose,model,price_version,
-          request_body,reserved_nano_usd,status,charged_nano_usd) VALUES(%s,'earlier-mini','x','test',%s,%s,%s,%s,'settled',%s)""",
-            (
-                uuid4(),
-                MODEL,
-                ledger.PRICE_VERSION,
-                Jsonb(body()),
-                40 * ledger.NANO - remaining,
-                40 * ledger.NANO - remaining,
-            ),
-        )
-    with pytest.raises(ledger.BudgetBlocked, match="allowance"):
-        ledger.execute(
-            "strong-over-cap",
-            "test",
-            reasoning_body(),
-            transport=lambda _: pytest.fail("Strong model bypassed existing spending"),
-        )
-    ledger.execute("mini-within-cap", "test", body(), transport=lambda _: response())
-    assert ledger.snapshot()["calls"] == 2
-    assert 0 < float(ledger.snapshot()["remaining_usd"]) < remaining / ledger.NANO
 
 
 @pytest.mark.parametrize(
@@ -904,4 +895,5 @@ def test_depth_transport_timeout_keeps_full_hold_and_never_retries(monkeypatch):
         assert call['charged_nano_usd'] is None
     with pytest.raises(ledger.BudgetBlocked):
         ledger.execute('depth-timeout', 'test', value)
-    assert posts == [1] and ledger.snapshot()['unresolved'] == 1
+    # An explicit second attempt is now sent again; no automatic retry happens.
+    assert posts == [1, 1] and ledger.snapshot()['unresolved'] == 2
