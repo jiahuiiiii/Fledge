@@ -30,8 +30,8 @@ tests: `tests/test_password_auth.py`.
 2. Then the add-company search opens so they can start their watchlist.
 3. The home page uses their answers: headline and next step follow their goal,
    their interests are repeated back as search hints, the starter questions
-   are reordered by goal, and the view starts in **Beginner** mode for new/ETF
-   investors and **Pro** for others. A top-bar switch changes it at any time
+   are reordered by goal, and the view starts in **Beginner** mode for everyone but
+   "Active" traders, who start in **Pro**. A top-bar switch changes it at any time
    (see [Beginner and Pro modes](beginner-mode.md)).
 4. Each account follows at most **five companies**. Once an account has a
    watchlist, the sidebar shows only those companies. A sixth company can still

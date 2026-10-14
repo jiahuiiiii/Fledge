@@ -143,6 +143,12 @@
   color: var(--color-faint);
   font-style: italic;
 }
+.world-news-links li.world-news-caveat {
+  background: none;
+  padding: 0 var(--space-1);
+  color: var(--color-faint);
+  font-style: italic;
+}
 .world-news-empty {
   color: var(--color-muted);
 }
@@ -150,6 +156,16 @@
   margin-top: var(--space-2);
 }
 @media (max-width: 640px) {
+  /* One swipeable row of filters instead of a block of chips. */
+  .world-news-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: var(--space-1);
+  }
+  .world-news-filters button {
+    flex: none;
+  }
   .world-news {
     padding: var(--space-5) var(--space-4);
   }

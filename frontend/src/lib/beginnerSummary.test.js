@@ -50,3 +50,32 @@ test("picks world headlines linked to the company, else the big picture", () => 
   assert.deepEqual(other.linked, []);
   assert.deepEqual(other.bigPicture.map((a) => a.id), ["1", "2"]);
 });
+
+import { oneLine } from "./beginnerSummary.js";
+
+test("sums up the saved readings in one plain sentence", () => {
+  assert.equal(
+    oneLine({
+      newsTone: "mixed / balanced",
+      social: [{ tone: "positive leaning" }],
+      links: [{ effect: "could_hurt" }],
+    }),
+    "News about it is mixed. People online are mostly upbeat. 1 world headline could hurt it. Worth reading the headlines below before you decide anything.",
+  );
+  assert.equal(
+    oneLine({ newsTone: null, newsCount: 2, social: [], links: [{ effect: "could_help" }, { effect: "could_hurt" }] }),
+    "There are 2 recent updates, not yet read by AI. Of 2 world headlines linked to it, 1 could help it and 1 could hurt it. Worth reading the headlines below before you decide anything.",
+  );
+  assert.equal(oneLine({}), "There’s no recent news saved yet.");
+  assert.equal(
+    oneLine({ newsTone: "negative leaning", social: [{ tone: "positive leaning" }, { tone: "negative leaning" }] }),
+    "News about it is mostly negative. People online are split. Worth reading the headlines below before you decide anything.",
+  );
+});
+
+test("adds the either-way headlines and a calm close when nothing is worrying", () => {
+  assert.equal(
+    oneLine({ newsTone: "positive leaning", links: [{ effect: "could_help" }, { effect: "mixed_or_unclear" }] }),
+    "News about it is mostly positive. Of 2 world headlines linked to it, 1 could help it and 1 could go either way. Nothing in the saved news looks worrying right now.",
+  );
+});

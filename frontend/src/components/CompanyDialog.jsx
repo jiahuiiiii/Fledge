@@ -175,6 +175,8 @@ export default function CompanyDialog({
               {result.companies.map((company) => {
                 const saved = company.instrument_id;
                 const isHidden = hidden.some((c) => c.id === saved);
+                // "Open" only for companies already on this account's list.
+                const listed = visible.some((c) => c.id === saved);
                 return (
                   <li key={company.symbol}>
                     <button
@@ -182,7 +184,7 @@ export default function CompanyDialog({
                       className="company-result"
                       disabled={!!busy || !company.available}
                       onClick={() => add(company)}
-                      aria-label={`${saved ? (isHidden ? "Restore" : "Open") : "Add"} ${company.symbol} · ${company.name}`}
+                      aria-label={`${saved && (isHidden || listed) ? (isHidden ? "Restore" : "Open") : "Add"} ${company.symbol} · ${company.name}`}
                     >
                       <span className="company-symbol-mark" aria-hidden="true">
                         {company.symbol.slice(0, 2)}
@@ -202,11 +204,11 @@ export default function CompanyDialog({
                             : "Adding…"
                           : !company.available
                             ? "Unavailable"
-                            : saved
-                              ? isHidden
-                                ? "Restore"
-                                : "Open"
-                              : "+ Add"}
+                            : isHidden
+                              ? "Restore"
+                              : saved && listed
+                                ? "Open"
+                                : "+ Add"}
                       </span>
                     </button>
                   </li>
@@ -247,7 +249,7 @@ export default function CompanyDialog({
         {(visible.length > 0 || hidden.length > 0) && (
           <details className="company-management">
             <summary>
-              Manage sidebar <span>{visible.length} companies</span>
+              Manage my companies <span>{visible.length} companies</span>
             </summary>
             <p>
               Removing a company only hides it from your sidebar. Research and

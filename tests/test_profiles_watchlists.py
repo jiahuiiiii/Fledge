@@ -89,7 +89,7 @@ def test_home_follows_answers_without_naming_companies(owner):
     profile.save(owner, 'stocks', ['technology', 'healthcare'], 'medium', 'check')
     page = home.build(owner)
     assert page['next_step']['action'] == 'add_company'
-    assert page['starter_order'][0] == 'risks' and page['detail_mode'] == 'data'
+    assert page['starter_order'][0] == 'risks' and page['detail_mode'] == 'explain'
     assert [i['label'] for i in page['interests']] == ['Technology', 'Healthcare']
     iid, = companies(1)
     watchlist.add(owner, iid)

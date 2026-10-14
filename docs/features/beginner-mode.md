@@ -55,3 +55,11 @@ ideas, account menu). `frontend/src/styles/mobile.css`, loaded last:
 - Research tabs scroll sideways with a fade showing more tabs exist.
 - Small controls (Beginner/Pro, demo bar, "Read source", source links, World
   filters) are at least 44 px tall on phones and touch screens.
+
+## After the beginner persona test — 14 October 2026
+
+See [the persona test](../reviews/2026-10-14/beginner-persona.md). Beginner is
+now the default for everyone except "Active" traders; Summary opens with an
+**In short** line; the view form, home cards and News & discussion intro use
+plain words in Beginner; new username accounts see only their own companies
+plus the fictional practice ones.

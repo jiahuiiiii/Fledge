@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
+import { useProfile } from "../lib/profile";
 import { formatTimestamp } from "../lib/dateTime";
 import { companyName } from "../lib/companyIdentity";
 import { snapshot } from "../lib/companySnapshot";
@@ -7,6 +8,7 @@ import { overviewNews } from "../lib/overviewSections";
 import { sourceCoverage } from "../lib/sourceCoverage";
 import {
   itemTone,
+  oneLine,
   plainTone,
   platformName,
   priceLine,
@@ -38,6 +40,7 @@ export default function BeginnerSummary({
   onUpdate,
 }) {
   const [world, setWorld] = useState(null);
+  const { mode } = useProfile();
   useEffect(() => {
     if (!visible) return;
     let active = true;
@@ -58,9 +61,25 @@ export default function BeginnerSummary({
   const newsTone = scopes.find((s) => s.scope === "news");
   const social = socialTones(scopes);
   const items = overviewNews(data);
-  const news = items.filter((s) => s.kind === "news").slice(0, 5);
+  const analysedNews = items.filter((s) => s.kind === "news");
+  // Without a news reading, show the saved company documents instead (newest
+  // first, no tone), so the card is never empty when sources exist.
+  const news = (
+    analysedNews.length
+      ? analysedNews
+      : (data.documents || [])
+          .filter((d) => d.title)
+          .map((d) => ({ ...d, headline: d.title }))
+          .sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at))
+  ).slice(0, 5);
   const posts = items.filter((s) => s.kind === "social").slice(0, 3);
   const { linked, bigPicture } = worldForCompany(world, instrumentId);
+  const summaryLine = oneLine({
+    newsTone: newsTone?.analysed ? newsTone.tone : null,
+    newsCount: news.length,
+    social,
+    links: linked.map((x) => x.link).filter(Boolean),
+  });
 
   return (
     <div className="beginner-summary">
@@ -80,6 +99,10 @@ export default function BeginnerSummary({
         ) : (
           <p className="bs-muted">No share price saved yet.</p>
         )}
+        <p className="bs-oneline">
+          <span className="section-label">IN SHORT</span>
+          {summaryLine}
+        </p>
       </section>
 
       {sentences.length > 0 && (
@@ -97,7 +120,7 @@ export default function BeginnerSummary({
         <div className="bs-head">
           <h4 id="bs-news">What the news says</h4>
           <span className={`bs-tone mood-${toneMood(newsTone?.tone)}`}>
-            {newsTone?.analysed ? plainTone(newsTone.tone) : "Not checked yet"}
+            {newsTone?.analysed ? plainTone(newsTone.tone) : "Not read yet"}
           </span>
         </div>
         {news.length ? (
@@ -228,6 +251,9 @@ export default function BeginnerSummary({
         ) : (
           <p className="bs-muted">No recent world headlines saved yet.</p>
         )}
+        {linked.some((x) => x.link) && (
+          <p className="bs-caveat">A possibility to think about, not a prediction or a tip.</p>
+        )}
         <button type="button" className="bs-more" onClick={onWorld}>
           Open World news →
         </button>
@@ -242,8 +268,9 @@ export default function BeginnerSummary({
           </>
         ) : (
           <p className="bs-muted">
-            Why are you interested in {name}? Write it down in a sentence, and
-            Fledge will tell you when news supports or challenges it.
+            Why are you interested in {name}? Write it down in a sentence. Later,
+            you can turn on news alerts to hear when news backs it up or goes
+            against it.
           </p>
         )}
         {onSaveView && (
@@ -255,7 +282,10 @@ export default function BeginnerSummary({
 
       <p className="bs-note">
         This page rewords saved news and posts; it is not advice to buy or
-        sell. Switch to Pro for financials, charts and comparisons.
+        sell.
+        {mode === "explain"
+          ? " Switch to Pro for financials, charts and comparisons."
+          : " The other tabs have the financials, charts and comparisons."}
       </p>
     </div>
   );

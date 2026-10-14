@@ -51,3 +51,17 @@
     padding-block: 6px;
   }
 }
+
+/* Beginner mode hides the financial figures on home cards. */
+.company-overview-figures[hidden] {
+  display: none !important;
+}
+.beginner-news-intro {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  color: var(--color-text-2);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}

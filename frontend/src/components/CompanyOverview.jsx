@@ -18,12 +18,16 @@ import "./CompanyOverview.css";
 const stamp = (value) =>
   formatTimestamp(value, { fallback: "Date unavailable" });
 
+import { useProfile } from "../lib/profile";
+
 export default function CompanyOverview({
   catalogue,
   initialWorkspace,
   onOpen,
 }) {
   const [readings, setReadings] = useState({});
+  // Beginner mode keeps each card to the price and a plain news line.
+  const beginner = useProfile().mode === "explain";
   const [refresh, setRefresh] = useState(0);
   const [query, setQuery] = useState("");
   const current = useRef({ catalogue, initialWorkspace });
@@ -185,19 +189,28 @@ export default function CompanyOverview({
                   </span>
                   <span className="company-overview-tone">
                     <span>
-                      News tone ·{" "}
+                      {beginner ? "News · " : "News tone · "}
                       {tone?.label ||
                         (tone
-                          ? "Too few interpretable developments"
-                          : "No saved reading")}
+                          ? beginner
+                            ? "Not enough to tell yet"
+                            : "Too few interpretable developments"
+                          : beginner
+                            ? "Not read yet"
+                            : "No saved reading")}
                     </span>
                     <small>
-                      {tone
-                        ? `${tone.selected} ${tone.selected === 1 ? "story" : "stories"} · ${tone.total} counted groups · ${tone.stale ? "older reading" : "saved"} ${stamp(tone.savedAt)}`
-                        : "Analyse news in the company workspace"}
+                      {beginner
+                        ? "Open the company for the headlines"
+                        : tone
+                          ? `${tone.selected} ${tone.selected === 1 ? "story" : "stories"} · ${tone.total} counted groups · ${tone.stale ? "older reading" : "saved"} ${stamp(tone.savedAt)}`
+                          : "Analyse news in the company workspace"}
                     </small>
                   </span>
-                  <span className="company-overview-figures">
+                  <span
+                    className="company-overview-figures"
+                    hidden={beginner}
+                  >
                     <span>
                       <span>Revenue · 12 months</span>
                       <strong>

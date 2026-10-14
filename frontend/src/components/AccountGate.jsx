@@ -177,7 +177,7 @@ export default function AccountGate({ children }) {
         <a className="brand" href="/">
           fledge<span>↗</span>
         </a>
-        <h1>Sign in to your research</h1>
+        <h1>{creating ? "Create your Fledge account" : "Sign in to your research"}</h1>
         <p>
           Your questions, ideas and monitoring settings belong to your account.
         </p>

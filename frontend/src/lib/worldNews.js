@@ -4,7 +4,7 @@
 export const EFFECT_LABELS = {
   could_help: "could help",
   could_hurt: "could hurt",
-  mixed_or_unclear: "mixed or unclear",
+  mixed_or_unclear: "could go either way",
 };
 
 // "all", "mine" (names or may affect a watchlist company) or a theme id.

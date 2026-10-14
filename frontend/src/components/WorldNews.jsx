@@ -120,7 +120,7 @@ export default function WorldNews({ active, onOpenCompany }) {
         {page?.checked_at
           ? `Headlines checked ${formatTimestamp(page.checked_at)} · Finnhub market news, last 3 days.`
           : "No world headlines saved yet."}
-        {blocker && page && (
+        {blocker && page && !page.check && (
           <span id="world-check-blocker"> {blocker}</span>
         )}
         {page?.check && (
@@ -132,9 +132,7 @@ export default function WorldNews({ active, onOpenCompany }) {
       </p>
       {page && !page.configured && (
         <p className="warning" role="status">
-          World news needs a Finnhub key. Add <code>FINNHUB_API_KEY</code> and{" "}
-          <code>THESIS_LIVE_DATA_ENABLED=true</code> to your private .env file,
-          then restart Fledge.
+          New world headlines aren’t connected yet, so only saved ones show.
         </p>
       )}
       {page?.error && (
@@ -232,6 +230,9 @@ export default function WorldNews({ active, onOpenCompany }) {
                       <q>{link.quote}</q>
                     </li>
                   ))}
+                  <li className="world-news-caveat">
+                    A possibility to think about, not a prediction or a tip.
+                  </li>
                 </ul>
               )}
             </li>

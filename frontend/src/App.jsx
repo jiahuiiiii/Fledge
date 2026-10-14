@@ -329,8 +329,16 @@ function ResearchApp({ signOut, session }) {
     const params = new URLSearchParams({ company: id, view });
     if (evaluation) params.set("evaluation", evaluation);
     history.replaceState(null, "", `?${params}`);
-    if (id !== destination.id)
+    if (id !== destination.id) {
       setInboxState((state) => ({ ...state, page: 0, cutoff: "" }));
+      // A different company or page starts at the top, not the old scroll spot.
+      requestAnimationFrame(() => {
+        window.scrollTo(0, 0);
+        document
+          .querySelectorAll(".main-workspace, .workspace-grid")
+          .forEach((el) => el.scrollTo?.(0, 0));
+      });
+    }
     setDestination({ id, view, evaluation });
   }
   const [home, setHome] = useState(null);
@@ -418,6 +426,9 @@ function ResearchApp({ signOut, session }) {
       ) : (
         <CompanyWorkspace
           signOut={signOut}
+          sharedCatalogue={
+            session.mode !== "password" || !!session.is_installation_owner
+          }
           instrumentId={destination.id || defaultCompany}
           selectedCompanyId={destination.id}
           onWorkspaceReset={(resetSelection) => {
@@ -452,6 +463,7 @@ const pendingPriceRead = { data: null, error: "" };
 
 function CompanyWorkspace({
   signOut,
+  sharedCatalogue = true,
   instrumentId,
   selectedCompanyId,
   onWorkspaceReset,
@@ -919,14 +931,17 @@ function CompanyWorkspace({
     watchlist
       ? watchlist.companies.some((listed) => listed.id === company.id)
       : company.watchlisted;
+  // New username accounts start from their own list (plus practice companies),
+  // not every company other accounts have added.
   const usesWatchlist =
+    !sharedCatalogue ||
     watchlist?.started ||
     data.watchlist_started ||
     data.catalogue.some(watched);
   const visibleCompanies = data.catalogue.filter(
     (company) =>
       !hiddenCompanies.includes(company.id) &&
-      (!usesWatchlist || watched(company)),
+      (!usesWatchlist || watched(company) || company.mode === "recorded"),
   );
   const hiddenCatalogue = data.catalogue.filter((company) =>
     hiddenCompanies.includes(company.id),
@@ -1036,8 +1051,17 @@ function CompanyWorkspace({
             : "Your monitoring definition is saved. Checking the available filing evidence."
           : status === "archived"
             ? "Idea archived. Monitoring is off; your history is preserved."
-            : "Draft saved. Monitoring is off.",
+            : beginner
+              ? "Your view is saved. News alerts are off; turn them on in News & discussion to hear when news backs it up or goes against it."
+              : "Draft saved. Monitoring is off.",
       );
+      // Show the confirmation instead of leaving it above the scrolled view.
+      requestAnimationFrame(() => {
+        window.scrollTo(0, 0);
+        document
+          .querySelectorAll(".main-workspace, .workspace-grid")
+          .forEach((el) => el.scrollTo?.(0, 0));
+      });
     } catch (e) {
       if (activeScope.current !== scope) return;
       setFormError(e.message);
@@ -1817,7 +1841,13 @@ function CompanyWorkspace({
                           instrumentId={instrumentId}
                           visible={view === "workspace" && tab === "summary"}
                           savedView={current}
-                          onSaveView={isRecorded ? undefined : openEditor}
+                          onSaveView={() => {
+                            openEditor();
+                            if (!current) {
+                              const plain = `Why do I like ${data.instrument.name}?`;
+                              setEditor({ ...formFor(null, plain), question: plain });
+                            }
+                          }}
                           onView={setTab}
                           onSource={setSource}
                           onWorld={() => setView("world")}
@@ -1828,6 +1858,15 @@ function CompanyWorkspace({
                       </RetainedView>
                       <RetainedView active={tab === "evidence"}>
                         <>
+                          {beginner && (
+                            <p className="beginner-news-intro">
+                              Every saved news article and online post about{" "}
+                              {data.instrument.name}, newest first. Tap one to
+                              read it in full. A label like “positive” or
+                              “negative” describes how the article sounds, not
+                              what you should do.
+                            </p>
+                          )}
                           {!isRecorded && (
                             <MarketResearch
                               question={question}
@@ -3140,8 +3179,12 @@ function CompanyWorkspace({
           proposalIds.length
             ? "Review selected suggestions"
             : current
-              ? "Edit your idea"
-              : "Save your reasoning"
+              ? beginner
+                ? "Edit your view"
+                : "Edit your idea"
+              : beginner
+                ? "Your view"
+                : "Save your reasoning"
         }
         onClose={() => !busy && setEditor(null)}
       >
@@ -3167,11 +3210,12 @@ function CompanyWorkspace({
             )}
             <section className="idea-writing">
               <p className="idea-intro">
-                Start with your question and your point of view. Add monitoring
-                rules when you’re ready.
+                {beginner
+                  ? "Say in your own words why you like this company. Rules for alerts are optional."
+                  : "Start with your question and your point of view. Add monitoring rules when you’re ready."}
               </p>
               <label className="field">
-                Research question
+                {beginner ? "Your question" : "Research question"}
                 <input
                   value={editor.question}
                   maxLength={200}
@@ -3183,13 +3227,19 @@ function CompanyWorkspace({
                 />
               </label>
               <div className="field">
-                <label htmlFor="idea-reasoning">My reasoning</label>
+                <label htmlFor="idea-reasoning">
+                  {beginner ? "Your answer" : "My reasoning"}
+                </label>
                 <textarea
                   id="idea-reasoning"
                   value={editor.reasoning}
                   maxLength={3000}
                   rows={3}
-                  placeholder="I think… because… I’m unsure about… I would reconsider if…"
+                  placeholder={
+                    beginner
+                      ? "I like it because… I’m not sure about… I’d change my mind if…"
+                      : "I think… because… I’m unsure about… I would reconsider if…"
+                  }
                   aria-describedby="reasoning-starter"
                   onChange={(e) => {
                     setApproved(false);
@@ -3197,9 +3247,9 @@ function CompanyWorkspace({
                   }}
                 />
                 <p id="reasoning-starter" className="reasoning-prompt">
-                  Use your own words. One reason and one uncertainty are enough
-                  to start. You can save a draft without a monitoring rule,
-                  including why you decided not to invest.
+                  {beginner
+                    ? "One or two sentences in your own words is enough."
+                    : "Use your own words. One reason and one uncertainty are enough to start. You can save a draft without a monitoring rule, including why you decided not to invest."}
                 </p>
               </div>
             </section>
@@ -3213,10 +3263,13 @@ function CompanyWorkspace({
             >
               <summary>
                 <span>
-                  <strong>Add monitoring rules</strong>
+                  <strong>
+                    {beginner ? "Get alerts (optional)" : "Add monitoring rules"}
+                  </strong>
                   <small>
-                    Optional · Track numbers or developments that would change
-                    your mind
+                    {beginner
+                      ? "Tell Fledge which news would change your mind"
+                      : "Optional · Track numbers or developments that would change your mind"}
                   </small>
                 </span>
                 <Icon name="plus" width="18" />
@@ -3557,7 +3610,11 @@ function CompanyWorkspace({
                   busy || !!conflict || proposalStale || !editor.question.trim()
                 }
               >
-                {proposalIds.length ? "Use suggestions in draft" : "Save draft"}
+                {proposalIds.length
+                  ? "Use suggestions in draft"
+                  : beginner
+                    ? "Save my view"
+                    : "Save draft"}
               </button>
               {(editor.conditions.length > 0 || editor.events.length > 0) && (
                 <button
