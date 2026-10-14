@@ -7,6 +7,12 @@ import {
   overviewNews,
   overviewModel,
   ratio,
+  previewable,
+  recentHeadlines,
+  headlinesAfterReading,
+  analystRevenueForecast,
+  borrowingYears,
+  pastDayTone,
 } from "./overviewSections.js";
 const row = (key, value, end = "2026-08-02") => ({
   key,
@@ -245,4 +251,219 @@ test("named fiscal guidance remains readable without inventing an ending date", 
     }),
     "Access withdrawn",
   );
+});
+test("quarterly outlook compares only with the same fiscal quarter a year earlier", async () => {
+  const { revenueComparisons, fiscalQuarter, growthText, guidanceScope } =
+    await import("./overviewSections.js");
+  const period = (kind, start, end, value) => ({
+    kind,
+    start,
+    end,
+    metrics: [{ key: "revenue", value }],
+  });
+  const flow = {
+    income_flow: {
+      periods: [
+        period("trailing", "2025-07-01", "2026-06-30", "775680000000"),
+        period("quarter", "2026-04-01", "2026-06-30", "200606000000"),
+        period("quarter", "2026-01-01", "2026-03-31", "181519000000"),
+        period("annual", "2025-01-01", "2025-12-31", "716924000000"),
+        period("quarter", "2025-07-01", "2025-09-30", "180169000000"),
+        period("quarter", "2025-04-01", "2025-06-30", "167702000000"),
+        period("quarter", "2025-01-01", "2025-03-31", "155667000000"),
+        period("annual", "2024-01-01", "2024-12-31", "637959000000"),
+      ],
+    },
+  };
+  const guidance = {
+    low: "197000000000",
+    high: "202000000000",
+    unit: null,
+    section: { period_type: "quarter", period_label: "Q3 2026", quarter: 3 },
+    release: { published_at: "2026-07-31T08:06:23+08:00" },
+  };
+  const { latestQuarter, outlook } = revenueComparisons(flow, guidance);
+  assert.equal(latestQuarter.current.end, "2026-06-30");
+  assert.equal(latestQuarter.previous.end, "2025-06-30");
+  assert.equal(latestQuarter.growth.toFixed(2), "19.62");
+  assert.equal(outlook.previous.end, "2025-09-30");
+  assert.equal(growthText(outlook.growth), "+9.3% to +12.1%");
+  assert.equal(guidanceScope(guidance.section), "one quarter");
+  // Quarters after the latest saved fiscal year count from its end.
+  const annuals = [{ start: "2025-01-01", end: "2025-12-31" }];
+  assert.equal(
+    fiscalQuarter({ start: "2026-04-01", end: "2026-06-30" }, annuals),
+    2,
+  );
+  // A non-USD outlook, a missing year-earlier quarter or an annual outlook
+  // without an ending date gets no implied growth.
+  assert.equal(
+    revenueComparisons(flow, { ...guidance, unit: "EUR" }).outlook,
+    null,
+  );
+  const missing = structuredClone(flow);
+  missing.income_flow.periods.splice(4, 1);
+  assert.equal(revenueComparisons(missing, guidance).outlook, null);
+  assert.equal(
+    revenueComparisons(flow, {
+      ...guidance,
+      section: { period_type: "annual", period_label: "FY2026" },
+    }).outlook,
+    null,
+  );
+  const annual = revenueComparisons(flow, {
+    ...guidance,
+    low: "800000000000",
+    high: "800000000000",
+    section: { period_type: "annual", period_end: "2026-12-31" },
+  });
+  assert.equal(annual.outlook.previous.end, "2025-12-31");
+  assert.equal(growthText(annual.outlook.growth), "+11.6%");
+  // No quarters: nothing to compare, nothing invented.
+  assert.deepEqual(revenueComparisons({}, guidance), {
+    latestQuarter: null,
+    outlook: null,
+  });
+});
+
+test("Overview preview skips abusive and very short untitled posts but keeps news", () => {
+  assert.equal(
+    previewable({
+      kind: "social",
+      body: "Worked there before. Foul mouth bitch.",
+    }),
+    false,
+  );
+  assert.equal(previewable({ kind: "social", body: "Avgo." }), false);
+  assert.equal(
+    previewable({ kind: "social", title: "AVGO earnings", body: "" }),
+    true,
+  );
+  assert.equal(previewable({ kind: "news", title: "Chip stocks fall" }), true);
+  assert.equal(
+    previewable({
+      kind: "social",
+      body: "Broadcom's AI networking demand still looks strong to me.",
+    }),
+    true,
+  );
+});
+
+test("Past-day headlines are company news only, newest first, and never future-dated", () => {
+  const now = Date.parse("2026-10-13T10:00:00Z");
+  const items = [
+    { id: 1, kind: "news", title: "Old", published_at: "2026-10-11T09:00:00Z" },
+    {
+      id: 2,
+      kind: "news",
+      title: "Earlier today",
+      published_at: "2026-10-13T06:00:00Z",
+    },
+    {
+      id: 3,
+      kind: "social",
+      title: "Post",
+      published_at: "2026-10-13T08:00:00Z",
+    },
+    {
+      id: 4,
+      kind: "news",
+      title: "Latest",
+      published_at: "2026-10-13T08:30:00Z",
+    },
+    {
+      id: 5,
+      kind: "news",
+      title: "Future",
+      published_at: "2026-10-13T12:00:00Z",
+    },
+  ];
+  assert.deepEqual(
+    recentHeadlines(items, now).map((s) => s.id),
+    [4, 2],
+  );
+});
+
+test("Headlines after the AI reading's cutoff are counted; withheld readings count none", () => {
+  const items = [
+    { kind: "news", published_at: "2026-10-12T00:00:00Z" },
+    { kind: "news", published_at: "2026-10-13T08:00:00Z" },
+    { kind: "social", published_at: "2026-10-13T08:00:00Z" },
+  ];
+  const sentiment = { cutoff: "2026-10-11T17:28:27Z" };
+  assert.equal(headlinesAfterReading(sentiment, items).length, 2);
+  assert.equal(
+    headlinesAfterReading({ ...sentiment, withheld: true }, items).length,
+    0,
+  );
+  assert.equal(headlinesAfterReading(null, items).length, 0);
+});
+
+test("Analyst revenue forecast keeps an unstated currency as $ and picks the nearest year", () => {
+  const fmp = {
+    public_forecasts: {
+      available: true,
+      snapshot: {
+        data: {
+          forecasts: [
+            {
+              period_type: "annual",
+              period_end: "2027-10-31",
+              fiscal_year: 2027,
+              currency: null,
+              metrics: [{ key: "revenue", average: "130000000000" }],
+            },
+            {
+              period_type: "annual",
+              period_end: "2026-10-31",
+              fiscal_year: 2026,
+              currency: null,
+              displayed_analyst_count: 40,
+              metrics: [{ key: "revenue", average: "105970000000" }],
+            },
+          ],
+        },
+      },
+    },
+  };
+  const result = analystRevenueForecast(fmp);
+  assert.equal(result.display, "$106bn");
+  assert.equal(result.periodEnd, "2026-10-31");
+  assert.equal(result.currencyStated, false);
+  assert.equal(
+    analystRevenueForecast({ public_forecasts: { available: false } }),
+    null,
+  );
+});
+
+test("Borrowing in years of free cash flow needs the same end date and positive cash flow", () => {
+  const debt = { value: "61079000000", end: "2026-08-02" };
+  assert.equal(
+    borrowingYears(debt, { value: "39403000000", end: "2026-08-02" }).toFixed(
+      2,
+    ),
+    "1.55",
+  );
+  assert.equal(
+    borrowingYears(debt, { value: "39403000000", end: "2026-05-03" }),
+    null,
+  );
+  assert.equal(borrowingYears(debt, { value: "-5", end: "2026-08-02" }), null);
+});
+
+test("Past-day tone counts only relevant news stories in the day before the cutoff", () => {
+  const sentiment = { cutoff: "2026-10-13T09:20:00Z" };
+  const items = [
+    { kind: "news", tone: "negative", published_at: "2026-10-13T08:29:00Z" },
+    { kind: "news", tone: "negative", published_at: "2026-10-13T07:00:00Z" },
+    { kind: "news", tone: "positive", published_at: "2026-10-11T07:00:00Z" },
+    { kind: "news", tone: null, published_at: "2026-10-13T07:00:00Z" },
+    { kind: "social", tone: "positive", published_at: "2026-10-13T07:00:00Z" },
+    { kind: "news", tone: "positive", published_at: "2026-10-13T10:00:00Z" },
+  ];
+  assert.deepEqual(pastDayTone(sentiment, items), {
+    total: 2,
+    counts: { negative: 2 },
+  });
+  assert.equal(pastDayTone({ ...sentiment, withheld: true }, items), null);
 });

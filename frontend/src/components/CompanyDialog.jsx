@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Modal from "./Modal";
 import LoadingSkeleton from "./LoadingSkeleton";
 import { api } from "../api/client";
 import { companyName } from "../lib/companyIdentity";
+import { needsListingUpdate } from "../lib/companyDirectory";
 
 function ActionIcon({ restore = false }) {
   return (
@@ -38,6 +39,33 @@ export default function CompanyDialog({
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
+  // "" | "updating" | "failed": the automatic or manual listing update.
+  const [listing, setListing] = useState("");
+  const refreshing = useRef(null);
+  const tried = useRef(false);
+  useEffect(() => {
+    if (!open) tried.current = false;
+  }, [open]);
+  function refreshListings() {
+    if (refreshing.current) return refreshing.current;
+    setListing("updating");
+    refreshing.current = api
+      .refreshCompanyDirectory()
+      .then(() => setListing(""))
+      .catch(() => setListing("failed"))
+      .finally(() => {
+        refreshing.current = null;
+        // Re-read even after a failure: another tab may have updated it.
+        setRevision((r) => r + 1);
+      });
+    return refreshing.current;
+  }
+  // Update quietly once per opening when the saved copy is over a day old.
+  useEffect(() => {
+    if (!open || tried.current || !needsListingUpdate(result)) return;
+    tried.current = true;
+    refreshListings();
+  }, [open, result]);
   useEffect(() => {
     if (!open) return;
     let active = true;
@@ -62,17 +90,9 @@ export default function CompanyDialog({
       clearTimeout(timer);
     };
   }, [open, query, revision]);
-  async function update() {
-    setBusy("directory");
+  function update() {
     setError("");
-    try {
-      await api.refreshCompanyDirectory();
-      setRevision((r) => r + 1);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setBusy("");
-    }
+    refreshListings();
   }
   async function add(company) {
     if (company.instrument_id) {
@@ -82,10 +102,16 @@ export default function CompanyDialog({
     setBusy(company.symbol);
     setError("");
     try {
+      // A new listing needs current listings; wait for an update in progress.
+      if (refreshing.current) await refreshing.current;
       const saved = await api.addSecCompany(company.symbol);
       onAdded(saved.instrument_id);
     } catch (e) {
-      setError(e.message);
+      setError(
+        e.message?.startsWith("Update the company directory")
+          ? `US listings couldn’t be updated just now, so ${company.symbol} can’t be added yet. Try again in a few minutes.`
+          : e.message,
+      );
     } finally {
       setBusy("");
     }
@@ -171,7 +197,9 @@ export default function CompanyDialog({
                       </span>
                       <span className="company-result-action">
                         {busy === company.symbol
-                          ? "Adding…"
+                          ? listing === "updating"
+                            ? "Updating listings…"
+                            : "Adding…"
                           : !company.available
                             ? "Unavailable"
                             : saved
@@ -196,25 +224,25 @@ export default function CompanyDialog({
           )}
         </div>
         <div className="company-directory-status">
-          <span>
-            {!result?.retrieved_at
-              ? "Load the directory to search beyond the starter companies."
-              : result.stale
-                ? "Listings need updating before adding a new company."
-                : "Company identities from SEC · coverage varies by source"}
+          <span role="status">
+            {listing === "updating"
+              ? "Updating US listings from the SEC…"
+              : listing === "failed"
+                ? "Couldn’t update listings. Saved listings are still searchable; companies already in Fledge can be opened."
+                : !result?.retrieved_at
+                  ? "Load the directory to search beyond the starter companies."
+                  : "Company identities from SEC · coverage varies by source"}
           </span>
-          <button
-            type="button"
-            className="text-button"
-            onClick={update}
-            disabled={!!busy}
-          >
-            {busy === "directory"
-              ? "Updating…"
-              : result?.retrieved_at
-                ? "Update listings"
-                : "Load directory"}
-          </button>
+          {(listing === "failed" || !result?.retrieved_at) && (
+            <button
+              type="button"
+              className="text-button"
+              onClick={update}
+              disabled={!!busy || listing === "updating"}
+            >
+              {result?.retrieved_at ? "Try again" : "Load directory"}
+            </button>
+          )}
         </div>
         {(visible.length > 0 || hidden.length > 0) && (
           <details className="company-management">

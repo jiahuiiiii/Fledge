@@ -58,7 +58,24 @@ def plan(submissions, cik, now):
     return result
 
 
+# SEC's website appends a bot-check script with a random path to every page it
+# serves. It is not part of the filing; ignore it when deciding whether a
+# re-downloaded filing actually changed (13 Oct 2026: every check created a
+# "new version" of unchanged filings, invalidating reviewed AI figures).
+INJECTED_SCRIPT=re.compile(rb'<script type="text/javascript"\s+src="/[A-Za-z0-9/_\-]+"></script>(?=</body>)')
+
+
+def stable_content(raw):
+    return INJECTED_SCRIPT.sub(b'', bytes(raw))
+
+
 def commit(conn, iid, item, raw, data, now, name):
+    retained=one(conn,'SELECT id,raw_html FROM disclosure_documents WHERE instrument_id=%s AND url=%s ORDER BY available_at DESC,id DESC LIMIT 1',(iid,item['url']))
+    if retained and stable_content(retained['raw_html'])==stable_content(raw):
+        # Unchanged filing: keep the retained original bytes and version.
+        if not item.get('history'):
+            conn.execute('INSERT INTO disclosure_current VALUES(%s,%s,%s,%s) ON CONFLICT(instrument_id,slot) DO UPDATE SET document_id=excluded.document_id,checked_at=excluded.checked_at',(iid,item['slot'],retained['id'],now))
+        return str(retained['id'])
     digest=hashlib.sha256(raw).hexdigest()
     did=uuid5(NAMESPACE_URL,f'thesis:disclosure:{iid}:{item["url"]}:{digest}')
     # Exact A -> B -> A returns reuse the original availability timestamp.

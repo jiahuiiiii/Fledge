@@ -48,18 +48,6 @@ def test_one_oversized_whole_source_stops_before_any_paid_call(owner):
     assert ledger.snapshot() == before
 
 
-def test_full_plan_budget_check_before_first_dispatch(owner, monkeypatch):
-    iid, aid = setup(owner)
-    before = ledger.snapshot()
-    monkeypatch.setattr(B, 'MAX_SOURCES', 1)
-    monkeypatch.setattr(ledger, 'snapshot', lambda: dict(before, remaining_usd='0'))
-    with pytest.raises(ledger.BudgetBlocked, match='complete discussion summary'):
-        D.generate(iid, aid, transport=lambda _: pytest.fail('preflight must not dispatch'))
-    with transaction() as conn:
-        assert one(conn, 'SELECT count(*) n FROM model_calls')['n'] == before['calls']
-    assert D.history(iid, aid)['generation']['blocked_reason']
-
-
 def test_batches_publish_once_after_all_checks_with_exact_sources_and_cache(owner, monkeypatch):
     iid, aid = setup(owner)
     packet = packet_for(iid, aid)

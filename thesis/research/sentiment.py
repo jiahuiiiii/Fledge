@@ -550,10 +550,12 @@ def render(call, packet):
             | (sentiment_guards.apply(item, source, packet["company"])
                if packet.get("guard_policy") == sentiment_guards.POLICY else {})
         )
-    links = coverage.render(result.coverage_links, packet, items)
+    ignored = []
+    links = coverage.render(result.coverage_links, packet, items, ignored)
     return dict(
         items=items,
         coverage_links=links,
+        **({"ignored_coverage_links": ignored} if ignored else {}),
         summary=summarize(
             items, packet["sources"], links, packet.get("comparison_sources", [])
         ),
@@ -698,16 +700,24 @@ def _generate(iid, *, transport, now, lookback_days, progress, retry_failed):
     if old:
         with transaction() as c:
             return present(c, old)
-    result, calls = sentiment_batching.run(packet, transport=transport, progress=progress,
-                                         retry_failed=retry_failed)
+    from . import sentiment_reuse
+    with transaction() as c:
+        reused = sentiment_reuse.find(c, packet)
+    result, calls = sentiment_batching.run_reusing(packet, reused, transport=transport,
+                                                   progress=progress, retry_failed=retry_failed)
     packet["batching"] = dict(policy=sentiment_batching.POLICY,
                              call_ids=[str(call["id"]) for call in calls])
+    if result.get("source_reuse"):
+        packet["source_reuse"] = result["source_reuse"]
+    # A reading made entirely from saved labels points at the latest reused call.
+    call_id = calls[-1]["id"] if calls else max(
+        reused.values(), key=lambda saved: saved["analysis_id"])["call_id"]
     with transaction() as c:
         sentiment_batching.check_access(c, packet)
         row = one(
             c,
             "INSERT INTO sentiment_analyses VALUES(%s,%s,%s,%s,%s,%s,now()) ON CONFLICT(request_key) DO NOTHING RETURNING *",
-            (uuid4(), iid, key, calls[-1]["id"], Jsonb(packet), Jsonb(result)),
+            (uuid4(), iid, key, call_id, Jsonb(packet), Jsonb(result)),
         )
         row = row or one(
             c, "SELECT * FROM sentiment_analyses WHERE request_key=%s", (key,)

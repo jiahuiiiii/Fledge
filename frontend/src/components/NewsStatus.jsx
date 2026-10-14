@@ -41,6 +41,9 @@ export default function NewsStatus({ data, availability, onCoverage }) {
           {status.latest
             ? `latest news source check ${stamp(status.latest)}`
             : "no saved news source check"}
+          {analysis &&
+            !analysis.withheld &&
+            ` · tone reading ${stamp(analysis.created_at)}`}
           {status.failed.length > 0 && " · some news sources unavailable"}
           {status.waiting.length > 0 &&
             " · some sources waiting until their next allowed check"}

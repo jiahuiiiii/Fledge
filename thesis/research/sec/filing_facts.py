@@ -256,46 +256,65 @@ def attach(bundle, documents, cik, now):
 _overlays = OrderedDict()
 _overlay_lock = threading.Lock()
 _overlay_bytes = 0
-_OVERLAY_LIMIT = 32 * 1024 * 1024
+_OVERLAY_LIMIT = 96 * 1024 * 1024
 
 
-def cached_attach(bundle, documents, cik, now):
+def fingerprint(document):
+    """Hash of the actual saved bytes; the database can supply it without a transfer."""
+    if document.get('raw_sha'):
+        return bytes.fromhex(document['raw_sha'])
+    return hashlib.sha256(bytes(document['raw_html'])).digest()
+
+
+def cached_attach(bundle, documents, cik, now, load=None):
     """Cache only deterministic public extraction, never access or owner reviews.
 
     Fingerprint actual bytes as well as saved hashes so damaged/changed originals
-    cannot reuse a previously verified reading. Return independent copies because
-    downstream readers attach evidence to facts. No raw filing trees are retained.
+    cannot reuse a previously verified reading. Documents may carry a database-
+    computed `raw_sha` instead of `raw_html`; `load` then fetches the bytes only
+    when extraction must run. Entries are pickled, so every hit returns an
+    independent copy (downstream readers attach evidence to facts).
     """
     global _overlay_bytes
     digest = hashlib.sha256(json.dumps(bundle, sort_keys=True, separators=(',', ':')).encode())
     digest.update(str((METHOD, cik, now)).encode())
     for document in documents:
-        digest.update(json.dumps({k: str(v) for k, v in document.items() if k != 'raw_html'}, sort_keys=True).encode())
-        digest.update(hashlib.sha256(bytes(document['raw_html'])).digest())
+        digest.update(json.dumps({k: str(v) for k, v in document.items() if k not in ('raw_html', 'raw_sha')}, sort_keys=True).encode())
+        digest.update(fingerprint(document))
     key = digest.digest()
     with _overlay_lock:
-        entry = _overlays.get(key)
-        if entry is not None:
+        blob = _overlays.get(key)
+        if blob is not None:
             _overlays.move_to_end(key)
-    if entry is None:
+    if blob is None:
+        if load and any('raw_html' not in d for d in documents):
+            documents = load(documents)
         result = attach(bundle, documents, cik, now)
-        overlay = {k: v for k, v in result.items() if k.startswith('_original_') or k.startswith('_recovery_')}
-        size = len(pickle.dumps(overlay))
-        entry = (overlay, size)
-        if size <= _OVERLAY_LIMIT:
+        blob = pickle.dumps({k: v for k, v in result.items() if k.startswith('_original_') or k.startswith('_recovery_')},
+                            pickle.HIGHEST_PROTOCOL)
+        if len(blob) <= _OVERLAY_LIMIT:
             with _overlay_lock:
                 if key not in _overlays:
-                    _overlays[key] = entry
-                    _overlay_bytes += size
-                    while len(_overlays) > 16 or _overlay_bytes > _OVERLAY_LIMIT:
-                        _, (_, removed_size) = _overlays.popitem(last=False)
-                        _overlay_bytes -= removed_size
-    return dict(bundle, **deepcopy(entry[0]))
+                    _overlays[key] = blob
+                    _overlay_bytes += len(blob)
+                    while len(_overlays) > 64 or _overlay_bytes > _OVERLAY_LIMIT:
+                        _, removed = _overlays.popitem(last=False)
+                        _overlay_bytes -= len(removed)
+    return dict(bundle, **pickle.loads(blob))
+
+
+def load_raw(conn):
+    def load(documents):
+        raw = {str(r['id']): r['raw_html'] for r in rows(conn, "SELECT id,raw_html FROM disclosure_documents WHERE id=ANY(%s)",
+                                                       ([d['id'] for d in documents],))}
+        return [dict(d, raw_html=raw[str(d['id'])]) for d in documents if str(d['id']) in raw]
+    return load
 
 
 def enrich(conn,iid,bundle,cik,now):
     if not one(conn,"SELECT 1 FROM sources WHERE id='sec-disclosures' AND entitlement='sec-public'"): return bundle
-    documents=rows(conn,"SELECT DISTINCT ON (url) id,url,form,content_hash,raw_html FROM disclosure_documents WHERE instrument_id=%s AND source_id='sec-disclosures' AND form IN ('10-K','10-Q','10-K/A','10-Q/A') ORDER BY url,available_at DESC",(iid,))
-    result=cached_attach(bundle,documents,cik,now)
+    # Hash in the database: the originals are large and rarely need re-reading.
+    documents=rows(conn,"SELECT DISTINCT ON (url) id,url,form,content_hash,encode(sha256(raw_html),'hex') raw_sha FROM disclosure_documents WHERE instrument_id=%s AND source_id='sec-disclosures' AND form IN ('10-K','10-Q','10-K/A','10-Q/A') ORDER BY url,available_at DESC",(iid,))
+    result=cached_attach(bundle,documents,cik,now,load_raw(conn))
     from .financial_recovery import apply_reviewed
     return apply_reviewed(conn,iid,result,documents)

@@ -330,7 +330,28 @@ function ResearchApp({ signOut, session }) {
     setDestination({ id, view, evaluation });
   }
   const [home, setHome] = useState(null);
-  const [onboardingSkipped, setOnboardingSkipped] = useState(false);
+  // "Skip for now" lasts a week in this browser instead of returning on every reload.
+  const [onboardingSkipped, setOnboardingSkipped] = useState(() => {
+    try {
+      const until = Number(
+        localStorage.getItem("fledge:onboarding-skipped-until"),
+      );
+      return until > Date.now();
+    } catch {
+      return false;
+    }
+  });
+  const skipOnboarding = () => {
+    try {
+      localStorage.setItem(
+        "fledge:onboarding-skipped-until",
+        String(Date.now() + 7 * 24 * 3600e3),
+      );
+    } catch {
+      // Storage can be unavailable; the skip still applies to this visit.
+    }
+    setOnboardingSkipped(true);
+  };
   useEffect(() => {
     let active = true;
     const load = () =>
@@ -357,51 +378,60 @@ function ResearchApp({ signOut, session }) {
       api
         .saveDetailMode(mode)
         .then((profile) =>
-          setHome((current) => ({ ...current, profile, detail_mode: profile.detail_mode })),
+          setHome((current) => ({
+            ...current,
+            profile,
+            detail_mode: profile.detail_mode,
+          })),
         )
         .catch(() => {}),
   };
   return (
     <ProfileContext.Provider value={profileValue}>
-    {home?.profile && !home.profile.completed && !onboardingSkipped ? (
-      <Onboarding
-        onSkip={() => setOnboardingSkipped(true)}
-        onDone={(profile) => {
-          // Next step after the questions: choose companies for the watchlist.
-          window.fledgeOpenAddCompany = true;
-          setHome((current) => ({ ...current, profile, detail_mode: profile.detail_mode }));
-          dispatchEvent(new Event("fledge:home-changed"));
-        }}
-      />
-    ) : (
-    <CompanyWorkspace
-      signOut={signOut}
-      instrumentId={destination.id || defaultCompany}
-      selectedCompanyId={destination.id}
-      onWorkspaceReset={(resetSelection) => {
-        setHiddenCompanies([]);
-        if (resetSelection) choose("");
-      }}
-      inboxFilters={{ ...inboxState, company: destination.id }}
-      onInboxFiltersChange={(change) => {
-        const current = { ...inboxState, company: destination.id };
-        const next = typeof change === "function" ? change(current) : change;
-        const { company, ...filters } = next;
-        setInboxState(filters);
-        if (company !== destination.id) choose(company, destination.view);
-      }}
-      initialView={destination.view}
-      initialEvaluation={destination.evaluation}
-      onChoose={choose}
-      hiddenCompanies={hiddenCompanies}
-      onHideCompany={(id) =>
-        setHiddenCompanies((ids) => [...new Set([...ids, id])])
-      }
-      onRestoreCompany={(id) =>
-        setHiddenCompanies((ids) => ids.filter((value) => value !== id))
-      }
-    />
-    )}
+      {home?.profile && !home.profile.completed && !onboardingSkipped ? (
+        <Onboarding
+          onSkip={skipOnboarding}
+          onDone={(profile) => {
+            // Next step after the questions: choose companies for the watchlist.
+            window.fledgeOpenAddCompany = true;
+            setHome((current) => ({
+              ...current,
+              profile,
+              detail_mode: profile.detail_mode,
+            }));
+            dispatchEvent(new Event("fledge:home-changed"));
+          }}
+        />
+      ) : (
+        <CompanyWorkspace
+          signOut={signOut}
+          instrumentId={destination.id || defaultCompany}
+          selectedCompanyId={destination.id}
+          onWorkspaceReset={(resetSelection) => {
+            setHiddenCompanies([]);
+            if (resetSelection) choose("");
+          }}
+          inboxFilters={{ ...inboxState, company: destination.id }}
+          onInboxFiltersChange={(change) => {
+            const current = { ...inboxState, company: destination.id };
+            const next =
+              typeof change === "function" ? change(current) : change;
+            const { company, ...filters } = next;
+            setInboxState(filters);
+            if (company !== destination.id) choose(company, destination.view);
+          }}
+          initialView={destination.view}
+          initialEvaluation={destination.evaluation}
+          onChoose={choose}
+          hiddenCompanies={hiddenCompanies}
+          onHideCompany={(id) =>
+            setHiddenCompanies((ids) => [...new Set([...ids, id])])
+          }
+          onRestoreCompany={(id) =>
+            setHiddenCompanies((ids) => ids.filter((value) => value !== id))
+          }
+        />
+      )}
     </ProfileContext.Provider>
   );
 }
@@ -488,6 +518,10 @@ function CompanyWorkspace({
     [companySearch, setCompanySearch] = useState(""),
     [addingCompany, setAddingCompany] = useState(false);
   const [watchlistMessage, setWatchlistMessage] = useState("");
+  // The server's own reply to the latest add/remove. Workspace reads that were
+  // already in flight (e.g. loading polls) can return an older list, so once we
+  // have this reply the sidebar follows it instead of the workspace flags.
+  const [watchlist, setWatchlist] = useState(null);
   useEffect(() => {
     // After the first-login questions, open the company search once the
     // workspace has loaded (loading resets open dialogs).
@@ -859,13 +893,18 @@ function CompanyWorkspace({
   // Once an account has followed a company, the sidebar follows its watchlist
   // (max 5), even after the last company is removed. Accounts that never used
   // the watchlist keep seeing every company.
+  const watched = (company) =>
+    watchlist
+      ? watchlist.companies.some((listed) => listed.id === company.id)
+      : company.watchlisted;
   const usesWatchlist =
+    watchlist?.started ||
     data.watchlist_started ||
-    data.catalogue.some((company) => company.watchlisted);
+    data.catalogue.some(watched);
   const visibleCompanies = data.catalogue.filter(
     (company) =>
       !hiddenCompanies.includes(company.id) &&
-      (!usesWatchlist || company.watchlisted),
+      (!usesWatchlist || watched(company)),
   );
   const hiddenCatalogue = data.catalogue.filter((company) =>
     hiddenCompanies.includes(company.id),
@@ -875,13 +914,19 @@ function CompanyWorkspace({
     setRemovedCompany(company);
     api
       .removeFromWatchlist(company.id)
-      .then(() => dispatchEvent(new Event("fledge:home-changed")))
+      .then((summary) => {
+        setWatchlist(summary);
+        dispatchEvent(new Event("fledge:home-changed"));
+      })
       .catch(() => {});
   }
   async function followCompany(id) {
     try {
-      await api.addToWatchlist(id);
+      setWatchlist(await api.addToWatchlist(id));
       setWatchlistMessage("");
+      // A newly registered company is not in the loaded catalogue yet.
+      if (!data.catalogue.some((company) => company.id === id))
+        refresh().catch(() => {});
       dispatchEvent(new Event("fledge:home-changed"));
       return true;
     } catch (failure) {
@@ -1877,10 +1922,7 @@ function CompanyWorkspace({
                                   modelStatus?.enabled &&
                                   isRecorded && (
                                     <button
-                                      disabled={
-                                        busy ||
-                                        modelStatus.budget.unresolved > 0
-                                      }
+                                      disabled={busy}
                                       onClick={() =>
                                         act(
                                           () =>
@@ -1929,11 +1971,9 @@ function CompanyWorkspace({
                                 <p className="fine">
                                   {data.documents.length === 0
                                     ? "No permitted source passages available."
-                                    : modelStatus?.budget.unresolved > 0
-                                      ? modelAvailability(modelStatus).message
-                                      : isRecorded
-                                        ? "Read original evidence below. Optional AI selection highlights passages without changing your conditions or assessments."
-                                        : "This workspace contains structured financial data. Use the calculation trail to inspect inputs and open the original filing. News and management guidance are not connected yet."}
+                                    : isRecorded
+                                      ? "Read original evidence below. Optional AI selection highlights passages without changing your conditions or assessments."
+                                      : "This workspace contains structured financial data. Use the calculation trail to inspect inputs and open the original filing. News and management guidance are not connected yet."}
                                 </p>
                               )}
                             </section>
@@ -2214,17 +2254,27 @@ function CompanyWorkspace({
                         <>
                           {isRecorded ? (
                             renderFinancialReports()
-                          ) : data.financials_pending ? (
-                            <p role="status">
-                              {financialError || "Loading saved financials…"}{" "}
-                              {financialError && (
-                                <button onClick={retryFinancials}>
-                                  Try again
-                                </button>
-                              )}
+                          ) : data.financials_pending && financialError ? (
+                            <p role="alert">
+                              {financialError}{" "}
+                              <button onClick={retryFinancials}>
+                                Try again
+                              </button>
                             </p>
+                          ) : data.financials_pending ? (
+                            <LoadingSkeleton
+                              variant="financials"
+                              label="Loading saved financials…"
+                            />
                           ) : (
-                            <Suspense fallback={<p>Loading financials…</p>}>
+                            <Suspense
+                              fallback={
+                                <LoadingSkeleton
+                                  variant="financials"
+                                  label="Loading financials…"
+                                />
+                              }
+                            >
                               <FinancialsPage
                                 key={`financials-${instrumentId}`}
                                 revision={updatedAt}
@@ -2830,7 +2880,11 @@ function CompanyWorkspace({
             )}
             {modelAvailability(modelStatus).blocked && (
               <details className="research-ai-status">
-                <summary>New AI analysis is paused</summary>
+                <summary>
+                  {modelAvailability(modelStatus).state === "running"
+                    ? "AI is busy"
+                    : "New AI analysis is paused"}
+                </summary>
                 <p className="fine">{modelAvailability(modelStatus).message}</p>
                 {modelAvailability(modelStatus).detail && (
                   <p className="fine">

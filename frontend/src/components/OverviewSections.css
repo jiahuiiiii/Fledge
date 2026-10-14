@@ -250,6 +250,17 @@
 }
 .overview-bars > h4 {
   grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.overview-bars-note {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-2);
+  font-variant-numeric: tabular-nums;
 }
 .overview-bars + .overview-bars {
   margin-top: 14px;
@@ -290,6 +301,20 @@
   height: 100%;
   border-radius: 4px;
   min-width: 1px;
+}
+.overview-bar-track > .overview-bar-base {
+  opacity: 0.55;
+  border-radius: 4px 0 0 4px;
+}
+/* The outlook's low–high range sits on top of its low value. */
+.overview-bar-track > .overview-bar-range {
+  border-radius: 0 4px 4px 0;
+  border: 1px dashed var(--range-color);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--range-color) 0 3px,
+    transparent 3px 7px
+  );
 }
 .overview-bar-track > i {
   position: absolute;

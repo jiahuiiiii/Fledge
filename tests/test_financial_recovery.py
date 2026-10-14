@@ -37,9 +37,16 @@ def test_optional_review_cache_revoke_and_owner_isolation(owner,clean_model_ledg
     r=R.generate(owner,iid,p['document']['id'],p['plan_id'],transport=response)
     assert r['accepted']==[] and r['result']['items'][0]['value']=='40000000'
     assert R.generate(owner,iid,p['document']['id'],p['plan_id'],transport=lambda _:pytest.fail('duplicate call'))['id']==r['id']
+    assert not any(d['saved'] for d in p['documents']) and all('url' not in d for d in p['documents'])
+    with transaction(owner,consistent=True) as c:
+        marked={d['id']:d['saved'] for d in R.present(c,iid)['documents']}
+    assert marked[p['document']['id']]
     with transaction(admin=True) as c:
         other=str(uuid4());c.execute('INSERT INTO accounts VALUES(%s,%s)',(other,'Other owner'))
     with transaction(other) as c:assert one(c,'SELECT count(*) n FROM financial_recovery_readings')['n']==0
+    # Another account's saved reading does not mark the report for this one.
+    with transaction(other,consistent=True) as c:
+        assert not any(d['saved'] for d in R.present(c,iid)['documents'])
     with pytest.raises(ValueError,match='account'):R.review(other,iid,r['id'],['cost'],None)
     saved=R.review(owner,iid,r['id'],['cost'],None)
     with transaction(owner) as c:
@@ -64,13 +71,13 @@ def test_source_withdrawal_and_changed_plan(owner,clean_model_ledger,disclosure_
         with pytest.raises(ValueError,match='access'):R.present(c,iid)
 
 
-def test_unsettled_call_is_never_retried(owner,clean_model_ledger,disclosure_scope):
+def test_unsettled_call_is_never_retried_automatically(owner,clean_model_ledger,disclosure_scope):
     iid,p=setup(owner)
     def fail(_):raise TimeoutError('authored interruption')
     with pytest.raises(Exception):R.generate(owner,iid,p['document']['id'],p['plan_id'],transport=fail)
-    with pytest.raises(Exception):R.generate(owner,iid,p['document']['id'],p['plan_id'],transport=lambda _:pytest.fail('paid retry'))
     with transaction(owner) as c:
-        assert not R.present(c,iid)['can_run'];assert one(c,'SELECT count(*) n FROM model_calls')['n']==1
+        # No spending block: the owner can run it again explicitly.
+        assert R.present(c,iid)['can_run'];assert one(c,'SELECT count(*) n FROM model_calls')['n']==1
 
 
 def packet():
@@ -148,3 +155,73 @@ def test_unusable_settled_response_stays_blocked_without_new_call(owner,clean_mo
         preview=R.present(c,iid);assert not preview['can_run'] and preview['maximum_cost_usd']==0
         assert 'unusable' in preview['message']
     with pytest.raises(ValueError,match='unusable'):R.generate(owner,iid,p['document']['id'],p['plan_id'],transport=lambda _:pytest.fail('duplicate charge'))
+
+
+def balance_packet():
+    cell=lambda i,label,value:dict(id=i,concept='custom:'+i,label=label,text=f'{label} {value}',value=value,unit='USD',start=None,end='2025-09-30')
+    return dict(kind='annual',missing=[dict(key='debt'),dict(key='interest')],
+                cells=[cell('st','Short-term borrowings','10'),cell('lt','Long-term debt','90'),
+                       dict(id='int',concept='custom:Interest',label='Interest expense',text='Interest expense 4',value='4',unit='USD',start='2024-10-01',end='2025-09-30'),
+                       dict(id='int2',concept='custom:Interest2',label='Interest on notes',text='Interest on notes 1',value='1',unit='USD',start='2024-10-01',end='2025-09-30')])
+
+
+def test_borrowing_sums_balance_cells_and_interest_is_reported_only():
+    p=balance_packet()
+    out=rendered([dict(target='debt',operation='sum',inputs=['st','lt'],explanation='Short-term borrowings plus long-term debt.'),
+                  dict(target='interest',operation='reported',inputs=['int'],explanation='Reported interest expense.')],p)
+    assert {i['key']:i['value'] for i in out['items']}=={'debt':'100','interest':'4'}
+    assert rendered([dict(target='interest',operation='sum',inputs=['int','int2'],explanation='x')],p)['items']==[]
+    # Borrowing is a balance: a duration cell cannot supply it.
+    assert rendered([dict(target='debt',operation='reported',inputs=['int'],explanation='x')],p)['items']==[]
+
+
+def test_chart_gaps_only_count_missing_facts_the_charts_lack():
+    metric=lambda key,value=None,reason=R.MISSING:dict(key=key,value=value,reason=None if value else reason)
+    story=dict(status='available',
+        annual=[dict(accession='A',form='10-K',metrics=[metric('interest'),metric('capital_spending'),metric('revenue','10'),
+                     metric('net_consolidated'),metric('net_parent','5'),metric('operating_cash',reason='Amendment scope is unclear')])],
+        balances=[dict(accession='A',metrics=[metric('debt',reason='A complete reported borrowing total or all compatible long-/short-term components are unavailable.'),metric('liabilities','3')])],
+        quarterly=[],trailing=[dict(accession='A',metrics=[metric('capital_spending','2')])])
+    gaps=R.gaps_from_story(story)['A']
+    assert gaps['missing']=={'interest','debt'}
+    assert {'revenue','net_income','liabilities','capital_spending'}<=gaps['shown']
+    assert R.gaps_from_story(dict(status='empty'))=={}
+
+
+def test_reviewed_borrowing_reaches_the_borrowing_calculation():
+    from thesis.research.sec.financial_depth import total_debt
+    from thesis.research.sec.normalize import filing_rows
+    from datetime import datetime,timezone
+    b=bundle(annual=True);current=filing_rows(b['submissions'],datetime.now(timezone.utc))[-1]
+    assert total_debt(b,current)['value'] is None
+    end=current['end'].isoformat()
+    b['_original_facts']={'DebtLongtermAndShorttermCombinedAmount':[dict(concept='DebtLongtermAndShorttermCombinedAmount',namespace='ai-assisted',value='100',unit='USD',start=None,end=end,
+        accession=current['accessionNumber'],form=current['form'],filed=current['filingDate'],ai_assisted=True)]}
+    assert total_debt(b,current)['value']=='100'
+
+
+def with_bot_script(raw,path):
+    return raw.replace(b'</body>',b'<script type="text/javascript"  src="/'+path+b'"></script></body>')
+
+
+def test_sec_bot_script_does_not_create_a_new_version_or_drop_reviewed_figures(owner,clean_model_ledger,disclosure_scope):
+    iid=add_company('MSFT')['instrument_id'];apply(iid,bundle(annual=True))
+    disclosures.refresh(iid,submissions=metadata(),fetcher=lambda _:with_bot_script(source(),b'0TwCzv/Ab1'))
+    with transaction(owner,consistent=True) as c:p=R.present(c,iid)
+    r=R.generate(owner,iid,p['document']['id'],p['plan_id'],transport=response)
+    R.review(owner,iid,r['id'],['cost'],None)
+    with transaction(admin=True) as c:before=one(c,'SELECT count(*) n FROM disclosure_documents WHERE instrument_id=%s',(iid,))['n']
+    # The same filing re-downloaded with a different random bot-check script.
+    reset_attempt(iid);disclosures.refresh(iid,submissions=metadata(),fetcher=lambda _:with_bot_script(source(),b'4k06Qn/Zz9'))
+    with transaction(admin=True) as c:assert one(c,'SELECT count(*) n FROM disclosure_documents WHERE instrument_id=%s',(iid,))['n']==before
+    with transaction(owner,consistent=True) as c:
+        row=one(c,'SELECT * FROM financial_recovery_readings WHERE id=%s',(r['id'],))
+        assert not R.visible(c,row)['withheld'] and R.visible(c,row)['accepted']==['cost']
+        assert R.present(c,iid)['reading']['id']==r['id']
+
+
+def test_copies_differing_only_by_bot_script_count_as_one_filing(owner,clean_model_ledger,disclosure_scope):
+    from thesis.research.sec.disclosures import stable_content
+    raw=source()
+    assert stable_content(with_bot_script(raw,b'a/b'))==stable_content(with_bot_script(raw,b'c/d'))==stable_content(raw)
+    assert stable_content(raw.replace(b'>40<',b'>41<'))!=stable_content(raw)

@@ -45,8 +45,8 @@ def test_saved_legacy_wording_stays_exact_and_new_policy_reuses_paid_response(
     acquire(iid, clarification=True)
     render = coverage.render
 
-    def legacy_render(links, packet, items):
-        result = render(links, packet, items)
+    def legacy_render(links, packet, items, ignored=None):
+        result = render(links, packet, items, ignored)
         for value, supplied in zip(result, links):
             value["explanation"] = supplied.explanation
             value.pop("explanation_policy")

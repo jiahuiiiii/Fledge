@@ -123,27 +123,19 @@ def test_private_pending_request_blocks_other_owner_and_shared_dispatch(owner):
         )
         try:
             assert entered.wait(8)
-            for identity in (other, None):
-                with pytest.raises(ledger.BudgetBlocked, match="reconciliation"):
-                    ledger.execute(
-                        "blocked-" + str(identity),
-                        "test",
-                        body(),
-                        owner=identity,
-                        transport=lambda _: pytest.fail(
-                            "Cross-owner duplicate dispatch"
-                        ),
-                    )
-                with transaction(identity) as conn:
-                    assert rows(conn, "SELECT * FROM model_calls") == []
-                    assert ledger.snapshot(conn)["unresolved"] == 1
+            with transaction(other) as conn:
+                assert rows(conn, "SELECT * FROM model_calls") == []
+                assert ledger.snapshot(conn)["unresolved"] == 1
+            # Another owner's running request no longer blocks new work.
+            ledger.execute("other-" + str(other), "test", body(), owner=other,
+                           transport=lambda _: response())
         finally:
             release.set()
         first.result(timeout=8)
-    assert ledger.snapshot()["unresolved"] == 0 and ledger.snapshot()["calls"] == 1
+    assert ledger.snapshot()["unresolved"] == 0 and ledger.snapshot()["calls"] == 2
 
 
-def test_hidden_private_charge_still_enforces_shared_cap(owner):
+def test_hidden_private_charge_is_counted_but_no_longer_capped(owner):
     other = another_account()
     with transaction(admin=True) as conn:
         spent = one(conn, "SELECT cap_nano_usd FROM model_budget WHERE singleton")["cap_nano_usd"] - 1
@@ -156,14 +148,8 @@ def test_hidden_private_charge_still_enforces_shared_cap(owner):
     with transaction(other) as conn:
         assert rows(conn, "SELECT * FROM model_calls") == []
         assert ledger.snapshot(conn)["remaining_usd"] == "1e-09"
-    with pytest.raises(ledger.BudgetBlocked, match="allowance"):
-        ledger.execute(
-            "other-over-cap",
-            "test",
-            body(),
-            owner=other,
-            transport=lambda _: pytest.fail("Hidden charge bypassed budget"),
-        )
+    ledger.execute("other-over-cap", "test", body(), owner=other,
+                   transport=lambda _: response())
 
 
 def test_late_private_review_stays_on_original_revision_and_snapshot(owner):

@@ -1,5 +1,11 @@
 export function sentimentSummaryLabel(sample) {
-  if (!sample) return "No analysed texts";
+  const { label, detail } = sentimentSummaryParts(sample);
+  return detail ? `${label} · ${detail}` : label;
+}
+
+// The tone leads; how many texts it rests on is secondary detail.
+export function sentimentSummaryParts(sample) {
+  if (!sample) return { label: "No analysed texts", detail: "" };
   const counts = sample.counts || {};
   const usable = ["positive", "negative", "mixed", "neutral"].reduce(
     (n, key) => n + (counts[key] || 0),
@@ -22,7 +28,10 @@ export function sentimentSummaryLabel(sample) {
       : ["mixed", "mixed / balanced"].includes(sample.tone)
         ? "Mixed tone"
         : sample.tone || "No overall tone";
-  return `${label} · ${amount}${unclear ? ` · ${unclear} unclear` : ""}`;
+  return {
+    label,
+    detail: `${amount}${unclear ? ` · ${unclear} unclear` : ""}`,
+  };
 }
 
 export function priceComparisonText(value) {

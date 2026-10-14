@@ -8,6 +8,9 @@ from copy import deepcopy
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation, localcontext
 from functools import lru_cache
+from collections import OrderedDict
+import pickle
+import threading
 import io
 import hashlib
 import re
@@ -435,6 +438,46 @@ def trailing_groups(period, groups):
     return result
 
 
+_parsed = OrderedDict()
+_parsed_lock = threading.Lock()
+_parsed_bytes = 0
+_PARSED_LIMIT = 32 * 1024 * 1024
+
+
+def parsed(conn, document):
+    """Full extraction of one verified original, cached by its content hash.
+
+    Pickled entries give each caller an independent copy; raw bytes are fetched
+    only when the parse must run.
+    """
+    global _parsed_bytes
+    key = (document['content_hash'], document['cik'])
+    with _parsed_lock:
+        blob = _parsed.get(key)
+        if blob is not None:
+            _parsed.move_to_end(key)
+    if blob is None:
+        raw = bytes(one(conn, "SELECT raw_html FROM disclosure_documents WHERE id=%s", (document['id'],))['raw_html'])
+        if hashlib.sha256(raw).hexdigest() != document['content_hash']:
+            raise ValueError('The retained original filing could not be verified.')
+        # Deterministic for the same bytes, so an unsupported filing is cached too.
+        try: value = (None, extract.__wrapped__(raw, document['cik'], True, True))
+        except ValueError as error: value = (str(error), None)
+        blob = pickle.dumps(value, pickle.HIGHEST_PROTOCOL)
+        if len(blob) <= _PARSED_LIMIT:
+            with _parsed_lock:
+                if key not in _parsed:
+                    _parsed[key] = blob
+                    _parsed_bytes += len(blob)
+                    while _parsed_bytes > _PARSED_LIMIT:
+                        _, removed = _parsed.popitem(last=False)
+                        _parsed_bytes -= len(removed)
+    error, result = pickle.loads(blob)
+    if error is not None:
+        raise ValueError(error)
+    return result
+
+
 def present(conn, iid, flow=None):
     if not one(conn,"SELECT 1 FROM sources WHERE id=%s AND entitlement='sec-public'",(SOURCE,)):
         return dict(status='unavailable', groups=[], message='Original-filing source access is unavailable.', method=METHOD)
@@ -446,13 +489,14 @@ def present(conn, iid, flow=None):
     revenue_inputs = [f for p in flow.get('periods', []) for m in p['metrics'] if m['key'] == 'revenue'
                       for f in m['inputs'] if f.get('filing_url')]
     urls = sorted({f['filing_url'] for f in revenue_inputs})
-    documents = rows(conn,"SELECT DISTINCT ON (d.url) d.id,d.slot,d.form,d.url,d.published_at,d.available_at,d.content_hash,d.raw_html,s.cik FROM disclosure_documents d JOIN sec_companies s ON s.instrument_id=d.instrument_id WHERE d.instrument_id=%s AND d.source_id=%s AND d.form IN ('10-K','10-K/A','10-Q','10-Q/A') AND (d.url=ANY(%s) OR d.id IN (SELECT document_id FROM disclosure_current WHERE instrument_id=%s AND slot IN ('annual','quarter'))) ORDER BY d.url,d.available_at DESC,d.id DESC",(iid,SOURCE,urls,iid))
+    # Hash in the database and parse only on a cache miss: originals are large.
+    documents = rows(conn,"SELECT DISTINCT ON (d.url) d.id,d.slot,d.form,d.url,d.published_at,d.available_at,d.content_hash,encode(sha256(d.raw_html),'hex') raw_sha,s.cik FROM disclosure_documents d JOIN sec_companies s ON s.instrument_id=d.instrument_id WHERE d.instrument_id=%s AND d.source_id=%s AND d.form IN ('10-K','10-K/A','10-Q','10-Q/A') AND (d.url=ANY(%s) OR d.id IN (SELECT document_id FROM disclosure_current WHERE instrument_id=%s AND slot IN ('annual','quarter'))) ORDER BY d.url,d.available_at DESC,d.id DESC",(iid,SOURCE,urls,iid))
     groups=[]; candidates=[]; gaps=[]
     for document in documents:
         try:
-            if hashlib.sha256(bytes(document['raw_html'])).hexdigest() != document['content_hash']:
+            if document['raw_sha'] != document['content_hash']:
                 raise ValueError('The retained original filing could not be verified.')
-            result=deepcopy(extract(bytes(document['raw_html']),document['cik'],True,True))
+            result=parsed(conn,document)
             if result['report_end'] > document['published_at'].date().isoformat(): raise ValueError('Reported period is later than filing acceptance.')
             selected_groups = {}
             for group in sorted(result['groups'], key=lambda g:REVENUE.index(g['concept'].split(':')[-1])):

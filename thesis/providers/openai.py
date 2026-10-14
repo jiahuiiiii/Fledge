@@ -1,7 +1,7 @@
 """Direct Responses API with no retries, redirects, tools or credential logging."""
 
 import httpx
-from .settings import live_key, REASONING_MODEL
+from .settings import live_key, OPENAI_REASONING_MODEL as REASONING_MODEL
 
 
 class ProviderFailure(Exception):

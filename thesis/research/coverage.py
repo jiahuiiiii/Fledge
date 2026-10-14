@@ -91,7 +91,19 @@ def _repeat_guard(current, prior):
     return None
 
 
-def render(links, packet, items):
+IGNORED_REASONS = {
+    "unknown_report": "The link named a report that is not a supplied news item.",
+    "not_earlier_or_duplicate": "The link was repeated or did not point to an earlier report.",
+    "unrelated_item": "The linked report is not about the company.",
+    "unrelated_reference": "The earlier report is not about the company.",
+    "quote_not_in_report": "A quoted passage was not in the original report.",
+}
+
+
+def render(links, packet, items, ignored=None):
+    """Validated links only. Links are optional grouping hints, so an invalid one
+    is omitted (and recorded in `ignored`) instead of rejecting every
+    classification in the batch; both reports then stay separately counted."""
     selected = {s["label"]: s for s in packet["sources"]}
     all_sources = {
         **{s["label"]: s for s in packet.get("comparison_sources", [])},
@@ -99,6 +111,11 @@ def render(links, packet, items):
     }
     classifications = {i["source_id"]: i for i in items}
     output, seen = [], set()
+    def skip(link, reason):
+        if ignored is not None:
+            ignored.append(dict(item_id=link.item_id, reference_id=link.reference_id,
+                                relation=link.relation, reason=reason))
+
     for link in links:
         current, prior = selected.get(link.item_id), all_sources.get(link.reference_id)
         if (
@@ -107,25 +124,31 @@ def render(links, packet, items):
             or current["channel"] != "news"
             or prior["channel"] != "news"
         ):
-            raise ValueError("Coverage comparisons require supplied news reports.")
+            skip(link, "unknown_report")
+            continue
         if (
             link.item_id in seen
             or current["id"] == prior["id"]
             or _order(prior) >= _order(current)
         ):
-            raise ValueError(
-                "Coverage links must be unique and point to an earlier report."
-            )
-        seen.add(link.item_id)
+            skip(link, "not_earlier_or_duplicate")
+            continue
         if classifications[current["id"]]["relevance"] != "relevant":
-            raise ValueError(
-                "Unrelated news cannot form a target-company coverage group."
-            )
+            skip(link, "unrelated_item")
+            continue
         if (
             prior["id"] in classifications
             and classifications[prior["id"]]["relevance"] != "relevant"
         ):
-            raise ValueError("Unrelated reference news cannot form a coverage group.")
+            skip(link, "unrelated_reference")
+            continue
+        try:
+            current_quotes = _quotes(current, link.item_passages)
+            prior_quotes = _quotes(prior, link.reference_passages)
+        except ValueError:
+            skip(link, "quote_not_in_report")
+            continue
+        seen.add(link.item_id)
         guard = _repeat_guard(current, prior) if link.relation == "repeats" else None
         # An opinion/question is not interchangeable factual reporting.
         if link.relation == "repeats" and classifications[current["id"]][
@@ -141,8 +164,6 @@ def render(links, packet, items):
             guard = (
                 "The reference is opinion or uncertain reporting; retain both reports."
             )
-        current_quotes = _quotes(current, link.item_passages)
-        prior_quotes = _quotes(prior, link.reference_passages)
         # Comparing selected passages with ALL earlier passages also catches an
         # extractor choosing a different sentence from an unchanged body.
         normalize = lambda quote: " ".join(quote.split()).casefold()

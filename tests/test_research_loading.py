@@ -46,16 +46,31 @@ def test_analysis_waits_for_sources_and_ledger_then_runs(owner):
     iid=prepare(owner); loading.start(owner,iid,analyze=True,lookback_days=30)
     selected=[]
     for _ in range(6): loading.work_once(owner,lambda run,key:selected.append(key) or {})
-    call,_=ledger.reserve('queued-test','test',body())
-    assert ledger.snapshot()['running']==1 and ledger.snapshot()['needs_attention']==0
-    assert not loading.work_once(owner,lambda run,key: selected.append(key))
-    assert loading.latest(owner,iid)['steps'][-1]['status']=='queued'
+    # Another company's AI request, or an earlier failed one, never blocks this company.
+    call,_=ledger.reserve('other-company-running','test',body())
+    assert ledger.snapshot()['running']==1
+    from thesis.research.sentiment_batching import company_lock
+    with company_lock(iid):
+        # Only a reading of the same company makes this step wait.
+        assert not loading.work_once(owner,lambda run,key: selected.append(key))
+        step=loading.latest(owner,iid)['steps'][-1]
+        assert step['status']=='queued' and step['message']==loading.COMPANY_BUSY
     ledger.unresolved(call,'authored_transport_failure')
-    assert ledger.snapshot()['running']==0 and ledger.snapshot()['needs_attention']==1
     loading.work_once(owner,lambda run,key:selected.append(key))
+    assert 'analysis' in selected
+
+
+def test_lost_start_race_requeues_instead_of_failing(owner):
+    from thesis.service import Conflict
+    iid=prepare(owner); loading.start(owner,iid,analyze=True,lookback_days=30)
+    for _ in range(6): loading.work_once(owner,lambda run,key:{})
+    def busy(run,key):
+        if key=='analysis': raise Conflict('Sentiment analysis is already running for this company.')
+        return {}
+    loading.work_once(owner,busy)
     run=loading.latest(owner,iid)
-    assert not run['active'] and run['steps'][-1]['status']=='blocked'
-    assert 'analysis' not in selected
+    assert run['active'] and run['steps'][-1]['status']=='queued'
+    assert run['steps'][-1]['message']==loading.COMPANY_BUSY
 
 
 def test_restart_never_replays_an_inflight_step(owner):

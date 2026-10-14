@@ -126,6 +126,7 @@ def test_failure_stage_is_not_quiet_and_raw_exception_is_never_exposed(owner, st
     assert news_watch.run_once(owner, **args)
     a = watch_history.history(owner, iid)["items"][0]
     assert a["status"] == "failed" and a["details"]["failed_stage"] == stage
+    assert a["details"]["failure_reason"] == "an unexpected error (ValueError)."
     assert "No alert rule triggered" not in a[
         "reason"
     ] and "DO_NOT_COPY" not in json.dumps(a)
@@ -347,3 +348,107 @@ def test_one_failed_news_provider_does_not_stop_other_sources(owner):
     assert calls==["social"] and result["status"]=="completed"
     assert result["details"]["market"]=="failed" and result["details"]["coverage_gap"]
     assert "DO_NOT_COPY" not in json.dumps(result)
+
+
+def test_spending_block_reason_is_recorded_instead_of_a_generic_failure(owner):
+    from thesis.providers.ledger import BudgetBlocked
+
+    iid, _ = begin(owner)
+
+    def blocked(*a, **k):
+        raise BudgetBlocked("An earlier model request needs charge reconciliation")
+
+    assert news_watch.run_once(
+        owner,
+        market_refresh=lambda _: None,
+        social_refresh=lambda: None,
+        analyzer=blocked,
+    )
+    a = watch_history.history(owner, iid)["items"][0]
+    assert a["details"]["failed_stage"] == "sentiment analysis"
+    assert (
+        a["details"]["failure_reason"]
+        == "An earlier model request needs charge reconciliation."
+    )
+    with transaction(owner) as c:
+        error = c.execute(
+            "SELECT error FROM news_watches WHERE owner_id=%s AND instrument_id=%s",
+            (owner, iid),
+        ).fetchone()["error"]
+    assert "needs charge reconciliation" in error and "sentiment analysis" in error
+
+
+def test_failure_reason_shows_provider_setup_messages():
+    from thesis.providers.settings import ProviderConfigError
+
+    exc = ProviderConfigError("The AI provider settings in .env changed; restart the app to use them")
+    assert news_watch.failure_reason(exc) == "The AI provider settings in .env changed; restart the app to use them."
+
+
+def test_failure_reason_shows_app_batch_messages_but_hides_other_errors():
+    from pydantic import BaseModel, ValidationError
+    batch = ValueError("Batch 4 of 17 stopped. The AI's result did not pass the source and evidence checks.")
+    assert news_watch.failure_reason(batch) == str(batch)
+    assert news_watch.failure_reason(ValueError("raw provider text")) == "an unexpected error (ValueError)."
+    class M(BaseModel):
+        x: int
+    try:
+        M(x="Batch secret model text")
+    except ValidationError as exc:
+        assert news_watch.failure_reason(exc) == "an unexpected error (ValidationError)."
+
+
+def test_failed_check_retries_soon_then_returns_to_the_normal_schedule(owner):
+    from thesis.service import Conflict
+
+    iid, now = begin(owner)
+
+    def fail(_):
+        raise ValueError("DO_NOT_COPY")
+
+    def due_at():
+        with transaction(owner) as c:
+            row = one(c, "SELECT next_check_at,error FROM news_watches WHERE owner_id=%s AND instrument_id=%s", (owner, iid))
+        return row["next_check_at"], row["error"]
+
+    def attempt(clock, analyzer=None):
+        return news_watch.run_once(owner, now=clock, market_refresh=lambda _: None, social_refresh=lambda: None,
+                                   analyzer=analyzer or (lambda i: sentiment.generate(i, transport=provider("negative"))))
+
+    clock = now
+    for _ in range(news_watch.QUICK_RETRIES):
+        assert attempt(clock, fail)
+        due, error = due_at()
+        assert due == clock + timedelta(minutes=news_watch.RETRY_MINUTES)
+        assert "Trying again automatically" in error and "No automatic paid retry" not in error
+        clock = due + timedelta(seconds=1)
+    # After QUICK_RETRIES consecutive failures, the next try waits the full interval.
+    assert attempt(clock, fail)
+    due, error = due_at()
+    assert due == clock + timedelta(minutes=60) and "No automatic paid retry was made." in error
+    # A success resets the count; a busy company retries after a short wait.
+    clock = due + timedelta(seconds=1)
+    assert attempt(clock)
+    clock = due_at()[0] + timedelta(seconds=1)
+
+    def busy(_):
+        raise Conflict("Sentiment analysis is already running for this company.")
+
+    assert attempt(clock, busy)
+    due, error = due_at()
+    assert due == clock + timedelta(minutes=news_watch.BUSY_RETRY_MINUTES)
+    item = watch_history.history(owner, iid)["items"][0]
+    assert item["details"]["failure_reason"] == "Sentiment analysis is already running for this company."
+
+
+def test_scheduled_watch_allows_one_retry_of_a_failed_batch(owner, monkeypatch):
+    iid, _ = begin(owner)
+    seen = {}
+
+    def generate(i, **kw):
+        seen.update(kw)
+        return sentiment.generate(i, transport=provider("negative"))
+
+    monkeypatch.setattr(news_watch.sentiment, "generate", generate)
+    assert news_watch.run_once(owner, market_refresh=lambda _: None, social_refresh=lambda: None)
+    assert seen.get("retry_failed") is True

@@ -127,13 +127,12 @@ export default function Onboarding({ onDone, onSkip }) {
       </div>
       {error && <p className="error" role="alert">{error}</p>}
       <div className="onboarding-actions">
-        {step > 0 ? (
+        <button type="button" disabled={busy} onClick={onSkip}>
+          Skip for now
+        </button>
+        {step > 0 && (
           <button type="button" disabled={busy} onClick={() => setStep(step - 1)}>
             Back
-          </button>
-        ) : (
-          <button type="button" disabled={busy} onClick={onSkip}>
-            Skip for now
           </button>
         )}
         <button

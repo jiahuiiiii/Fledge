@@ -128,13 +128,14 @@ def test_unsupported_price_recovery_reuses_original_paid_batches_without_retry(o
             assert one(conn, "SELECT * FROM model_calls WHERE id=%s", (original["id"],)) == original
 
 
-def test_unknown_charge_cannot_be_retried_even_explicitly(owner):
+def test_unknown_charge_is_sent_again_on_the_next_explicit_run(owner):
     p=packet()
     def broken(body):raise TimeoutError()
     with patch.object(B,'check_access'):
         with pytest.raises(ledger.BudgetBlocked):B.run(p,transport=broken)
-        with pytest.raises(ledger.BudgetBlocked):B.run(p,transport=lambda _:pytest.fail('retry'),retry_failed=True)
-    assert ledger.snapshot()['calls']==1
+        assert ledger.snapshot()['calls']==1
+        B.run(p,transport=provider())
+    assert ledger.snapshot()['unresolved']==1 and ledger.snapshot()['calls']>1
 
 
 def test_only_one_explicit_retry_of_settled_invalid_batch(owner):

@@ -145,6 +145,134 @@ export function guidanceAmount(guidance) {
   return `${guidance.approximate ? "≈ " : ""}${format(guidance.low)}${number(high) !== number(guidance.low) ? `–${format(high)}` : ""}`;
 }
 
+export const guidanceScope = (section) =>
+  section?.period_type === "annual"
+    ? "full fiscal year"
+    : section?.period_type === "quarter"
+      ? "one quarter"
+      : null;
+
+const DAY = 86400000;
+const daysBetween = (a, b) => (Date.parse(b) - Date.parse(a)) / DAY;
+const nextDay = (value) =>
+  new Date(Date.parse(value) + DAY).toISOString().slice(0, 10);
+// Two reports cover the same period a year apart when their ends are about a
+// year apart (52/53-week fiscal calendars move the end by a few days).
+const yearApart = (earlier, later) => {
+  const gap = daysBetween(earlier, later);
+  return gap >= 354 && gap <= 375;
+};
+const growthRange = (low, high, base) =>
+  number(base) > 0 && number(low) != null
+    ? [
+        (number(low) / number(base) - 1) * 100,
+        (number(high ?? low) / number(base) - 1) * 100,
+      ]
+    : null;
+
+// Fiscal quarter number from the company's own annual report boundaries; a
+// quarter after the latest saved fiscal year counts from the day after it.
+export function fiscalQuarter(period, annuals) {
+  const containing = annuals.find(
+    (a) => a.start && a.start <= period.start && period.end <= a.end,
+  );
+  const previous = annuals
+    .filter((a) => a.end < period.start)
+    .sort((a, b) => b.end.localeCompare(a.end))[0];
+  const start = containing?.start || (previous && nextDay(previous.end));
+  if (!start) return null;
+  const elapsed = daysBetween(start, period.end) + 1;
+  if (elapsed < 80 || elapsed > 375) return null;
+  return Math.min(4, Math.max(1, Math.round(elapsed / 91.3)));
+}
+
+// Direct three-month quarters and fiscal years from the saved income
+// statements, each compared only with a report covering the same period a year
+// earlier. Outlook growth is code arithmetic on the release's own amounts.
+export function revenueComparisons(data, guidance) {
+  const periods = data?.income_flow?.periods || [];
+  const revenueRows = (kind, minimum, maximum) =>
+    periods
+      .filter((p) => p.kind === kind && p.start && p.end)
+      .map((p) => {
+        const row = p.metrics?.find((r) => r.key === "revenue");
+        const length = daysBetween(p.start, p.end) + 1;
+        return row &&
+          number(row.value) > 0 &&
+          length >= minimum &&
+          length <= maximum
+          ? { ...row, unit: "USD", start: p.start, end: p.end }
+          : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.end.localeCompare(a.end));
+  const quarters = revenueRows("quarter", 80, 100);
+  const annuals = revenueRows("annual", 357, 375);
+  const latest = quarters[0] || null;
+  const latestYearAgo =
+    latest && quarters.find((q) => yearApart(q.end, latest.end));
+  const latestQuarter = latest &&
+    latestYearAgo && {
+      current: latest,
+      previous: latestYearAgo,
+      growth: growthRange(latest.value, latest.value, latestYearAgo.value)[0],
+    };
+  const section = guidance?.section;
+  // A stated currency other than USD cannot be compared with USD results.
+  const comparable = guidance && (!guidance.unit || guidance.unit === "USD");
+  let outlook = null;
+  if (comparable && section?.period_type === "quarter") {
+    const target = Number(
+      section.quarter || section.period_label?.match(/Q([1-4])/)?.[1],
+    );
+    const released = (
+      guidance.release?.stated_release_date?.date ||
+      guidance.release?.published_at ||
+      ""
+    ).slice(0, 10);
+    const previous = section.period_end
+      ? quarters.find((q) => yearApart(q.end, section.period_end))
+      : target && released
+        ? // The latest reported instance of this fiscal quarter before the
+          // release, within the preceding fiscal year.
+          quarters.find(
+            (q) =>
+              q.end < released &&
+              daysBetween(q.end, released) <= 400 &&
+              fiscalQuarter(q, annuals) === target,
+          )
+        : null;
+    if (previous)
+      outlook = {
+        previous,
+        growth: growthRange(guidance.low, guidance.high, previous.value),
+      };
+  } else if (
+    comparable &&
+    section?.period_type === "annual" &&
+    section.period_end
+  ) {
+    const previous = annuals.find((a) => yearApart(a.end, section.period_end));
+    if (previous)
+      outlook = {
+        previous,
+        growth: growthRange(guidance.low, guidance.high, previous.value),
+      };
+  }
+  return { latestQuarter, outlook };
+}
+
+export const signedPercent = (value) =>
+  value == null
+    ? null
+    : `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value).toFixed(1)}%`;
+export const growthText = (range) =>
+  !range
+    ? null
+    : Math.abs(range[0] - range[1]) < 0.05
+      ? signedPercent(range[0])
+      : `${signedPercent(range[0])} to ${signedPercent(range[1])}`;
+
 export function overviewNews(data) {
   // Current permitted sources remain readable even when an older complete AI packet is withheld.
   const sources = data.sentiment_inputs
@@ -274,3 +402,95 @@ export function overviewModel(data, reads = {}) {
 
 export const yearLabel = (row) =>
   row?.end ? `Fiscal year ended ${day(row.end)}` : "Fiscal year unavailable";
+
+// Overview previews skip abusive and very short untitled social posts. The full
+// source list on News & discussion still shows every saved original.
+const ABUSIVE =
+  /\b(bitch(es|y)?|fuck\w*|shit(s|ty|head)?|cunts?|retard(s|ed)?|dickheads?|assholes?|bastards?|whores?|sluts?)\b/i;
+export function previewable(source) {
+  const text = `${source?.title || ""} ${source?.body || ""}`;
+  if (ABUSIVE.test(text)) return false;
+  return (
+    source.kind === "news" ||
+    !!source.title ||
+    (source.body || "").trim().length >= 40
+  );
+}
+
+const published = (source) => Date.parse(source?.published_at || "");
+
+// Company headlines from the last day, newest first, for the activity summary.
+export function recentHeadlines(headlines, now = Date.now(), hours = 24) {
+  return headlines
+    .filter(
+      (s) =>
+        s.kind === "news" &&
+        previewable(s) &&
+        now - published(s) <= hours * 3600e3 &&
+        published(s) <= now,
+    )
+    .sort((a, b) => published(b) - published(a));
+}
+
+// News published after the saved AI reading's source cutoff is not in its tone.
+export function headlinesAfterReading(sentiment, headlines) {
+  const cutoff = sentiment?.withheld
+    ? null
+    : Date.parse(sentiment?.cutoff || "");
+  if (!cutoff) return [];
+  return headlines.filter((s) => s.kind === "news" && published(s) > cutoff);
+}
+
+// The nearest saved annual analyst revenue forecast (public page). Its currency
+// is often unstated, so it is shown with "$", never silently as US dollars.
+export function analystRevenueForecast(fmp) {
+  const page = fmp?.public_forecasts?.available
+    ? fmp.public_forecasts.snapshot?.data
+    : null;
+  const forecast = (page?.forecasts || [])
+    .filter((f) => f.period_type === "annual" && f.period_end)
+    .sort((a, b) => a.period_end.localeCompare(b.period_end))
+    .find((f) =>
+      f.metrics?.some((m) => m.key === "revenue" && number(m.average) > 0),
+    );
+  if (!forecast) return null;
+  const metric = forecast.metrics.find((m) => m.key === "revenue");
+  const amount = money(metric.average);
+  return {
+    display: forecast.currency === "USD" ? amount : amount?.replace("US$", "$"),
+    periodEnd: forecast.period_end,
+    fiscalYear: forecast.fiscal_year,
+    analysts: forecast.displayed_analyst_count ?? null,
+    currencyStated: !!forecast.currency,
+  };
+}
+
+// Borrowing measured in years of past-12-month free cash flow, only when both
+// figures end on the same date and free cash flow is positive.
+export function borrowingYears(borrowing, freeCash) {
+  const debt = number(borrowing?.value);
+  const cash = number(freeCash?.value);
+  if (debt == null || !(cash > 0) || borrowing?.end !== freeCash?.end)
+    return null;
+  return debt / cash;
+}
+
+// The 7-day tone counts every development equally, so one major story can be
+// outweighed. This separates relevant news stories from the last day before the
+// reading's cutoff. Stories, not grouped developments, are counted here.
+export function pastDayTone(sentiment, headlines, hours = 24) {
+  const cutoff = sentiment?.withheld
+    ? null
+    : Date.parse(sentiment?.cutoff || "");
+  if (!cutoff) return null;
+  const counts = {};
+  let total = 0;
+  for (const s of headlines) {
+    const age = cutoff - published(s);
+    if (s.kind !== "news" || !s.tone || age < 0 || age > hours * 3600e3)
+      continue;
+    counts[s.tone] = (counts[s.tone] || 0) + 1;
+    total += 1;
+  }
+  return total ? { total, counts } : null;
+}

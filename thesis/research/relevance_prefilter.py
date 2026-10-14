@@ -132,14 +132,23 @@ def labels(call, body):
 
 def run(packet, *, transport=None):
     """Return (kept_ids, skipped_ids, record, calls). Raises BudgetBlocked on unknown charges."""
+    from . import parallel
     bodies = plan(packet)
     by_label = {s["label"]: s["id"] for s in packet["sources"]}
-    skipped, calls, usable = [], [], 0
-    for body in bodies:
+
+    def send(body):
         call = ledger.execute(request_key(body), "sentiment:" + POLICY, body, transport=transport)
         if call["status"] != "settled":
             raise ledger.BudgetBlocked(
                 "An earlier quick relevance check may already have been sent. No automatic retry; its charge needs review.")
+        return call
+
+    # Quick-check batches are independent; a few run at once, read back in order.
+    results, errors = parallel.run_all([lambda body=body: send(body) for body in bodies])
+    if errors:
+        raise errors[min(errors)]
+    skipped, calls, usable = [], [], 0
+    for body, call in zip(bodies, results):
         calls.append(call)
         found = labels(call, body)
         if found is None:

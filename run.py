@@ -86,6 +86,21 @@ def database():
     seed()
 
 
+def running(port):
+    """Return 'fledge' if Fledge already serves the port, 'other' if something else does."""
+    try:
+        socket.create_connection(("127.0.0.1", port), timeout=1).close()
+    except OSError:
+        return None
+    from urllib.request import urlopen
+
+    try:
+        with urlopen(f"http://127.0.0.1:{port}/", timeout=3) as response:
+            return "fledge" if b"Fledge" in response.read(65536) else "other"
+    except OSError:
+        return "other"
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--open", action="store_true")
@@ -108,6 +123,20 @@ def main():
             check=True,
         )
         return
+    url = f"http://127.0.0.1:{args.port}"
+    if not args.init_only:
+        state = running(args.port)
+        if state == "fledge":
+            print(f"Fledge is already running at {url}")
+            if args.open:
+                webbrowser.open(url)
+            return
+        if state == "other":
+            raise SystemExit(
+                f"Port {args.port} is in use, but not by a working Fledge (another program, or an "
+                f"older Fledge that stopped responding). Stop it (lsof -nP -iTCP:{args.port}) "
+                "or start with --port <number>."
+            )
     database()
     if args.init_only:
         print("Fledge database ready. Saved workspace preferences are preserved.")

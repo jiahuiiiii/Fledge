@@ -2,6 +2,14 @@
 
 Current installation contract, checked 8 October 2026: the user increased the entire building-period allowance to **US$30 on 5 October 2026**, recorded by migration 033. Thesis enforces that single cumulative limit, including every earlier call and held maximum. `THESIS_LIVE_TEST_BUDGET_USD=30` must match it. This is not a per-run or per-clone allowance and does not purchase credits. It does not use Fork's keys, ledger or approvals. Dated sections below preserve earlier decisions and price/profile checkpoints; their US$10/US$20 amounts are historical, not the current ceiling.
 
+## Switching AI provider — 13 October 2026
+
+One `.env` line chooses the provider: `THESIS_MODEL_PROVIDER=openai|anthropic|deepseek`. Each provider has its own key (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`) and default quick-check/main models: GPT-5.4 mini/GPT-5.4 (fixed), Claude Haiku 5.5/Opus 5.5, DeepSeek Flash/V4 Pro. Anthropic and DeepSeek accept optional `ANTHROPIC_MODEL`/`ANTHROPIC_REASONING_MODEL` and `DEEPSEEK_MODEL`/`DEEPSEEK_REASONING_MODEL` overrides among models priced in [`settings.py`](../../thesis/providers/settings.py). The older `THESIS_MODEL`/`THESIS_REASONING_MODEL` lines are ignored. Unquoted values may end in `# comment`.
+
+The provider is chosen at start-up. After editing `.env`, restart the app; until then `live_key()` refuses paid calls because the file no longer matches the running selection. Every provider shares the same ledger. Request builders keep one provider-neutral body (the Responses shape); [`anthropic_messages.py`](../../thesis/providers/anthropic_messages.py) and [`deepseek.py`](../../thesis/providers/deepseek.py) translate it and translate answers back, so parsing, validation and accounting are shared. Each request family has a price twin per model with the same output allowance and effort.
+
+DeepSeek specifics: fixed host `api.deepseek.com/chat/completions`, `reasoning_effort` none/low/high (medium sends high), JSON mode with the schema in the instructions (no strict schema; app validators still check every answer). Prices are DeepSeek's peak rates, so off-peak use is over-counted up to 2×. Empty JSON-mode answers are treated as incomplete. Whether `max_tokens` includes thinking tokens is not documented; a reply above the allowance fails settlement rather than being accepted. Not yet exercised with a real DeepSeek call. Prompts were evaluated on GPT-5.4; quality on other models is unverified.
+
 ## Sentiment classification tuning — 9 October 2026
 
 The owner authorized lower reasoning effort and a larger response ceiling after

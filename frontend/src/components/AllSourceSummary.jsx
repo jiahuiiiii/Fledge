@@ -1,7 +1,7 @@
 import { SourceLabel } from "./SourceFilters";
 import { sourceCoverage, sourceExclusionLabels } from "../lib/sourceCoverage";
 import "./AllSourceSummary.css";
-import { sentimentSummaryLabel } from "../lib/sentimentSummary";
+import { sentimentSummaryParts } from "../lib/sentimentSummary";
 
 export function SourceToneSummary({ analysis }) {
   const samples = sourceCoverage(analysis).scopes.filter(
@@ -12,7 +12,12 @@ export function SourceToneSummary({ analysis }) {
       {samples.map((sample) => (
         <div key={sample.scope}>
           <SourceLabel scope={sample.scope} />
-          <strong>{sentimentSummaryLabel(sample.sentimentSummary)}</strong>
+          <strong>
+            {sentimentSummaryParts(sample.sentimentSummary).label}
+          </strong>
+          <small className="tone-detail">
+            {sentimentSummaryParts(sample.sentimentSummary).detail}
+          </small>
         </div>
       ))}
     </div>
@@ -68,11 +73,16 @@ export default function AllSourceSummary({
               <SourceLabel scope={sample.scope} />
               <strong>
                 {sample.analysed
-                  ? sentimentSummaryLabel(sample.sentimentSummary)
+                  ? sentimentSummaryParts(sample.sentimentSummary).label
                   : connection?.status === "disabled"
                     ? "Connection off"
                     : "No analysed texts"}
               </strong>
+              {sample.analysed > 0 && (
+                <small className="tone-detail">
+                  {sentimentSummaryParts(sample.sentimentSummary).detail}
+                </small>
+              )}
               <dl className="source-coverage-counts">
                 <div>
                   <dt>Available</dt>
@@ -127,6 +137,17 @@ export function SourceCountingDetails({ analysis }) {
         this reading. Mentioning the company does not always make a source
         relevant. You can still open sources labelled unrelated or unclear.
       </p>
+      {analysis?.source_reuse?.reused > 0 && (
+        <p>
+          {analysis.source_reuse.reused} unchanged{" "}
+          {analysis.source_reuse.reused === 1 ? "source keeps its" : "sources keep their"}{" "}
+          labels from an earlier reading made the same way, so{" "}
+          {analysis.source_reuse.new
+            ? `only ${analysis.source_reuse.new} new or changed ${analysis.source_reuse.new === 1 ? "source was" : "sources were"} sent to the AI.`
+            : "no AI request was needed."}{" "}
+          Counts are recalculated over every source.
+        </p>
+      )}
       {analysis?.prefilter && (
         <p>
           A quick check with a smaller AI model looked at all{" "}
