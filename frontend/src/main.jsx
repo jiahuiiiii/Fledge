@@ -5,6 +5,7 @@ import "./styles/tokens.css";
 import "./styles/app.css";
 import "./components/ContentFirstLayout.css";
 import "./components/ReadingFlow.css";
+import "./styles/mobile.css";
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <App />

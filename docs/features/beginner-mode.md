@@ -42,3 +42,16 @@ and the page says it is not advice to buy or sell.
 `frontend/src/components/BeginnerSummary.jsx`, `lib/beginnerSummary.js`
 (+ tests), `ResearchNavigation.jsx` (`researchTabs`), `DetailModeToggle.jsx`,
 `lib/profile.js` (local mode for accounts without answers), `App.jsx`.
+
+## Phone layout fixes — 14 October 2026
+
+Checked every main view at 390 and 360 px wide (sign-in, first-login
+questions, home, company Summary/Overview/Financials/News, World, Updates, My
+ideas, account menu). `frontend/src/styles/mobile.css`, loaded last:
+
+- The all-companies home and World view no longer show the last-opened
+  company's header on phones (World also hides the demo bar).
+- The account menu stays inside the screen.
+- Research tabs scroll sideways with a fade showing more tabs exist.
+- Small controls (Beginner/Pro, demo bar, "Read source", source links, World
+  filters) are at least 44 px tall on phones and touch screens.
