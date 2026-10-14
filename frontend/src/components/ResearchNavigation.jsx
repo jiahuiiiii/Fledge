@@ -1,4 +1,10 @@
 const sections = {
+  summary: {
+    label: "Summary",
+    description:
+      "The price, what the news and people online are saying, and world events that may matter.",
+    icon: "M5 4h14v16H5zM8 8h8M8 12h8M8 16h5",
+  },
   evidence: {
     label: "News & discussion",
     description:
@@ -31,10 +37,16 @@ const sections = {
   },
 };
 
-export default function ResearchNavigation({ selected, onChange, recorded }) {
-  const keys = recorded
-    ? ["business", "fundamentals", "evidence"]
-    : ["business", "fundamentals", "evidence", "expectations", "valuation"];
+// Beginner mode keeps two plain views; Pro adds the detailed research tabs.
+export function researchTabs({ recorded, beginner }) {
+  if (beginner) return ["summary", "evidence"];
+  return recorded
+    ? ["summary", "business", "fundamentals", "evidence"]
+    : ["summary", "business", "fundamentals", "evidence", "expectations", "valuation"];
+}
+
+export default function ResearchNavigation({ selected, onChange, recorded, beginner }) {
+  const keys = researchTabs({ recorded, beginner });
   return (
     <div className="research-navigation">
       <div

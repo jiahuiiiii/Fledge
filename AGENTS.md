@@ -2,6 +2,10 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Beginner and Pro modes — 14 October 2026
+
+Owner (Ten) asked for a simpler view for beginners. Top-bar **Beginner | Pro** reuses `detail_mode` (explain/data; local browser fallback when the questions were skipped). Beginner companies show only a new chart-free **Summary** (price, basics sentences, news tone + headlines, social tone + posts, linked world news, your view) and News & discussion; Pro keeps all tabs with Summary first. Frontend only; saved readings are reworded, nothing new is inferred. [Contract](docs/features/beginner-mode.md).
+
 ## World news tab — 13 October 2026
 
 Owner (Ten) requested world events such as Fed rate cuts and wars. New **World** tab shows Finnhub general market headlines (last 3 days) with code-owned keyword theme tags, watchlist-name matches and an optional, user-triggered GPT-5.4 mini check of which watchlist companies a headline could affect (exact quote required; invalid links dropped; identical inputs reuse the saved call; no trade advice or price prediction). Migration 052; existing Finnhub key/clock/text checks and ledger/live-model switches unchanged. [Contract](docs/features/world-news.md).

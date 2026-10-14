@@ -43,7 +43,9 @@ import MarketResearch, { MarketQuote } from "./components/MarketResearch";
 import SentimentPanel from "./components/SentimentPanel";
 import ResearchNavigation, {
   ResearchSectionHeader,
+  researchTabs,
 } from "./components/ResearchNavigation";
+import BeginnerSummary from "./components/BeginnerSummary";
 import SocialConversation from "./components/SocialConversation";
 import UpdateInbox from "./components/UpdateInbox";
 import TelegramSettings from "./components/TelegramSettings";
@@ -80,7 +82,7 @@ import IdeaEvidenceReview from "./components/IdeaEvidenceReview";
 import Onboarding from "./components/Onboarding";
 import PersonalHome from "./components/PersonalHome";
 import DetailModeToggle from "./components/DetailModeToggle";
-import { ProfileContext } from "./lib/profile";
+import { ProfileContext, readLocalMode, writeLocalMode, useProfile } from "./lib/profile";
 import ReportExpectationEditor, {
   ReportExpectationText,
 } from "./components/ReportExpectation";
@@ -368,16 +370,24 @@ function ResearchApp({ signOut, session }) {
       removeEventListener("fledge:home-changed", load);
     };
   }, []);
-  const detailMode = home?.profile?.completed ? home.detail_mode : null;
+  const [localMode, setLocalMode] = useState(readLocalMode);
+  const detailMode = home?.profile?.completed
+    ? home.detail_mode
+    : localMode || "data";
   useEffect(() => {
-    if (detailMode) document.documentElement.dataset.detailMode = detailMode;
-    else delete document.documentElement.dataset.detailMode;
+    document.documentElement.dataset.detailMode = detailMode;
   }, [detailMode]);
   const profileValue = {
     home,
     profile: home?.profile || null,
-    setDetailMode: (mode) =>
-      api
+    mode: detailMode,
+    setDetailMode: (mode) => {
+      if (!home?.profile?.completed) {
+        writeLocalMode(mode);
+        setLocalMode(mode);
+        return Promise.resolve();
+      }
+      return api
         .saveDetailMode(mode)
         .then((profile) =>
           setHome((current) => ({
@@ -386,7 +396,8 @@ function ResearchApp({ signOut, session }) {
             detail_mode: profile.detail_mode,
           })),
         )
-        .catch(() => {}),
+        .catch(() => {});
+    },
   };
   return (
     <ProfileContext.Provider value={profileValue}>
@@ -507,7 +518,9 @@ function CompanyWorkspace({
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false),
-    [tab, setTab] = useState("business"),
+    { mode: viewMode } = useProfile(),
+    beginner = viewMode === "explain",
+    [tab, setTab] = useState(() => (beginner ? "summary" : "business")),
     [question, setQuestion] = useState(questionDefault);
   const [source, setSource] = useState(null),
     [editor, setEditor] = useState(null),
@@ -617,13 +630,19 @@ function CompanyWorkspace({
   function chooseCompany(id) {
     onChoose(id, !id && view === "idea" ? "workspace" : view);
   }
+  // Beginner mode shows only Summary and News & discussion.
+  const recordedCompany = data?.instrument?.mode === "recorded";
+  useEffect(() => {
+    const allowed = researchTabs({ recorded: recordedCompany, beginner });
+    if (!allowed.includes(tab)) setTab(allowed[0]);
+  }, [beginner, recordedCompany, tab]);
   const workspaceLane = useRef(createReadLane());
   const [financialError, setFinancialError] = useState("");
   const needsFinancials =
     sourcesOpen ||
     (view === "workspace" &&
       !!selectedCompanyId &&
-      ["business", "fundamentals"].includes(tab));
+      ["summary", "business", "fundamentals"].includes(tab));
   const includeFinancials = useRef(false);
   includeFinancials.current =
     !companyLoading && !data?.financials_pending && needsFinancials;
@@ -1765,6 +1784,7 @@ function CompanyWorkspace({
                       selected={tab}
                       onChange={setTab}
                       recorded={isRecorded}
+                      beginner={beginner}
                     />
                     <section
                       className="research-content"
@@ -1790,6 +1810,22 @@ function CompanyWorkspace({
                             });
                         }}
                       />
+                      <RetainedView active={tab === "summary"}>
+                        <BeginnerSummary
+                          key={`summary-${instrumentId}`}
+                          data={data}
+                          instrumentId={instrumentId}
+                          visible={view === "workspace" && tab === "summary"}
+                          savedView={current}
+                          onSaveView={isRecorded ? undefined : openEditor}
+                          onView={setTab}
+                          onSource={setSource}
+                          onWorld={() => setView("world")}
+                          onUpdate={
+                            isRecorded ? undefined : () => setUpdatesOpen(true)
+                          }
+                        />
+                      </RetainedView>
                       <RetainedView active={tab === "evidence"}>
                         <>
                           {!isRecorded && (

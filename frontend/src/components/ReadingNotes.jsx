@@ -11,11 +11,9 @@ export default function ReadingNotes({
   children,
   className = "",
 }) {
-  // Beginners ("Explain it to me") see these notes open by default.
-  const { home } = useProfile();
-  const [open, setOpen] = useState(
-    home?.profile?.completed && home.detail_mode === "explain",
-  );
+  // Beginner mode shows these notes open by default.
+  const { mode } = useProfile();
+  const [open, setOpen] = useState(mode === "explain");
   const status = [
     differentSources && "Different sources",
     stale && "Sources over a day old",
