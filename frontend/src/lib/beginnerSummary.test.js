@@ -79,3 +79,46 @@ test("adds the either-way headlines and a calm close when nothing is worrying", 
     "News about it is mostly positive. Of 2 world headlines linked to it, 1 could help it and 1 could go either way. Nothing in the saved news looks worrying right now.",
   );
 });
+
+import { newsLight, socialLight, worldLight, dayLabel, whatHappened } from "./beginnerSummary.js";
+
+test("news light counts upbeat articles and names the latest", () => {
+  const light = newsLight({ tone: "positive leaning", counts: { positive: 4, negative: 1, neutral: 1 }, analysed: 6, newsCount: 6, latest: "Apple moves assembly to India" });
+  assert.equal(light.mood, "good");
+  assert.equal(light.status, "Mostly positive");
+  assert.equal(light.reason, "4 of 6 recent articles sound upbeat. Latest: “Apple moves assembly to India”.");
+  assert.equal(newsLight({ newsCount: 2 }).status, "Not read yet");
+  assert.equal(newsLight({}).reason, "No company news saved yet.");
+});
+
+test("people light combines platforms", () => {
+  const light = socialLight([{ platform: "Reddit", tone: "positive leaning" }, { platform: "Hacker News", tone: "negative leaning" }]);
+  assert.equal(light.status, "Split");
+  assert.equal(light.reason, "Reddit: mostly positive · Hacker News: mostly negative.");
+  assert.equal(socialLight([]).status, "No reading yet");
+});
+
+test("world light leads with risks", () => {
+  const linked = [
+    { article: { headline: "Fed hints at cuts" }, link: { effect: "could_help", reason: "Lower rates help." } },
+    { article: { headline: "New tariffs" }, link: { effect: "could_hurt", reason: "Parts cost more." } },
+  ];
+  const light = worldLight(linked, "Apple");
+  assert.equal(light.mood, "bad");
+  assert.equal(light.status, "One risk to watch");
+  assert.equal(light.reason, "Parts cost more. (“New tariffs”)");
+  assert.equal(worldLight([], "Apple").status, "Nothing linked");
+});
+
+test("what happened merges sources newest first with day labels", () => {
+  const now = Date.parse("2026-10-15T04:00:00Z"); // 12:00 SGT
+  assert.equal(dayLabel("2026-10-15T01:00:00Z", now), "Today");
+  assert.equal(dayLabel("2026-10-14T01:00:00Z", now), "Yesterday");
+  const rows = whatHappened({
+    news: [{ id: 1, headline: "A", published_at: "2026-10-14T01:00:00Z" }],
+    posts: [{ id: 2, headline: "B", published_at: "2026-10-15T02:00:00Z" }],
+    world: [{ article: { id: 3, headline: "C", published_at: "2026-10-15T03:00:00Z", url: "https://x" } }],
+    now,
+  });
+  assert.deepEqual(rows.map((r) => [r.text, r.day, r.kind]), [["C", "Today", "world"], ["B", "Today", "post"], ["A", "Yesterday", "news"]]);
+});

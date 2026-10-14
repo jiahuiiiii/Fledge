@@ -138,3 +138,108 @@ export function oneLine({ newsTone, newsCount = 0, social = [], links = [] }) {
   else if (calm && NEWS_LINE[newsMood]) parts.push("Nothing in the saved news looks worrying right now");
   return parts.map((p) => p[0].toUpperCase() + p.slice(1) + ".").join(" ");
 }
+
+// ---- Signals layout (option B): three lights, why, and what happened ----
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+function combinedMood(tones = []) {
+  const moods = tones.map(toneMood).filter((m) => m !== "none");
+  if (!moods.length) return "none";
+  return moods.every((m) => m === moods[0]) ? moods[0] : "mixed";
+}
+
+// News light from the saved news reading (or saved updates when unread).
+export function newsLight({ tone, counts, analysed = 0, newsCount = 0, latest }) {
+  const mood = analysed ? toneMood(tone) : "none";
+  const status = analysed ? plainTone(tone) : newsCount ? "Not read yet" : "No news yet";
+  const usable = ["positive", "negative", "mixed", "neutral"].reduce(
+    (n, k) => n + (counts?.[k] || 0),
+    0,
+  );
+  let reason;
+  if (analysed && mood === "good" && usable)
+    reason = `${counts.positive || 0} of ${usable} recent articles sound upbeat.`;
+  else if (analysed && mood === "bad" && usable)
+    reason = `${counts.negative || 0} of ${usable} recent articles sound worried.`;
+  else if (analysed && mood === "mixed")
+    reason = "Recent articles pull in both directions.";
+  else if (analysed) reason = "Too few clear articles to tell which way news leans.";
+  else if (newsCount)
+    reason = `${plural(newsCount, "saved update")}, not read by AI yet.`;
+  else reason = "No company news saved yet.";
+  if (latest) reason += ` Latest: “${latest}”.`;
+  return { key: "news", title: "News", mood, status, reason };
+}
+
+const SOCIAL_STATUS = {
+  good: "Mostly upbeat",
+  bad: "Mostly worried",
+  mixed: "Split",
+};
+export function socialLight(social = []) {
+  const mood = combinedMood(social.map((s) => s.tone));
+  const status = social.length
+    ? SOCIAL_STATUS[mood] || "Not enough to tell yet"
+    : "No reading yet";
+  const reason = social.length
+    ? social
+        .map((s) => `${s.platform}: ${plainTone(s.tone).toLowerCase()}`)
+        .join(" · ") + "."
+    : "No reading of Reddit, Hacker News or X yet.";
+  return { key: "people", title: "People online", mood, status, reason };
+}
+
+export function worldLight(linked = [], name = "this company") {
+  const links = linked.map((x) => x.link).filter(Boolean);
+  const first = (effect) => linked.find((x) => x.link?.effect === effect);
+  const hurt = links.filter((l) => l.effect === "could_hurt").length;
+  const help = links.filter((l) => l.effect === "could_help").length;
+  const either = links.filter((l) => l.effect === "mixed_or_unclear").length;
+  const describe = (x) => `${x.link.reason} (“${x.article.headline}”)`;
+  if (hurt)
+    return {
+      key: "world", title: "World", mood: "bad",
+      status: hurt === 1 ? "One risk to watch" : `${hurt} risks to watch`,
+      reason: describe(first("could_hurt")),
+    };
+  if (help)
+    return { key: "world", title: "World", mood: "good", status: "Could help", reason: describe(first("could_help")) };
+  if (either)
+    return { key: "world", title: "World", mood: "mixed", status: "Could go either way", reason: describe(first("mixed_or_unclear")) };
+  if (linked.length)
+    return {
+      key: "world", title: "World", mood: "none", status: "In the news",
+      reason: `“${linked[0].article.headline}” names ${name}.`,
+    };
+  return {
+    key: "world", title: "World", mood: "none", status: "Nothing linked",
+    reason: `No recent world headline is linked to ${name} yet.`,
+  };
+}
+
+// Short day label in Singapore time: Today, Yesterday, Mon… or 3 Oct.
+export function dayLabel(value, now = Date.now()) {
+  const t = Date.parse(value);
+  if (!Number.isFinite(t)) return "";
+  const day = (ms) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Singapore" }).format(ms);
+  const diff = Math.round((Date.parse(day(now)) - Date.parse(day(t))) / 86400e3);
+  if (diff <= 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  const fmt = diff < 7 ? { weekday: "short" } : { day: "numeric", month: "short" };
+  return new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Singapore", ...fmt }).format(t);
+}
+
+// Newest company news, posts and linked world headlines, merged by date.
+export function whatHappened({ news = [], posts = [], world = [], limit = 6, now = Date.now() }) {
+  const rows = [
+    ...news.map((s) => ({ id: `n-${s.id}`, kind: "news", text: s.headline, at: s.published_at, item: s })),
+    ...posts.map((s) => ({ id: `p-${s.id}`, kind: "post", text: s.headline, at: s.published_at, item: s })),
+    ...world.map((x) => ({ id: `w-${x.article.id}`, kind: "world", text: x.article.headline, at: x.article.published_at, url: x.article.url })),
+  ].filter((r) => r.text && Number.isFinite(Date.parse(r.at)));
+  return rows
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
+    .slice(0, limit)
+    .map((r) => ({ ...r, day: dayLabel(r.at, now) }));
+}

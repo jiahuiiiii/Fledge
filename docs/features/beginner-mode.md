@@ -16,26 +16,35 @@ server; accounts that skipped them keep it in this browser (default Pro).
   help and reading notes open by default.
 - **Pro**: every tab, with **Summary** added first.
 
-## The Summary page
+## The Summary page ("Signals", chosen 15 October 2026)
 
-One column of plain cards, no charts:
+Option B of the four designs the team compared. One column, no charts:
 
-1. **Share price**: last saved price and "up/down x% in the last session".
-   The move is not explained by a headline.
-2. **The basics**: the existing plain sentences about revenue growth,
-   management guidance and cash versus borrowing, when saved.
-3. **What the news says**: the saved AI tone for company news in words
-   ("Mostly positive", "Mixed", "Not enough to tell yet") and the five newest
-   headlines with their own tone; each opens the original source.
-4. **What people are saying online**: tone per platform (Reddit, Hacker News,
-   X) and the three newest posts.
-5. **World news that may matter**: World-tab headlines that name the company
-   or that the watchlist check linked to it, with the plain reason; otherwise
-   the two newest rate, conflict or trade headlines as the big picture.
-6. **Your view**: the saved idea, or a prompt to write one.
+1. **Price**: last saved price and "up/down x% in the last session". The move
+   is not explained by a headline.
+2. **Three lights**, readable in seconds, each a tap target that jumps to its
+   reason:
+   - **News**: the saved AI news tone in words ("Mostly positive", "Mixed",
+     "Not enough to tell yet"); "Not read yet" when only unread updates exist.
+   - **People online**: the combined tone across Reddit, Hacker News and X
+     ("Mostly upbeat", "Mostly worried", "Split").
+   - **World**: from the World tab's watchlist check: "One risk to watch"
+     (red) if any linked headline could hurt, else "Could help" or "Could go
+     either way"; "Nothing linked" otherwise.
+   When any light is red, a line under them says "Something here could hurt.
+   Worth reading the reasons before you decide anything."
+3. **Why these lights?**: one plain line per light, e.g. "4 of 6 recent
+   articles sound upbeat. Latest: …", each platform's tone, and the world
+   link's reason with its headline; plus "possibilities, not predictions or
+   tips".
+4. **What happened**: newest company news, posts and linked world headlines
+   merged by date (Today / Yesterday / weekday), each opening its source;
+   links to all news & posts and to World news.
+5. **Your view**: the saved view, or a prompt to write one.
 
-Everything rewords saved readings; nothing new is calculated or recommended,
-and the page says it is not advice to buy or sell.
+Lights describe what is being said, not whether to buy or sell; nothing new is
+calculated or recommended. Helpers: `newsLight`, `socialLight`, `worldLight`,
+`whatHappened` in `lib/beginnerSummary.js` (tested).
 
 ## Code
 

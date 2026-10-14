@@ -1,33 +1,25 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { useProfile } from "../lib/profile";
-import { formatTimestamp } from "../lib/dateTime";
 import { companyName } from "../lib/companyIdentity";
-import { snapshot } from "../lib/companySnapshot";
 import { overviewNews } from "../lib/overviewSections";
 import { sourceCoverage } from "../lib/sourceCoverage";
 import {
-  itemTone,
-  oneLine,
-  plainTone,
+  newsLight,
   platformName,
   priceLine,
+  socialLight,
   socialTones,
-  toneMood,
+  whatHappened,
   worldForCompany,
+  worldLight,
 } from "../lib/beginnerSummary";
 import "./BeginnerSummary.css";
 
-const EFFECT_WORDS = {
-  could_help: "Could help",
-  could_hurt: "Could hurt",
-  mixed_or_unclear: "Could go either way",
-};
-const when = (value) => formatTimestamp(value, { fallback: "date unknown" });
-
-// One page for beginners: the price, what the news and people online are
-// saying, world events that may matter, and the user's own view. No charts.
-// Everything is a saved reading reworded; Fledge never says buy or sell.
+// Beginner summary, "Signals" layout: the price, three lights (News, People
+// online, World) readable in seconds, one-line reasons, a merged list of what
+// happened, and the user's own view. No charts. Everything rewords saved
+// readings; Fledge never says buy or sell.
 export default function BeginnerSummary({
   data,
   instrumentId,
@@ -55,7 +47,6 @@ export default function BeginnerSummary({
 
   const name = companyName(data.instrument);
   const price = priceLine(data.market?.quote?.quote);
-  const { sentences } = snapshot(data);
   const reading = data.sentiment?.withheld ? null : data.sentiment;
   const scopes = sourceCoverage(reading).scopes;
   const newsTone = scopes.find((s) => s.scope === "news");
@@ -73,190 +64,119 @@ export default function BeginnerSummary({
           .sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at))
   ).slice(0, 5);
   const posts = items.filter((s) => s.kind === "social").slice(0, 3);
-  const { linked, bigPicture } = worldForCompany(world, instrumentId);
-  const summaryLine = oneLine({
-    newsTone: newsTone?.analysed ? newsTone.tone : null,
-    newsCount: news.length,
-    social,
-    links: linked.map((x) => x.link).filter(Boolean),
-  });
+  const { linked } = worldForCompany(world, instrumentId);
+  const lights = [
+    newsLight({
+      tone: newsTone?.tone,
+      counts: newsTone?.sentimentSummary?.counts,
+      analysed: newsTone?.analysed || 0,
+      newsCount: news.length,
+      latest: news[0]?.headline,
+    }),
+    socialLight(social),
+    worldLight(linked, name),
+  ];
+  const timeline = whatHappened({ news, posts, world: linked });
+  const pointer = lights.some((l) => l.mood === "bad")
+    ? "Something here could hurt. Worth reading the reasons before you decide anything."
+    : null;
 
   return (
-    <div className="beginner-summary">
-      <section className="bs-card bs-hero" aria-label="Share price">
-        <div>
-          <span className="section-label">SHARE PRICE</span>
-          <p className="bs-muted">
-            {name}
-            {data.instrument.sector ? ` · ${data.instrument.sector}` : ""}
-          </p>
-        </div>
+    <div className="beginner-summary signals">
+      <section className="bs-price-row" aria-label="Share price">
         {price ? (
-          <div className={`bs-price mood-${price.mood}`}>
+          <>
             <strong>{price.price}</strong>
-            {price.move && <span>{price.move}</span>}
-          </div>
+            {price.move && (
+              <span className={`mood-${price.mood}`}>
+                <span aria-hidden="true">
+                  {price.mood === "bad" ? "▼ " : price.mood === "good" ? "▲ " : ""}
+                </span>
+                {price.move}
+              </span>
+            )}
+          </>
         ) : (
-          <p className="bs-muted">No share price saved yet.</p>
+          <span className="bs-muted">No share price saved yet</span>
         )}
-        <p className="bs-oneline">
-          <span className="section-label">IN SHORT</span>
-          {summaryLine}
-        </p>
       </section>
 
-      {sentences.length > 0 && (
-        <section className="bs-card" aria-labelledby="bs-basics">
-          <h4 id="bs-basics">The basics</h4>
-          <ul className="bs-list">
-            {sentences.map((sentence) => (
-              <li key={sentence}>{sentence}</li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <section aria-labelledby="bs-lights-title">
+        <h4 id="bs-lights-title" className="sr-only">
+          {name} at a glance
+        </h4>
+        <ul className="bs-lights">
+          {lights.map((light) => (
+            <li key={light.key}>
+              <a className={`bs-light mood-${light.mood}`} href={`#why-${light.key}`}>
+                <span className="bs-dot" aria-hidden="true"></span>
+                <span className="bs-light-title">{light.title}</span>
+                <strong>{light.status}</strong>
+              </a>
+            </li>
+          ))}
+        </ul>
+        {pointer && <p className="bs-pointer">{pointer}</p>}
+      </section>
 
-      <section className="bs-card" aria-labelledby="bs-news">
-        <div className="bs-head">
-          <h4 id="bs-news">What the news says</h4>
-          <span className={`bs-tone mood-${toneMood(newsTone?.tone)}`}>
-            {newsTone?.analysed ? plainTone(newsTone.tone) : "Not read yet"}
-          </span>
-        </div>
-        {news.length ? (
-          <ul className="bs-headlines">
-            {news.map((item) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  className="bs-link"
-                  onClick={() => onSource?.(item)}
-                >
-                  {item.headline}
-                </button>
-                <small>
-                  {item.source || item.publisher || "News"} ·{" "}
-                  {when(item.published_at)}
-                  {itemTone(item.tone) && (
-                    <span className={`bs-chip tone-${item.tone}`}>
-                      {itemTone(item.tone)}
-                    </span>
-                  )}
-                </small>
+      <section className="bs-card" aria-labelledby="bs-why">
+        <h4 id="bs-why">Why these lights?</h4>
+        <ul className="bs-why">
+          {lights.map((light) => (
+            <li key={light.key} id={`why-${light.key}`} tabIndex={-1}>
+              <span className={`bs-dot mood-${light.mood}`} aria-hidden="true"></span>
+              <span>
+                <strong>{light.title}:</strong> {light.reason}
+              </span>
+            </li>
+          ))}
+        </ul>
+        {linked.some((x) => x.link) && (
+          <p className="bs-caveat">
+            World links are possibilities to think about, not predictions or tips.
+          </p>
+        )}
+      </section>
+
+      <section className="bs-card" aria-labelledby="bs-happened">
+        <h4 id="bs-happened">What happened</h4>
+        {timeline.length ? (
+          <ul className="bs-timeline">
+            {timeline.map((row) => (
+              <li key={row.id}>
+                <span className="bs-day">{row.day}</span>
+                {row.kind === "world" ? (
+                  <a href={row.url} target="_blank" rel="noopener noreferrer">
+                    {row.text}
+                    <small> · World</small>
+                  </a>
+                ) : (
+                  <button type="button" className="bs-link" onClick={() => onSource?.(row.item)}>
+                    {row.text}
+                    <small> · {row.kind === "post" ? platformName(row.item.platform) : row.item.source || "News"}</small>
+                  </button>
+                )}
               </li>
             ))}
           </ul>
         ) : (
           <p className="bs-muted">
-            No company news saved yet.{" "}
+            Nothing saved yet.{" "}
             {onUpdate && (
-              <button type="button" className="bs-link" onClick={onUpdate}>
+              <button type="button" className="bs-link inline" onClick={onUpdate}>
                 Get the latest news
               </button>
             )}
           </p>
         )}
-      </section>
-
-      <section className="bs-card" aria-labelledby="bs-social">
-        <div className="bs-head">
-          <h4 id="bs-social">What people are saying online</h4>
+        <div className="bs-more-row">
+          <button type="button" className="bs-more" onClick={() => onView?.("evidence")}>
+            All news & posts →
+          </button>
+          <button type="button" className="bs-more" onClick={onWorld}>
+            World news →
+          </button>
         </div>
-        {social.length ? (
-          <ul className="bs-tones">
-            {social.map((s) => (
-              <li key={s.platform}>
-                <span>{s.platform}</span>
-                <span className={`bs-tone mood-${toneMood(s.tone)}`}>
-                  {plainTone(s.tone)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="bs-muted">
-            No reading of Reddit, Hacker News or X yet.
-          </p>
-        )}
-        {posts.length > 0 && (
-          <ul className="bs-headlines">
-            {posts.map((item) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  className="bs-link"
-                  onClick={() => onSource?.(item)}
-                >
-                  {item.headline}
-                </button>
-                <small>
-                  {platformName(item.platform)} · {when(item.published_at)}
-                  {itemTone(item.tone) && (
-                    <span className={`bs-chip tone-${item.tone}`}>
-                      {itemTone(item.tone)}
-                    </span>
-                  )}
-                </small>
-              </li>
-            ))}
-          </ul>
-        )}
-        <button type="button" className="bs-more" onClick={() => onView?.("evidence")}>
-          Read all news & posts →
-        </button>
-      </section>
-
-      <section className="bs-card" aria-labelledby="bs-world">
-        <div className="bs-head">
-          <h4 id="bs-world">World news that may matter</h4>
-        </div>
-        {!world ? (
-          <p className="bs-muted">Loading world news…</p>
-        ) : linked.length ? (
-          <ul className="bs-headlines">
-            {linked.map(({ article, link }) => (
-              <li key={article.id}>
-                <a href={article.url} target="_blank" rel="noopener noreferrer">
-                  {article.headline}
-                </a>
-                {link ? (
-                  <p className={`bs-effect effect-${link.effect}`}>
-                    <strong>{EFFECT_WORDS[link.effect] || "Possible effect"}:</strong>{" "}
-                    {link.reason}
-                  </p>
-                ) : (
-                  <p className="bs-muted">This headline names {name}.</p>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : bigPicture.length ? (
-          <>
-            <p className="bs-muted">
-              Nothing yet ties world news to {name}. The big picture:
-            </p>
-            <ul className="bs-headlines">
-              {bigPicture.map((article) => (
-                <li key={article.id}>
-                  <a href={article.url} target="_blank" rel="noopener noreferrer">
-                    {article.headline}
-                  </a>
-                  <small>
-                    {article.publisher} · {when(article.published_at)}
-                  </small>
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : (
-          <p className="bs-muted">No recent world headlines saved yet.</p>
-        )}
-        {linked.some((x) => x.link) && (
-          <p className="bs-caveat">A possibility to think about, not a prediction or a tip.</p>
-        )}
-        <button type="button" className="bs-more" onClick={onWorld}>
-          Open World news →
-        </button>
       </section>
 
       <section className="bs-card bs-view" aria-labelledby="bs-yourview">
@@ -281,8 +201,7 @@ export default function BeginnerSummary({
       </section>
 
       <p className="bs-note">
-        This page rewords saved news and posts; it is not advice to buy or
-        sell.
+        The lights describe what is being said, not whether to buy or sell.
         {mode === "explain"
           ? " Switch to Pro for financials, charts and comparisons."
           : " The other tabs have the financials, charts and comparisons."}
