@@ -73,8 +73,12 @@ def new_session(conn, account, now):
     return cookie, SESSION_DAYS * 86400
 
 
-def register(username, password, *, now=None):
-    """Public sign-up. Always creates a new, separate account."""
+def register(username, password, *, now=None, terms_version=None):
+    """Public sign-up. Always creates a new, separate account.
+
+    ``terms_version`` records the Terms of Use and Privacy Notice the person
+    accepted, in the same transaction as the account (PDPA consent record).
+    """
     name = normalize(username)
     check_password(password)
     now = now or datetime.now(timezone.utc)
@@ -87,6 +91,9 @@ def register(username, password, *, now=None):
         conn.execute('INSERT INTO accounts VALUES(%s,%s)', (account, 'Research account'))
         conn.execute('INSERT INTO password_credentials(account_id,username,password_hash) VALUES(%s,%s,%s)',
                      (account, name, hashed))
+        if terms_version:
+            conn.execute('INSERT INTO terms_acceptances(account_id,terms_version,accepted_at) VALUES(%s,%s,%s)',
+                         (account, terms_version, now))
         return new_session(conn, account, now)
 
 

@@ -40,8 +40,98 @@
 }
 .onboarding-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-top: 8px;
+}
+.onboarding-actions button {
+  min-height: 44px;
+}
+.onboarding-options button {
+  min-height: 52px;
+}
+.onboarding-intro {
+  color: var(--color-text-2);
+}
+.onboarding-progress {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin: 16px 0 8px;
+}
+.onboarding-progress span {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-line-strong);
+}
+.onboarding-progress span.done {
+  background: var(--color-accent);
+}
+.onboarding-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+.onboarding-chips button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+.onboarding-chips button.selected {
+  border-color: var(--color-accent);
+  background: var(--color-positive-soft, var(--color-surface-2));
+}
+.investor-type-card {
+  margin: 12px 0 24px;
+  padding: 20px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+.investor-type-card h2 {
+  margin: 6px 0 4px;
+  font-size: 28px;
+  color: var(--color-accent-light, var(--color-text));
+}
+.investor-type-card h3 {
+  margin: 16px 0 4px;
+  font-size: var(--text-md);
+}
+.investor-type-card p {
+  margin: 6px 0;
+  color: var(--color-text-2);
+  line-height: 1.55;
+}
+.investor-type-card .investor-type-short {
+  color: var(--color-text);
+  font-size: var(--text-md);
+}
+.investor-type-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin: 14px 0 0;
+}
+.investor-type-facts div {
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.investor-type-facts dt {
+  font-size: var(--text-xs);
+  color: var(--color-muted, var(--color-text-2));
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.investor-type-facts dd {
+  margin: 4px 0 0;
+  color: var(--color-text);
+  font-weight: 600;
 }
 .onboarding-actions .primary {
   margin-left: auto;

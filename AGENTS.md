@@ -2,6 +2,10 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Investor-type quiz and Terms/PDPA consent — 15 October 2026
+
+From real-user feedback via Ten. First sign-in asks **5 questions** (adds `trade_frequency` and `drop_reaction`, migration 053) and shows one of four investor types (Long-term investor, Steady builder, Swing trader, Active trader; deterministic points in `thesis/investor_type.py`, never used to recommend). Retake from Account. Sign-up requires ticking Terms of Use + Privacy Notice consent (server-enforced, recorded in `terms_acceptances`); existing accounts accept once. `/terms` and `/privacy` pages. Open: DPO contact and legal review. [Contract](docs/features/investor-quiz-and-consent.md).
+
 ## Beginner and Pro modes — 14 October 2026
 
 Owner (Ten) asked for a simpler view for beginners. Top-bar **Beginner | Pro** reuses `detail_mode` (explain/data; local browser fallback when the questions were skipped). Beginner companies show only a new chart-free **Summary** (price, basics sentences, news tone + headlines, social tone + posts, linked world news, your view) and News & discussion; Pro keeps all tabs with Summary first. Frontend only; saved readings are reworded, nothing new is inferred. [Contract](docs/features/beginner-mode.md).

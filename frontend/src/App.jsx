@@ -342,6 +342,16 @@ function ResearchApp({ signOut, session }) {
     setDestination({ id, view, evaluation });
   }
   const [home, setHome] = useState(null);
+  // "Retake the quiz" in the Account menu reopens the five questions.
+  const [retakeQuiz, setRetakeQuiz] = useState(false);
+  useEffect(() => {
+    const open = () => {
+      setRetakeQuiz(true);
+      window.scrollTo(0, 0);
+    };
+    addEventListener("fledge:retake-quiz", open);
+    return () => removeEventListener("fledge:retake-quiz", open);
+  }, []);
   // "Skip for now" lasts a week in this browser instead of returning on every reload.
   const [onboardingSkipped, setOnboardingSkipped] = useState(() => {
     try {
@@ -409,12 +419,16 @@ function ResearchApp({ signOut, session }) {
   };
   return (
     <ProfileContext.Provider value={profileValue}>
-      {home?.profile && !home.profile.completed && !onboardingSkipped ? (
+      {home?.profile &&
+      (retakeQuiz || (!home.profile.completed && !onboardingSkipped)) ? (
         <Onboarding
-          onSkip={skipOnboarding}
+          retake={retakeQuiz}
+          profile={home.profile}
+          onSkip={retakeQuiz ? () => setRetakeQuiz(false) : skipOnboarding}
           onDone={(profile) => {
-            // Next step after the questions: choose companies for the watchlist.
-            window.fledgeOpenAddCompany = true;
+            // Next step after the first quiz: choose companies for the watchlist.
+            if (!retakeQuiz) window.fledgeOpenAddCompany = true;
+            setRetakeQuiz(false);
             setHome((current) => ({
               ...current,
               profile,

@@ -103,8 +103,18 @@ export const api = {
     }),
   login: (email) => request("/auth/login", { method: "POST", body: { email } }),
   logout: () => request("/auth/logout", { method: "POST" }),
-  register: (username, password) =>
-    request("/auth/register", { method: "POST", body: { username, password } }),
+  register: (username, password, termsVersion) =>
+    request("/auth/register", {
+      method: "POST",
+      body: {
+        username,
+        password,
+        accept_terms: !!termsVersion,
+        terms_version: termsVersion || "",
+      },
+    }),
+  acceptTerms: (terms_version) =>
+    request("/terms/accept", { method: "POST", body: { terms_version } }),
   passwordLogin: (username, password) =>
     request("/auth/password-login", {
       method: "POST",
