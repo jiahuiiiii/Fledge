@@ -242,10 +242,12 @@ export default function CompanyOverview({
               )}
               <span className="company-overview-footer">
                 <span>
-                  {company.status ? "Idea saved" : "No saved idea"}
+                  {company.status
+                    ? beginner ? "View saved" : "Idea saved"
+                    : beginner ? "No view saved yet" : "No saved idea"}
                   {company.unread > 0 && ` · ${company.unread} to review`}
                 </span>
-                <span>Open workspace →</span>
+                <span>{beginner ? "See summary →" : "Open workspace →"}</span>
               </span>
             </button>
           );

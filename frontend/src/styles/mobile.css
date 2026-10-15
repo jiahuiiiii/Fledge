@@ -72,6 +72,20 @@
     min-height: 44px;
     min-width: 44px;
   }
+}
+
+/* Tablets (601-980px): the company rail is hidden, so the all-companies
+   home must not keep a 0px first column (it left the page blank). */
+@media (max-width: 980px) {
+  .app-shell .workspace-grid,
+  .app-shell.all-companies-view .workspace-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app-shell .main-workspace {
+    grid-column: 1 / -1;
+  }
+}
+
 /* ---- Beginner shell: fewer things to click ---- */
 [data-detail-mode="explain"] .app-shell .company-actions,
 [data-detail-mode="explain"] .app-shell .research-navigation,

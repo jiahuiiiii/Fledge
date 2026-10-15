@@ -441,3 +441,47 @@
 .beginner-summary [id^="bs-"] {
   scroll-margin-top: 140px;
 }
+
+/* ---- Every screen size ---- */
+/* Narrow phones: three squeezed boxes become three easy-to-read rows. */
+@media (max-width: 480px) {
+  .bs-lights {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+  .bs-light {
+    min-height: 56px;
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+    grid-template-areas: "shape title go" "shape status go";
+    align-items: center;
+    column-gap: var(--space-3);
+    row-gap: 2px;
+    padding: var(--space-3) var(--space-4);
+  }
+  .bs-light .bs-shape { grid-area: shape; font-size: 18px; }
+  .bs-light .bs-light-title { grid-area: title; }
+  .bs-light strong { grid-area: status; }
+  .bs-light::after {
+    content: "›";
+    grid-area: go;
+    color: var(--color-muted);
+    font-size: 22px;
+  }
+  .bs-price-row strong { font-size: 30px; }
+}
+/* Large screens: use the width. News and people sit side by side. */
+@media (min-width: 1180px) {
+  .beginner-summary.signals {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    max-width: 1180px;
+  }
+  .beginner-summary.signals > :not(.bs-card) {
+    grid-column: 1 / -1;
+  }
+  .beginner-summary.signals .bs-lights {
+    max-width: 860px;
+  }
+}
