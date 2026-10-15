@@ -15,7 +15,8 @@ MODES = ('explain', 'data')
 
 def default_mode(experience):
     # Newer investors start with plain-language explanations; anyone can switch.
-    return 'explain' if experience in ('new', 'etf') else 'data'
+    # Beginner (explain) unless they research and trade regularly.
+    return 'data' if experience == 'active' else 'explain'
 
 
 def public(row):

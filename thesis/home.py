@@ -31,7 +31,7 @@ def next_step(profile, listed):
     if not listed:
         return dict(action='add_company', label='Add a company you own or want to understand')
     if profile['goal'] == 'monitor':
-        return dict(action='watch', label='Turn on a watch for a company on your list')
+        return dict(action='watch', label='Turn on news alerts for a company on your list')
     if profile['goal'] == 'check':
         return dict(action='save_reasoning', label='Write down why you like a company and what would change your mind')
     return dict(action='read_overview', label='Start with how your first company makes money')

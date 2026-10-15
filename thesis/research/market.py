@@ -54,7 +54,7 @@ def reserve_request():
 
 
 def fetch(endpoint, params, *, transport=None):
-    if endpoint not in ("quote", "company-news", "stock/metric"):
+    if endpoint not in ("quote", "company-news", "stock/metric", "news"):
         raise ValueError("Unsupported market endpoint")
     token = key()
     reserve_request()

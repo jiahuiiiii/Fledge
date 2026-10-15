@@ -421,6 +421,25 @@ def personal_home():
     return {"result": home.build(auth.current_owner())}
 
 
+@app.get("/api/v1/world-news")
+def world_news():
+    from .research import world_news as news
+    return {"result": news.view(auth.current_owner())}
+
+
+@app.post("/api/v1/world-news/refresh")
+def refresh_world_news():
+    from .research import world_news as news
+    news.refresh()
+    return {"result": news.view(auth.current_owner())}
+
+
+@app.post("/api/v1/world-news/check")
+def check_world_news():
+    from .research import world_news as news
+    return {"result": news.check(auth.current_owner())}
+
+
 @app.get("/api/v1/watchlist")
 def get_watchlist():
     from . import watchlist

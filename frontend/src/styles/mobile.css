@@ -1,0 +1,67 @@
+/* Phone fixes, loaded last. Layout rules elsewhere stay the source of truth;
+   these only correct what broke or was too small to tap on a phone. */
+
+/* The World view is about the world, not the last-opened company. */
+.app-shell[data-view="world"] .company-header,
+.app-shell[data-view="world"] .demo-bar,
+.app-shell[data-view="world"] .mobile-company-picker {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  /* The phone header grid must not bring back a company header on the
+     all-companies home page. */
+  .app-shell.all-companies-view .company-header {
+    display: none;
+  }
+  /* Keep the account panel inside the screen. */
+  .account-menu > div {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    top: 64px;
+    width: auto;
+  }
+  /* Research tabs scroll sideways; show that more tabs exist. */
+  .research-navigation .content-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent);
+    mask-image: linear-gradient(90deg, #000 85%, transparent);
+  }
+  .research-navigation .content-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .world-news-head h2 {
+    font-size: var(--text-xl);
+  }
+}
+
+/* Phones and touch screens: at least 44px tap targets for small controls. */
+@media (max-width: 600px), (pointer: coarse) {
+  .app-shell .detail-mode button,
+  .app-shell .demo-bar button,
+  .app-shell button.source-link,
+  .app-shell button.text-button,
+  .app-shell .world-news-filters button {
+    min-height: 44px;
+  }
+  .bs-link,
+  .bs-headlines a {
+    padding-block: 6px;
+  }
+}
+
+/* Beginner mode hides the financial figures on home cards. */
+.company-overview-figures[hidden] {
+  display: none !important;
+}
+.beginner-news-intro {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  color: var(--color-text-2);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}

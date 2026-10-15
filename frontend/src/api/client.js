@@ -290,6 +290,9 @@ export const api = {
   saveDetailMode: (detail_mode) =>
     request("/profile/detail-mode", { method: "PUT", body: { detail_mode } }),
   home: () => request("/home"),
+  worldNews: () => request("/world-news"),
+  refreshWorldNews: () => request("/world-news/refresh", { method: "POST" }),
+  checkWorldNews: () => request("/world-news/check", { method: "POST" }),
   addToWatchlist: (instrument_id) =>
     request("/watchlist", { method: "POST", body: { instrument_id } }),
   removeFromWatchlist: (instrument_id) =>

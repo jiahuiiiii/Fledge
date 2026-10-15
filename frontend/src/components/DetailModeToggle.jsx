@@ -1,21 +1,22 @@
 import { useProfile } from "../lib/profile";
 
-// Same data, different depth: plain-language explanations or the full detail.
+// Beginner shows a plain summary and hides charts and detailed financials;
+// Pro shows everything. Same saved research either way.
 export default function DetailModeToggle() {
-  const { profile, setDetailMode } = useProfile();
-  if (!profile?.completed) return null;
-  const mode = profile.detail_mode;
+  const { home, mode, setDetailMode } = useProfile();
+  if (!home) return null;
   return (
-    <div className="detail-mode" role="radiogroup" aria-label="Detail level">
+    <div className="detail-mode" role="radiogroup" aria-label="View mode">
       {[
-        ["explain", "Explain it to me"],
-        ["data", "Show me the data"],
-      ].map(([key, label]) => (
+        ["explain", "Beginner", "A plain summary: price, news, what people say, world events"],
+        ["data", "Pro", "Everything: financials, charts, comparisons and full evidence"],
+      ].map(([key, label, title]) => (
         <button
           key={key}
           type="button"
           role="radio"
           aria-checked={mode === key}
+          title={title}
           className={mode === key ? "active" : ""}
           onClick={() => mode !== key && setDetailMode(key)}
         >

@@ -2,6 +2,13 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Beginner and Pro modes — 14 October 2026
+
+Owner (Ten) asked for a simpler view for beginners. Top-bar **Beginner | Pro** reuses `detail_mode` (explain/data; local browser fallback when the questions were skipped). Beginner companies show only a new chart-free **Summary** (price, basics sentences, news tone + headlines, social tone + posts, linked world news, your view) and News & discussion; Pro keeps all tabs with Summary first. Frontend only; saved readings are reworded, nothing new is inferred. [Contract](docs/features/beginner-mode.md).
+
+## World news tab — 13 October 2026
+
+Owner (Ten) requested world events such as Fed rate cuts and wars. New **World** tab shows Finnhub general market headlines (last 3 days) with code-owned keyword theme tags, watchlist-name matches and an optional, user-triggered GPT-5.4 mini check of which watchlist companies a headline could affect (exact quote required; invalid links dropped; identical inputs reuse the saved call; no trade advice or price prediction). Migration 052; existing Finnhub key/clock/text checks and ledger/live-model switches unchanged. [Contract](docs/features/world-news.md).
 ## Faster readings and quicker watch retries — 13 October 2026
 
 Owner asked for concurrent analysis and automatic retries. Batches/quick checks of one reading run up to `THESIS_AI_CONCURRENCY` (default 4) at once; two watch workers; failed watches retry after 10 min (3 min if the company is busy) up to 2 times; watches may retry an evidence-check failure once (`retry_failed=True`). Tone panel and Data freshness show the reading time. Same requests/results; a failure can now cost up to 3 in-flight batches, which stay saved. 2,092 backend and 179 frontend tests pass (new `tests/test_parallel_batches.py`, two watch-retry tests). Claude rate limits under parallel load are untested live. [Contract](docs/features/sentiment-batching.md#parallel-batches-parallel-watches-and-quick-retries--13-october-2026).
