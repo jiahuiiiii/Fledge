@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ProModeSwitch } from "./DetailModeToggle";
 import { api } from "../api/client";
 import "./AccountGate.css";
 
@@ -156,6 +157,7 @@ export default function AccountGate({ children }) {
             <p className="account-identity">
               {session.username || session.email || "Research account"}
             </p>
+            <ProModeSwitch />
             <p>
               Company news and financial data are shared. Your saved questions,
               ideas and monitoring settings are private.

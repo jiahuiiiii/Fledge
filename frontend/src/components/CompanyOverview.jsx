@@ -94,13 +94,17 @@ export default function CompanyOverview({
     >
       <div className="company-overview-heading">
         <div>
-          <span className="section-label">YOUR RESEARCH</span>
+          <span className="section-label">
+            {beginner ? "YOUR COMPANIES" : "YOUR RESEARCH"}
+          </span>
           <h1>
-            All companies <span>{catalogue.length}</span>
+            {beginner ? "My companies" : "All companies"}{" "}
+            <span>{catalogue.length}</span>
           </h1>
           <p className="muted">
-            Saved prices and financials, together. Open a company to explore its
-            evidence.
+            {beginner
+              ? "Tap a company to see what’s happening with it."
+              : "Saved prices and financials, together. Open a company to explore its evidence."}
           </p>
         </div>
         <button

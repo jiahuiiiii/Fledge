@@ -81,7 +81,7 @@ import ReportingAge, { ageLabel } from "./components/ReportingAge";
 import IdeaEvidenceReview from "./components/IdeaEvidenceReview";
 import Onboarding from "./components/Onboarding";
 import PersonalHome from "./components/PersonalHome";
-import DetailModeToggle from "./components/DetailModeToggle";
+import { SettingsMenu } from "./components/DetailModeToggle";
 import { ProfileContext, readLocalMode, writeLocalMode, useProfile } from "./lib/profile";
 import ReportExpectationEditor, {
   ReportExpectationText,
@@ -381,7 +381,7 @@ function ResearchApp({ signOut, session }) {
   const [localMode, setLocalMode] = useState(readLocalMode);
   const detailMode = home?.profile?.completed
     ? home.detail_mode
-    : localMode || "data";
+    : localMode || "explain";
   useEffect(() => {
     document.documentElement.dataset.detailMode = detailMode;
   }, [detailMode]);
@@ -859,12 +859,19 @@ function CompanyWorkspace({
             fledge<span>↗</span>
           </a>
           <nav aria-label="Workspace navigation">
-            {[
-              ["workspace", "Workspace"],
-              ["ideas", "My ideas"],
-              ["updates", "Updates"],
-              ["world", "World"],
-            ].map(([key, label]) => (
+            {(beginner
+              ? [
+                  ["workspace", "Home"],
+                  ["world", "World"],
+                  ["ideas", "My views"],
+                ]
+              : [
+                  ["workspace", "Workspace"],
+                  ["ideas", "My ideas"],
+                  ["updates", "Updates"],
+                  ["world", "World"],
+                ]
+            ).map(([key, label]) => (
               <button
                 key={key}
                 className={view === key ? "active" : ""}
@@ -971,6 +978,11 @@ function CompanyWorkspace({
       return false;
     }
   }
+  const updatesWaiting =
+    data.review_schedule?.unseen_count > 0 ||
+    data.changes.some((c) => !c.review_action) ||
+    data.research_alerts?.some((a) => !a.review_action) ||
+    data.idea_alerts?.some((a) => a.published && !a.review_action);
   const displayInstrument = companyLoading
     ? data.catalogue.find((company) => company.id === instrumentId) || {
         name: "Company research",
@@ -1574,12 +1586,20 @@ function CompanyWorkspace({
           fledge<span>↗</span>
         </a>
         <nav aria-label="Workspace navigation">
-          {[
-            ["workspace", "Workspace"],
-            ["ideas", "My ideas"],
-            ["updates", "Updates"],
-            ["world", "World"],
-          ].map(([key, label]) => (
+          {(beginner
+            ? [
+                ["workspace", "Home"],
+                ["world", "World"],
+                ["ideas", "My views"],
+                ...(updatesWaiting ? [["updates", "Updates"]] : []),
+              ]
+            : [
+                ["workspace", "Workspace"],
+                ["ideas", "My ideas"],
+                ["updates", "Updates"],
+                ["world", "World"],
+              ]
+          ).map(([key, label]) => (
             <button
               key={key}
               className={
@@ -1597,20 +1617,13 @@ function CompanyWorkspace({
               onClick={() => setView(key)}
             >
               {label}
-              {key === "updates" &&
-                (data.review_schedule?.unseen_count > 0 ||
-                  data.changes.some((c) => !c.review_action) ||
-                  data.research_alerts?.some((a) => !a.review_action) ||
-                  data.idea_alerts?.some(
-                    (a) => a.published && !a.review_action,
-                  )) && <i className="dot" />}
+              {key === "updates" && updatesWaiting && <i className="dot" />}
             </button>
           ))}
         </nav>
         <div className="topbar-tools">
-          <DetailModeToggle />
-          <TelegramSettings />
-          {signOut}
+          {!beginner && <TelegramSettings />}
+          {signOut || <SettingsMenu />}
         </div>
       </header>
       {watchlistMessage && (
@@ -1854,7 +1867,15 @@ function CompanyWorkspace({
                               setEditor({ ...formFor(null, plain), question: plain });
                             }
                           }}
-                          onView={setTab}
+                          onView={(next) => {
+                            setTab(next);
+                            requestAnimationFrame(() => {
+                              window.scrollTo(0, 0);
+                              document
+                                .querySelectorAll(".main-workspace, .workspace-grid")
+                                .forEach((el) => el.scrollTo?.(0, 0));
+                            });
+                          }}
                           onSource={setSource}
                           onWorld={() => setView("world")}
                           onUpdate={
@@ -1864,6 +1885,23 @@ function CompanyWorkspace({
                       </RetainedView>
                       <RetainedView active={tab === "evidence"}>
                         <>
+                          {beginner && (
+                            <button
+                              type="button"
+                              className="beginner-back"
+                              onClick={() => {
+                                setTab("summary");
+                                requestAnimationFrame(() => {
+                                  window.scrollTo(0, 0);
+                                  document
+                                    .querySelectorAll(".main-workspace, .workspace-grid")
+                                    .forEach((el) => el.scrollTo?.(0, 0));
+                                });
+                              }}
+                            >
+                              ← Back to summary
+                            </button>
+                          )}
                           {beginner && (
                             <p className="beginner-news-intro">
                               {isRecorded

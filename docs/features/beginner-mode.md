@@ -72,3 +72,17 @@ now the default for everyone except "Active" traders; Summary opens with an
 **In short** line; the view form, home cards and News & discussion intro use
 plain words in Beginner; new username accounts see only their own companies
 plus the fictional practice ones.
+
+## Beginner first, Pro in the account menu — 15 October 2026
+
+Owner: still too many things to click. Everyone now starts in **Beginner**
+(including "Active" traders); the top-bar Beginner | Pro switch is gone and
+**Pro tools** is a switch inside the **Account** menu (a small **Settings** menu
+when Fledge runs without accounts). In Beginner:
+
+- Top menu: **Home · World · My views** (Updates appears only when something is
+  waiting); no Telegram button.
+- Company page: just the Summary; no Ask a question / Data & sources buttons,
+  research tabs, section heading or practice-story bar. "All news & posts →"
+  opens the news list with "← Back to summary".
+- Home: "My companies", one plain line, no search box or reload button.

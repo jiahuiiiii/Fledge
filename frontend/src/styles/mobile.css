@@ -72,4 +72,50 @@
     min-height: 44px;
     min-width: 44px;
   }
+/* ---- Beginner shell: fewer things to click ---- */
+[data-detail-mode="explain"] .app-shell .company-actions,
+[data-detail-mode="explain"] .app-shell .research-navigation,
+[data-detail-mode="explain"] .app-shell .research-section-heading,
+[data-detail-mode="explain"] .app-shell .demo-bar,
+[data-detail-mode="explain"] .company-overview-search,
+[data-detail-mode="explain"] .company-overview-heading > button {
+  display: none !important;
+}
+.beginner-back {
+  margin-bottom: var(--space-3);
+  min-height: 44px;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--color-accent);
+  font: inherit;
+  cursor: pointer;
+}
+.pro-mode-switch {
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-md);
+}
+.pro-mode-switch label {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  cursor: pointer;
+  min-height: 44px;
+}
+.pro-mode-switch input {
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  accent-color: var(--color-accent);
+}
+.pro-mode-switch span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pro-mode-switch small {
+  color: var(--color-muted);
+  line-height: 1.4;
 }

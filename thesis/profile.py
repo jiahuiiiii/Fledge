@@ -15,8 +15,8 @@ MODES = ('explain', 'data')
 
 def default_mode(experience):
     # Newer investors start with plain-language explanations; anyone can switch.
-    # Beginner (explain) unless they research and trade regularly.
-    return 'data' if experience == 'active' else 'explain'
+    # Everyone starts in Beginner; Pro tools are switched on from the account menu.
+    return 'explain'
 
 
 def public(row):
