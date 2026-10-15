@@ -65,3 +65,11 @@
   font-size: var(--text-sm);
   line-height: 1.5;
 }
+
+/* Company dialog controls (remove, undo, add) were under 44px on phones. */
+@media (max-width: 600px), (pointer: coarse) {
+  .company-modal button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

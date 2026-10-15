@@ -118,10 +118,13 @@ export default function WorldNews({ active, onOpenCompany }) {
       </header>
       <p className="world-news-status fine">
         {page?.checked_at
-          ? `Headlines checked ${formatTimestamp(page.checked_at)} · Finnhub market news, last 3 days.`
+          ? `Market news from Finnhub, last 3 days. Last updated ${formatTimestamp(page.checked_at)}.`
           : "No world headlines saved yet."}
-        {blocker && page && !page.check && (
-          <span id="world-check-blocker"> {blocker}</span>
+        {blocker && page && (
+          <span id="world-check-blocker">
+            {" "}
+            Watchlist check: {blocker}
+          </span>
         )}
         {page?.check && (
           <span>
@@ -132,7 +135,9 @@ export default function WorldNews({ active, onOpenCompany }) {
       </p>
       {page && !page.configured && (
         <p className="warning" role="status">
-          New world headlines aren’t connected yet, so only saved ones show.
+          {page.articles.length
+            ? "New headlines can’t load right now, so these are the last saved ones."
+            : "World headlines aren’t connected yet."}
         </p>
       )}
       {page?.error && (
@@ -154,7 +159,7 @@ export default function WorldNews({ active, onOpenCompany }) {
         >
           {[
             { id: "all", label: "All", count: page.articles.length },
-            { id: "mine", label: "My companies", count: mineCount },
+            { id: "mine", label: "About my companies", count: mineCount },
             ...themeCounts(page.articles, page.themes),
           ].map((option) => (
             <button
@@ -227,7 +232,6 @@ export default function WorldNews({ active, onOpenCompany }) {
                         {link.symbol} · {EFFECT_LABELS[link.effect]}
                       </strong>{" "}
                       {link.reason}
-                      <q>{link.quote}</q>
                     </li>
                   ))}
                   <li className="world-news-caveat">
@@ -240,9 +244,9 @@ export default function WorldNews({ active, onOpenCompany }) {
         </ul>
       )}
       <p className="fine world-news-note">
-        Theme tags are keyword-based. AI-suggested effects are possibilities to
-        read and check, quoted from the headline; they are not predictions or
-        advice to buy or sell.
+        Topic tags come from keywords in the headline. “Could help / could
+        hurt” notes are written by AI from the headline: possibilities to read
+        and check, not predictions or advice to buy or sell.
       </p>
     </section>
   );

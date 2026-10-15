@@ -1021,6 +1021,10 @@ function CompanyWorkspace({
       setFormError("Resolve the saved-versus-draft comparison before saving.");
       return;
     }
+    if (beginner && status === "draft" && !proposalIds.length && !editor.reasoning?.trim()) {
+      setFormError("Write a sentence or two in “Your answer” first.");
+      return;
+    }
     setBusy(true);
     setFormError("");
     try {
@@ -1052,7 +1056,9 @@ function CompanyWorkspace({
           : status === "archived"
             ? "Idea archived. Monitoring is off; your history is preserved."
             : beginner
-              ? "Your view is saved. News alerts are off; turn them on in News & discussion to hear when news backs it up or goes against it."
+              ? isRecorded
+                ? "Your view is saved."
+                : "Your view is saved. News alerts are off; to get them, turn on Watch in News & discussion."
               : "Draft saved. Monitoring is off.",
       );
       // Show the confirmation instead of leaving it above the scrolled view.
@@ -1844,7 +1850,7 @@ function CompanyWorkspace({
                           onSaveView={() => {
                             openEditor();
                             if (!current) {
-                              const plain = `Why do I like ${data.instrument.name}?`;
+                              const plain = `What do I think about ${data.instrument.name}, and why?`;
                               setEditor({ ...formFor(null, plain), question: plain });
                             }
                           }}
@@ -1860,11 +1866,9 @@ function CompanyWorkspace({
                         <>
                           {beginner && (
                             <p className="beginner-news-intro">
-                              Every saved news article and online post about{" "}
-                              {data.instrument.name}, newest first. Tap one to
-                              read it in full. A label like “positive” or
-                              “negative” describes how the article sounds, not
-                              what you should do.
+                              {isRecorded
+                                ? `This practice company’s story so far, from its own company reports (not today’s news). “Supports” and “Challenges” show how each report fits the story; they aren’t advice.`
+                                : `Every saved news article and online post about ${data.instrument.name}, newest first. Tap one to read it in full. A label like “positive” or “negative” describes how the article sounds, not what you should do.`}
                             </p>
                           )}
                           {!isRecorded && (
@@ -3211,7 +3215,7 @@ function CompanyWorkspace({
             <section className="idea-writing">
               <p className="idea-intro">
                 {beginner
-                  ? "Say in your own words why you like this company. Rules for alerts are optional."
+                  ? "Say in your own words what you think of this company and why, whether you like it or not. Alerts are optional."
                   : "Start with your question and your point of view. Add monitoring rules when you’re ready."}
               </p>
               <label className="field">

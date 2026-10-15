@@ -31,6 +31,6 @@ export function checkBlocker(page) {
     return "Add a company to your watchlist to check headlines against it.";
   if (!page.articles?.length) return "Refresh world news first.";
   if (!page.ai?.available)
-    return "AI checks aren’t switched on for this installation.";
+    return "needs AI, which isn’t switched on in this copy of Fledge.";
   return null;
 }
