@@ -10,7 +10,7 @@ EXPERIENCE = ('new', 'etf', 'stocks', 'active')
 INTERESTS = ('technology', 'banks', 'healthcare', 'consumer', 'energy',
              'industrials', 'property', 'communications', 'unsure')
 HORIZONS = ('short', 'medium', 'long', 'unsure')
-GOALS = ('learn', 'check', 'monitor')
+GOALS = ('learn', 'check', 'monitor', 'news')
 MODES = ('explain', 'data')
 FREQUENCIES = ('daily', 'weekly', 'monthly', 'rarely', 'unsure')
 DROPS = ('sell', 'hold', 'add', 'check', 'unsure')
@@ -44,8 +44,15 @@ def get(owner):
         return public(one(conn, 'SELECT * FROM investor_profiles WHERE owner_id=%s', (owner,)))
 
 
-def save(owner, experience, interests, horizon, goal, detail_mode=None,
+# Holding period follows from the trading-style answer; it is not asked.
+HORIZON_FROM_FREQUENCY = {'daily': 'short', 'weekly': 'short', 'monthly': 'long',
+                          'rarely': 'long', 'unsure': 'unsure', None: 'unsure'}
+
+
+def save(owner, experience, interests=(), horizon=None, goal='learn', detail_mode=None,
          trade_frequency=None, drop_reaction=None):
+    interests = list(interests)
+    horizon = horizon or HORIZON_FROM_FREQUENCY.get(trade_frequency, 'unsure')
     if experience not in EXPERIENCE or horizon not in HORIZONS or goal not in GOALS:
         raise ValueError('Answer each question before continuing.')
     if trade_frequency not in (None, *FREQUENCIES) or drop_reaction not in (None, *DROPS):

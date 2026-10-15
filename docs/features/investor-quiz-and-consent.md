@@ -1,5 +1,13 @@
 # Investor-type quiz and Terms/PDPA consent — 15 October 2026
 
+> **Updated 16 October 2026** after 12 persona runs (see
+> `docs/reviews/2026-10-16/onboarding-friction-personas.md`): first sign-in now asks
+> **2 questions on one screen** (experience, goal); the investor type is optional and
+> later (2 more questions from Home or Account), adds **Just starting out**, and quotes
+> the person's answers. Holding period is derived from the style answer (migration 054
+> adds the `news` goal). Interests are no longer asked. The table below is the original
+> 15 October design.
+
 Requested by Ten after feedback from a real user:
 
 > When logging in, answer 5 questions to identify which type of investor you

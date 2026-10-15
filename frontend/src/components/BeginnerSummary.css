@@ -485,3 +485,17 @@
     max-width: 860px;
   }
 }
+.bs-practice {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px dashed var(--color-gold, #e9b872);
+  border-radius: var(--radius-md);
+  color: var(--color-text-2);
+  font-size: var(--text-sm);
+}
+.bs-practice strong {
+  color: var(--color-gold, #e9b872);
+}
+.beginner-summary.signals > .bs-practice {
+  grid-column: 1 / -1;
+}

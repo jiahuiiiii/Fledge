@@ -133,3 +133,19 @@
   color: var(--color-muted);
   line-height: 1.4;
 }
+
+/* Keyboard users can jump past the top bar straight to the page. */
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 400;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: #10160a;
+  font-weight: 700;
+}
+.skip-link:focus {
+  top: 8px;
+}

@@ -18,7 +18,7 @@ function InvestorTypeLine() {
           <strong>{name}</strong>
         </>
       ) : (
-        "Find out what kind of investor you are in 5 questions."
+        "What kind of investor are you? "
       )}
       <button
         type="button"
@@ -27,7 +27,9 @@ function InvestorTypeLine() {
           dispatchEvent(new Event("fledge:retake-quiz"));
         }}
       >
-        {name ? "Retake the quiz" : "Take the quiz"}
+        {name
+          ? "Retake the quiz"
+          : `Find out in ${profile.completed ? 2 : 4} questions`}
       </button>
     </div>
   );
@@ -41,6 +43,11 @@ function TermsGate({ onAccepted, onSignOut }) {
   const [error, setError] = useState("");
   async function accept(event) {
     event.preventDefault();
+    if (!agree) {
+      setError("Tick the box to agree, or sign out below.");
+      document.getElementById("account-consent")?.focus();
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -71,7 +78,7 @@ function TermsGate({ onAccepted, onSignOut }) {
         </ul>
         <form onSubmit={accept}>
           <ConsentCheck checked={agree} onChange={setAgree} />
-          <button type="submit" className="primary" disabled={!agree || busy}>
+          <button type="submit" className="primary" disabled={busy}>
             {busy ? "Please wait…" : "Agree and continue"}
           </button>
         </form>
@@ -84,25 +91,27 @@ function TermsGate({ onAccepted, onSignOut }) {
   );
 }
 
-function ConsentCheck({ checked, onChange }) {
+function ConsentCheck({ checked, onChange, invalid = false }) {
   return (
     <label className="consent-check">
       <input
+        id="account-consent"
         type="checkbox"
-        required
+        aria-invalid={invalid}
+        aria-describedby={invalid ? "consent-error" : undefined}
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
       />
       <span>
-        I have read and agree to the{" "}
+        I agree to the{" "}
         <a href="/terms" target="_blank" rel="noopener">
           Terms of Use
         </a>{" "}
-        and the{" "}
+        and to Fledge using my data as set out in the{" "}
         <a href="/privacy" target="_blank" rel="noopener">
           Privacy Notice
         </a>
-        , and I consent to Fledge using my personal data as described there.
+        .
       </span>
     </label>
   );
@@ -113,7 +122,15 @@ export default function AccountGate({ children }) {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [creating, setCreating] = useState(false);
+  // First-time visitors (no account on this browser yet) start on Create.
+  const [creating, setCreating] = useState(() => {
+    try {
+      return !localStorage.getItem("fledge:has-account");
+    } catch {
+      return true;
+    }
+  });
+  const [fieldError, setFieldError] = useState({});
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -218,18 +235,46 @@ export default function AccountGate({ children }) {
   }
   async function sendPassword(event) {
     event.preventDefault();
+    // Our own messages, shown under each field, instead of browser bubbles.
+    const problems = {};
+    const name = username.trim();
+    if (creating) {
+      if (!/^[A-Za-z0-9_.-]{3,30}$/.test(name))
+        problems.username = name.includes("@")
+          ? "⚠ Use a username, not an email: 3–30 letters or numbers."
+          : /\s/.test(name)
+            ? "⚠ No spaces, please: 3–30 letters or numbers."
+            : "⚠ Use 3–30 letters or numbers (. - _ are fine).";
+      if (password.length < 8)
+        problems.password = `⚠ At least 8 characters (you have ${password.length}).`;
+      if (!agree)
+        problems.consent =
+          "⚠ Tick the box to agree to the Terms and Privacy Notice.";
+    } else {
+      if (!name) problems.username = "Enter your username.";
+      if (!password) problems.password = "Enter your password.";
+    }
+    setFieldError(problems);
+    if (Object.keys(problems).length) {
+      const first = problems.username
+        ? "account-username"
+        : problems.password
+          ? "account-password"
+          : "account-consent";
+      document.getElementById(first)?.focus();
+      return;
+    }
     setBusy(true);
     setError("");
     setMessage("");
     try {
-      if (creating) {
-        if (!agree)
-          throw new Error(
-            "Tick the box to accept the Terms of Use and Privacy Notice.",
-          );
-        await api.register(username, password, TERMS_VERSION);
+      if (creating) await api.register(name, password, TERMS_VERSION);
+      else await api.passwordLogin(name, password);
+      try {
+        localStorage.setItem("fledge:has-account", "1");
+      } catch {
+        /* Storage can be unavailable; only the default tab changes. */
       }
-      else await api.passwordLogin(username, password);
       setPassword("");
       setSession(await api.session());
     } catch (failure) {
@@ -270,8 +315,23 @@ export default function AccountGate({ children }) {
       session,
       session.mode === "managed" || session.mode === "password" ? (
         <details className="account-menu">
-          <summary>Account</summary>
-          <div>
+          <summary
+            aria-label="Account menu"
+            onKeyDown={(event) => {
+              if (event.key === "Escape")
+                event.currentTarget.parentElement.removeAttribute("open");
+            }}
+          >
+            Account
+          </summary>
+          <div
+            onKeyDown={(event) => {
+              if (event.key !== "Escape") return;
+              const menu = event.currentTarget.parentElement;
+              menu.removeAttribute("open");
+              menu.querySelector("summary")?.focus();
+            }}
+          >
             <span className="section-label">SIGNED IN AS</span>
             <p className="account-identity">
               {session.username || session.email || "Research account"}
@@ -279,8 +339,8 @@ export default function AccountGate({ children }) {
             <InvestorTypeLine />
             <ProModeSwitch />
             <p>
-              Company news and financial data are shared. Your saved questions,
-              ideas and monitoring settings are private.
+              News and company data are the same for everyone. Your answers,
+              notes and settings are private to you.
             </p>
             <button
               onClick={signOut}
@@ -300,45 +360,102 @@ export default function AccountGate({ children }) {
   return (
     <main className="account-page">
       <section className="account-card">
-        <a className="brand" href="/">
-          fledge<span>↗</span>
+        <a className="brand" href="/" aria-label="Fledge home">
+          fledge<span aria-hidden="true">↗</span>
         </a>
-        <h1>{creating ? "Create your Fledge account" : "Sign in to your research"}</h1>
-        <p>
-          Your questions, ideas and monitoring settings belong to your account.
+        <h1 className="account-pitch">
+          Understand the news behind your stocks
+        </h1>
+        <p className="account-lede">
+          Plain-English news, what people online are saying and world events
+          for US-listed companies. Fledge never tells you what to buy.
         </p>
         {!session && !error ? (
           <p role="status">Checking your session…</p>
         ) : session?.mode === "password" ? (
-          <form onSubmit={sendPassword}>
-            <label htmlFor="account-username">Username</label>
-            <input
-              id="account-username"
-              autoComplete="username"
-              required
-              minLength={3}
-              maxLength={30}
-              pattern="[A-Za-z0-9_.\-]{3,30}"
-              title="3–30 letters, numbers, dots, dashes or underscores"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-            />
-            <label htmlFor="account-password">Password</label>
-            <input
-              id="account-password"
-              type="password"
-              autoComplete={creating ? "new-password" : "current-password"}
-              required
-              minLength={creating ? 8 : 1}
-              maxLength={128}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-            {creating && <ConsentCheck checked={agree} onChange={setAgree} />}
+          <form onSubmit={sendPassword} noValidate>
+            <div className="account-tabs" role="tablist" aria-label="Account">
+              {[
+                [true, "Create account"],
+                [false, "Sign in"],
+              ].map(([value, text]) => (
+                <button
+                  key={text}
+                  type="button"
+                  role="tab"
+                  aria-selected={creating === value}
+                  className={creating === value ? "active" : ""}
+                  onClick={() => {
+                    setCreating(value);
+                    setError("");
+                    setFieldError({});
+                  }}
+                >
+                  {text}
+                </button>
+              ))}
+            </div>
+            <div className="account-field">
+              <label htmlFor="account-username">Username</label>
+              <input
+                id="account-username"
+                autoComplete="username"
+                autoCapitalize="none"
+                maxLength={30}
+                aria-describedby="username-hint"
+                aria-invalid={!!fieldError.username}
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+              />
+              <small id="username-hint" className={fieldError.username ? "field-error" : ""}>
+                {fieldError.username ||
+                  (creating
+                    ? "3–30 letters or numbers, no spaces (. - _ are fine). Not your email."
+                    : "")}
+              </small>
+            </div>
+            <div className="account-field">
+              <label htmlFor="account-password">Password</label>
+              <input
+                id="account-password"
+                type="password"
+                autoComplete={creating ? "new-password" : "current-password"}
+                maxLength={128}
+                aria-describedby="password-hint"
+                aria-invalid={!!fieldError.password}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+              <small id="password-hint" className={fieldError.password ? "field-error" : ""}>
+                {fieldError.password ||
+                  (creating ? "At least 8 characters." : "")}
+              </small>
+            </div>
+            {creating && (
+              <>
+                <ConsentCheck
+                  invalid={!!fieldError.consent}
+                  checked={agree}
+                  onChange={(value) => {
+                    setAgree(value);
+                    setFieldError((f) => ({ ...f, consent: "" }));
+                  }}
+                />
+                {fieldError.consent && (
+                  <p className="field-error" role="alert" id="consent-error">
+                    {fieldError.consent}
+                  </p>
+                )}
+                <p className="consent-reassure">
+                  We keep only your username, your answers and what you save.
+                  No NRIC, bank details or real money.
+                </p>
+              </>
+            )}
             <button
               type="submit"
-              className="primary"
-              disabled={busy || remaining > 0 || (creating && !agree)}
+              className="primary account-submit"
+              disabled={busy || remaining > 0}
             >
               {busy
                 ? "Please wait…"
@@ -347,18 +464,6 @@ export default function AccountGate({ children }) {
                   : creating
                     ? "Create account"
                     : "Sign in"}
-            </button>
-            <button
-              type="button"
-              className="account-switch"
-              onClick={() => {
-                setCreating(!creating);
-                setError("");
-              }}
-            >
-              {creating
-                ? "Already have an account? Sign in"
-                : "New to Fledge? Create an account"}
             </button>
           </form>
         ) : (
@@ -395,8 +500,8 @@ export default function AccountGate({ children }) {
         )}
         {session?.mode === "password" ? (
           <p className="financial-note">
-            Test version: there is no password reset yet, so keep your password
-            somewhere safe. Your work stays saved when you sign out.
+            There’s no password reset yet, so keep your password somewhere
+            safe.
           </p>
         ) : (
         <p className="financial-note">

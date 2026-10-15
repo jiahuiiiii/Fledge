@@ -29,6 +29,24 @@ import {
 import Select from "./components/Select";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api/client";
+// After a full-page step (questions, result) the app comes back: start at the
+// top and put focus on the page heading so screen readers announce it.
+function focusMainHeading() {
+  setTimeout(() => {
+    window.scrollTo(0, 0);
+    document
+      .querySelectorAll(".main-workspace, .workspace-grid")
+      .forEach((el) => el.scrollTo?.(0, 0));
+    const heading = document.querySelector(
+      ".main-workspace h1, .main-workspace h2",
+    );
+    if (!heading) return;
+    heading.setAttribute("tabindex", "-1");
+    heading.focus({ preventScroll: true });
+  }, 300);
+}
+// The practice company with a full worked example (Northstar).
+const INSTRUMENT_DEMO = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 import { roleLabel, resultLabel } from "./lib/conditionRoles";
 import { revisionPayload } from "./lib/kestrelDiff";
 import Modal from "./components/Modal";
@@ -422,13 +440,13 @@ function ResearchApp({ signOut, session }) {
       {home?.profile &&
       (retakeQuiz || (!home.profile.completed && !onboardingSkipped)) ? (
         <Onboarding
-          retake={retakeQuiz}
+          stage={retakeQuiz ? "type" : "start"}
           profile={home.profile}
           onSkip={retakeQuiz ? () => setRetakeQuiz(false) : skipOnboarding}
+          onTurnOnPro={() => api.saveDetailMode("data").catch(() => {})}
           onDone={(profile) => {
-            // Next step after the first quiz: choose companies for the watchlist.
-            if (!retakeQuiz) window.fledgeOpenAddCompany = true;
             setRetakeQuiz(false);
+            focusMainHeading();
             setHome((current) => ({
               ...current,
               profile,
@@ -869,6 +887,9 @@ function CompanyWorkspace({
         className={`app-shell${view === "updates" ? " inbox-view" : ""}${view === "ideas" ? " ideas-view" : ""}${!selectedCompanyId ? " all-companies-view" : ""}`}
       >
         <header className="topbar">
+          <a className="skip-link" href="#workspace">
+            Skip to content
+          </a>
           <a className="brand" href="#workspace">
             fledge<span>↗</span>
           </a>
@@ -894,7 +915,12 @@ function CompanyWorkspace({
                     ? "page"
                     : undefined
                 }
-                onClick={() => setView(key)}
+                onClick={() =>
+                  // Beginner "Home" always goes back to the list of companies.
+                  beginner && key === "workspace"
+                    ? onChoose("", "workspace")
+                    : setView(key)
+                }
               >
                 {label}
               </button>
@@ -1589,6 +1615,9 @@ function CompanyWorkspace({
       className={`app-shell${view === "updates" ? " inbox-view" : ""}${view === "ideas" ? " ideas-view" : ""}${!selectedCompanyId ? " all-companies-view" : ""}`}
     >
       <header className="topbar">
+        <a className="skip-link" href="#workspace">
+          Skip to content
+        </a>
         <a
           href="#workspace"
           className="brand"
@@ -1628,7 +1657,12 @@ function CompanyWorkspace({
                   ? "page"
                   : undefined
               }
-              onClick={() => setView(key)}
+              onClick={() =>
+                // Beginner "Home" always goes back to the list of companies.
+                beginner && key === "workspace"
+                  ? onChoose("", "workspace")
+                  : setView(key)
+              }
             >
               {label}
               {key === "updates" && updatesWaiting && <i className="dot" />}
@@ -1870,6 +1904,7 @@ function CompanyWorkspace({
                       <RetainedView active={tab === "summary"}>
                         <BeginnerSummary
                           key={`summary-${instrumentId}`}
+                          practice={recordedCompany}
                           data={data}
                           instrumentId={instrumentId}
                           visible={view === "workspace" && tab === "summary"}
@@ -2512,6 +2547,10 @@ function CompanyWorkspace({
                     <PersonalHome
                       onAddCompany={() => setAddingCompany(true)}
                       onOpenCompany={(id) => onChoose(id)}
+                      practice={
+                        visibleCompanies.find((c) => c.id === INSTRUMENT_DEMO) ||
+                        visibleCompanies.find((c) => c.mode === "recorded")
+                      }
                     />
                     <CompanyOverview
                       catalogue={visibleCompanies}

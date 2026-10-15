@@ -40,9 +40,10 @@ export default function BeginnerSummary({
   onSource,
   onWorld,
   onUpdate,
+  practice = false,
 }) {
   const [world, setWorld] = useState(null);
-  const { mode } = useProfile();
+  const { mode, setDetailMode } = useProfile();
   useEffect(() => {
     if (!visible) return;
     let active = true;
@@ -126,6 +127,12 @@ export default function BeginnerSummary({
 
   return (
     <div className="beginner-summary signals">
+      {practice && (
+        <p className="bs-practice">
+          <strong>Practice company, not real.</strong> Sample news and posts
+          that show how Fledge works.
+        </p>
+      )}
       <section className="bs-price-row" aria-label="Share price">
         {price ? (
           <>
@@ -274,12 +281,23 @@ export default function BeginnerSummary({
         )}
       </section>
 
-      <p className="bs-note">
-        The lights count what is being said; they don’t tell you to buy or sell.
-        {mode === "explain"
-          ? " Switch to Pro for financials, charts and comparisons."
-          : " The other tabs have the financials, charts and comparisons."}
-      </p>
+      {mode === "explain" ? (
+        <p className="bs-note">
+          Want financials, charts and comparisons?{" "}
+          <button
+            type="button"
+            className="bs-link inline"
+            onClick={() => setDetailMode?.("data")}
+          >
+            Turn on Pro tools
+          </button>{" "}
+          (you can switch back in Account).
+        </p>
+      ) : (
+        <p className="bs-note">
+          The other tabs have the financials, charts and comparisons.
+        </p>
+      )}
     </div>
   );
 }

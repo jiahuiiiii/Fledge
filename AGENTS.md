@@ -2,6 +2,10 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Lighter onboarding after 12 persona runs — 16 October 2026
+
+First sign-in is **2 questions on one screen** (experience, goal incl. new `news`), then straight into the app; no auto-opened Add-company dialog. Investor type is optional/later (style + 15% fall, from Home card or Account), adds `starting_out`, result quotes answers. Landing pitch, inline sign-up hints/errors, shorter consent line, practice-company labels, search finds own companies, Beginner Home returns to the list, skip link and focus management. Migration 054. [Review](docs/reviews/2026-10-16/onboarding-friction-personas.md).
+
 ## Investor-type quiz and Terms/PDPA consent — 15 October 2026
 
 From real-user feedback via Ten. First sign-in asks **5 questions** (adds `trade_frequency` and `drop_reaction`, migration 053) and shows one of four investor types (Long-term investor, Steady builder, Swing trader, Active trader; deterministic points in `thesis/investor_type.py`, never used to recommend). Retake from Account. Sign-up requires ticking Terms of Use + Privacy Notice consent (server-enforced, recorded in `terms_acceptances`); existing accounts accept once. `/terms` and `/privacy` pages. Open: DPO contact and legal review. [Contract](docs/features/investor-quiz-and-consent.md).

@@ -48,8 +48,9 @@ function Terms() {
       <h2>3. Information can be wrong or late</h2>
       <p>
         Prices, news and summaries come from outside sources and from AI. They
-        can be delayed, incomplete or wrong. Every item links to its source so
-        you can check it yourself.
+        can be delayed, incomplete or wrong. News items and posts link to their
+        source so you can check them; AI summaries are built from those
+        sources and can still get things wrong.
       </p>
       <h2>4. Your account</h2>
       <ul>
@@ -104,14 +105,14 @@ function Privacy() {
       <h2>1. What we collect</h2>
       <ul>
         <li>
-          <strong>Account:</strong> your username, or your email if you sign in
-          by email link. Your password is stored only as a scrambled hash; we
-          cannot read it.
+          <strong>Account:</strong> your username (or your email address, on
+          versions of Fledge that use email sign-in). Your password is stored
+          only as a scrambled hash; we cannot read it.
         </li>
         <li>
-          <strong>Quiz answers:</strong> your experience, how long you hold,
-          how often you trade, how you react to a fall, your goal and any
-          interests you pick.
+          <strong>Your answers:</strong> where you are with investing and what
+          you want from Fledge. If you choose to take the investor-type quiz,
+          also your trading style and how you would react to a fall.
         </li>
         <li>
           <strong>What you save:</strong> companies you follow, questions,
@@ -169,14 +170,16 @@ function Privacy() {
         </li>
       </ul>
       <p>
-        Some of these services are based outside Singapore. We send each one
-        only what it needs.
+        Some of these services are based outside Singapore: OpenAI, Anthropic,
+        Finnhub and Telegram process data in the United States or elsewhere,
+        and DeepSeek in China. We send each one only what it needs.
       </p>
       <h2>5. How we protect it</h2>
       <p>
         Passwords are hashed, sign-in cookies cannot be read by web pages, and
-        the database keeps each account’s saved work separate so no one else
-        can see it.
+        the database keeps each account’s saved work separate so other users
+        cannot see it. Only the people who run Fledge can access the database,
+        and only to keep it working.
       </p>
       <h2>6. How long we keep it</h2>
       <p>

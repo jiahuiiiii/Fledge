@@ -116,6 +116,28 @@ export default function CompanyDialog({
       setBusy("");
     }
   }
+  // Companies already in this account's list (including the practice
+  // companies) always match by name or ticker, even when they are not in the
+  // US listings directory. Newcomers search for the company they were sent.
+  const needle = query.trim().toLowerCase();
+  const fromServer = result?.companies || [];
+  const ownMatches = needle
+    ? visible
+        .filter(
+          (c) =>
+            (c.symbol || "").toLowerCase().includes(needle) ||
+            (c.name || "").toLowerCase().includes(needle),
+        )
+        .filter((c) => !fromServer.some((r) => r.instrument_id === c.id))
+        .map((c) => ({
+          symbol: c.symbol,
+          name: c.name,
+          instrument_id: c.id,
+          available: true,
+          exchange: c.mode === "recorded" ? "Practice" : "",
+        }))
+    : [];
+  const rows = [...ownMatches, ...fromServer];
   return (
     <Modal
       open={open}
@@ -170,9 +192,9 @@ export default function CompanyDialog({
         <div className="company-search-results" aria-busy={loading}>
           {loading ? (
             <LoadingSkeleton rows={3} label="Finding companies…" />
-          ) : result?.companies?.length ? (
+          ) : rows.length ? (
             <ul aria-label="Company search results">
-              {result.companies.map((company) => {
+              {rows.map((company) => {
                 const saved = company.instrument_id;
                 const isHidden = hidden.some((c) => c.id === saved);
                 // "Open" only for companies already on this account's list.
@@ -219,8 +241,9 @@ export default function CompanyDialog({
             <div className="company-search-empty">
               <strong>No matching companies</strong>
               <p>
-                Try the ticker or a shorter name. Coverage is limited to
-                supported US exchange listings.
+                Fledge covers US-listed companies for now, such as Apple
+                (AAPL). Singapore (SGX) and other non-US shares aren’t covered
+                yet.
               </p>
             </div>
           )}
@@ -230,9 +253,9 @@ export default function CompanyDialog({
             {listing === "updating"
               ? "Updating US listings from the SEC…"
               : listing === "failed"
-                ? "Couldn’t update listings. Saved listings are still searchable; companies already in Fledge can be opened."
+                ? "Showing the companies we already have. The full US list couldn’t refresh just now."
                 : !result?.retrieved_at
-                  ? "Load the directory to search beyond the starter companies."
+                  ? "Search more US companies by loading the full list."
                   : "Company identities from SEC · coverage varies by source"}
           </span>
           {(listing === "failed" || !result?.retrieved_at) && (
@@ -242,7 +265,7 @@ export default function CompanyDialog({
               onClick={update}
               disabled={!!busy || listing === "updating"}
             >
-              {result?.retrieved_at ? "Try again" : "Load directory"}
+              {result?.retrieved_at ? "Try again" : "Load full list"}
             </button>
           )}
         </div>

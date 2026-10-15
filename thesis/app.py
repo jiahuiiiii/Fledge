@@ -411,7 +411,7 @@ class InvestorProfile(BaseModel):
     model_config = ConfigDict(extra="forbid")
     experience: str = Field(max_length=16)
     interests: list[str] = Field(default_factory=list, max_length=9)
-    horizon: str = Field(max_length=16)
+    horizon: str | None = Field(default=None, max_length=16)
     goal: str = Field(max_length=16)
     detail_mode: str | None = Field(default=None, max_length=16)
     trade_frequency: str | None = Field(default=None, max_length=16)
