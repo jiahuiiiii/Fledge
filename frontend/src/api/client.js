@@ -301,6 +301,8 @@ export const api = {
     request("/profile/detail-mode", { method: "PUT", body: { detail_mode } }),
   home: () => request("/home"),
   worldNews: () => request("/world-news"),
+  portfolio: () => request("/portfolio"),
+  explainPortfolio: () => request("/portfolio/explain", { method: "POST" }),
   refreshWorldNews: () => request("/world-news/refresh", { method: "POST" }),
   checkWorldNews: () => request("/world-news/check", { method: "POST" }),
   addToWatchlist: (instrument_id) =>
