@@ -193,3 +193,43 @@
 .account-card input[aria-invalid="true"] {
   border-width: 2px;
 }
+
+/* ---- Decluttered sign-up (16 Oct) ---- */
+.account-card .account-form {
+  gap: 14px;
+  margin: 24px 0 0;
+}
+.account-card .account-pitch {
+  margin: 20px 0 6px;
+  font-size: 24px;
+}
+.account-card .account-lede {
+  margin: 0;
+}
+.account-field label {
+  font-size: var(--text-sm);
+  color: var(--color-text-2);
+}
+.account-card input::placeholder {
+  color: var(--color-faint, #7c889b);
+}
+.account-card .consent-check {
+  min-height: 0;
+  align-items: center;
+}
+.account-card .account-alt {
+  margin: 4px 0 0;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-2);
+}
+.account-card .account-alt button {
+  min-height: 44px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--color-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}

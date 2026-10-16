@@ -105,9 +105,9 @@ function ConsentCheck({ checked, onChange, invalid = false }) {
       <span>
         I agree to the{" "}
         <a href="/terms" target="_blank" rel="noopener">
-          Terms of Use
+          Terms
         </a>{" "}
-        and to Fledge using my data as set out in the{" "}
+        and{" "}
         <a href="/privacy" target="_blank" rel="noopener">
           Privacy Notice
         </a>
@@ -364,37 +364,19 @@ export default function AccountGate({ children }) {
           fledge<span aria-hidden="true">↗</span>
         </a>
         <h1 className="account-pitch">
-          Understand the news behind your stocks
+          {session?.mode === "password" && !creating
+            ? "Welcome back"
+            : "Understand the news behind your stocks"}
         </h1>
         <p className="account-lede">
-          Plain-English news, what people online are saying and world events
-          for US-listed companies. Fledge never tells you what to buy.
+          {session?.mode === "password" && !creating
+            ? "Sign in to pick up where you left off."
+            : "Plain-English news and what people are saying, for US stocks."}
         </p>
         {!session && !error ? (
           <p role="status">Checking your session…</p>
         ) : session?.mode === "password" ? (
-          <form onSubmit={sendPassword} noValidate>
-            <div className="account-tabs" role="tablist" aria-label="Account">
-              {[
-                [true, "Create account"],
-                [false, "Sign in"],
-              ].map(([value, text]) => (
-                <button
-                  key={text}
-                  type="button"
-                  role="tab"
-                  aria-selected={creating === value}
-                  className={creating === value ? "active" : ""}
-                  onClick={() => {
-                    setCreating(value);
-                    setError("");
-                    setFieldError({});
-                  }}
-                >
-                  {text}
-                </button>
-              ))}
-            </div>
+          <form onSubmit={sendPassword} noValidate className="account-form">
             <div className="account-field">
               <label htmlFor="account-username">Username</label>
               <input
@@ -402,17 +384,17 @@ export default function AccountGate({ children }) {
                 autoComplete="username"
                 autoCapitalize="none"
                 maxLength={30}
-                aria-describedby="username-hint"
+                placeholder={creating ? "Letters or numbers, no spaces" : ""}
+                aria-describedby={fieldError.username ? "username-error" : undefined}
                 aria-invalid={!!fieldError.username}
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
               />
-              <small id="username-hint" className={fieldError.username ? "field-error" : ""}>
-                {fieldError.username ||
-                  (creating
-                    ? "3–30 letters or numbers, no spaces (. - _ are fine). Not your email."
-                    : "")}
-              </small>
+              {fieldError.username && (
+                <small id="username-error" className="field-error">
+                  {fieldError.username}
+                </small>
+              )}
             </div>
             <div className="account-field">
               <label htmlFor="account-password">Password</label>
@@ -421,15 +403,17 @@ export default function AccountGate({ children }) {
                 type="password"
                 autoComplete={creating ? "new-password" : "current-password"}
                 maxLength={128}
-                aria-describedby="password-hint"
+                placeholder={creating ? "At least 8 characters" : ""}
+                aria-describedby={fieldError.password ? "password-error" : undefined}
                 aria-invalid={!!fieldError.password}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
-              <small id="password-hint" className={fieldError.password ? "field-error" : ""}>
-                {fieldError.password ||
-                  (creating ? "At least 8 characters." : "")}
-              </small>
+              {fieldError.password && (
+                <small id="password-error" className="field-error">
+                  {fieldError.password}
+                </small>
+              )}
             </div>
             {creating && (
               <>
@@ -446,10 +430,6 @@ export default function AccountGate({ children }) {
                     {fieldError.consent}
                   </p>
                 )}
-                <p className="consent-reassure">
-                  We keep only your username, your answers and what you save.
-                  No NRIC, bank details or real money.
-                </p>
               </>
             )}
             <button
@@ -465,6 +445,19 @@ export default function AccountGate({ children }) {
                     ? "Create account"
                     : "Sign in"}
             </button>
+            <p className="account-alt">
+              {creating ? "Already have an account? " : "New to Fledge? "}
+              <button
+                type="button"
+                onClick={() => {
+                  setCreating(!creating);
+                  setError("");
+                  setFieldError({});
+                }}
+              >
+                {creating ? "Sign in" : "Create an account"}
+              </button>
+            </p>
           </form>
         ) : (
           <form onSubmit={send}>
@@ -498,17 +491,12 @@ export default function AccountGate({ children }) {
             Retry connection
           </button>
         )}
-        {session?.mode === "password" ? (
+        {session?.mode !== "password" && (
           <p className="financial-note">
-            There’s no password reset yet, so keep your password somewhere
-            safe.
+            Open the newest email link in this browser. New sign-ins renew
+            automatically for up to seven days. Your work stays saved when you
+            sign out.
           </p>
-        ) : (
-        <p className="financial-note">
-          Open the newest email link in this browser. New sign-ins renew
-          automatically for up to seven days. Your work stays saved when you
-          sign out.
-        </p>
         )}
       </section>
     </main>
