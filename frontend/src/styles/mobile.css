@@ -65,3 +65,87 @@
   font-size: var(--text-sm);
   line-height: 1.5;
 }
+
+/* Company dialog controls (remove, undo, add) were under 44px on phones. */
+@media (max-width: 600px), (pointer: coarse) {
+  .company-modal button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Tablets (601-980px): the company rail is hidden, so the all-companies
+   home must not keep a 0px first column (it left the page blank). */
+@media (max-width: 980px) {
+  .app-shell .workspace-grid,
+  .app-shell.all-companies-view .workspace-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app-shell .main-workspace {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ---- Beginner shell: fewer things to click ---- */
+[data-detail-mode="explain"] .app-shell .company-actions,
+[data-detail-mode="explain"] .app-shell .research-navigation,
+[data-detail-mode="explain"] .app-shell .research-section-heading,
+[data-detail-mode="explain"] .app-shell .demo-bar,
+[data-detail-mode="explain"] .company-overview-search,
+[data-detail-mode="explain"] .company-overview-heading > button {
+  display: none !important;
+}
+.beginner-back {
+  margin-bottom: var(--space-3);
+  min-height: 44px;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--color-accent);
+  font: inherit;
+  cursor: pointer;
+}
+.pro-mode-switch {
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-md);
+}
+.pro-mode-switch label {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  cursor: pointer;
+  min-height: 44px;
+}
+.pro-mode-switch input {
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  accent-color: var(--color-accent);
+}
+.pro-mode-switch span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pro-mode-switch small {
+  color: var(--color-muted);
+  line-height: 1.4;
+}
+
+/* Keyboard users can jump past the top bar straight to the page. */
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 400;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: #10160a;
+  font-weight: 700;
+}
+.skip-link:focus {
+  top: 8px;
+}

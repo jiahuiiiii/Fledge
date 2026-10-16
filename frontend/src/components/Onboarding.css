@@ -40,11 +40,43 @@
 }
 .onboarding-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-top: 8px;
 }
-.onboarding-actions .primary {
-  margin-left: auto;
+.onboarding-actions button {
+  min-height: 44px;
+}
+.onboarding-options button {
+  min-height: 52px;
+}
+.onboarding-intro {
+  color: var(--color-text-2);
+}
+.investor-type-card {
+  margin: 12px 0 24px;
+  padding: 20px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+.investor-type-card h2 {
+  margin: 6px 0 4px;
+  font-size: 28px;
+  color: var(--color-accent-light, var(--color-text));
+}
+.investor-type-card h3 {
+  margin: 16px 0 4px;
+  font-size: var(--text-md);
+}
+.investor-type-card p {
+  margin: 6px 0;
+  color: var(--color-text-2);
+  line-height: 1.55;
+}
+.investor-type-card .investor-type-short {
+  color: var(--color-text);
+  font-size: var(--text-md);
 }
 .detail-mode {
   display: inline-flex;
@@ -82,31 +114,192 @@
   display: none;
 }
 .personal-home {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin: 0 0 20px;
-  padding: 18px 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 16px;
+  margin: 0 0 16px;
+  padding: 14px 16px;
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
 }
 .personal-home h2 {
-  margin: 6px 0;
+  margin: 0 0 2px;
+  font-size: var(--text-md);
 }
 .personal-home p {
-  margin: 4px 0;
+  margin: 0;
   color: var(--color-text-2);
+  font-size: var(--text-sm);
 }
-.personal-home-side {
+.personal-home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.personal-home-actions button {
+  min-height: 44px;
+}
+.personal-home .personal-home-type {
+  grid-column: 1 / -1;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-line);
+}
+.personal-home-type strong {
+  color: var(--color-text);
+}
+.personal-home .text-link {
+  min-height: 44px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--color-accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+@media (max-width: 600px) {
+  .personal-home {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .personal-home-actions {
+    justify-content: stretch;
+  }
+  .personal-home-actions button {
+    flex: 1 1 auto;
+  }
+}
+
+/* ---- Lighter onboarding (one screen per step) ---- */
+.onboarding-question {
+  margin: 20px 0 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.onboarding-question legend {
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--color-text);
+}
+.onboarding-question .onboarding-options {
+  margin: 10px 0 0;
+}
+.onboarding-options button {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--text-base, 15px);
+}
+.onboarding-text {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 10px;
+  gap: 2px;
 }
-.personal-home-count strong {
-  color: var(--color-text);
-  font-size: 1.2em;
+.onboarding-check {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--color-line-strong);
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--color-bg, #0f141c);
+}
+.onboarding-options button.selected {
+  background: var(--color-positive-soft, var(--color-surface-2));
+  outline: none;
+}
+.onboarding-options button.selected .onboarding-check {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+.onboarding-options button:focus-visible,
+.onboarding-chips button:focus-visible,
+.onboarding-sticky button:focus-visible {
+  outline: 3px solid var(--color-text);
+  outline-offset: 2px;
+}
+.onboarding h1:focus {
+  outline: none;
+}
+.onboarding-sticky {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  gap: 8px;
+  margin: 20px -4px 0;
+  padding: 12px 4px;
+  background: var(--color-surface);
+}
+.onboarding-sticky .primary {
+  min-height: 52px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.onboarding-sticky button {
+  min-height: 44px;
+  font-size: var(--text-base, 15px);
+}
+.onboarding-skip {
+  background: none;
+  border: 0;
+  color: var(--color-text-2);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.investor-type-said {
+  font-style: italic;
+}
+.onboarding-options button {
+  justify-content: flex-start;
+  text-align: left;
+}
+.onboarding-text {
+  align-items: flex-start;
+}
+.onboarding-question legend:focus {
+  outline: none;
+}
+.onboarding-sticky .error {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-negative-soft, #3a1f26);
+  color: var(--color-negative-light, #f6bcc4);
+  font-weight: 600;
+}
+.onboarding-pro {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.onboarding-pro input {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 2px 0 0;
+  accent-color: var(--color-accent);
+}
+.onboarding-pro input:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.onboarding-pro span {
+  display: grid;
+  gap: 2px;
+}
+.onboarding-pro small {
+  color: var(--color-text-2);
 }

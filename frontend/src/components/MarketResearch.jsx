@@ -64,7 +64,7 @@ export function MarketQuote({ market, history, compact = false }) {
             </small>
           </>
         ) : (
-          <p>No quote retrieved. Choose Update data to load it.</p>
+          <p>No share price saved yet. Prices load once the company’s data is updated.</p>
         )}
         {!compact && status?.quote_error && (
           <p className="warning" role="status">

@@ -20,6 +20,19 @@ const stamp = (value) =>
 
 import { useProfile } from "../lib/profile";
 
+// Newcomers were puzzled by companies they never added. Say what they are.
+function practiceNote(catalogue) {
+  const practice = catalogue.filter((c) => c.mode === "recorded");
+  const lead = "Choose a company to see what’s happening with it.";
+  if (!practice.length) return lead;
+  const names = practice.map((c) => c.name || c.symbol);
+  const list =
+    names.length > 1
+      ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)} are practice companies`
+      : `${names[0]} is a practice company`;
+  return `${lead} ${list} (not real) so you can see how Fledge works.`;
+}
+
 export default function CompanyOverview({
   catalogue,
   initialWorkspace,
@@ -84,9 +97,15 @@ export default function CompanyOverview({
     };
   }, [membership, refresh]);
   const loading = catalogue.some((company) => !readings[company.id]);
-  const companies = catalogue.filter((company) =>
-    companyMatches(company, query),
-  );
+  // Your own companies first, then practice companies (the worked example,
+  // Northstar, before the others), so newcomers see one that has data.
+  const rank = (c) =>
+    c.mode !== "recorded" ? 0 : c.id === "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" ? 1 : 2;
+  const companies = catalogue
+    .filter((company) => companyMatches(company, query))
+    .map((company, index) => [company, index])
+    .sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1])
+    .map(([company]) => company);
   return (
     <section
       className="collection-page company-overview"
@@ -94,13 +113,17 @@ export default function CompanyOverview({
     >
       <div className="company-overview-heading">
         <div>
-          <span className="section-label">YOUR RESEARCH</span>
+          <span className="section-label">
+            {beginner ? "YOUR COMPANIES" : "YOUR RESEARCH"}
+          </span>
           <h1>
-            All companies <span>{catalogue.length}</span>
+            {beginner ? "My companies" : "All companies"}{" "}
+            <span>{catalogue.length}</span>
           </h1>
           <p className="muted">
-            Saved prices and financials, together. Open a company to explore its
-            evidence.
+            {beginner
+              ? practiceNote(catalogue)
+              : "Saved prices and financials, together. Open a company to explore its evidence."}
           </p>
         </div>
         <button
@@ -238,10 +261,12 @@ export default function CompanyOverview({
               )}
               <span className="company-overview-footer">
                 <span>
-                  {company.status ? "Idea saved" : "No saved idea"}
+                  {company.status
+                    ? beginner ? "View saved" : "Idea saved"
+                    : beginner ? "No view saved yet" : "No saved idea"}
                   {company.unread > 0 && ` · ${company.unread} to review`}
                 </span>
-                <span>Open workspace →</span>
+                <span>{beginner ? "See summary →" : "Open workspace →"}</span>
               </span>
             </button>
           );

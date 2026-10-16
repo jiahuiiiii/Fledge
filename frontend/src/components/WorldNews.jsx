@@ -7,11 +7,14 @@ import {
   filterArticles,
   themeCounts,
 } from "../lib/worldNews";
+import { useProfile } from "../lib/profile";
 import "./WorldNews.css";
 
 // World view: major market headlines (central banks, conflicts, trade, energy)
 // and which watchlist companies they might touch. Possibilities to read, not advice.
 export default function WorldNews({ active, onOpenCompany }) {
+  // Beginners get the headlines, not the machinery: one short status line.
+  const beginner = useProfile().mode === "explain";
   const [page, setPage] = useState(null);
   const [filter, setFilter] = useState("all");
   const [busy, setBusy] = useState("");
@@ -105,6 +108,7 @@ export default function WorldNews({ active, onOpenCompany }) {
           >
             {busy === "refresh" ? "Refreshing…" : "Refresh"}
           </button>
+          {!(beginner && blocker) && (
           <button
             type="button"
             className="primary"
@@ -114,25 +118,34 @@ export default function WorldNews({ active, onOpenCompany }) {
           >
             {busy === "check" ? "Checking…" : "Check against my watchlist"}
           </button>
+          )}
         </div>
       </header>
       <p className="world-news-status fine">
         {page?.checked_at
-          ? `Headlines checked ${formatTimestamp(page.checked_at)} · Finnhub market news, last 3 days.`
+          ? `Market news from Finnhub, last 3 days. Last updated ${formatTimestamp(page.checked_at)}.`
           : "No world headlines saved yet."}
-        {blocker && page && !page.check && (
-          <span id="world-check-blocker"> {blocker}</span>
+        {beginner && page && !page.configured && page.articles.length > 0 && (
+          <span> These are the latest saved headlines.</span>
         )}
-        {page?.check && (
+        {!beginner && blocker && page && (
+          <span id="world-check-blocker">
+            {" "}
+            Watchlist check: {blocker}
+          </span>
+        )}
+        {!beginner && page?.check && (
           <span>
             {" "}
             Last watchlist check {formatTimestamp(page.check.checked_at)}.
           </span>
         )}
       </p>
-      {page && !page.configured && (
+      {page && !page.configured && !(beginner && page.articles.length) && (
         <p className="warning" role="status">
-          New world headlines aren’t connected yet, so only saved ones show.
+          {page.articles.length
+            ? "New headlines can’t load right now, so these are the last saved ones."
+            : "World headlines aren’t connected yet."}
         </p>
       )}
       {page?.error && (
@@ -154,7 +167,7 @@ export default function WorldNews({ active, onOpenCompany }) {
         >
           {[
             { id: "all", label: "All", count: page.articles.length },
-            { id: "mine", label: "My companies", count: mineCount },
+            { id: "mine", label: "About my companies", count: mineCount },
             ...themeCounts(page.articles, page.themes),
           ].map((option) => (
             <button
@@ -227,7 +240,6 @@ export default function WorldNews({ active, onOpenCompany }) {
                         {link.symbol} · {EFFECT_LABELS[link.effect]}
                       </strong>{" "}
                       {link.reason}
-                      <q>{link.quote}</q>
                     </li>
                   ))}
                   <li className="world-news-caveat">
@@ -240,9 +252,9 @@ export default function WorldNews({ active, onOpenCompany }) {
         </ul>
       )}
       <p className="fine world-news-note">
-        Theme tags are keyword-based. AI-suggested effects are possibilities to
-        read and check, quoted from the headline; they are not predictions or
-        advice to buy or sell.
+        Topic tags come from keywords in the headline. “Could help / could
+        hurt” notes are written by AI from the headline: possibilities to read
+        and check, not predictions or advice to buy or sell.
       </p>
     </section>
   );

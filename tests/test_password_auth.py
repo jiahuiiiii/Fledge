@@ -1,12 +1,13 @@
 """Username/password sign-in for the test product."""
 import pytest
 from fastapi.testclient import TestClient
-from thesis import auth, password_auth, profile
+from thesis import auth, password_auth, profile, terms
 from thesis.app import app
 from thesis.config import OWNER
 from thesis.db import transaction, one
 
 HEADERS = {'X-Thesis-Request': 'local-ui'}
+CONSENT = {'accept_terms': True, 'terms_version': terms.VERSION}
 
 
 @pytest.fixture
@@ -79,7 +80,7 @@ def test_sign_up_never_claims_the_owner_account(password_mode):
     with pytest.raises(password_auth.PasswordFailure, match='already has a login'):
         password_auth.provision_owner('someone', 'owner password')
     client = TestClient(app)
-    response = client.post('/api/v1/auth/register', json={'username': 'ten_owner2', 'password': 'owner password'}, headers=HEADERS)
+    response = client.post('/api/v1/auth/register', json={'username': 'ten_owner2', 'password': 'owner password', **CONSENT}, headers=HEADERS)
     assert response.status_code == 200
     assert client.get('/api/v1/session').json()['result']['is_installation_owner'] is False
 
@@ -88,15 +89,23 @@ def test_api_sign_up_answers_and_sign_out(password_mode):
     client = TestClient(app)
     assert client.get('/api/v1/session').json()['result'] == {'mode': 'password', 'authenticated': False}
     assert client.get('/api/v1/home').status_code == 401
-    created = client.post('/api/v1/auth/register', json={'username': 'newbie', 'password': 'pass word 1'}, headers=HEADERS)
+    no_consent = client.post('/api/v1/auth/register', json={'username': 'newbie', 'password': 'pass word 1'}, headers=HEADERS)
+    assert no_consent.status_code == 422 and 'Terms of Use' in no_consent.text
+    old_terms = client.post('/api/v1/auth/register', json={'username': 'newbie', 'password': 'pass word 1',
+                                                             'accept_terms': True, 'terms_version': '2020-01-01'}, headers=HEADERS)
+    assert old_terms.status_code == 422
+    with transaction(admin=True) as conn:
+        assert one(conn, "SELECT count(*) n FROM password_credentials WHERE username='newbie'")['n'] == 0
+    created = client.post('/api/v1/auth/register', json={'username': 'newbie', 'password': 'pass word 1', **CONSENT}, headers=HEADERS)
     assert created.status_code == 200 and auth.COOKIE in created.cookies
     session = client.get('/api/v1/session').json()['result']
     assert session['authenticated'] and session['username'] == 'newbie' and session['mode'] == 'password'
+    assert session['terms']['accepted'] and session['terms']['version'] == terms.VERSION
     body = dict(experience='new', interests=['technology'], horizon='long', goal='learn')
     assert client.put('/api/v1/profile', json=body, headers=HEADERS).status_code == 200
     assert profile.get(session['account_id'])['interests'] == ['technology']
     assert profile.get(OWNER) == {'completed': False}
-    taken = client.post('/api/v1/auth/register', json={'username': 'newbie', 'password': 'pass word 1'}, headers=HEADERS)
+    taken = client.post('/api/v1/auth/register', json={'username': 'newbie', 'password': 'pass word 1', **CONSENT}, headers=HEADERS)
     assert taken.status_code == 409
     assert client.post('/api/v1/auth/logout', headers={**HEADERS, 'X-Thesis-Account': session['account_id']}).status_code == 200
     assert client.get('/api/v1/home').status_code == 401
@@ -104,3 +113,20 @@ def test_api_sign_up_answers_and_sign_out(password_mode):
     assert wrong.status_code == 401
     assert client.post('/api/v1/auth/password-login', json={'username': 'newbie', 'password': 'pass word 1'}, headers=HEADERS).status_code == 200
     assert client.get('/api/v1/home').json()['result']['profile']['completed']
+
+
+def test_existing_accounts_accept_terms_once(password_mode):
+    cookie, _ = password_auth.register('olduser', 'pass word 1')  # signed up before consent existed
+    account = password_auth.authenticate(cookie)
+    assert terms.status(account)['accepted'] is False
+    client = TestClient(app)
+    client.cookies.set(auth.COOKIE, cookie)
+    assert client.get('/api/v1/session').json()['result']['terms']['accepted'] is False
+    stale = client.post('/api/v1/terms/accept', json={'terms_version': '2020-01-01'}, headers=HEADERS)
+    assert stale.status_code == 422
+    accepted = client.post('/api/v1/terms/accept', json={'terms_version': terms.VERSION}, headers=HEADERS)
+    assert accepted.status_code == 200 and accepted.json()['result']['accepted']
+    assert client.post('/api/v1/terms/accept', json={'terms_version': terms.VERSION}, headers=HEADERS).status_code == 200
+    assert client.get('/api/v1/session').json()['result']['terms']['accepted'] is True
+    other, _ = password_auth.register('someone_else', 'pass word 1')
+    assert terms.status(password_auth.authenticate(other))['accepted'] is False  # consent is per account

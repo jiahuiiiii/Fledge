@@ -1,42 +1,92 @@
 import { useProfile } from "../lib/profile";
+import { typeName } from "../lib/investorTypes";
 import "./Onboarding.css";
 
 // The tailored part of the home page: built by the server from the user's
-// first-login answers and watchlist (GET /api/v1/home). No company is suggested.
-export default function PersonalHome({ onAddCompany, onOpenCompany }) {
+// first-login answers and watchlist (GET /api/v1/home). No company is suggested
+// except the practice company, which is labelled as an example.
+export default function PersonalHome({ onAddCompany, onOpenCompany, practice }) {
   const { home } = useProfile();
-  if (!home?.profile?.completed) return null;
-  const { headline, next_step: step, interests, watchlist } = home;
+  if (!home?.profile) return null;
+  const { headline, next_step: step, watchlist, profile } = home;
+  // People who skipped the first questions still get a way in, without a nag.
+  if (!profile.completed)
+    return (
+      <section className="personal-home" aria-label="Your home">
+        <div className="personal-home-main">
+          <h2>Welcome to Fledge</h2>
+          <p>Start with the practice company to see how it works.</p>
+        </div>
+        <div className="personal-home-actions">
+          {practice && (
+            <button
+              type="button"
+              className="primary"
+              onClick={() => onOpenCompany(practice.id)}
+            >
+              See an example: {practice.name || practice.symbol}
+            </button>
+          )}
+          <button type="button" onClick={onAddCompany}>
+            Add a company
+          </button>
+        </div>
+        <p className="personal-home-type">
+          What kind of investor are you?{" "}
+          <button
+            type="button"
+            className="text-link"
+            onClick={() => dispatchEvent(new Event("fledge:retake-quiz"))}
+          >
+            Find out in 4 questions
+          </button>
+        </p>
+      </section>
+    );
   const first = watchlist.companies[0];
   const action =
     step.action === "add_company"
-      ? ["Add a company", onAddCompany]
+      ? watchlist.full
+        ? null
+        : ["Add a company", onAddCompany]
       : first
         ? [`Open ${first.symbol}`, () => onOpenCompany(first.id)]
         : null;
+  const type = typeName(profile.investor_type);
   return (
     <section className="personal-home" aria-label="Your home">
-      <div>
-        <span className="section-label">FOR YOU</span>
+      <div className="personal-home-main">
         <h2>{headline}</h2>
         <p>{step.label}</p>
-        {interests.length > 0 && (
-          <p className="fine">
-            Your interests: {interests.map((item) => item.label).join(", ")}.
-            Search for any company you’re curious about.
-          </p>
-        )}
       </div>
-      <div className="personal-home-side">
-        <p className="personal-home-count">
-          Watchlist <strong>{watchlist.count}</strong> / {watchlist.limit}
-        </p>
-        {action && !(step.action === "add_company" && watchlist.full) && (
+      <div className="personal-home-actions">
+        {action && (
           <button type="button" className="primary" onClick={action[1]}>
             {action[0]}
           </button>
         )}
+        {!first && practice && (
+          <button type="button" onClick={() => onOpenCompany(practice.id)}>
+            See an example: {practice.name || practice.symbol}
+          </button>
+        )}
       </div>
+      <p className="personal-home-type">
+        {type ? (
+          <>
+            Your investor type: <strong>{type}</strong>.{" "}
+          </>
+        ) : (
+          "What kind of investor are you? "
+        )}
+        <button
+          type="button"
+          className="text-link"
+          onClick={() => dispatchEvent(new Event("fledge:retake-quiz"))}
+        >
+          {type ? "Retake" : "Find out in 2 questions"}
+        </button>
+      </p>
     </section>
   );
 }

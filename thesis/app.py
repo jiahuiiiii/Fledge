@@ -259,6 +259,11 @@ async def validation_handler(request, exc):
     return error(422, "Check your question, conditions and numeric values.")
 
 
+def terms_state(owner):
+    from . import terms
+    return terms.status(owner)
+
+
 @app.get("/api/v1/session")
 def bootstrap():
     from .db import transaction, one
@@ -294,6 +299,7 @@ def bootstrap():
                 "account_id": owner,
                 "email": email,
                 "is_installation_owner": owner == OWNER,
+                "terms": terms_state(owner) if managed else None,
                 "preferred_instrument": (
                     str(preferred["instrument_id"]) if preferred else None
                 ),
@@ -327,6 +333,16 @@ class PasswordRequest(BaseModel):
     password: str = Field(min_length=1, max_length=256)
 
 
+class RegisterRequest(PasswordRequest):
+    accept_terms: bool = False
+    terms_version: str = Field(default="", max_length=16)
+
+
+class TermsAcceptance(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    terms_version: str = Field(min_length=1, max_length=16)
+
+
 def password_session(action, payload):
     from . import password_auth
     config = auth.configuration()
@@ -334,7 +350,11 @@ def password_session(action, payload):
         return error(409, "Username sign-in is not enabled for this installation.")
     try:
         if action == "register":
-            cookie, lifetime = password_auth.register(payload.username, payload.password)
+            from . import terms
+            if not payload.accept_terms or payload.terms_version != terms.VERSION:
+                return error(422, "Read and accept the Terms of Use and Privacy Notice to create an account.")
+            cookie, lifetime = password_auth.register(payload.username, payload.password,
+                                                      terms_version=terms.VERSION)
         else:
             cookie, lifetime = password_auth.login(payload.username, payload.password)
     except password_auth.PasswordFailure as failure:
@@ -348,8 +368,17 @@ def password_session(action, payload):
 
 
 @app.post("/api/v1/auth/register")
-def register_account(payload: PasswordRequest):
+def register_account(payload: RegisterRequest):
     return password_session("register", payload)
+
+
+@app.post("/api/v1/terms/accept")
+def accept_terms(payload: TermsAcceptance):
+    from . import terms
+    try:
+        return {"result": terms.accept(auth.current_owner(), payload.terms_version)}
+    except ValueError as failure:
+        return error(422, str(failure))
 
 
 @app.post("/api/v1/auth/password-login")
@@ -382,9 +411,11 @@ class InvestorProfile(BaseModel):
     model_config = ConfigDict(extra="forbid")
     experience: str = Field(max_length=16)
     interests: list[str] = Field(default_factory=list, max_length=9)
-    horizon: str = Field(max_length=16)
+    horizon: str | None = Field(default=None, max_length=16)
     goal: str = Field(max_length=16)
     detail_mode: str | None = Field(default=None, max_length=16)
+    trade_frequency: str | None = Field(default=None, max_length=16)
+    drop_reaction: str | None = Field(default=None, max_length=16)
 
 
 class DetailMode(BaseModel):
@@ -1283,6 +1314,8 @@ if dist.exists():
 
 
 @app.get("/")
+@app.get("/terms")
+@app.get("/privacy")
 def index():
     return FileResponse(dist / "index.html")
 

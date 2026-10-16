@@ -4,6 +4,7 @@ import { resultLabel } from "../lib/conditionRoles";
 import { useState } from "react";
 import CompanyAvatar from "./CompanyAvatar";
 import { companyName } from "../lib/companyIdentity";
+import { useProfile } from "../lib/profile";
 import "./IdeasAndChanges.css";
 const metrics = {
   revenue_growth: "Revenue growth",
@@ -19,6 +20,7 @@ export default function IdeasAndChanges({
   selectedCompany,
   onCreate,
 }) {
+  const beginner = useProfile().mode === "explain";
   const [filter, setFilter] = useState("unreviewed");
   const ideas = catalogue
     .filter((c) => c.status)
@@ -38,7 +40,7 @@ export default function IdeasAndChanges({
       {mode !== "ideas" && <span className="section-label">YOUR RESEARCH</span>}
       <div className="ideas-heading">
         <div>
-          <h2>{mode === "ideas" ? "My ideas" : "What changed"}</h2>
+          <h2>{mode === "ideas" ? (beginner ? "My views" : "My ideas") : "What changed"}</h2>
           <p className="muted">
             {mode === "ideas"
               ? "The views you chose to save, in your own words."
@@ -48,7 +50,8 @@ export default function IdeasAndChanges({
         {mode === "ideas" && (
           <span className="ideas-scope">
             {selectedCompany && <span>{selectedCompany.symbol}</span>}
-            {ideas.length} saved {ideas.length === 1 ? "idea" : "ideas"}
+            {ideas.length} saved{" "}
+            {beginner ? (ideas.length === 1 ? "view" : "views") : ideas.length === 1 ? "idea" : "ideas"}
           </span>
         )}
       </div>
@@ -125,13 +128,13 @@ export default function IdeasAndChanges({
                 {onCreate ? (
                   <>
                     <button className="primary" onClick={onCreate}>
-                      Save my reasoning <IdeaArrow />
+                      {beginner ? "Write my view" : "Save my reasoning"} <IdeaArrow />
                     </button>
                     <button
                       className="ideas-research-link"
                       onClick={() => onOpen(selectedCompany.id, "workspace")}
                     >
-                      Read company research
+                      {beginner ? "See the summary first" : "Read company research"}
                     </button>
                   </>
                 ) : (

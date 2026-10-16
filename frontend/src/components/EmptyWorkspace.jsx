@@ -4,7 +4,7 @@ import TelegramSettings from "./TelegramSettings";
 import { companionPromise } from "../lib/companion";
 import { useProfile } from "../lib/profile";
 import { api } from "../api/client";
-import DetailModeToggle from "./DetailModeToggle";
+
 
 export default function EmptyWorkspace({ view, onChoose }) {
   const [adding, setAdding] = useState(false);
@@ -61,7 +61,6 @@ export default function EmptyWorkspace({ view, onChoose }) {
             </button>
           ))}
         </nav>
-        <DetailModeToggle />
         <TelegramSettings />
       </header>
       <main className="empty-workspace">

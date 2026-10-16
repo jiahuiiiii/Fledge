@@ -51,3 +51,185 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* PDPA consent: a real checkbox, never pre-ticked. */
+.account-card .consent-check {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  min-height: 44px;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--color-text-2);
+  cursor: pointer;
+}
+.account-card .consent-check input {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 1px 0 0;
+  accent-color: var(--color-accent);
+}
+.terms-gate ul {
+  margin: 12px 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+  color: var(--color-text-2);
+  line-height: 1.5;
+}
+.account-menu .account-type {
+  margin: 12px 0 0;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+.account-menu .account-type strong {
+  display: block;
+  color: var(--color-text);
+}
+.account-menu .account-type button {
+  margin-top: 4px;
+  min-height: 44px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--color-accent);
+  font: inherit;
+  cursor: pointer;
+}
+.account-menu .account-legal {
+  display: flex;
+  gap: 16px;
+  font-size: var(--text-sm);
+}
+.account-menu .account-legal a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-2);
+}
+.account-card .consent-check a {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+/* ---- Landing and sign-up: say what Fledge is, hints up front ---- */
+.account-card .account-pitch {
+  margin: 16px 0 6px;
+  font-size: 26px;
+  line-height: 1.2;
+}
+.account-card .account-lede {
+  margin: 0 0 4px;
+  color: var(--color-text-2);
+  line-height: 1.55;
+}
+.account-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+.account-tabs button {
+  min-height: 44px;
+  border: 0;
+  border-radius: calc(var(--radius-md) - 2px);
+  background: none;
+  color: var(--color-text-2);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.account-tabs button.active {
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 0 0 1px var(--color-line-strong);
+}
+.account-field {
+  display: grid;
+  gap: 6px;
+}
+.account-field small {
+  min-height: 1em;
+  color: var(--color-text-2);
+  font-size: var(--text-sm);
+}
+.account-card .field-error,
+.account-field small.field-error {
+  margin: 0;
+  color: var(--color-negative-light, #f6bcc4);
+  font-size: var(--text-sm);
+}
+.account-card input:focus-visible,
+.account-card .consent-check input:focus-visible,
+.account-tabs button:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.account-card input[aria-invalid="true"] {
+  border-color: var(--color-negative, #f08a96);
+}
+.account-card .consent-reassure {
+  margin: -6px 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-2);
+}
+.account-card .account-submit {
+  min-height: 52px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.pro-mode-switch input:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.account-card .field-error,
+.account-field small.field-error {
+  font-weight: 700;
+}
+.account-card input[aria-invalid="true"] {
+  border-width: 2px;
+}
+
+/* ---- Decluttered sign-up (16 Oct) ---- */
+.account-card .account-form {
+  gap: 14px;
+  margin: 24px 0 0;
+}
+.account-card .account-pitch {
+  margin: 20px 0 6px;
+  font-size: 24px;
+}
+.account-card .account-lede {
+  margin: 0;
+}
+.account-field label {
+  font-size: var(--text-sm);
+  color: var(--color-text-2);
+}
+.account-card input::placeholder {
+  color: var(--color-faint, #7c889b);
+}
+.account-card .consent-check {
+  min-height: 0;
+  align-items: center;
+}
+.account-card .account-alt {
+  margin: 4px 0 0;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-2);
+}
+.account-card .account-alt button {
+  min-height: 44px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--color-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}

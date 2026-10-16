@@ -19,11 +19,11 @@ test("rewords saved tones in plain language", () => {
 test("describes the price move without explaining it", () => {
   assert.deepEqual(priceLine({ price: 231.5, change_percent: -1.234 }), {
     price: "$231.50",
-    move: "down 1.2% in the last session",
+    move: "down 1.2% since the last close",
     mood: "bad",
   });
   assert.equal(priceLine(null), null);
-  assert.equal(priceLine({ price: 10, change_percent: 0.01 }).move, "flat in the last session");
+  assert.equal(priceLine({ price: 10, change_percent: 0.01 }).move, "flat since the last close");
 });
 
 test("lists social tone per platform that has a reading", () => {
@@ -104,9 +104,10 @@ test("world light leads with risks", () => {
     { article: { headline: "New tariffs" }, link: { effect: "could_hurt", reason: "Parts cost more." } },
   ];
   const light = worldLight(linked, "Apple");
-  assert.equal(light.mood, "bad");
-  assert.equal(light.status, "One risk to watch");
-  assert.equal(light.reason, "Parts cost more. (“New tariffs”)");
+  assert.equal(light.mood, "mixed");
+  assert.equal(light.status, "1 could help, 1 could hurt");
+  assert.equal(light.reason, "One world event could hurt Apple. Read why below.");
+  assert.equal(worldLight([linked[1]], "Apple").mood, "bad");
   assert.equal(worldLight([], "Apple").status, "Nothing linked");
 });
 
@@ -121,4 +122,20 @@ test("what happened merges sources newest first with day labels", () => {
     now,
   });
   assert.deepEqual(rows.map((r) => [r.text, r.day, r.kind]), [["C", "Today", "world"], ["B", "Today", "post"], ["A", "Yesterday", "news"]]);
+});
+
+import { groupByTone, countLabel, countMood, newsMeaning, peopleMeaning } from "./beginnerSummary.js";
+
+test("groups headlines by tone and labels them with counts", () => {
+  const groups = groupByTone([
+    { id: 1, tone: "positive" }, { id: 2, tone: "negative" }, { id: 3, tone: "neutral" },
+    { id: 4, tone: null }, { id: 5, tone: "positive" },
+  ]);
+  assert.equal(countLabel(groups), "2 good, 1 bad, 1 neutral");
+  assert.equal(countMood(groups), "mixed");
+  assert.match(newsMeaning(groups), /good and bad news/);
+  assert.equal(countLabel(groupByTone([{ tone: null }, { tone: null }])), "2 new, not rated yet");
+  assert.equal(countLabel(groupByTone([])), "Nothing saved yet");
+  assert.match(peopleMeaning(groupByTone([{ tone: "positive" }])), /hype can be wrong/);
+  assert.match(peopleMeaning(groupByTone([{ tone: "positive" }, { tone: "positive" }, { tone: "negative" }])), /^Most posts are upbeat, but some are worried/);
 });

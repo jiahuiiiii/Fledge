@@ -44,11 +44,11 @@ export function priceLine(quote) {
   })}`;
   if (quote.change_percent == null) return { price, move: null, mood: "none" };
   const pct = Math.abs(Number(quote.change_percent)).toFixed(1);
-  if (Number(pct) === 0) return { price, move: "flat in the last session", mood: "none" };
+  if (Number(pct) === 0) return { price, move: "flat since the last close", mood: "none" };
   const up = quote.change_percent > 0;
   return {
     price,
-    move: `${up ? "up" : "down"} ${pct}% in the last session`,
+    move: `${up ? "up" : "down"} ${pct}% since the last close`,
     mood: up ? "good" : "bad",
   };
 }
@@ -192,28 +192,32 @@ export function socialLight(social = []) {
 
 export function worldLight(linked = [], name = "this company") {
   const links = linked.map((x) => x.link).filter(Boolean);
-  const first = (effect) => linked.find((x) => x.link?.effect === effect);
   const hurt = links.filter((l) => l.effect === "could_hurt").length;
   const help = links.filter((l) => l.effect === "could_help").length;
   const either = links.filter((l) => l.effect === "mixed_or_unclear").length;
-  const describe = (x) => `${x.link.reason} (“${x.article.headline}”)`;
-  if (hurt)
+  if (links.length) {
+    const status = [
+      help && `${help} could help`,
+      hurt && `${hurt} could hurt`,
+      either && `${either} either way`,
+    ]
+      .filter(Boolean)
+      .join(", ");
+    const mood = help && hurt ? "mixed" : hurt ? "bad" : help ? "good" : "mixed";
     return {
-      key: "world", title: "World", mood: "bad",
-      status: hurt === 1 ? "One risk to watch" : `${hurt} risks to watch`,
-      reason: describe(first("could_hurt")),
+      key: "world", title: "World", mood, status, hurt,
+      reason: hurt
+        ? `${hurt === 1 ? "One world event" : `${hurt} world events`} could hurt ${name}. Read why below.`
+        : `No linked world event looks likely to hurt ${name}.`,
     };
-  if (help)
-    return { key: "world", title: "World", mood: "good", status: "Could help", reason: describe(first("could_help")) };
-  if (either)
-    return { key: "world", title: "World", mood: "mixed", status: "Could go either way", reason: describe(first("mixed_or_unclear")) };
+  }
   if (linked.length)
     return {
-      key: "world", title: "World", mood: "none", status: "In the news",
+      key: "world", title: "World", mood: "none", status: "In the news", hurt: 0,
       reason: `“${linked[0].article.headline}” names ${name}.`,
     };
   return {
-    key: "world", title: "World", mood: "none", status: "Nothing linked",
+    key: "world", title: "World", mood: "none", status: "Nothing linked", hurt: 0,
     reason: `No recent world headline is linked to ${name} yet.`,
   };
 }
@@ -242,4 +246,78 @@ export function whatHappened({ news = [], posts = [], world = [], limit = 6, now
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
     .slice(0, limit)
     .map((r) => ({ ...r, day: dayLabel(r.at, now) }));
+}
+
+// ---- Concrete lights: real headlines grouped by how they sound ----
+
+// Split saved news or posts by their saved tone. Unrated items (no AI reading
+// yet, or unclear) stay visible as "not rated".
+export function groupByTone(items = []) {
+  const groups = { good: [], bad: [], mixed: [], neutral: [], unrated: [] };
+  for (const item of items) {
+    if (item.tone === "positive") groups.good.push(item);
+    else if (item.tone === "negative") groups.bad.push(item);
+    else if (item.tone === "mixed") groups.mixed.push(item);
+    else if (item.tone === "neutral") groups.neutral.push(item);
+    else groups.unrated.push(item);
+  }
+  return groups;
+}
+
+// "2 good, 1 bad, 3 just facts" — counts instead of a vague mood word.
+export function countLabel(groups, { good = "good", bad = "bad", neutral = "neutral" } = {}) {
+  const parts = [
+    groups.good.length && `${groups.good.length} ${good}`,
+    groups.bad.length && `${groups.bad.length} ${bad}`,
+    groups.mixed.length && `${groups.mixed.length} mixed`,
+    groups.neutral.length && `${groups.neutral.length} ${neutral}`,
+  ].filter(Boolean);
+  if (parts.length) return parts.join(", ");
+  if (groups.unrated.length) return `${groups.unrated.length} new, not rated yet`;
+  return "Nothing saved yet";
+}
+
+export function countMood(groups) {
+  const good = groups.good.length;
+  const bad = groups.bad.length;
+  if (good && bad) return "mixed";
+  if (bad) return "bad";
+  if (good) return "good";
+  if (groups.mixed.length) return "mixed";
+  return "none";
+}
+
+// What the mix of headlines means, in words a beginner can act on safely.
+export function newsMeaning(groups) {
+  const good = groups.good.length;
+  const bad = groups.bad.length;
+  if (good && bad)
+    return "There is good and bad news. Read both sides below.";
+  if (bad)
+    return "The recent news is bad for the company. Read why below; bad news doesn’t always mean the price falls.";
+  if (good)
+    return "The recent news is good for the company. Good news doesn’t guarantee the share price goes up.";
+  if (groups.mixed.length || groups.neutral.length)
+    return "The recent news mostly reports what happened, without clearly good or bad news for the company.";
+  if (groups.unrated.length)
+    return "Fledge hasn’t rated these yet. Read the headlines and judge for yourself.";
+  return "No company news is saved yet.";
+}
+
+export function peopleMeaning(groups) {
+  const up = groups.good.length;
+  const down = groups.bad.length;
+  const both = groups.mixed.length;
+  const tail = " Online posts are opinions, not facts.";
+  if (up && down)
+    return (up > down
+      ? "Most posts are upbeat, but some are worried."
+      : down > up
+        ? "Most posts are worried, but some are upbeat."
+        : "Posts are split between upbeat and worried.") + tail;
+  if (down) return "Posts sound worried." + tail;
+  if (up) return "Posts sound upbeat. Online hype can be wrong.";
+  if (both) return "Posts see both good and bad sides." + tail;
+  if (groups.unrated.length) return "These posts haven’t been rated yet." + tail;
+  return "No posts about this company are saved yet.";
 }

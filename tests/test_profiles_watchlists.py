@@ -32,7 +32,7 @@ def test_profile_defaults_validation_and_mode(owner):
     assert profile.get(owner) == {'completed': False}
     saved = profile.save(owner, 'new', ['technology', 'banks'], 'long', 'learn')
     assert saved['completed'] and saved['detail_mode'] == 'explain'
-    assert profile.save(owner, 'active', [], 'short', 'monitor')['detail_mode'] == 'data'
+    assert profile.save(owner, 'active', [], 'short', 'monitor')['detail_mode'] == 'explain'
     assert profile.save(owner, 'stocks', ['healthcare'], 'medium', 'check', 'explain')['detail_mode'] == 'explain'
     assert profile.set_mode(owner, 'data')['detail_mode'] == 'data'
     for bad in (dict(experience='pro'), dict(interests=['crypto']), dict(interests=['banks', 'banks']),
