@@ -2,6 +2,10 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Your list today (portfolio read) — 16 October 2026
+
+Home shows the whole watchlist together when it has 2+ companies: lights for today's move, sector spread on file and the account's world-news links, bars grouped by sector, and an optional **Explain my list** (one bounded AI request; every driver cites saved headline IDs; advice-like wording and unknown IDs dropped; answers reused; private per account, migration 055). [Contract](docs/features/portfolio-read.md) · [Testing](docs/testing/portfolio-read.md).
+
 ## Lighter onboarding after 12 persona runs — 16 October 2026
 
 First sign-in is **2 questions on one screen** (experience, goal incl. new `news`), then straight into the app; no auto-opened Add-company dialog. Investor type is optional/later (style + 15% fall, from Home card or Account), adds `starting_out`, result quotes answers. Landing pitch, inline sign-up hints/errors, shorter consent line, practice-company labels, search finds own companies, Beginner Home returns to the list, skip link and focus management. Migration 054. [Review](docs/reviews/2026-10-16/onboarding-friction-personas.md).

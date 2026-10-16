@@ -98,6 +98,7 @@ import ReviewDownload from "./components/ReviewDownload";
 import ReportingAge, { ageLabel } from "./components/ReportingAge";
 import IdeaEvidenceReview from "./components/IdeaEvidenceReview";
 import Onboarding from "./components/Onboarding";
+import PortfolioRead from "./components/PortfolioRead";
 import PersonalHome from "./components/PersonalHome";
 import { SettingsMenu } from "./components/DetailModeToggle";
 import { ProfileContext, readLocalMode, writeLocalMode, useProfile } from "./lib/profile";
@@ -2552,6 +2553,7 @@ function CompanyWorkspace({
                         visibleCompanies.find((c) => c.mode === "recorded")
                       }
                     />
+                    <PortfolioRead onOpenCompany={(id) => onChoose(id)} />
                     <CompanyOverview
                       catalogue={visibleCompanies}
                       initialWorkspace={data}

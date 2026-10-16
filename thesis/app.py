@@ -471,6 +471,18 @@ def check_world_news():
     return {"result": news.check(auth.current_owner())}
 
 
+@app.get("/api/v1/portfolio")
+def portfolio_read():
+    from . import portfolio
+    return {"result": portfolio.build(auth.current_owner())}
+
+
+@app.post("/api/v1/portfolio/explain")
+def explain_portfolio():
+    from . import portfolio
+    return {"result": portfolio.explain(auth.current_owner())}
+
+
 @app.get("/api/v1/watchlist")
 def get_watchlist():
     from . import watchlist
