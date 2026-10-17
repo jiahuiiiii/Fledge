@@ -326,6 +326,20 @@ before dispatch. No paid news-noise run yet; independent replay/noise gate0/7,
 owner labels0/50and live gates remain. No live schema/settings/research change.
 [Scope and limits](../testing/news-noise-replay.md#complete-sample-replay-and-bounded-evaluator--17-october-2026).
 
+Paid replay follow-up17October: first run stopped at13paid requests/12validated
+answers/5of172frames, US$0.119564confirmed,0unresolved holds or automatic retries.
+The failed event answer supplied headline text as a passage ID. New schema3binds
+both event evidence fields to each source's permitted IDs, sharing variants for
+identical sets; instructions/tone bodies and strict runtime checks stay exact.
+311affected offline tests pass. Saved-only recheck validates12/12good answers
+free,0new calls; the56-case tone plan/fingerprint remains exact (hard cases4/6).
+Revised plan reuses12good answers, explicitly retests1failed request and sends
+untouched work only; expected additionalUS$2–5, combined capUS$6including prior
+cost. Not executed; paid retest needs owner approval. Independent noise gate0/7,
+owner labels0/50, live approval/shadow/outcome gates remain; **phase5not done**.
+No live setting, migration, install/restart, research/preference or delivery
+change. [Record](../testing/news-noise-replay.md#first-paid-stop-and-source-bound-schemas--17-october-2026).
+
 1. **Split the prompt into smaller tasks:**
    1. relevance (the existing quick check);
    2. tone and evidence basis;

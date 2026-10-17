@@ -66,7 +66,31 @@ def validate(plan):
                 or N.sentiment_reuse.content_key(source)!=N.sentiment_reuse.content_key(saved['source'])
                 or not N.candidate(record,saved['source'],saved['item'])):
             raise ValueError('An inherited tone no longer matches the frozen evidence/policy.')
+    child=plan;depth=0
+    while child.get('previous_plan'):
+        parent=child['previous_plan'];depth+=1
+        if depth>3 or N.digest({k:v for k,v in parent.items() if k!='fingerprint'})!=parent.get('fingerprint'):
+            raise ValueError('An earlier frozen news plan changed.')
+        if (child['capture']!=parent['capture'] or child['reused']!=parent['reused']
+                or child['contract']['models']!=parent['contract']['models']
+                or any(v!=parent['contract']['modules'].get(k) for k,v in child['contract']['modules'].items() if k!=T.__name__)):
+            raise ValueError('A news schema revision cannot change sources, tones, models or other production contracts.')
+        child=parent
+    if len(set(plan.get('retry_hashes',[])))!=len(plan.get('retry_hashes',[])):
+        raise ValueError('Repeated retry authorization.')
     return plan['capture']
+
+
+def revised_plan(previous,retry_hashes):
+    if N.digest({k:v for k,v in previous.items() if k!='fingerprint'})!=previous.get('fingerprint'):
+        raise ValueError('The original frozen news plan changed.')
+    core={k:deepcopy(v) for k,v in previous.items() if k not in {'fingerprint','previous_plan','retry_hashes'}}
+    core.update(contract=contract(),previous_plan=deepcopy(previous),retry_hashes=sorted(set(retry_hashes)))
+    plan=dict(core,fingerprint=N.digest(core));validate(plan);return plan
+
+
+def without_schema(body):
+    body=deepcopy(body);body['text']['format'].pop('schema');return body
 
 
 def packet_for(company,sources,cutoff):
@@ -119,12 +143,13 @@ def access(packet):
 class Stopped(Exception):pass
 
 
-def run(plan,output,cap,*,approved_plan,transport=None,remaining_after=None):
+def run(plan,output,cap,*,approved_plan,transport=None,remaining_after=None,revised_after=None,saved_only=False):
     capture=validate(plan)
     if approved_plan!=plan['fingerprint']:raise ValueError('Execution needs the exact frozen plan binding.')
     if not isinstance(cap,Decimal) or not cap.is_finite() or not 0<cap<=8:
         raise ValueError('Choose an explicit combined cap from above zero to US$8.')
-    if transport is None and os.environ.get('THESIS_TEST_OFFLINE')=='true':
+    if remaining_after is not None and revised_after is not None:raise ValueError('Choose one explicit continuation mode.')
+    if not saved_only and transport is None and os.environ.get('THESIS_TEST_OFFLINE')=='true':
         raise ValueError('Offline tests cannot dispatch a provider request.')
     output=Path(output)
     if output.exists():raise ValueError('Choose a new output path; retained evidence is immutable.')
@@ -132,11 +157,19 @@ def run(plan,output,cap,*,approved_plan,transport=None,remaining_after=None):
         if not one(lock,"SELECT pg_try_advisory_xact_lock(hashtextextended('experiment:news-noise-v1',0)) locked")['locked']:
             raise ValueError('A news-noise campaign is already running.')
         old=saved_calls()
-        if old and remaining_after is None:raise ValueError('A prior campaign exists; explicit same-plan continuation is required.')
+        if old and remaining_after is None and revised_after is None:raise ValueError('A prior campaign exists; explicit same-plan continuation is required.')
         if remaining_after is not None:
             prior=Path(remaining_after)
             if json.loads((prior/'plan.json').read_text())!=plan:
                 raise ValueError('A continuation must retain the identical frozen plan.')
+        if revised_after is not None:
+            prior=Path(revised_after)
+            if json.loads((prior/'plan.json').read_text())!=plan.get('previous_plan'):
+                raise ValueError('A revised campaign must retain the exact original plan.')
+            before=json.loads((prior/'campaign.json').read_text())
+            failed={c['request_hash'] for c in before['calls'] if not c['passed']}
+            if before['fingerprint']!=plan['previous_plan']['fingerprint'] or not set(plan.get('retry_hashes',[]))<=failed:
+                raise ValueError('Only explicitly named failed requests may receive a revised attempt.')
         output.mkdir(parents=True)
         (output/'plan.json').write_text(json.dumps(plan,ensure_ascii=False,indent=2)+'\n')
         report=dict(fingerprint=plan['fingerprint'],completed=False,attempted=0,calls=[],frames_completed=0,
@@ -148,6 +181,7 @@ def run(plan,output,cap,*,approved_plan,transport=None,remaining_after=None):
         save()
         if any(c['status']!='settled' or ledger.REDISPATCH in c['request_key'] for c in old):
             report['stopped']='prior_unsettled_or_redispatched_attempt';save();return report
+        inherited={N.digest(without_schema(c['request_body'])):c for c in old} if plan.get('previous_plan') else {}
         companies={c['instrument_id']:c for c in capture['companies']}
         state={};link_state={}
         for sid,saved in plan['reused'].items():
@@ -162,11 +196,20 @@ def run(plan,output,cap,*,approved_plan,transport=None,remaining_after=None):
         def call(task,packet,body,parse):
             access(packet);key=PREFIX+N.digest(body);calls=saved_calls()
             prior=next((c for c in calls if c['request_key']==key),None)
-            if prior is not None and (prior['status']!='settled' or prior['request_hash']!=N.digest(body)):
+            inherited_schema=False;retested=None
+            if prior is None and inherited:
+                candidate=inherited.get(N.digest(without_schema(body)))
+                if candidate:
+                    if candidate['request_hash'] in plan.get('retry_hashes',[]):retested=str(candidate['id'])
+                    else:prior=candidate;inherited_schema=True
+                elif any(c['request_body']['input'][1]==body['input'][1] for c in old):
+                    report['stopped']='request_changed_beyond_schema';raise Stopped()
+            if prior is not None and (prior['status']!='settled' or (not inherited_schema and prior['request_hash']!=N.digest(body))):
                 report['stopped']='prior_attempt_unsettled_or_changed';raise Stopped()
             if any(c['request_key'].startswith(key) and c['request_key']!=key for c in calls):
                 report['stopped']='prior_redispatch_refused';raise Stopped()
             if prior is None:
+                if saved_only:report['stopped']='new_request_needed_saved_only';raise Stopped()
                 paid,pending=spend(calls)
                 if paid+pending+ledger.estimate(body)>int(cap*ledger.NANO):
                     report['stopped']='combined_cap_before_dispatch';raise Stopped()
@@ -179,7 +222,8 @@ def run(plan,output,cap,*,approved_plan,transport=None,remaining_after=None):
             if filename.exists():
                 if json.loads(filename.read_text())!=prior['response_body']:raise ValueError('Retained raw response changed.')
             else:filename.write_text(json.dumps(prior['response_body'],ensure_ascii=False,indent=2)+'\n')
-            row=dict(task=task,request_hash=N.digest(body),call_id=str(prior['id']),passed=False)
+            row=dict(task=task,request_hash=prior['request_hash'],planned_request_hash=N.digest(body),
+                inherited_schema=inherited_schema,retested_call_id=retested,call_id=str(prior['id']),passed=False)
             report['calls'].append(row)
             try:result=parse(prior)
             except (ValueError,KeyError,TypeError) as error:
@@ -294,6 +338,7 @@ if __name__=='__main__':
     parser.add_argument('--capture',type=Path,help='Freeze current permitted-label candidates read-only, without AI calls.')
     parser.add_argument('--output',type=Path);parser.add_argument('--cap-usd',type=Decimal)
     parser.add_argument('--approved-plan');parser.add_argument('--remaining-after',type=Path)
+    parser.add_argument('--revised-after',type=Path);parser.add_argument('--saved-only',action='store_true')
     args=parser.parse_args()
     if args.capture:
         if args.execute or args.plan.exists():parser.error('Freeze to a new plan path without --execute.')
@@ -308,6 +353,7 @@ if __name__=='__main__':
     else:plan=json.loads(args.plan.read_text())
     if args.execute:
         if args.output is None or args.cap_usd is None:parser.error('Choose a new output and explicit combined cap.')
-        result=run(plan,args.output,args.cap_usd,approved_plan=args.approved_plan,remaining_after=args.remaining_after)
+        result=run(plan,args.output,args.cap_usd,approved_plan=args.approved_plan,remaining_after=args.remaining_after,
+            revised_after=args.revised_after,saved_only=args.saved_only)
         print(json.dumps({k:v for k,v in result.items() if k!='calls'},indent=2))
     else:print(json.dumps(estimate(plan),indent=2))

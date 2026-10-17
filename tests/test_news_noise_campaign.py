@@ -152,3 +152,68 @@ def test_read_write_snapshot_is_rejected_before_loading_frozen_candidates():
         def execute(self,sql):assert sql=='SHOW transaction_read_only';return self
         def fetchone(self):return dict(transaction_read_only='off')
     with pytest.raises(ValueError,match='read-only'):C.collect(Writable(),capture)
+
+
+def old_schema_run(tmp_path,monkeypatch,access):
+    current=C.T.bounded_schema;seen=[];normal=provider(seen)
+    def old_schema(task,sources):
+        if task!='event':return current(task,sources)
+        schema=C.T.strict_schema(C.T.EventResult)
+        schema['$defs']['EventItem']['properties']['id']['enum']=[s['label'] for s in sources]
+        return schema
+    def invalid_third(body):
+        answer=normal(body)
+        if len(seen)==3:
+            value=json.loads(answer['output'][0]['content'][0]['text'])
+            value['items'][0]['reporting']['passages']=['A headline is not a passage ID']
+            answer['output'][0]['content'][0]['text']=json.dumps(value)
+        return answer
+    with monkeypatch.context() as old:
+        old.setattr(C.T,'bounded_schema',old_schema);old.setattr(C.T,'SCHEMA_POLICY','authored-schema-2')
+        _,_,plan=inputs();report=run(plan,tmp_path/'old',invalid_third)
+    assert len(seen)==3 and sum(c['passed'] for c in report['calls'])==2
+    return plan,report,seen,normal
+
+
+def test_revised_news_schema_reuses_valid_answers_and_retests_only_explicit_failed_request(tmp_path,access,monkeypatch):
+    old,first,seen,normal=old_schema_run(tmp_path,monkeypatch,access)
+    failed=first['calls'][-1]['request_hash'];revised=C.revised_plan(old,[failed])
+    report=run(revised,tmp_path/'revision',normal,revised_after=tmp_path/'old')
+    assert report['completed'] and report['attempted']==len(seen)-3
+    assert sum(c['inherited_schema'] for c in report['calls'])>=1
+    assert sum(bool(c['retested_call_id']) for c in report['calls'])==1
+    assert Decimal(report['paid_usd'])==Decimal(C.spend(C.saved_calls())[0])/C.ledger.NANO
+    assert Decimal(report['paid_usd'])>Decimal(first['paid_usd'])
+
+
+def test_saved_only_revision_never_dispatches_even_with_a_large_cap(tmp_path,access,monkeypatch):
+    old,first,seen,normal=old_schema_run(tmp_path,monkeypatch,access)
+    revised=C.revised_plan(old,[first['calls'][-1]['request_hash']])
+    report=run(revised,tmp_path/'free',lambda _:pytest.fail('Saved-only execution dispatched'),
+        revised_after=tmp_path/'old',saved_only=True)
+    assert not report['completed'] and report['attempted']==0 and len(seen)==3
+    assert report['stopped']=='new_request_needed_saved_only' and report['paid_usd']==first['paid_usd']
+    assert sum(c['passed'] for c in report['calls'])==2
+
+
+def test_schema_revision_without_failed_case_authorization_cannot_redispatch_it(tmp_path,access,monkeypatch):
+    old,first,seen,normal=old_schema_run(tmp_path,monkeypatch,access)
+    revised=C.revised_plan(old,[])
+    report=run(revised,tmp_path/'not-approved',normal,revised_after=tmp_path/'old')
+    assert report['attempted']==0 and not report['completed'] and len(seen)==3
+    assert report['stopped']=='validator_failure_no_retry'
+    valid=C.revised_plan(old,[first['calls'][0]['request_hash']])
+    with pytest.raises(ValueError,match='explicitly named failed'):
+        run(valid,tmp_path/'valid-cannot-retry',normal,revised_after=tmp_path/'old')
+
+
+def test_schema_revision_keeps_original_failed_charge_in_budget(tmp_path,access,monkeypatch):
+    old,first,seen,normal=old_schema_run(tmp_path,monkeypatch,access)
+    revised=C.revised_plan(old,[first['calls'][-1]['request_hash']])
+    result=C.run(revised,tmp_path/'bounded-revision',Decimal(first['paid_usd']),approved_plan=revised['fingerprint'],
+        transport=normal,revised_after=tmp_path/'old')
+    assert result['attempted']==0 and result['stopped']=='combined_cap_before_dispatch' and len(seen)==3
+    assert result['paid_usd']==first['paid_usd']
+    changed=deepcopy(revised);changed['capture']['companies'][0]['name']='Changed'
+    changed['fingerprint']=C.N.digest({k:v for k,v in changed.items() if k!='fingerprint'})
+    with pytest.raises(ValueError):C.validate(changed)

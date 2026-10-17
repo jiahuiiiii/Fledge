@@ -124,3 +124,42 @@ def test_schema_revision_changes_reading_identity_without_changing_source_text(m
     p=packet();new=R.identity(p)
     monkeypatch.setattr(T,'SCHEMA_POLICY','authored-previous-schema')
     assert R.identity(p)!=new
+
+
+def test_event_schema_restricts_both_evidence_fields_to_each_sources_own_ids():
+    p=packet();p['sources']=[s for s in p['sources'] if s['channel']=='news']
+    # The second source has only a headline, while the first has body passages.
+    p['sources'][1]['text']='';p['sources'][1]['passages']=[dict(id='p0',quote=p['sources'][1]['title'])]
+    schema=T.request_for('event',p)['text']['format']['schema']
+    branches=schema['properties']['items']['items']['anyOf']
+    assert len(branches)==2
+    for source in p['sources']:
+        branch=next(b for b in branches if source['label'] in b['properties']['id']['enum'])
+        for field in ('reporting','importance'):
+            definition=schema['$defs'][branch['properties'][field]['$ref'].rsplit('/',1)[1]]
+            allowed=definition['properties']['passages']['items']['enum']
+            assert set(allowed)=={x['id'] for x in source['passages']}
+            assert source['title'] not in allowed
+    raw=events(p);raw[1]['reporting']['passages']=['p1'];raw[1]['importance']['passages']=['p0']
+    with pytest.raises(ValueError,match='original report'):T.event_labels(call(dict(items=raw)),p,tones(p))
+
+
+def test_equal_passage_sets_share_one_event_variant_instead_of_copying_per_item():
+    p=packet();p['sources']=[s for s in p['sources'] if s['channel']=='news']
+    for source in p['sources']:source['passages']=source['passages'][:1]
+    schema=T.bounded_schema('event',p['sources'])
+    branch=schema['properties']['items']['items']
+    assert set(branch['properties']['id']['enum'])=={s['label'] for s in p['sources']}
+    assert len(schema['$defs'])==2 and len(T.INSTRUCTIONS['event'])<=6000
+
+
+def test_eight_different_event_passage_sets_stay_within_the_complete_request_bound():
+    from thesis.research.citations import source_passages
+    p=packet();template=p['sources'][0];p['sources']=[]
+    for index in range(8):
+        source=dict(template,id='authored-source-'+str(index),label='item_'+str(index+1),
+            title='Authored announcement '+str(index),text='\n'.join('A complete sentence '+str(n)+'.' for n in range(index+1)))
+        source['passages'],_=source_passages(source['title'],source['text']);p['sources'].append(source)
+    body=T.request_for('event',p);schema=body['text']['format']['schema']
+    assert schema['type']=='object' and len(schema['properties']['items']['items']['anyOf'])==8
+    assert len(ledger.canonical(body).encode())<=48000

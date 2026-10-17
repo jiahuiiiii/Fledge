@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## News-replay paid stop and event schema fix — 17 October 2026
+
+First one-pass replay stops at13paid requests/12valid answers/5of172frames: headline text supplied as a passage ID fails own-source validation. US$0.119564confirmed,0unresolved holds/automatic retries. New schema3shares event variants by identical own-ID sets, binding both evidence fields to the correct item labels. Same answer format/instructions; tone requests and strict runtime citation checks remain exact.
+
+311affected offline tests pass. Real saved-only recheck validates12/12good answers free,0new calls, earlier cost retained;56-case tone plan/fingerprint exact, hard cases4/6still valid, owner labels0/50. Frozen revised plan proposes12free reuses,1explicit failed-request retest, then untouched work; additionalUS$2–5expected, combined capUS$6including prior charge. **Not executed; owner must approve paid retest.** Independent noise0/7and live gates remain, phase5not done. No source refresh/research/preference/configuration/migration/install/app-or-DBrestart/Telegram change; user CSS exact. Preserve paid failure and free/test diagnostics. [Record and official schema reference](docs/testing/news-noise-replay.md#first-paid-stop-and-source-bound-schemas--17-october-2026).
+
 ## Complete-sample news replay prepared — 17 October 2026
 
 File-only company-news replay now requires complete baseline/frame evidence, uses production publication/routing and bounded immediate/recap formatters, and shares exact24-hour displayed-story identities. Seven input dates and nonzero messages alone do not pass: independent frozen-excerpt review remains separate from model importance. News-only counterfactual, no live-timeliness/private-idea/social/price claim.

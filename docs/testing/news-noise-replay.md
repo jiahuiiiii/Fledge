@@ -98,3 +98,45 @@ their independent reservation sumUS$35.4902475is not an approved spend. Expected
 actual campaignUS$2–5, sequential combined capUS$6. Bounded duplicate work depends
 on actual relevance, candidate pairs and negative-pair caching. No paid news-noise
 campaign has run at this checkpoint; replay/noise acceptance remains0/7.
+
+## First paid stop and source-bound schemas — 17 October 2026
+
+The first one-pass campaign stopped after13paid requests,12validated answers
+and5/172frames. ConfirmedUS$0.119564, zero unresolved holds. The failed event
+answer put headline text where a passage ID was required; the own-source
+validator rejected it. No automatic retry occurred. Noise acceptance remains
+0/7days, with no percentage or success claim from the incomplete run.
+
+`sentiment-task-schema-3` now groups news items by their identical supplied
+passage-ID sets. Each event variant binds its allowed item labels and both
+reporting/importance passage enums to that set. Different passage sets use
+nested variants; equal sets share definitions. This preserves the same array
+result format and event/tone instructions, while preventing quote strings or
+other-source IDs from entering these fields under strict generation. Runtime
+citation checks remain strict. The request remains bounded at48kB, including an
+eight-distinct-variant test. Nested choices and definitions follow the
+[official Structured Outputs subset](https://developers.openai.com/api/docs/guides/structured-outputs#supported-schemas).
+
+The operator now supports a separately frozen schema revision with explicit
+failed-request nomination. Original input/cached tones/models and other production
+contracts cannot change. Reuse compares the complete request outside its schema,
+then revalidates the old raw answer; valid answers stay free. Changed requests
+beyond the schema cannot silently replay an old input. The old failed response
+remains rejected; a new body is allowed only for the named failed request after
+explicit owner approval. Cumulative costs include the original failure, and a
+failed new attempt cannot automatically retry under the original authorization.
+Saved-only mode forbids all new dispatches even when budget remains.
+
+Final311affected offline tests pass. A real saved-only recheck validates all12
+earlier successful answers (five under inherited event schemas), zero new calls
+and the originalUS$0.119564retained. The56-case tone plan is byte-equivalent at
+the request level and still validates its original fingerprint; its4/6hard-case
+result remains separate from pending owner labels0/50. The review page is exact.
+
+The proposed revised paid run reuses12good answers, retests only the one failed
+request and sends only untouched requests thereafter. Expected additionalUS$2–5;
+combined capUS$6including the initialUS$0.119564. Its event reservation sum
+US$35.881205is not spending authorization. **No revised paid execution yet;
+the no-automatic-paid-retry rule requires explicit owner approval.** No app
+publication, source refresh, environment/preference/migration/install/restart
+change or Telegram call. Preserve both stops and all free-check/test diagnostics.
