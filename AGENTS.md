@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Actual severity routing connection — 17 October 2026 (prepared)
+
+New065prepares new actual importance/move publications and separate actual routing/recap/cost policies, behind a default-off switch plus explicit start. Old previews stay immutable; preview calendars/backoff cannot skip actual work. High routes alone enter immediate Telegram, medium recaps and low app-only; dispatch rechecks start/routes, rollback blocks new importance messages from legacy delivery. Existing account preferences and separate new-type switches remain.
+
+Full offline2509pass/93optional skips;13new/257related and202frontend tests/build/scopedformat,13isolated browser groups1440/390/320pass,0HTTPcalls; screenshots inspected.065unapplied live, no environment/install/app-or-DBrestart/research/preference change, US$0; user CSS exact. Cross-publication24-hour story suppression, independent7-day noise replay, owner quality0/50, hard cases0/6 and live/shadow/approval gates remain; phase5not done. [Contract](docs/features/daily-updates.md#actual-routing-connection--17-october-2026-prepared).
+
 ## Responsive split-window header — 17 October 2026
 
 Owner reported clipped Account and wrapped My ideas at half-screen width. New isolated `styles/header.css` uses the existing980px breakpoint: logo/tools above,44px navigation below, labels kept together; desktop/phone design unchanged. Source imports it last; user `app.css` is byte-for-byte preserved. Both actual App header templates (loaded/loading, Beginner/Pro) pass64resize cases320–1440plus4menu/navigation checks; source and installed-CSS runs each68pass,0HTTPrequests, screenshots inspected.202frontend tests/build/scopedformat/diff pass. CSS-only atomic install16:12:38SGT, existing assets/scripts and app process exact, backup `.local/backups/header-responsive-20261017T081238Z/`. No app/DBrestart, environment/data/preference change, source/AIcall; phase5preparations remain uninstalled. [Review](docs/reviews/2026-10-17/responsive-header.md).

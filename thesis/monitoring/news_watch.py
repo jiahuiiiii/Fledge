@@ -385,7 +385,7 @@ def publish(owner, iid, analysis_id, *, claim_token=None, now=None):
                     previous["id"],
                     idea["id"] if idea else None,
                     Jsonb(alert),
-                    alert['kind']=='important_reporting',
+                    alert['kind']=='important_reporting' and not alert_routing.live_active(now),
                 ),
             )
         if claim_token is not None and watch["claim_token"] != claim_token:

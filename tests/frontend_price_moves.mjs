@@ -26,6 +26,7 @@ window.actions=[];
 let reviewed=null;
 let companyMode=false;
 let dailyMode=false;
+let actualMode=false;
 const members=['NVDA','AVGO','AMZN','GOOGL'].map((symbol,i)=>({symbol,instrument_id:symbol,
  price:i<2?'96.8':'98.3',previous_close:'100',change_percent:i<2?'-3.2':'-1.7',quoted_at:'2026-10-14T20:00:00Z',
  context_only:i>1,triggered:i<2,thresholds:{session:'3',relative:'2',two_sessions:'5'},reasons:i<2?['session_move']:[],
@@ -55,8 +56,8 @@ api.dailyUpdates=async()=>{window.actions.push({kind:'read-daily'});return {enab
 api.researchReview=async(filters)=>({instrument_id:filters.instrument_id||null,review:filters.review,page:filters.page,
  daily_reports_enabled:dailyMode,
  page_size:20,total:1,cutoff:'2026-10-15T00:00:00Z',records:companyMode ? [{kind:'company',id:companyDetail.id,
- title:companyDetail.payload.title,created_at:companyDetail.created_at,detail:companyDetail,feedback_enabled:true,
- routing:{preview:true,channel:'telegram',reason:'At least one cited company development has high importance.'}}] : [{kind:'move',id:detail.id,title:detail.title,feedback_enabled:true,
+ title:companyDetail.payload.title,created_at:companyDetail.created_at,detail:{...companyDetail,preview:!actualMode},feedback_enabled:true,
+ routing:{preview:!actualMode,channel:'telegram',reason:'At least one cited company development has high importance.'}}] : [{kind:'move',id:detail.id,title:detail.title,feedback_enabled:true,
  created_at:'2026-10-14T20:00:00Z',review_action:reviewed,detail:{...detail,review_action:reviewed}}],
  companies:members.map(m=>({id:m.instrument_id,symbol:m.symbol,name:'Authored company',mode:'sec',
  coverage:{concerns:[],watch:{enabled:true},social_feeds:[]}})),totals:{pending_count:reviewed?0:1}});
@@ -74,6 +75,7 @@ function Wrapper({options}){
 const root=createRoot(document.getElementById('root'));let serial=0;
 window.showFixture=(options={})=>{
  companyMode=!!options.company;
+ actualMode=!!options.actual;
  dailyMode=!!options.daily;
  if(options.clean){
   detail.explanation.sentences[0].citations[0].quote='Investors rotate out of AI on spending worries.';
@@ -169,6 +171,18 @@ try{
   await company.getByRole('region',{name:'Rate this alert'}).screenshot({path:path.join(out,'company-rating-'+width+'.png'),animations:'disabled'});
   await page.screenshot({path:path.join(out,'company-routing-'+width+'.png'),animations:'disabled'});
  }
+ await page.evaluate(()=>window.showFixture({inbox:true,company:true,actual:true}));
+ await company.locator(':scope > summary').click();
+ await company.getByLabel('Delivery route').getByText(/Delivery route · Telegram immediately/).waitFor();
+ assert.equal(await company.getByText('Preview · not sent to Telegram',{exact:true}).count(),0);
+ assert.equal(await company.getByLabel('Delivery preview').count(),0);
+ for(const width of [1440,390,320]){
+  await page.setViewportSize({width,height:1100});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  assert.equal(await company.locator('blockquote').count(),1);
+  await company.getByLabel('Delivery route').scrollIntoViewIfNeeded();
+  await page.screenshot({path:path.join(out,'company-actual-routing-'+width+'.png'),animations:'disabled'});
+ }
  const beforeDaily=(await page.evaluate(()=>window.actions)).filter(a=>a.kind==='read-daily').length;
  await page.evaluate(()=>window.showFixture({inbox:true,daily:true}));
  await page.getByRole('group',{name:'Daily recaps and AI spending'}).waitFor();
@@ -178,6 +192,6 @@ try{
  assert.equal(await page.getByRole('group',{name:'Daily recaps and AI spending'}).count(),0);
  assert.equal((await page.evaluate(()=>window.actions)).filter(a=>a.kind==='read-daily').length,beforeDaily+1);
  assert.deepEqual(errors,[]);assert.deepEqual(requests,[]);
- console.log(JSON.stringify({passed:12,viewports:[1440,390,320],network_requests:0,output:out}));
+ console.log(JSON.stringify({passed:13,viewports:[1440,390,320],network_requests:0,output:out}));
 }catch(error){console.error(JSON.stringify({errors,output:out,body:(await page.locator('body').innerText()).slice(0,2200)}));throw error;}
 finally{await browser.close();}

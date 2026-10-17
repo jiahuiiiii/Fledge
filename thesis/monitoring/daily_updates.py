@@ -1,7 +1,7 @@
 """Daily medium-route membership and exact spending observations; no AI/HTTP.
 
-Records are previews in this preparation. Reading never generates a digest or
-notifies anyone. Source access is rechecked when frozen membership is opened.
+Actual records require the separate routing activation; prior previews stay
+previews. Reading never generates a digest or notifies anyone.
 """
 from datetime import datetime,date,time,timedelta,timezone
 from decimal import Decimal,InvalidOperation
@@ -15,6 +15,7 @@ from .review_schedule import occurrence
 from .move_watch import option
 
 POLICY='daily-updates-1'
+LIVE_POLICY='daily-updates-live-1'
 NANO=Decimal(1_000_000_000)
 SGT=ZoneInfo('Asia/Singapore')
 PAGE_SIZE=20
@@ -31,6 +32,16 @@ def enabled():return str(option('THESIS_DAILY_REPORTS') or 'false').lower() in {
 def started():
     value=option('THESIS_DAILY_REPORTS_STARTED_AT')
     return review_digest.clock(value) if value else None
+
+
+def mode(now):
+    from . import alert_routing as R
+    since=started()
+    if since is None or since>now:return None
+    if R.live_requested():
+        if not R.live_active(now):return None
+        return dict(preview=False,policy=LIVE_POLICY,since=max(since,R.live_start()))
+    return dict(preview=True,policy=POLICY,since=since)
 
 
 def clock():return datetime.now(timezone.utc)
@@ -72,9 +83,11 @@ def spend(owner,day,*,now=None):
 
 
 def next_digest(conn,owner,since,now):
-    last=one(conn,'SELECT window_end FROM daily_digests WHERE owner_id=%s AND policy=%s ORDER BY window_end DESC LIMIT 1',(owner,POLICY))
+    policy=mode(now)['policy']
+    last=one(conn,'SELECT window_end FROM daily_digests WHERE owner_id=%s AND policy=%s ORDER BY window_end DESC LIMIT 1',(owner,policy))
     if last:
-        start=last['window_end'];end=occurrence(start.astimezone(SGT).date()+timedelta(days=1),420,SGT)
+        start=max(last['window_end'],since);end=occurrence(start.astimezone(SGT).date(),420,SGT)
+        if end<=start:end=occurrence(start.astimezone(SGT).date()+timedelta(days=1),420,SGT)
     else:
         local=since.astimezone(SGT);end=occurrence(local.date(),420,SGT)
         if end<=since:end=occurrence(local.date()+timedelta(days=1),420,SGT)
@@ -83,13 +96,14 @@ def next_digest(conn,owner,since,now):
 
 
 def make_digest(conn,owner,start,end,now):
+    current=mode(now)
     candidates=rows(conn,"SELECT r.* FROM (SELECT DISTINCT ON(kind,event_id) * FROM alert_routing_decisions WHERE owner_id=%s "
-        "ORDER BY kind,event_id,created_at DESC,id DESC) r WHERE r.channel='digest' "
+        "AND preview=%s ORDER BY kind,event_id,created_at DESC,id DESC) r WHERE r.channel='digest' "
         'AND r.created_at>=%s AND r.created_at<%s AND NOT EXISTS(SELECT 1 FROM daily_digest_members m '
-        'WHERE m.owner_id=r.owner_id AND m.kind=r.kind AND m.event_id=r.event_id) ORDER BY r.created_at,r.id LIMIT 1001',(owner,start,end))
+        'WHERE m.owner_id=r.owner_id AND m.kind=r.kind AND m.event_id=r.event_id) ORDER BY r.created_at,r.id LIMIT 1001',(owner,current['preview'],start,end))
     if len(candidates)>1000:raise ValueError(TOO_MANY)
     identity=uuid4()
-    conn.execute('INSERT INTO daily_digests VALUES(%s,%s,%s,%s,%s,%s,true)',(identity,owner,start,end,now,POLICY))
+    conn.execute('INSERT INTO daily_digests VALUES(%s,%s,%s,%s,%s,%s,%s)',(identity,owner,start,end,now,current['policy'],current['preview']))
     for position,r in enumerate(candidates):
         conn.execute('INSERT INTO daily_digest_members VALUES(%s,%s,%s,%s,%s,%s)',
             (owner,identity,position,r['id'],r['kind'],r['event_id']))
@@ -101,7 +115,7 @@ def save_spend(conn,owner,day,now):
     if value is None:return None
     conn.execute('INSERT INTO daily_spend_reports VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) '
         'ON CONFLICT(owner_id,day,policy) DO NOTHING',
-        (uuid4(),owner,day,value['window_start'],value['window_end'],now,POLICY,
+        (uuid4(),owner,day,value['window_start'],value['window_end'],now,mode(now)['policy'],
          value['charged_nano_usd'],value['pending_max_nano_usd'],value['settled_calls'],value['pending_calls'],value['experiment_charged_nano_usd']))
     return value
 
@@ -109,24 +123,26 @@ def save_spend(conn,owner,day,now):
 def notice(conn,owner,day,now,threshold):
     value=spend(owner,day,now=now)
     if value is None or threshold is None or value['charged_nano_usd']<=threshold:return None
-    return one(conn,'INSERT INTO daily_cost_notices VALUES(%s,%s,%s,%s,%s,%s,%s,%s,true) '
+    current=mode(now)
+    return one(conn,'INSERT INTO daily_cost_notices VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s) '
         'ON CONFLICT(owner_id,day,policy) DO NOTHING RETURNING id',
-        (uuid4(),owner,day,threshold,value['charged_nano_usd'],value['pending_max_nano_usd'],now,POLICY))
+        (uuid4(),owner,day,threshold,value['charged_nano_usd'],value['pending_max_nano_usd'],now,current['policy'],current['preview']))
 
 
 def run_once(owner,*,now=None):
     if not enabled():return 0
-    now=review_digest.clock(now or clock());since=started()
-    if since is None or since>now:return 0
+    now=review_digest.clock(now or clock());current=mode(now)
+    if current is None:return 0
+    since=current['since']
     with transaction(owner) as conn:
         if not one(conn,'SELECT pg_try_advisory_xact_lock(hashtextextended(%s,0)) locked',('daily-updates:'+str(owner),))['locked']:return 0
-        state=one(conn,'SELECT next_check_at,last_success_at FROM daily_updates_state WHERE owner_id=%s',(owner,))
+        state=one(conn,'SELECT next_check_at,last_success_at FROM daily_updates_state WHERE owner_id=%s AND policy=%s',(owner,current['policy']))
         if state and state['next_check_at']>now:return 0
         created=0;window=next_digest(conn,owner,since,now)
         if window:make_digest(conn,owner,*window,now);created+=1
         if str(owner)==str(OWNER):
             today=now.astimezone(SGT).date();first=since.astimezone(SGT).date()
-            last=one(conn,'SELECT max(day) AS report_day FROM daily_spend_reports WHERE owner_id=%s AND policy=%s',(owner,POLICY))['report_day']
+            last=one(conn,'SELECT max(day) AS report_day FROM daily_spend_reports WHERE owner_id=%s AND policy=%s',(owner,current['policy']))['report_day']
             report_day=last+timedelta(days=1) if last else first
             if report_day<today:save_spend(conn,owner,report_day,now);created+=1
             threshold=cost_threshold()
@@ -140,9 +156,9 @@ def run_once(owner,*,now=None):
                         (changed,now,day_bounds(first)[0]))
                 for day in {today}|{r['report_day'] for r in days}:
                     created+=bool(notice(conn,owner,day,now,threshold))
-        conn.execute('INSERT INTO daily_updates_state VALUES(%s,%s,%s,%s,NULL) ON CONFLICT(owner_id) '
-            'DO UPDATE SET next_check_at=excluded.next_check_at,last_attempt_at=excluded.last_attempt_at,last_success_at=excluded.last_success_at,error=NULL',
-            (owner,now+timedelta(minutes=1),now,now))
+        conn.execute('INSERT INTO daily_updates_state VALUES(%s,%s,%s,%s,NULL,%s) ON CONFLICT(owner_id) '
+            'DO UPDATE SET next_check_at=excluded.next_check_at,last_attempt_at=excluded.last_attempt_at,last_success_at=excluded.last_success_at,error=NULL,policy=excluded.policy',
+            (owner,now+timedelta(minutes=1),now,now,current['policy']))
         return created
 
 
@@ -152,11 +168,14 @@ def poll(owner):
         logging.getLogger('thesis').warning('Daily recap preparation failed; existing alerts and delivery continue.')
         if enabled():
             try:
-                now=clock();error='too_many_records' if isinstance(exc,ValueError) and str(exc)==TOO_MANY else 'preparation_failed'
+                now=clock();current=mode(now)
+                if current is None:return 0
+                error='too_many_records' if isinstance(exc,ValueError) and str(exc)==TOO_MANY else 'preparation_failed'
                 with transaction(owner) as conn:
-                    conn.execute('INSERT INTO daily_updates_state VALUES(%s,%s,%s,NULL,%s) ON CONFLICT(owner_id) '
-                        'DO UPDATE SET next_check_at=excluded.next_check_at,last_attempt_at=excluded.last_attempt_at,error=excluded.error',
-                        (owner,now+timedelta(hours=1),now,error))
+                    conn.execute('INSERT INTO daily_updates_state VALUES(%s,%s,%s,NULL,%s,%s) ON CONFLICT(owner_id) '
+                        'DO UPDATE SET next_check_at=excluded.next_check_at,last_attempt_at=excluded.last_attempt_at,error=excluded.error,policy=excluded.policy,'
+                        'last_success_at=CASE WHEN daily_updates_state.policy=excluded.policy THEN daily_updates_state.last_success_at ELSE NULL END',
+                        (owner,now+timedelta(hours=1),now,error,current['policy']))
             except Exception:pass  # Status-storage failure cannot block ordinary delivery either.
         return 0
 

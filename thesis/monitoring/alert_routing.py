@@ -1,7 +1,6 @@
-"""Preview-only severity decisions; no transport, source fetch or model call.
+"""Immutable severity decisions; actual routing requires an explicit opt-in/start.
 
-The channel is a proposal, never a delivery instruction. Live severity routing
-and new delivery types require a separate approved rollout.
+Preview records are never promoted. No transport, source fetch or model call.
 """
 from datetime import datetime,timezone
 import logging
@@ -11,13 +10,47 @@ from thesis.db import transaction,one,rows
 from thesis.research import coverage,reporting_basis,sentiment_tasks
 
 POLICY='alert-severity-preview-1'
+LIVE_POLICY='alert-severity-live-1'
 CHANNELS={'high':'telegram','medium':'digest','low':'app'}
 RANK={'low':0,'medium':1,'high':2}
 
 
+def live_requested():
+    from .move_watch import option
+    return str(option('THESIS_ALERT_ROUTING_LIVE') or 'false').lower() in {'true','1','on'}
+
+
+def live_start():
+    from .move_watch import option
+    from thesis import review_digest
+    try:
+        value=option('THESIS_ALERT_ROUTING_LIVE_STARTED_AT')
+        return review_digest.clock(value) if value else None
+    except (ValueError,TypeError):return None
+
+
+def live_active(now=None):
+    start=live_start()
+    return live_requested() and start is not None and start<=(now or datetime.now(timezone.utc))
+
+
 def enabled():
     from .move_watch import option
-    return str(option('THESIS_ALERT_ROUTING_PREVIEW') or 'false').lower() in {'true','1','on'}
+    return live_active() or str(option('THESIS_ALERT_ROUTING_PREVIEW') or 'false').lower() in {'true','1','on'}
+
+
+def delivery_reason(conn,owner,record,*,now):
+    """Recheck a queued publication against current mode; absent routes fail closed."""
+    is_new=record['kind']=='company' and record['detail'].get('payload',{}).get('kind')=='important_reporting'
+    if not live_requested():
+        return 'New importance delivery is off. Review it in Updates.' if is_new else None
+    if not live_active(now) or record['created_at']<live_start():
+        return 'This alert predates the active severity-routing start, or routing is unavailable.'
+    route=one(conn,'SELECT channel FROM alert_routing_decisions WHERE owner_id=%s AND kind=%s AND event_id=%s '
+        'AND policy=%s AND NOT preview',(owner,record['kind'],record['id'],LIVE_POLICY))
+    if not route or route['channel']!='telegram':
+        return 'This update belongs in the daily recap or app, or has no actual severity decision.'
+    return None
 
 
 def importance(item):
@@ -79,7 +112,7 @@ def classify(record,*,idea_items=None):
     return dict(severity=level,channel=CHANNELS[level],reason=reason,items=levels)
 
 
-def save(conn,owner,record,*,now):
+def save(conn,owner,record,*,now,preview=True):
     idea_items=None
     if record['kind']=='idea' and not record['detail'].get('withheld'):
         check=one(conn,'SELECT analysis_id FROM idea_alert_checks WHERE owner_id=%s AND id=%s',(owner,record['id']))
@@ -93,45 +126,52 @@ def save(conn,owner,record,*,now):
         publication=one(conn,'SELECT current_id,kind FROM research_alerts WHERE owner_id=%s AND id=%s',(owner,record['id']))
         if publication and publication['kind']!='important_reporting':
             proposal=one(conn,"SELECT id,payload FROM research_alerts WHERE owner_id=%s AND current_id=%s "
-                "AND kind='important_reporting' AND preview",(owner,publication['current_id']))
+                "AND kind='important_reporting' AND preview=%s",(owner,publication['current_id'],preview))
             own_ids={i['source_id'] for i in record['detail'].get('payload',{}).get('items',[])}
             proposed_ids={i['source_id'] for i in proposal['payload']['items']} if proposal else set()
             if own_ids and own_ids<=proposed_ids:
                 covered_by=str(proposal['id'])
                 decision=dict(severity='low',channel='app',items=decision['items'],
-                    reason='These sources are already covered by the company importance preview; do not propose a second delivery.')
-    return one(conn,'INSERT INTO alert_routing_decisions VALUES(%s,%s,%s,%s,%s,%s,%s,true,%s,%s,%s) '
+                    reason='These sources are already covered by the company importance update; keep one delivery.')
+    return one(conn,'INSERT INTO alert_routing_decisions VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) '
         'ON CONFLICT(owner_id,kind,event_id,policy) DO NOTHING RETURNING id',
-        (uuid4(),owner,record['kind'],record['id'],POLICY,decision['severity'],decision['channel'],
+        (uuid4(),owner,record['kind'],record['id'],POLICY if preview else LIVE_POLICY,decision['severity'],decision['channel'],preview,
          decision['reason'],Jsonb(dict(items=decision['items'],event_created_at=record['created_at'].isoformat(),covered_by=covered_by)),now))
 
 
 def latest(conn,owner,kind,event_id):
     return one(conn,'SELECT severity,channel,preview,reason,created_at FROM alert_routing_decisions '
-        'WHERE owner_id=%s AND kind=%s AND event_id=%s AND policy=%s',(owner,kind,event_id,POLICY))
+        'WHERE owner_id=%s AND kind=%s AND event_id=%s AND policy=%s',(owner,kind,event_id,LIVE_POLICY if live_active() else POLICY))
 
 
 def run_once(owner,*,now=None):
-    if not enabled():return 0
     from .move_watch import option
     from thesis import review_digest
+    now=review_digest.clock(now or datetime.now(timezone.utc))
+    actual=live_active(now)
+    if live_requested() and not actual:return 0
+    if not actual and str(option('THESIS_ALERT_ROUTING_PREVIEW') or 'false').lower() not in {'true','1','on'}:return 0
     # An explicit installation start prevents a historical alert flood/backfill.
-    start=option('THESIS_ALERT_ROUTING_STARTED_AT')
+    start=live_start() if actual else option('THESIS_ALERT_ROUTING_STARTED_AT')
     if not start:return 0
-    start=review_digest.clock(start);now=review_digest.clock(now or datetime.now(timezone.utc))
+    start=review_digest.clock(start)
     with transaction(owner) as conn:
         if not one(conn,'SELECT pg_try_advisory_xact_lock(hashtextextended(%s,0)) locked',
                    ('alert-routing:'+str(owner),))['locked']:return 0
         events=rows(conn,review_digest.EVENTS+'SELECT e.* FROM events e WHERE e.created_at>=%(start)s '
+            "AND (NOT %(actual)s OR ((e.kind<>'company' OR EXISTS(SELECT 1 FROM research_alerts a WHERE a.owner_id=e.owner_id AND a.id=e.id AND NOT a.preview)) "
+            "AND (e.kind<>'move' OR EXISTS(SELECT 1 FROM move_events m WHERE m.owner_id=e.owner_id AND m.id=e.id AND NOT m.preview)))) "
             'AND e.created_at<=%(now)s AND NOT EXISTS(SELECT 1 FROM alert_routing_decisions r WHERE '
             'r.owner_id=e.owner_id AND r.kind=e.kind AND r.event_id=e.id AND r.policy=%(policy)s) '
-            'ORDER BY e.created_at,e.id LIMIT 100',dict(owner=owner,start=start,now=now,policy=POLICY))
-        return sum(bool(save(conn,owner,r,now=now)) for r in review_digest.details(conn,owner,events))
+            'ORDER BY e.created_at,e.id LIMIT 100',dict(owner=owner,start=start,now=now,actual=actual,policy=LIVE_POLICY if actual else POLICY))
+        return sum(bool(save(conn,owner,r,now=now,preview=not actual)) for r in review_digest.details(conn,owner,events))
 
 
 def poll_preview(owner):
-    """A failed shadow calculation must not block ordinary Telegram delivery."""
+    """Shadow failures preserve ordinary delivery; live routing fails closed."""
     try:return run_once(owner)
     except Exception:
-        logging.getLogger('thesis').warning('Alert routing preview could not be recorded; existing delivery continues.')
+        message=('Alert routing could not be recorded; unrouted alerts remain in Fledge.' if live_requested() else
+                 'Alert routing preview could not be recorded; existing delivery continues.')
+        logging.getLogger('thesis').warning(message)
         return 0

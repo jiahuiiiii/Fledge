@@ -206,12 +206,16 @@ def run_once(owner):
                 return False
             if cfg.get("enabled"):
                 from .move_watch import option
+                from . import alert_routing as routing
                 moves_enabled = str(option('THESIS_MOVE_TELEGRAM_ENABLED') or 'false').lower() in {'true','1','on'}
                 candidates = rows(conn, review_digest.EVENTS + """SELECT e.* FROM events e WHERE created_at>%(start)s AND created_at>%(fresh)s
                   AND (e.kind<>'move' OR (%(moves_enabled)s AND EXISTS(SELECT 1 FROM move_events m WHERE m.owner_id=e.owner_id AND m.id=e.id AND NOT m.preview)))
-                  AND (e.kind<>'company' OR EXISTS(SELECT 1 FROM research_alerts a WHERE a.owner_id=e.owner_id AND a.id=e.id AND NOT a.preview))
+                  AND (e.kind<>'company' OR EXISTS(SELECT 1 FROM research_alerts a WHERE a.owner_id=e.owner_id AND a.id=e.id AND NOT a.preview AND (a.kind<>'important_reporting' OR %(routing_active)s)))
+                  AND (NOT %(routing_requested)s OR (e.created_at>=%(routing_start)s AND EXISTS(SELECT 1 FROM alert_routing_decisions r
+                    WHERE r.owner_id=e.owner_id AND r.kind=e.kind AND r.event_id=e.id AND NOT r.preview AND r.policy=%(routing_policy)s AND r.channel='telegram')))
                   AND NOT EXISTS(SELECT 1 FROM telegram_deliveries d WHERE d.owner_id=e.owner_id AND d.kind=e.kind AND d.event_id=e.id)
-                  ORDER BY created_at,id LIMIT 100""", dict(owner=owner, start=cfg["enabled_at"], fresh=now-timedelta(hours=24), moves_enabled=moves_enabled))
+                  ORDER BY created_at,id LIMIT 100""", dict(owner=owner, start=cfg["enabled_at"], fresh=now-timedelta(hours=24), moves_enabled=moves_enabled,
+                    routing_active=routing.live_active(now),routing_requested=routing.live_requested(),routing_start=routing.live_start(),routing_policy=routing.LIVE_POLICY))
                 for item in candidates:
                     conn.execute("INSERT INTO telegram_deliveries(id,owner_id,kind,event_id,event_at) VALUES(%s,%s,%s,%s,%s) ON CONFLICT(owner_id,kind,event_id) DO NOTHING", (uuid4(), owner, item["kind"], item["id"], item["created_at"]))
                 from .daily_telegram import enqueue
@@ -249,7 +253,9 @@ def run_once(owner):
                     elif record['detail'].get('preview'):
                         why = 'Preview alerts are kept in Updates and are never forwarded.'
                     else:
-                        message = render(record)
+                        from . import alert_routing as routing
+                        why = routing.delivery_reason(conn,owner,record,now=now)
+                        if not why:message = render(record)
                 except (ValueError, KeyError, TypeError, IndexError):
                     why = "This alert could not be prepared safely. Review its evidence in Updates."
             else:

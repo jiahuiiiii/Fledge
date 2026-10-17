@@ -253,6 +253,18 @@ call, migration or restart. Actual routing/record production, live-choice approv
 owner quality/noise replay and live gates remain; **phase5not done**.
 [Contract](../features/daily-updates.md#telegram-transport-follow-up--17-october-2026).
 
+Actual-routing follow-up17October:065prepares **new** actual company/move
+publications and separate actual routing/daily policies behind a default-off
+switch and explicit start. Immediate Telegram selection/dispatch require an
+actual high route; medium enters the matching daily recap, low stays in Updates.
+Old previews are never promoted, preview calendars/backoff do not skip actual
+work, and rollback cannot send new importance records through the legacy path.
+13new/257related backend,202frontend/build/scopedformat and13isolated browser
+groups pass,0HTTPcalls. Full offline2509pass/93optional skips.065unapplied, no live activation/install/restart or paid
+call. Cross-publication24-hour story suppression, seven-day noise replay,
+owner labels0/50, new-prompt hard cases0/6 and live approval/shadow/outcome gates
+remain; **phase5not done**. [Contract](../features/daily-updates.md#actual-routing-connection--17-october-2026-prepared).
+
 1. **Split the prompt into smaller tasks:**
    1. relevance (the existing quick check);
    2. tone and evidence basis;

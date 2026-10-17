@@ -155,3 +155,61 @@ Phase 5 remains **not done**: actual routing/record production, independent
 one-week noise replay, owner-labelled quality (0/50), new-prompt hard-case
 evaluation and live/shadow/outcome gates remain outstanding. None of these
 preparations supplies the owner's delivery or cost-level approval.
+
+## Actual routing connection — 17 October 2026 (prepared)
+
+Migration **065** is additive and unapplied live. It removes the preview-only
+insertion constraint for **new** importance publications and adds the recap
+runtime's policy marker. Existing publications, routes, recaps and cost notices
+remain immutable; no saved preview is promoted or enrolled again.
+
+`THESIS_ALERT_ROUTING_LIVE` defaults off. Actual mode additionally requires an
+explicit, valid, non-future `THESIS_ALERT_ROUTING_LIVE_STARTED_AT`. Missing,
+invalid or future starts prevent actual capture and delivery. This switch is
+prepared infrastructure, not owner approval or a replacement for quality and
+shadow gates. No setting has been enabled in the running app.
+
+After a separately approved activation, new company importance publications and
+price events can be actual records. Actual routing excludes preview publications
+and events older than the activation start. High qualifies for immediate
+Telegram; medium qualifies for the daily recap; low remains in Updates. Unknown
+importance still goes to the daily review rather than being assumed high. New
+importance publications can include neutral/favourable developments. When an
+old-style and importance publication cover the same source set, only the latter
+gets an immediate route. These are routing decisions, not proof of delivery.
+
+Telegram checks actual high routing at both selection and dispatch. Unrouted,
+medium and low publications cannot enter the immediate outbox in actual mode.
+Changing the start after queuing is rechecked. Turning actual routing off restores
+the ordinary pipeline for its existing alert types, while new importance records
+stay out of that legacy path, including messages already queued. Price delivery
+still separately requires `THESIS_MOVE_TELEGRAM_ENABLED`; recap/cost delivery
+still requires its explicit switches and delivery start, plus the existing
+account's connected/enabled chat. No account preference changes are made here.
+
+Daily preparation uses separate actual/preview policy identities and matching
+route modes. Actual windows start no earlier than routing/daily activation, so
+an earlier preview calendar cannot skip the first actual recap. Preview backoff
+and observation cursors do not carry into actual mode. A later explicit start
+clamps the next window instead of enrolling the intervening history. Existing
+recap membership remains unique per publication. Cost notices likewise use a
+separate actual policy; earlier preview notices stay exact. The cost level still
+has no implicit approved default.
+
+The route label appears beside the existing evidence and rating controls in
+Updates. Preview records retain the explicit preview wording. Reading either
+mode still performs no AI call, source refresh, review action or send.
+
+Current verification: **13 new actual-mode tests**, **257 related offline tests**,
+**202 frontend tests**, build/scoped formatting, and **13 isolated browser groups**
+at 1440/390/320 pass with zero browser HTTP requests; screenshots inspected.
+Full offline backend: **2,509 pass / 93 optional skips**. All transport is mocked.
+This work costs US$0 and changes no live database,
+environment, account settings, installed assets or app/DB process. User CSS is
+byte-for-byte preserved. Private evidence:
+`.local/live-tests/redesign-phase-5-20261017/actual-routing-prepared/`.
+
+Still required: cross-publication/story suppression across 24 hours (the current
+same-reading/source-set guard is narrower), independent seven-day noise replay,
+owner labels (0/50), new-prompt hard cases (0/6), quality/cost evaluation, owner
+live choices and forward shadow/outcome measurements. **Phase 5 is not done.**

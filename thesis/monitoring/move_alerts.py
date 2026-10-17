@@ -111,8 +111,9 @@ def record(owner, event, *, now=None):
         evidence=headlines(conn,companies,now)
         eid=uuid4()
         primary=by_symbol[event['triggered_symbols'][0]]['instrument_id']
-        conn.execute('INSERT INTO move_events VALUES(%s,%s,%s,%s,%s,%s,%s,true,%s,%s,%s)',
-                     (eid,owner,primary,now,event['session'],event['kind'],event['direction'],price_moves.POLICY,Jsonb(event),Jsonb(evidence)))
+        from .alert_routing import live_active
+        conn.execute('INSERT INTO move_events VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+                     (eid,owner,primary,now,event['session'],event['kind'],event['direction'],not live_active(now),price_moves.POLICY,Jsonb(event),Jsonb(evidence)))
         for member in members:
             iid=by_symbol[member['symbol']]['instrument_id']
             indexes=member['indexes'];sector=member.get('sector');history=member.get('two_sessions')

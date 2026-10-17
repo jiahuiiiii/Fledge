@@ -1,5 +1,5 @@
 export default function AlertRoutingPreview({ record }) {
-  if (!record.routing?.preview || record.detail?.withheld) return null;
+  if (!record.routing || record.detail?.withheld) return null;
   const label = {
     telegram: "Telegram immediately",
     digest: "Daily digest",
@@ -7,8 +7,14 @@ export default function AlertRoutingPreview({ record }) {
   }[record.routing.channel];
   if (!label) return null;
   return (
-    <p className="fine" aria-label="Delivery preview">
-      Routing preview · {label}. {record.routing.reason}
+    <p
+      className="fine"
+      aria-label={
+        record.routing.preview ? "Delivery preview" : "Delivery route"
+      }
+    >
+      {record.routing.preview ? "Routing preview" : "Delivery route"} · {label}.{" "}
+      {record.routing.reason}
     </p>
   );
 }

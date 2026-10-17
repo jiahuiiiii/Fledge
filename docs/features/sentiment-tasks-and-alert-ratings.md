@@ -157,3 +157,13 @@ now prepares digest/cost outbox types and immutable mappings from sent numbered
 buttons to original private alerts. Final166affected offline tests and6browser
 groups pass; delivery is still off,064unapplied, normal records still previews.
 Actual routing/record production and all quality/noise/live approval gates remain.
+
+Actual-routing follow-up17October: [the default-off actual-mode connection](daily-updates.md#actual-routing-connection--17-october-2026-prepared)
+now prepares new actual publications/routes/recaps/cost notices, separate start
+and policy identities, and immediate-outbox filtering at selection and dispatch.
+Old previews stay immutable; new importance records cannot escape through the
+legacy path on rollback.065unapplied live; settings remain off.13new/257related
+backend,202frontend/build and13isolated browser groups pass,0HTTPcalls,US$0.
+Full offline2509pass/93optional skips.
+Cross-publication24-hour story suppression, independent7-day noise replay,
+owner quality0/50, hard cases0/6 and approval/live/shadow gates still remain.
