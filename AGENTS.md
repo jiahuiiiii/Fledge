@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Factual announcements survive editorial guards — 17 October 2026 (prepared)
+
+Three authored probes exposed valuation-word false positives on buyback, dividend and product announcements. Headline guard3now separates direct primary announcements from soft valuation cues; explicit advice/thesis/comparison headlines stay low even when they repeat real news. Management quotes alone are not automatically author opinion. Routing policy3preserves old immutable decisions.
+
+238affected offline tests and68current-policy checks pass (overlap). Tone56plan, blind page and protected CSS exact. Refreshed pending purpose-test plan retains history/tones/models/prompt/US$6combined cap; saved-only validates4cached answers,0new calls, priorUS$2.43838875/0unresolved retained. Earlier sealed plans retained; no paid authorization inferred from refresh. Originalnoise15/23(65.22%)still fails; guard2diagnostic11/20(55%)not presented as guard3result. Owner labels0/50, paid-test approval, observation periods and live delivery decisions remain. No data/settings/migration/install/restart change. [Counterexamples and limits](docs/testing/news-noise-replay.md#factual-announcement-counterexamples--17-october-2026).
+
 ## Provider comparison requires both observation periods — 17 October 2026
 
 Read-only lane report no longer awards zero-denial success when rollout traffic is missing, or when a provider exists in only one period. Per-provider counts/coverage remain unknown until both sides are observed; a known increase for another provider still fails.43related offline tests pass; no collection/pacing/schema/app change.

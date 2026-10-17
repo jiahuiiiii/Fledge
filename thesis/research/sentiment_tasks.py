@@ -19,7 +19,7 @@ from .citations import model_source
 POLICY = 'sentiment-small-tasks-1'
 PROMPT = 'thesis-source-sentiment-tasks-1'
 SCHEMA_POLICY = 'sentiment-task-schema-3'
-HEADLINE_POLICY = 'news-editorial-headlines-2'
+HEADLINE_POLICY = 'news-editorial-headlines-3'
 EVENT_POLICY = 'news-article-purpose-2'
 MAX_PAIRS = 16
 
@@ -215,7 +215,7 @@ def request_for(task, packet, *, pairs=None):
 
 LOW_HEADLINE = re.compile(r'\b(?:stock comparison|stocks? to (?:buy|watch)|'
                           r'why .{0,60}(?:stock|shares) (?:rose|fell|dropped|gained)|'
-                          r'price recap|market recap|undervalued|overvalued|bull case|bear case|'
+                          r'price recap|market recap|bull case|bear case|'
                           r'priced like|consider buying|bullish call|bearish call|'
                           r"should (?:you|i|investors) (?:buy|sell|hold)|i(?:['’]d| would) (?:buy|sell|consider)|"
                           r'what (?:it|this|that) means for investors|long[- ]term thesis)\b', re.I)
@@ -228,11 +228,27 @@ def editorial_headline(title):
     This is a conservative supplement to the separate model form judgment.
     """
     title=str(title or '')
-    return bool(LOW_HEADLINE.search(title) or (
-        re.search(r'\b(?:stock|shares)\b',title,re.I) and re.search(r'\b(?:cheap|expensive)\b',title,re.I)) or (
+    # Explicit recommendations/theses remain editorial even if the same title
+    # mentions an announcement. A valuation adjective alone proves neither.
+    if LOW_HEADLINE.search(title):return True
+    if (
         re.search(r'\b(?:vs\.?|versus)\b',title,re.I) and re.search(r'\b(?:stock|shares|better buy|valuation)\b',title,re.I)
         and not re.search(r'\b(?:jury|court|lawsuit|licens\w*|verdict|trial)\b',title,re.I)) or (
-        re.search(r'\banalyst\b',title,re.I) and re.search(r'\b(?:upside|price target|top pick)\b',title,re.I)))
+        re.search(r'\banalyst\b',title,re.I) and re.search(r'\b(?:upside|price target|top pick)\b',title,re.I)):
+        return True
+    primary=re.split(r'[;.!?]|\b(?:after|following|amid|because|despite|as|when)\b',title,maxsplit=1,flags=re.I)[0]
+    direct_announcement=bool(re.search(
+        r'\b(?:approves?|authori[sz]es?|announces?|declares?|raises?|increases?|cuts?|suspends?|'
+        r'launches|introduces|recalls|withdraws)\b.{0,45}\b(?:buyback|repurchase|dividend|guidance|product|device)\b',primary,re.I))
+    if direct_announcement:return False
+    # Quoted management judgments are not automatically the author's valuation
+    # thesis. Leave their actual importance to the stated-development evidence.
+    if re.search(r'\b(?:ceo|cfo|chief executive|management|chair)\b.{0,25}\b(?:says?|calls?|sees|believes?)\b',title,re.I):return False
+    valuation=r'(?:cheap|expensive|undervalued|overvalued)'
+    return bool(re.search(r'^(?:is|are|does|do|why|how)\b.{0,120}\b'+valuation+r'\b',title,re.I)
+        or re.search(r'\b(?:could|may|might)\s+be\b.{0,30}\b'+valuation+r'\b',title,re.I)
+        or re.search(r'\b(?:stock|shares)(?:\s+(?:is|are|looks?|seems?|still|now|too|very|more|less)){0,5}\s+'+valuation+r'\b',title,re.I)
+        or re.search(r'\b'+valuation+r'\s+(?:stock|shares)\b',title,re.I))
 
 
 def event_labels(call, packet, tones):

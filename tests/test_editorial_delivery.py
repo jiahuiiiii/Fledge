@@ -21,6 +21,10 @@ from test_alert_routing import scored
     'How A Legal Win Could Reshape The Long-Term Thesis For Investors',
     'Example vs Rival: Which Stock Is The Better Buy?',
     'Three AI Stocks to Watch After New Research Funding',
+    'Should You Buy Example Stock After Its $2 Billion Buyback?',
+    'Example Stock Could Be Undervalued After Its Board Approves A Buyback',
+    'Is Example (EX) Cheap Following Its New Product Launch?',
+    'Example Stock Looks Cheap After Its Dividend Increase',
 ])
 def test_clear_editorial_wrappers_are_low_despite_factual_background(title):
     assert T.editorial_headline(title)
@@ -40,9 +44,18 @@ def test_clear_editorial_wrappers_are_low_despite_factual_background(title):
     'Why Is Example Recalling Its New Device?',
     'Example CEO Raises Revenue Guidance And Criticises AI Investors',
     'Example Announces A New Product At An Investor Event',
+    'Example Board Approves $2 Billion Buyback; CEO Says Shares Are Undervalued',
+    'Example Raises Dividend After Analysts Call Shares Undervalued',
+    'Example Launches A Cheap New AI Device; Shares Rise',
+    'Example CEO Says Shares Are Undervalued',
+    'Example Introduces An Expensive New Device As Shares Fall',
 ])
 def test_real_or_uncertain_developments_are_not_rejected_by_keyword_alone(title):
     assert not T.editorial_headline(title)
+    s=source('item_1','Example announced its new company development.');s['title']=title
+    reading=analyse([s],[]);item=scored(reading['result']['items'][0])
+    record=dict(kind='company',detail=dict(payload=dict(items=[item]),sources=[s]))
+    assert R.importance(item,s)=='high' and R.classify(record)['channel']=='telegram'
 
 
 def fixture(monkeypatch,*,low_level='low',editorial=False):

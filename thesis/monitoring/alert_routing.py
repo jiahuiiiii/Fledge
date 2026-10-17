@@ -9,8 +9,8 @@ from psycopg.types.json import Jsonb
 from thesis.db import transaction,one,rows
 from thesis.research import coverage,reporting_basis,sentiment_tasks
 
-POLICY='alert-severity-preview-2'
-LIVE_POLICY='alert-severity-live-2'
+POLICY='alert-severity-preview-3'
+LIVE_POLICY='alert-severity-live-3'
 CHANNELS={'high':'telegram','medium':'digest','low':'app'}
 RANK={'low':0,'medium':1,'high':2}
 
