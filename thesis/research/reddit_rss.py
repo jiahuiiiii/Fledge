@@ -144,6 +144,8 @@ def read(kind, value, *, transport=None, cache_only=False):
                               trust_env=False, transport=transport,
                               headers={'User-Agent': UA, 'Accept': 'application/atom+xml'}) as client:
                 with client.stream('GET', url) as response:
+                    from .source_observations import record
+                    record('reddit_rss', response.status_code)
                     remember_reset(response.headers, datetime.now(timezone.utc))
                     if response.status_code in (401, 403, 429):
                         now = datetime.now(timezone.utc)
@@ -255,7 +257,32 @@ def replies(body, post, now, days):
     return result, removed
 
 
-def collect(company, days, enabled, now, fetcher=None, *, cache_only=False):
+def retained_thread(post, now):
+    """Only a known, unchanged feed update permits reuse without a request."""
+    updated = post.get('updated_at')
+    if updated is None:
+        return None
+    with transaction(source=True) as conn:
+        capability = one(conn, 'SELECT * FROM provider_clocks WHERE provider=%s', (PREFIX+'comments',))
+        if capability:
+            _check_clock(capability, now)
+        saved = one(conn, 'SELECT * FROM reddit_thread_checks WHERE thread_key=%s', (post['post_key'],))
+        if (saved and saved['feed_updated_at'] == updated
+                and saved['checked_at'] <= now
+                and now - saved['checked_at'] < timedelta(days=7)):
+            return bytes(saved['body'])
+    return None
+
+
+def retain_thread(post, body, now):
+    if post.get('updated_at') is None:
+        return
+    with transaction(source=True) as conn:
+        conn.execute('INSERT INTO reddit_thread_checks VALUES(%s,%s,%s,%s) ON CONFLICT(thread_key) DO UPDATE SET feed_updated_at=excluded.feed_updated_at,checked_at=excluded.checked_at,body=excluded.body WHERE reddit_thread_checks.checked_at<=excluded.checked_at',
+                     (post['post_key'],post['updated_at'],now,body))
+
+
+def collect(company, days, enabled, now, fetcher=None, *, cache_only=False, incremental=False):
     get = fetcher or read
     selected, comments, removed = [], [], []
     discovered = excluded = 0
@@ -298,9 +325,15 @@ def collect(company, days, enabled, now, fetcher=None, *, cache_only=False):
             live_allowed=False
     for post in sorted(selected, key=lambda p: (social.mentions(dict(title=p['title'],body=''),company['symbol'],company['name']),p['published_at']), reverse=True)[:3]:
         try:
-            reply, withdrawn = replies((get if live_allowed else cached)('comments', post), post, now, days)
-            if not live_allowed:
+            saved = retained_thread(post,now) if incremental else None
+            body = saved if saved is not None else (get if live_allowed else cached)('comments', post)
+            reply, withdrawn = replies(body, post, now, days)
+            if incremental and saved is None:
+                retain_thread(post,body,now)
+            if not live_allowed or saved is not None:
                 checks['comments']['cached'] = True
+            if saved is not None:
+                checks['comments']['unchanged_threads'] = checks['comments'].get('unchanged_threads',0) + 1
             # Preserve the bounded discussion, including short replies. The
             # exact topic is supplied downstream; membership never invents an
             # immediate parent or establishes a comment's company relevance.

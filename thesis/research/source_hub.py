@@ -1,6 +1,7 @@
 """Bounded Deus-style news fan-in with independent, visible provider outcomes."""
 from thesis.display_time import stamp as display_stamp
 import json
+import contextvars
 import re
 from threading import Lock
 from urllib.parse import urljoin, urlsplit
@@ -88,6 +89,8 @@ def get(provider, url, *, params=None, headers=None, transport=None):
             endpoint = url
             for redirect in range(3):
                 with client.stream('GET',endpoint,params=params) as response:
+                    from .source_observations import record
+                    record(provider, response.status_code)
                     if provider in FEEDS and response.status_code in (301,302,307,308):
                         target=urljoin(endpoint,response.headers.get('Location',''))
                         destination=urlsplit(target)
@@ -303,7 +306,8 @@ def refresh_rss(iid,*,fetcher=None):
         try:return refresh(iid,provider,fetcher=fetcher)
         except Conflict as exc:return dict(status='cached',message=str(exc))
     with ThreadPoolExecutor(max_workers=3) as pool:
-        results=list(pool.map(run,FEEDS))
+        futures=[pool.submit(contextvars.copy_context().run,run,provider) for provider in FEEDS]
+        results=[future.result() for future in futures]
     matched=sum(r.get('matched',0) for r in results)
     failed=sum(r['status']=='failed' for r in results)
     waiting=sum(r['status']=='cached' for r in results)

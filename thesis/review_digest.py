@@ -11,7 +11,7 @@ from uuid import UUID
 from .db import transaction, one, rows
 from . import service
 from .research import idea_alerts, sentiment, social
-from .monitoring import news_watch
+from .monitoring import news_watch, watch_lanes
 
 PAGE_SIZE = 20
 # Owner predicates supplement forced RLS. UNION ALL keeps distinct alert kinds.
@@ -44,11 +44,7 @@ def clock(value):
 def coverage(conn, owner, company, now):
     """Current source health, never inferred from the absence of alerts."""
     iid = company["id"]
-    watch = one(
-        conn,
-        "SELECT enabled,interval_minutes,match_idea,idea_purpose,last_check_at,next_check_at,error FROM news_watches WHERE owner_id=%s AND instrument_id=%s",
-        (owner, iid),
-    )
+    watch = watch_lanes.present(conn, owner, iid)
     if company["mode"] == "recorded":
         return dict(
             mode="recorded",

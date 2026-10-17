@@ -13,24 +13,9 @@ def require_active(owner, iid, token, now=None, *, renew=False):
 
     now = now or datetime.now(timezone.utc)
     with transaction(owner) as conn:
-        row = one(
-            conn,
-            "SELECT enabled,claim_token,lease_until FROM news_watches WHERE owner_id=%s AND instrument_id=%s FOR UPDATE",
-            (owner, iid),
-        )
-        if (
-            not row
-            or not row["enabled"]
-            or row["claim_token"] != token
-            or not row["lease_until"]
-            or row["lease_until"] <= now
-        ):
+        from .watch_lanes import active
+        if not active(conn, owner, iid, token, now, renew=renew):
             raise WatchStopped()
-        if renew:
-            # Progress keeps this live worker leased. Never revive an expired,
-            # stopped or replaced watch, or change its saved schedule/settings.
-            conn.execute('UPDATE news_watches SET lease_until=GREATEST(lease_until,%s) WHERE owner_id=%s AND instrument_id=%s AND claim_token=%s',
-                         (now + timedelta(minutes=15), owner, iid, token))
 
 
 def collect(owner, iid, token, details, *, fetcher=None, now=None):

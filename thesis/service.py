@@ -671,7 +671,7 @@ def state(owner, instrument_id=INSTRUMENT, *, include_financials=True):
         from .research.proposals import list_for as proposals_for
         from .research import sentiment, social, idea_alerts, sentiment_inputs
         from .research import question_library, source_hub
-        from .monitoring import news_watch, filing_watch, review_schedule
+        from .monitoring import news_watch, filing_watch, review_schedule, watch_lanes
 
         # The response is one explicit source scope; all downstream paths use this set.
         return dict(
@@ -685,11 +685,7 @@ def state(owner, instrument_id=INSTRUMENT, *, include_financials=True):
             ),
             social_status=social.status(conn, instrument_id),
             provider_status=source_hub.status(conn, instrument_id),
-            news_watch=one(
-                conn,
-                "SELECT enabled,interval_minutes,next_check_at,last_check_at,error,match_idea,event_version_id,include_context,idea_purpose FROM news_watches WHERE owner_id=%s AND instrument_id=%s",
-                (owner, instrument_id),
-            ),
+            news_watch=watch_lanes.present(conn, owner, instrument_id),
             research_alerts=news_watch.list_alerts(conn, owner),
             idea_alerts=idea_alerts.list_for(conn, owner),
             idea_watch_state=one(

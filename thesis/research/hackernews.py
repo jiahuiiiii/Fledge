@@ -56,6 +56,8 @@ def fetch(kind, value, now, *, lookback_days=7, company_name=None):
         },
     ) as client:
         with client.stream("GET", url, params=params) as response:
+            from .source_observations import record
+            record('hackernews', response.status_code)
             response.raise_for_status()
             data = bytearray()
             for chunk in response.iter_bytes():
@@ -127,9 +129,12 @@ def parse_item(raw, key, symbol, now, *, lookback_days=7, company_name=None, ver
     )
 
 
-def refresh(iid, *, fetcher=None, now=None, lookback_days=7, include_threads=False):
+def refresh(iid, *, fetcher=None, now=None, lookback_days=7, include_threads=False, incremental=None):
     from thesis.service import Conflict
     from .sec.service import collection_lock
+    if incremental is None:
+        from thesis.monitoring.watch_lanes import enabled
+        incremental = enabled()
 
     supplied_clock = now
     now = now or datetime.now(timezone.utc)
@@ -170,10 +175,20 @@ def refresh(iid, *, fetcher=None, now=None, lookback_days=7, include_threads=Fal
         # Recheck up to eight retained comments even if removed from the search index.
         prior = rows(
             conn,
-            "SELECT DISTINCT ON(post_key) post_key,published_at FROM social_posts WHERE instrument_id=%s AND platform='hackernews' AND published_at>=%s ORDER BY post_key,published_at DESC",
-            (iid, now - timedelta(days=lookback_days)),
+            "SELECT DISTINCT ON(post_key) post_key,published_at,available_at FROM social_posts WHERE instrument_id=%s AND platform='hackernews' AND published_at>=%s AND published_at<=%s AND available_at<=%s ORDER BY post_key,published_at DESC,available_at DESC",
+            (iid, now - timedelta(days=lookback_days), now, now),
         )
-        prior = sorted(prior, key=lambda p: p["published_at"], reverse=True)[:8]
+        recent_checks = {}
+        if incremental:
+            recent_checks = {r['post_key'][3:]: r['checked_at'] for r in rows(conn,
+                'SELECT post_key,checked_at FROM hn_comment_checks WHERE instrument_id=%s AND checked_at>%s AND checked_at<=%s',
+                (iid,now-timedelta(days=1),now))}
+            for p in prior:
+                if p['available_at'] > now-timedelta(days=1):
+                    recent_checks.setdefault(p['post_key'][3:],p['available_at'])
+        prior = (sorted([p for p in prior if p['post_key'][3:] not in recent_checks],
+                        key=lambda p: p['available_at'])[:8] if incremental else
+                 sorted(prior, key=lambda p: p["published_at"], reverse=True)[:8])
     fetcher = fetcher or (lambda kind, value, clock: fetch(kind, value, clock, lookback_days=lookback_days, company_name=company["name"]))
     posts, withdrawn, excluded, checked, errors = [], [], 0, 0, []
     parents, originals = {}, {}
@@ -222,11 +237,14 @@ def refresh(iid, *, fetcher=None, now=None, lookback_days=7, include_threads=Fal
         keys = list(dict.fromkeys([k for pair in zip_longest(direct[:24], thread_keys) for k in pair if k]))[:48]
     else:
         keys = direct[:20]
-    for key in ([] if api_denied else keys):
+    skipped_retained = sum(key in recent_checks for key in keys)
+    verified_keys = []
+    for key in ([] if api_denied else [k for k in keys if k not in recent_checks]):
         try:
             raw = fetcher("item", key, now)
             post, removed = parse_item(raw, key, company["symbol"], now, lookback_days=lookback_days, company_name=company["name"], verified_parent=parents.get(key))
             checked += 1
+            verified_keys.append(key)
             if removed:
                 withdrawn.append("hn:" + key)
             elif post:
@@ -275,6 +293,10 @@ def refresh(iid, *, fetcher=None, now=None, lookback_days=7, include_threads=Fal
         )
         if state["attempt_id"] != token:
             raise Conflict("A newer HN check replaced this attempt.")
+        if incremental:
+            for key in verified_keys:
+                conn.execute('INSERT INTO hn_comment_checks VALUES(%s,%s,%s) ON CONFLICT(instrument_id,post_key) DO UPDATE SET checked_at=GREATEST(hn_comment_checks.checked_at,excluded.checked_at)',
+                             (iid,'hn:'+key,done))
         for key in withdrawn:
             conn.execute(
                 "INSERT INTO hn_withdrawals VALUES(%s,%s) ON CONFLICT DO NOTHING",
@@ -312,7 +334,7 @@ def refresh(iid, *, fetcher=None, now=None, lookback_days=7, include_threads=Fal
             "UPDATE hn_refresh_state SET lease_until=NULL,completed_at=%s,post_count=%s,matched_count=%s,excluded_count=%s,error=%s WHERE instrument_id=%s",
             (done, checked, len(posts), excluded, error, iid),
         )
-    result=dict(checked=["hackernews"], failures=int(bool(error)))
+    result=dict(checked=["hackernews"], failures=int(bool(error)), retained_skipped=skipped_retained)
     if include_threads:
         result.update(message=error or f'{len(posts)} verified comments matched in this {lookback_days}-day search sample; {checked} original comments checked. This is a limited sample, not all Hacker News discussion.', matched=len(posts))
     return result

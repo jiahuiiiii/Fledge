@@ -48,6 +48,7 @@ def configure(owner, iid, version_id):
 
 
 def active(c, owner, iid, version_id, token, snapshot_id=None):
+    from .watch_lanes import active as claim_active
     idea = one(
         c,
         "SELECT t.status,v.id FROM theses t JOIN thesis_versions v ON v.thesis_id=t.id AND v.owner_id=t.owner_id AND v.revision=t.revision WHERE t.owner_id=%s AND t.instrument_id=%s FOR UPDATE OF t",
@@ -67,9 +68,7 @@ def active(c, owner, iid, version_id, token, snapshot_id=None):
         and str(idea["id"]) == str(version_id)
         and watch["enabled"]
         and str(watch["event_version_id"]) == str(version_id)
-        and watch["claim_token"] == token
-        and watch["lease_until"]
-        and watch["lease_until"] > datetime.now(timezone.utc)
+        and claim_active(c, owner, iid, token, datetime.now(timezone.utc), watch=watch)
     )
     if good and snapshot_id is not None:
         latest = one(

@@ -6,9 +6,9 @@ from zoneinfo import ZoneInfo
 from uuid import uuid4
 from psycopg.types.json import Jsonb
 from thesis.db import transaction, one, rows
-from thesis.research import sentiment, social, market, coverage, reporting_basis
+from thesis.research import sentiment, social, market, coverage, reporting_basis, source_observations
 from thesis.research.sentiment_context import changed_common_context
-from . import watch_history
+from . import watch_history, watch_lanes
 
 logger = logging.getLogger(__name__)
 SGT = ZoneInfo("Asia/Singapore")
@@ -118,6 +118,7 @@ def configure(
             "UPDATE news_watches SET match_idea=%s,include_context=%s,idea_purpose=%s WHERE owner_id=%s AND instrument_id=%s",
             (matched, context, purpose, owner, iid),
         )
+        c.execute("DELETE FROM fast_watch_state WHERE owner_id=%s AND instrument_id=%s", (owner, iid))
     return dict(
         enabled=enabled,
         interval_minutes=interval,
@@ -312,15 +313,7 @@ def publish(owner, iid, analysis_id, *, claim_token=None, now=None):
             "SELECT * FROM news_watches WHERE owner_id=%s AND instrument_id=%s FOR UPDATE",
             (owner, iid),
         )
-        if (
-            not watch
-            or not watch["enabled"]
-            or (claim_token is not None and watch["claim_token"] != claim_token)
-            or (
-                claim_token is not None
-                and (not watch["lease_until"] or watch["lease_until"] <= now)
-            )
-        ):
+        if not watch_lanes.active(c, owner, iid, claim_token, now, watch=watch):
             return 0
         current = one(
             c,
@@ -390,10 +383,14 @@ def publish(owner, iid, analysis_id, *, claim_token=None, now=None):
                     Jsonb(alert),
                 ),
             )
-        c.execute(
-            "UPDATE news_watches SET baseline_id=%s,last_check_at=%s,error=NULL WHERE owner_id=%s AND instrument_id=%s",
-            (current["id"], now, owner, iid),
-        )
+        if claim_token is not None and watch["claim_token"] != claim_token:
+            c.execute("UPDATE news_watches SET baseline_id=%s WHERE owner_id=%s AND instrument_id=%s",
+                      (current["id"], owner, iid))
+        else:
+            c.execute(
+                "UPDATE news_watches SET baseline_id=%s,last_check_at=%s,error=NULL WHERE owner_id=%s AND instrument_id=%s",
+                (current["id"], now, owner, iid),
+            )
         remember(c, owner, iid, current)
         return len(alerts)
 
@@ -490,6 +487,7 @@ def failure_reason(exc):
     return f"an unexpected error ({type(exc).__name__})."
 
 
+@source_observations.scoped
 def run_once(
     owner,
     *,
@@ -500,15 +498,20 @@ def run_once(
     idea_analyzer=None,
     event_analyzer=None,
     context_fetcher=None,
+    lane=None,
 ):
     from thesis.service import Conflict
     from . import watch_context
 
     supplied_clock = now
     now = now or datetime.now(timezone.utc)
+    split_lanes = watch_lanes.enabled()
+    if lane == "fast" and not split_lanes:
+        return False
+    lane = "fast" if lane == "fast" else "slow" if split_lanes else "combined"
     token = uuid4()
     with transaction(owner) as c:
-        watch = one(
+        watch = watch_lanes.claim_fast(c, owner, now, token) if lane == "fast" else one(
             c,
             "SELECT * FROM news_watches WHERE owner_id=%s AND enabled AND next_check_at<=%s AND (lease_until IS NULL OR lease_until<=%s) ORDER BY next_check_at FOR UPDATE SKIP LOCKED LIMIT 1",
             (owner, now, now),
@@ -516,22 +519,20 @@ def run_once(
         if not watch:
             return False
         iid = str(watch["instrument_id"])
-        c.execute(
-            "UPDATE news_watches SET claim_token=%s,lease_until=%s,next_check_at=%s WHERE owner_id=%s AND instrument_id=%s",
-            (
-                token,
-                now + timedelta(minutes=15),
-                now + timedelta(minutes=watch["interval_minutes"]),
-                owner,
-                iid,
-            ),
-        )
-        watch_history.start(c, owner, watch, token, now, now + timedelta(minutes=15))
+        if lane != "fast":
+            c.execute(
+                "UPDATE news_watches SET claim_token=%s,lease_until=%s,next_check_at=%s WHERE owner_id=%s AND instrument_id=%s",
+                (token, now + timedelta(minutes=15),
+                 now + timedelta(minutes=watch["interval_minutes"]), owner, iid),
+            )
+        watch_history.start(c, owner, dict(watch, lane=lane), token, now, now + timedelta(minutes=15))
+    source_observations.CHECK.set(token)
     message = None
     status = "completed"
     stage = "company news"
     analysis_id = idea_check_id = None
     details = {
+        "lane": lane,
         "market": "not_run",
         "social": "not_run",
         "analysis": "not_run",
@@ -541,14 +542,17 @@ def run_once(
     }
     try:
         watch_context.require_active(owner, iid, token, supplied_clock)
-        try:
-            (market_refresh or market.refresh)(iid)
-            details["market"] = "checked"
-        except Conflict:
-            details["market"] = "shared_recent_check"
-        except ValueError:
-            details["market"] = "failed"
-        if market_refresh is None:
+        if lane == "slow":
+            details["market"] = "separate_fast_lane"
+        else:
+            try:
+                (market_refresh or market.refresh)(iid)
+                details["market"] = "checked"
+            except Conflict:
+                details["market"] = "shared_recent_check"
+            except ValueError:
+                details["market"] = "failed"
+        if market_refresh is None and lane != "slow":
             from thesis.research import source_hub
             watch_context.require_active(owner, iid, token, supplied_clock)
             details["publisher_feeds"] = source_hub.refresh_rss(iid)
@@ -559,21 +563,20 @@ def run_once(
                 details["alpha_vantage"] = {"status": "cached"}
         stage = "social sources"
         watch_context.require_active(owner, iid, token, supplied_clock)
-        try:
-            social_result = social_refresh() if social_refresh else social.refresh_company(iid)
-            details["social"] = "checked"
-            if isinstance(social_result,dict) and social_result.get("x"):
-                details["x"] = social_result["x"]
-        except Conflict:
-            details["social"] = "shared_recent_check"
+        if lane != "fast":
+            try:
+                social_result = social_refresh() if social_refresh else social.refresh_company(iid)
+                details["social"] = "checked"
+                if isinstance(social_result,dict) and social_result.get("x"):
+                    details["x"] = social_result["x"]
+            except Conflict:
+                details["social"] = "shared_recent_check"
+        else:
+            details["social"] = "separate_slow_lane"
         with transaction(owner) as c:
-            active = one(
-                c,
-                "SELECT enabled,claim_token,match_idea FROM news_watches WHERE owner_id=%s AND instrument_id=%s",
-                (owner, iid),
-            )
-        if active["enabled"] and active["claim_token"] == token:
-            if watch.get("include_context"):
+            active = watch_lanes.active(c, owner, iid, token, supplied_clock or datetime.now(timezone.utc))
+        if active:
+            if watch.get("include_context") and lane != "fast":
                 stage = "original reply context"
                 watch_context.collect(
                     owner,
@@ -595,17 +598,8 @@ def run_once(
                 details["event_review_id"] = checked_event.get("id")
                 details["event_snapshot_id"] = checked_event.get("applied_snapshot_id")
                 with transaction(owner) as c:
-                    still_active = one(
-                        c,
-                        "SELECT enabled,claim_token,lease_until FROM news_watches WHERE owner_id=%s AND instrument_id=%s",
-                        (owner, iid),
-                    )
-                if (
-                    not still_active["enabled"]
-                    or still_active["claim_token"] != token
-                    or not still_active["lease_until"]
-                    or still_active["lease_until"] <= datetime.now(timezone.utc)
-                ):
+                    still_active = watch_lanes.active(c, owner, iid, token, supplied_clock or datetime.now(timezone.utc))
+                if not still_active:
                     raise WatchStopped()
             stage = "sentiment analysis"
             watch_context.require_active(owner, iid, token, supplied_clock)
@@ -621,7 +615,7 @@ def run_once(
             details["company_alerts"] = publish(
                 owner, iid, record["id"], claim_token=token, now=supplied_clock
             )
-            if active["match_idea"]:
+            if watch["match_idea"]:
                 from thesis.research import idea_alerts
 
                 stage = "saved-reasoning analysis"
@@ -649,25 +643,19 @@ def run_once(
             "Saved research is still available. No automatic paid retry was made."
         )
     with transaction(owner) as c:
-        active = one(
-            c,
-            "SELECT enabled,claim_token FROM news_watches WHERE owner_id=%s AND instrument_id=%s",
-            (owner, iid),
-        )
-        if status == "completed" and (
-            not active["enabled"] or active["claim_token"] != token
-        ):
+        active = watch_lanes.active(c, owner, iid, token, supplied_clock or datetime.now(timezone.utc))
+        if status == "completed" and not active:
             status = "stopped"
         watch_history.finish(
             c, owner, token, status, details, analysis_id, idea_check_id, supplied_clock
         )
         finished = supplied_clock or datetime.now(timezone.utc)
         retry_at = None
-        if status == "failed" and active["enabled"] and active["claim_token"] == token:
+        if status == "failed" and active:
             recent = rows(
                 c,
-                "SELECT r.status FROM watch_check_results r JOIN watch_checks w ON w.id=r.check_id WHERE w.owner_id=%s AND w.instrument_id=%s ORDER BY w.started_at DESC LIMIT %s",
-                (owner, iid, QUICK_RETRIES + 1),
+                "SELECT r.status FROM watch_check_results r JOIN watch_checks w ON w.id=r.check_id WHERE w.owner_id=%s AND w.instrument_id=%s AND w.lane=%s ORDER BY w.started_at DESC LIMIT %s",
+                (owner, iid, lane, QUICK_RETRIES + 1),
             )
             failures = next((n for n, r in enumerate(recent) if r["status"] != "failed"), len(recent))
             if failures <= QUICK_RETRIES:
@@ -677,8 +665,9 @@ def run_once(
                     f"Trying again automatically at {retry_at.astimezone(SGT):%H:%M} SGT "
                     "(saved batches are reused).",
                 )
+        table = "fast_watch_state" if lane == "fast" else "news_watches"
         c.execute(
-            "UPDATE news_watches SET lease_until=NULL,last_check_at=%s,error=%s,next_check_at=LEAST(next_check_at,COALESCE(%s,next_check_at)) WHERE owner_id=%s AND instrument_id=%s AND claim_token=%s",
+            f"UPDATE {table} SET lease_until=NULL,last_check_at=%s,error=%s,next_check_at=LEAST(next_check_at,COALESCE(%s,next_check_at)) WHERE owner_id=%s AND instrument_id=%s AND claim_token=%s",
             (finished, message, retry_at, owner, iid, token),
         )
     return True

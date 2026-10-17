@@ -111,6 +111,16 @@ Decide between the OpenAI path (stay on GPT-5.4 + GPT-5.4 mini) and the Anthropi
 
 ### Phase 3 — faster collection
 
+**17 October 2026: implementation prepared; live acceptance pending (not done).**
+Owner approved additive migrations and continuing the entire plan without
+phase-boundary confirmation. Migrations056/057 add independent fast runtime
+state, lane-labelled history, incremental-source checkpoints and scoped HTTP
+status observations; existing preferences/history are preserved. Features are
+off pending the required live choices. Full offline backend2194pass/93optional
+skips; related438pass (overlapping); frontend199pass,
+build and6isolated browser groups at1440/390/320pass. 0/72live hours; medians and
+provider-denial baseline unverified. [Contract/results](../features/watch-lanes.md).
+
 1. **Fast lane**, every 15 minutes during US market hours (plus 1 hour either side) and hourly otherwise: quote and price, Finnhub, publisher RSS, Alpha Vantage. No Reddit or Hacker News.
 2. **Slow lane**, hourly: Reddit and Hacker News.
    - Re-download a Reddit thread's comments only when the thread is new, or its feed entry's updated time changed.

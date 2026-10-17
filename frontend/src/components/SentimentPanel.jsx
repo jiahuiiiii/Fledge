@@ -13,6 +13,7 @@ import SentimentContext, { RedditThreadContext } from "./SentimentContext";
 import OriginalSample from "./OriginalSample";
 import CurrentSentimentSources from "./CurrentSentimentSources";
 import WatchCheckHistory from "./WatchCheckHistory";
+import { watchFrequencyLabel } from "../lib/watchLanes";
 import SentimentHistory from "./SentimentHistory";
 import SourceFilters, { SourceLabel, sourceScope } from "./SourceFilters";
 import AllSourceSummary, {
@@ -734,7 +735,7 @@ export default function SentimentPanel({
           </label>
           {watch?.enabled && (
             <label>
-              Check every{" "}
+              {watchFrequencyLabel(watch)}{" "}
               <Select
                 aria-label="Watch frequency"
                 disabled={busy}
@@ -745,6 +746,19 @@ export default function SentimentPanel({
                 <option value={240}>4 hours</option>
               </Select>
             </label>
+          )}
+          {watch?.enabled && watch?.lanes_enabled && (
+            <p className="fine">
+              News checks run every 15 minutes from one hour before the US
+              session until one hour after it, and hourly otherwise. Discussions
+              use the frequency above.
+              {watch.fast_check?.last_check_at && (
+                <> Last news check: {stamp(watch.fast_check.last_check_at)}.</>
+              )}
+              {watch.fast_check?.error && (
+                <span className="warning"> {watch.fast_check.error}</span>
+              )}
+            </p>
           )}
           {watch?.enabled && (
             <label className="watch-scope">

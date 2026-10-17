@@ -48,19 +48,20 @@ async def lifespan(app):
     thread = threading.Thread(target=loop, daemon=True)
     thread.start()
 
-    def watch_loop():
+    def watch_loop(lane=None):
         from .monitoring.news_watch import run_once
 
         while not stop.wait(5):
             try:
                 for owner in auth.background_owners():
-                    run_once(owner)
+                    run_once(owner, lane=lane)
             except Exception:
                 logging.getLogger("thesis").exception("Local research watch failed")
 
     # Two workers: different companies' scheduled checks no longer queue behind
     # each other. Each claims a different watch through its lease.
     watch_threads = [threading.Thread(target=watch_loop, daemon=True) for _ in range(2)]
+    watch_threads += [threading.Thread(target=watch_loop, args=("fast",), daemon=True) for _ in range(2)]
     for watch_thread in watch_threads:
         watch_thread.start()
 

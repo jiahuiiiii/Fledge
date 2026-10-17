@@ -2,6 +2,7 @@ import LoadingSkeleton from "./LoadingSkeleton";
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { stamp } from "./MarketResearch";
+import { watchLaneLabel, separateWatchSteps } from "../lib/watchLanes";
 const names = {
   completed: "Check completed",
   failed: "Check failed",
@@ -10,6 +11,7 @@ const names = {
   unfinished: "Completion missing",
 };
 const steps = {
+  ...separateWatchSteps,
   checked: "Checked",
   shared_recent_check: "Used recent shared coverage",
   completed: "Completed",
@@ -89,7 +91,10 @@ export default function WatchCheckHistory({ instrumentId, lastCheck }) {
           aria-label="Scheduled watch check"
         >
           <div className="row">
-            <strong>{names[c.status]}</strong>
+            <strong>
+              {watchLaneLabel(c.lane) ? `${watchLaneLabel(c.lane)} · ` : ""}
+              {names[c.status]}
+            </strong>
             <small>{stamp(c.started_at)}</small>
           </div>
           <p>{c.reason}</p>
