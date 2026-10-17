@@ -38,6 +38,8 @@ def render(record):
     kind = record["kind"]
     if d.get("withheld"):
         raise ValueError("Source access changed; do not forward this alert.")
+    if d.get('preview'):
+        raise ValueError('Preview alerts must never be sent.')
     symbol = plain(d.get("symbol"), 18)
     label = {"company": "Company update", "idea": "Saved idea", "condition": "Monitored condition", "move": "Price move"}[kind]
     parts = [f"<b>{escape(symbol)} · {label}</b>", f"<b>{escape(plain(record['title'], 180))}</b>"]

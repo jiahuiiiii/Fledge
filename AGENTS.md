@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Importance and routing previews — 17 October 2026 (prepared)
+
+New062prepares append-only private severity/channel proposals and explicit company importance previews. Neutral/favourable news can qualify independently of tone; unchanged backfills/seen stories/initial baselines stay quiet. Own-source importance evidence, code-owned low categories, private idea matches and source withholding guard classification. All new importance publications are previews, rejected at Telegram selection/dispatch/render; ordinary delivery remains unchanged for comparison. Same-source old/new company publications propose only1immediate delivery, with a covering-preview reference. Background preview errors cannot block delivery. Route/evidence/rating stay together in Updates; one preview notice, no repeated exact quotes.
+
+Related263offline pass/2optional skips; final dedup/delivery/review99pass (overlap),202frontend/build/scopedformat and10isolated browser groups1440/390/320pass,0HTTPcalls, screenshots inspected. Retain initial repeated-notice browser failure. Both routing preview/start settings remain off/unset;061/062not applied live, no environment/install/restart/saved-research/preference change, US$0. Daily digest/cost alerts, live routing approval, one-week replay and quality/live gates remain outstanding. [Contract](docs/features/sentiment-tasks-and-alert-ratings.md).
+
 ## Smaller sentiment tasks and private alert ratings — 17 October 2026 (prepared)
 
 Phase5now connects separate tone, news-importance and candidate-only duplicate tasks through an opt-in runner. Unchanged old tones retain original prompt/model/calls; importance backfill can still cost once. Ledger reuse, source/context bounds, explicit single retry/terminal split and no automatic paid retry remain. Negative comparisons cache exact pairs; both old tone and new event repair reasons remain inspectable. Final related164offline tests pass; no new-prompt paid evaluation or owner labels (0/50).

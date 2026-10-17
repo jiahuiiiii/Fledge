@@ -8,6 +8,7 @@ import IdeaAlertChecks from "./IdeaAlertChecks";
 import { ResearchAlerts } from "./SentimentPanel";
 import MoveAlertCard from "./MoveAlertCard";
 import AlertRating from "./AlertRating";
+import AlertRoutingPreview from "./AlertRoutingPreview";
 import { ConditionChange } from "./IdeasAndChanges";
 import { inboxSummary, recordKey } from "../lib/inbox";
 import "./UpdateInbox.css";
@@ -283,6 +284,7 @@ export default function UpdateInbox({
                   >
                     <div className="inbox-kind">{kindName[record.kind]}</div>
                     <ConditionChange change={d} onOpen={onOpen} />
+                    <AlertRoutingPreview record={record} />
                     <AlertRating record={record} />
                   </article>
                 );
@@ -303,6 +305,9 @@ export default function UpdateInbox({
                     </div>
                     <h3>{summary.title}</h3>
                     <p className="inbox-preview">{summary.text}</p>
+                    {record.kind === "company" && d.preview && (
+                      <p className="fine">Preview · not sent to Telegram</p>
+                    )}
                     {summary.source && (
                       <p className="inbox-source-caption">
                         {summary.source}
@@ -386,6 +391,7 @@ export default function UpdateInbox({
                         }
                       />
                     )}
+                    <AlertRoutingPreview record={record} />
                     <AlertRating record={record} />
                   </div>
                 </details>

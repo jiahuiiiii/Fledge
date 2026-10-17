@@ -203,6 +203,7 @@ def run_once(owner):
                 moves_enabled = str(option('THESIS_MOVE_TELEGRAM_ENABLED') or 'false').lower() in {'true','1','on'}
                 candidates = rows(conn, review_digest.EVENTS + """SELECT e.* FROM events e WHERE created_at>%(start)s AND created_at>%(fresh)s
                   AND (e.kind<>'move' OR (%(moves_enabled)s AND EXISTS(SELECT 1 FROM move_events m WHERE m.owner_id=e.owner_id AND m.id=e.id AND NOT m.preview)))
+                  AND (e.kind<>'company' OR EXISTS(SELECT 1 FROM research_alerts a WHERE a.owner_id=e.owner_id AND a.id=e.id AND NOT a.preview))
                   AND NOT EXISTS(SELECT 1 FROM telegram_deliveries d WHERE d.owner_id=e.owner_id AND d.kind=e.kind AND d.event_id=e.id)
                   ORDER BY created_at,id LIMIT 100""", dict(owner=owner, start=cfg["enabled_at"], fresh=now-timedelta(hours=24), moves_enabled=moves_enabled))
                 for item in candidates:
@@ -226,6 +227,8 @@ def run_once(owner):
                         why = "The saved idea changed or the original alert is unavailable."
                     elif record["detail"].get("withheld"):
                         why = "Source access changed; alert details were not forwarded."
+                    elif record['detail'].get('preview'):
+                        why = 'Preview alerts are kept in Updates and are never forwarded.'
                     else:
                         message = render(record)
                 except (ValueError, KeyError, TypeError, IndexError):

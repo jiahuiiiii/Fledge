@@ -106,10 +106,12 @@ async def lifespan(app):
     def telegram_loop():
         from .monitoring.telegram import run_once
         from .monitoring.telegram_updates import poll_feedback
+        from .monitoring.alert_routing import poll_preview as preview_routes
 
         while not stop.wait(5):
             try:
                 for owner in auth.background_owners():
+                    preview_routes(owner)
                     run_once(owner)
                 poll_feedback()
             except Exception:

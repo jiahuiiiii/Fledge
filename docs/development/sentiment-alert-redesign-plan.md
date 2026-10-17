@@ -208,6 +208,16 @@ evaluation, owner labels, saved-research change or restart. Severity routing,
 daily digest/cost alerts, the one-week replay and all quality/live gates remain
 outstanding. [Contract](../features/sentiment-tasks-and-alert-ratings.md).
 
+Routing follow-up:062prepares immutable private route proposals and company
+importance previews, including neutral/favourable news. Seen-story/backfill guards
+stay quiet; saved-idea preferences remain. All importance publications are
+previews and cannot enter/send from Telegram; ordinary delivery stays unchanged
+for shadow comparison. Related263pass/2optional skips, final dedup/delivery99pass,
+202frontend/build and10
+isolated inbox/browser groups pass. Route capture defaults off and needs an
+explicit start;061/062remain unapplied live. Daily digest/cost alerts, actual
+approved routing, one-week replay and owner-quality/live gates remain pending.
+
 1. **Split the prompt into smaller tasks:**
    1. relevance (the existing quick check);
    2. tone and evidence basis;

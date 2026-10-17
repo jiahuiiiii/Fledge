@@ -1087,6 +1087,24 @@ function AlertEvidence({ item, sources, onSource, comparison }) {
         {source?.source}
       </p>
       <SentimentBasis item={item} />
+      {item.importance && (
+        <div className="importance-evidence">
+          <p className="fine">
+            Importance assessment: {item.importance.level} ·{" "}
+            {item.importance.category?.replaceAll("_", " ")}. An interpretation
+            of the source, separate from tone.
+          </p>
+          {(item.importance.citations || [])
+            .filter(
+              (c) =>
+                c.source_id === item.source_id &&
+                !(item.citations || []).some((old) => old.quote === c.quote),
+            )
+            .map((c, i) => (
+              <blockquote key={i}>{c.quote}</blockquote>
+            ))}
+        </div>
+      )}
       <SentimentContext value={item.conversation} />
       <RedditThreadContext value={item.thread_context} />
       {comparison && (
@@ -1191,6 +1209,9 @@ export function ResearchAlerts({
             </p>
           ) : (
             <>
+              {a.preview && !embedded && (
+                <p className="fine">Preview · not sent to Telegram</p>
+              )}
               <h3>{a.payload.title}</h3>
               <p>{a.payload.reason}</p>
               <SentimentLimits

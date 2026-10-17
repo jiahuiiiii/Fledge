@@ -73,5 +73,6 @@ Updates places the same Useful / Not useful choices beside existing evidence.
 
 Neither switch is enabled. There has been no new-prompt paid evaluation, live
 migration, saved-research change or restart. Owner annotations remain0/50, so
-neither semantic quality nor phase5acceptance is verified. Routing, daily digest,
-cost alerts and the one-week replay remain to implement.
+neither semantic quality nor phase5acceptance is verified. Subsequent preview
+routing is recorded in the linked contract; live routing, daily digest, cost
+alerts and the one-week replay remain to implement.

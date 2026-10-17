@@ -24,6 +24,7 @@ import ${JSON.stringify(path.join(frontend,"src/styles/app.css"))};
 import ${JSON.stringify(path.join(frontend,"src/styles/mobile.css"))};
 window.actions=[];
 let reviewed=null;
+let companyMode=false;
 const members=['NVDA','AVGO','AMZN','GOOGL'].map((symbol,i)=>({symbol,instrument_id:symbol,
  price:i<2?'96.8':'98.3',previous_close:'100',change_percent:i<2?'-3.2':'-1.7',quoted_at:'2026-10-14T20:00:00Z',
  context_only:i>1,triggered:i<2,thresholds:{session:'3',relative:'2',two_sessions:'5'},reasons:i<2?['session_move']:[],
@@ -35,13 +36,24 @@ const detail={id:'authored-move',preview:true,withheld:false,event_type:'market'
  citations:[{source_id:'a1',quote:'Investors rotate out of AI <script>alert(1)</script>'}]}]},
  sources:[{id:'a1',title:'Authored market headline <img src=x>',publisher:'Authored Wire',published_at:'2026-10-14T19:00:00Z',url:'https://example.test/market'}],
  limitation:'Bounded saved excerpts; not complete coverage.'};
+const companyDetail={id:'authored-company',instrument_id:'NVDA',symbol:'NVDA',preview:true,withheld:false,
+ created_at:'2026-10-14T20:00:00Z',previous_items:[],previous_sources:[],
+ payload:{title:'New company developments to review',reason:'A newly analysed company development has cited importance evidence.',
+ previous_cutoff:'2026-10-13T20:00:00Z',items:[{id:'item_1',source_id:'n1',sentiment:'neutral',statement:'reported_development',
+ evidence_policy:'authored-current-policy',explanation:'The source describes a company announcement.',
+ citations:[{source_id:'n1',quote:'Nvidia announced a new supply agreement.'}],
+ importance:{level:'high',category:'deal',citations:[{source_id:'n1',quote:'Nvidia announced a new supply agreement.'}]}}]},
+ sources:[{id:'n1',title:'Nvidia announces a new supply agreement',body:'Nvidia announced a new supply agreement.',
+ source:'Authored Wire',kind:'news',published_at:'2026-10-14T19:00:00Z',url:'https://example.test/deal'}]};
 api.priceReferences=async(id)=>{window.actions.push({kind:'read-sector',id});return {sector:{symbol:'SOXX',origin:'classification'},choices:[{symbol:'SOXX',name:'Semiconductor fund'}]};};
 api.setPriceReference=async(id,symbol)=>{window.actions.push({kind:'save-sector',id,symbol});return {symbol,origin:'owner'};};
 api.reviewMoveAlert=async(id,action)=>{window.actions.push({kind:'review-move',id,action});reviewed=action;};
 api.reviewAlert=async()=>{throw new Error('Move routed to company review');};
 api.rateAlert=async(kind,id,value)=>{window.actions.push({kind:'rate',alertKind:kind,id,value});return {value};};
 api.researchReview=async(filters)=>({instrument_id:filters.instrument_id||null,review:filters.review,page:filters.page,
- page_size:20,total:1,cutoff:'2026-10-15T00:00:00Z',records:[{kind:'move',id:detail.id,title:detail.title,feedback_enabled:true,
+ page_size:20,total:1,cutoff:'2026-10-15T00:00:00Z',records:companyMode ? [{kind:'company',id:companyDetail.id,
+ title:companyDetail.payload.title,created_at:companyDetail.created_at,detail:companyDetail,feedback_enabled:true,
+ routing:{preview:true,channel:'telegram',reason:'At least one cited company development has high importance.'}}] : [{kind:'move',id:detail.id,title:detail.title,feedback_enabled:true,
  created_at:'2026-10-14T20:00:00Z',review_action:reviewed,detail:{...detail,review_action:reviewed}}],
  companies:members.map(m=>({id:m.instrument_id,symbol:m.symbol,name:'Authored company',mode:'sec',
  coverage:{concerns:[],watch:{enabled:true},social_feeds:[]}})),totals:{pending_count:reviewed?0:1}});
@@ -58,6 +70,7 @@ function Wrapper({options}){
 }
 const root=createRoot(document.getElementById('root'));let serial=0;
 window.showFixture=(options={})=>{
+ companyMode=!!options.company;
  if(options.clean){
   detail.explanation.sentences[0].citations[0].quote='Investors rotate out of AI on spending worries.';
   detail.sources[0].title='Investors weigh AI spending as technology shares fall';
@@ -134,7 +147,25 @@ try{
   await record.getByRole('region',{name:'Rate this alert'}).scrollIntoViewIfNeeded();
   await page.screenshot({path:path.join(out,'inbox-'+width+'.png'),animations:'disabled'});
  }
+ await page.evaluate(()=>window.showFixture({inbox:true,company:true}));
+ const company=page.locator('[data-kind="company"]');
+ await company.getByText('Preview · not sent to Telegram',{exact:true}).waitFor();
+ await company.locator(':scope > summary').click();
+ await company.getByText(/Importance assessment: high · deal/).waitFor();
+ await company.getByLabel('Delivery preview').getByText(/Routing preview · Telegram immediately/).waitFor();
+ assert.equal(await company.locator('blockquote').count(),1);
+ assert.equal(await company.locator('blockquote').innerText(),'Nvidia announced a new supply agreement.');
+ await company.getByRole('button',{name:'Useful',exact:true}).click();
+ await company.getByText('Rating saved.',{exact:true}).waitFor();
+ for(const width of [1440,390,320]){
+  await page.setViewportSize({width,height:1100});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await company.getByRole('region',{name:'Rate this alert'}).scrollIntoViewIfNeeded();
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await company.getByRole('region',{name:'Rate this alert'}).screenshot({path:path.join(out,'company-rating-'+width+'.png'),animations:'disabled'});
+  await page.screenshot({path:path.join(out,'company-routing-'+width+'.png'),animations:'disabled'});
+ }
  assert.deepEqual(errors,[]);assert.deepEqual(requests,[]);
- console.log(JSON.stringify({passed:9,viewports:[1440,390,320],network_requests:0,output:out}));
+ console.log(JSON.stringify({passed:10,viewports:[1440,390,320],network_requests:0,output:out}));
 }catch(error){console.error(JSON.stringify({errors,output:out,body:(await page.locator('body').innerText()).slice(0,2200)}));throw error;}
 finally{await browser.close();}

@@ -357,12 +357,15 @@ def publish(owner, iid, analysis_id, *, claim_token=None, now=None):
             if previous and not watch["match_idea"]
             else []
         )
+        from . import alert_routing
+        proposals=(alert_routing.important_reporting(previous,current,seen)
+                   if alert_routing.enabled() and not watch['match_idea'] else [])
         idea = one(
             c,
             "SELECT v.id,v.question,v.reasoning,v.revision FROM thesis_versions v JOIN theses t ON t.id=v.thesis_id AND t.owner_id=v.owner_id AND t.revision=v.revision WHERE t.owner_id=%s AND t.instrument_id=%s AND t.status<>'archived'",
             (owner, iid),
         )
-        for alert in alerts:
+        for alert in alerts+proposals:
             alert.update(
                 cutoff=current["packet"]["cutoff"],
                 previous_cutoff=previous["packet"]["cutoff"],
@@ -371,7 +374,8 @@ def publish(owner, iid, analysis_id, *, claim_token=None, now=None):
             if idea:
                 alert["saved_idea"]["id"] = str(idea["id"])
             c.execute(
-                "INSERT INTO research_alerts VALUES(%s,%s,%s,%s,%s,%s,%s,%s,now()) ON CONFLICT(owner_id,instrument_id,current_id,kind) DO NOTHING",
+                "INSERT INTO research_alerts(id,owner_id,instrument_id,kind,current_id,previous_id,version_id,payload,created_at,preview) "
+                "VALUES(%s,%s,%s,%s,%s,%s,%s,%s,now(),%s) ON CONFLICT(owner_id,instrument_id,current_id,kind) DO NOTHING",
                 (
                     uuid4(),
                     owner,
@@ -381,6 +385,7 @@ def publish(owner, iid, analysis_id, *, claim_token=None, now=None):
                     previous["id"],
                     idea["id"] if idea else None,
                     Jsonb(alert),
+                    alert['kind']=='important_reporting',
                 ),
             )
         if claim_token is not None and watch["claim_token"] != claim_token:
@@ -392,7 +397,7 @@ def publish(owner, iid, analysis_id, *, claim_token=None, now=None):
                 (current["id"], now, owner, iid),
             )
         remember(c, owner, iid, current)
-        return len(alerts)
+        return len(alerts)+len(proposals)
 
 
 def list_alerts(conn, owner, ids=None):
@@ -421,6 +426,7 @@ def list_alerts(conn, owner, ids=None):
                 created_at=a["created_at"].isoformat(),
                 review_action=a["review_action"],
                 withheld=withheld,
+                preview=a.get('preview',False),
                 payload={} if withheld else a["payload"],
                 sources=[] if withheld else visible["sources"],
                 source_limits=(
