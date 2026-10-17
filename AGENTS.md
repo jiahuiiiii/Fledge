@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Offline drawdown comparison — 17 October 2026
+
+Owner proposed recent-high/low episodes with volatility scaling. New file-only replay plus database-enforced read-only capture compares8saved histories:189–192common scored sessions after60prior-return warm-up,0gaps. Fixed7adds11NVDA candidate days beyond3/5; scaled4×floor2adds9. NVDA's14October close is7.49875%below6October's high; both enter then, neither follows up15October. AMZN/GOOGL remain context-only. QQQ has only5saved probe closes; full-year2-point-gap comparison remains unverified, no fetch to fill it.
+
+107offline experiment/related tests pass. Independent up/down state fixes the prototype's rally masking a pullback; anchors/entry thresholds freeze,5-point steps and half-recovery re-arm are explicit.10-session entry still misses0.4%daily drift over30days (>11%loss). Typical moves1.16%AAPL/4.17%MU; retaining fixed3/5alongside adaptive episodes cannot reduce baseline volume. No best threshold/false-positive claim; independent usefulness review and forward preview remain. US$0,0AI/provider calls, no schema/configuration/account/source change or app/DB restart; user CSS untouched. Candidates remain offline and need owner approval before live changes. [Comparison and limits](docs/testing/drawdown-rule-comparison.md).
+
 ## Importance and routing previews — 17 October 2026 (prepared)
 
 New062prepares append-only private severity/channel proposals and explicit company importance previews. Neutral/favourable news can qualify independently of tone; unchanged backfills/seen stories/initial baselines stay quiet. Own-source importance evidence, code-owned low categories, private idea matches and source withholding guard classification. All new importance publications are previews, rejected at Telegram selection/dispatch/render; ordinary delivery remains unchanged for comparison. Same-source old/new company publications propose only1immediate delivery, with a covering-preview reference. Background preview errors cannot block delivery. Route/evidence/rating stay together in Updates; one preview notice, no repeated exact quotes.

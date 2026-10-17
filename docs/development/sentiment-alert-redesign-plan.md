@@ -173,6 +173,17 @@ saved-record edits or migration. Prepared for next installation, not yet live.
 A2.5%daily slide can evade all current thresholds despite losing7.31%over3days;
 track this limit in preview instead of lowering thresholds to fit one example.
 
+Owner follow-up17October: evaluate recent-high/low drawdown episodes and volatility
+scaling on saved history before choosing new thresholds. Offline8-company replay
+now compares fixed7and4×prior60-return candidates over189–192scored sessions,
+with explicit reset/follow-up rules and independent up/down episodes.107related
+offline tests pass; NVDA enters14October at7.49875%below its recent high, no new
+step15October. QQQ has only5probe closes, so the full-year3/2/5comparison is
+incomplete. No live defaults changed, no AI/provider call or restart. The10-session
+entry still misses sufficiently slow drift; counts do not establish usefulness.
+[Results and limitations](../testing/drawdown-rule-comparison.md). This adds
+candidate evidence, not approval to alter thresholds or phase4acceptance.
+
 1. **Move detector (code only).** For each watched stock, compare today's change with the Nasdaq-100 (QQQ), the S&P 500 (SPY) and a sector fund (SOXX for semiconductors, otherwise the closest sector fund). Trigger on:
    - a move of ±3% or more in a session;
    - a gap of 2 points or more against the index;
