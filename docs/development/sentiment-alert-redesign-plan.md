@@ -111,6 +111,13 @@ Decide between the OpenAI path (stay on GPT-5.4 + GPT-5.4 mini) and the Anthropi
 
 ### Phase 3 — faster collection
 
+**Installation follow-up, 17 October 2026:** approved056/057 applied (schema57)
+and matching tested frontend installed after a full archive backup; saved data
+and preferences were exact across preparation. Owner started the stopped app
+in Terminal. HTTP200/two combined checks verified12:38:12SGT, the conservative
+phase1/2 observation start. Lanes/metrics remain off, so phase3's live measurement
+has not started. No new Telegram delivery or environment change.
+
 **17 October 2026: implementation prepared; live acceptance pending (not done).**
 Owner approved additive migrations and continuing the entire plan without
 phase-boundary confirmation. Migrations056/057 add independent fast runtime

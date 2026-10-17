@@ -1,7 +1,8 @@
 # Independent news and discussion checks
 
 Prepared 17 October 2026 for the sentiment/alert redesign. Additive migrations
-056/057 were approved by the owner; they have only run in disposable tests.
+056/057 were approved by the owner; their offline verification preceded the
+live installation recorded below.
 No existing account preference, reading or applied migration was edited.
 
 `THESIS_SENTIMENT_LANES=true` enables two independent news workers alongside
@@ -98,3 +99,21 @@ Evidence: `.local/live-tests/redesign-phase-3-20261017/`. The separately request
 full-plan continuation is authorised; phase4 work can proceed while live gates
 remain explicitly pending. The earlier GPT AVGO lookup found0/15 exact saved
 matches and made no paid call; the missing paid replay still needs approval.
+
+## Installation follow-up — 17 October 2026
+
+The app was already stopped when checked: no listener/process, zero active jobs,
+four overdue watches and zero newly due within90seconds. The approved056/057
+were applied after a full256,951,392-byte archive backup whose catalogue was
+verified (no restore rehearsal). Schema is57. The tested30-file frontend was
+installed atomically, retaining older assets and preserving the user's CSS.
+Ten saved research/preference/ledger table fingerprints were exact across this
+preparation; `.env` was unchanged. These checks precede normal resumed activity.
+
+The owner started Fledge from Terminal. HTTP200 and two running combined checks
+were verified at12:38:12SGT (04:38:12UTC). Use that conservative verification
+time for the phase1/2 observation start. No app or database process was operated
+by the implementation tools. New lanes and passive source metrics remain off;
+their baseline/three-day acceptance has not started. No new alert delivery was
+enabled. Backup `.local/backups/redesign-core-20261017T043032Z/`; preparation and
+startup evidence `.local/live-tests/redesign-core-install-20261017/`.
