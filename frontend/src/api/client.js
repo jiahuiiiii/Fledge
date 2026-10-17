@@ -262,6 +262,14 @@ export const api = {
       method: "POST",
       body: { action },
     }),
+  reviewMoveAlert: (id, action) =>
+    request(`/move-alerts/${id}/review`, { method: "POST", body: { action } }),
+  priceReferences: (id) => request(`/companies/${id}/price-references`),
+  setPriceReference: (id, symbol) =>
+    request(`/companies/${id}/price-references`, {
+      method: "POST",
+      body: { symbol },
+    }),
   suggest: (body) => request("/proposals/generate", { method: "POST", body }),
   approveSuggestions: (proposal_ids, definition) =>
     request("/proposals/approve", {

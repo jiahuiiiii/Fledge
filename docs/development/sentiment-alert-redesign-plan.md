@@ -89,7 +89,7 @@ or app restart. See [phase 1 verification](../testing/sentiment-reliability.md).
 
 **Owner decision, 17 October 2026:** use GPT: retain GPT-5.4 for bulk readings and GPT-5.4 mini for the quick relevance check. Haiku is excluded from the selected rollout; its benchmark failure is not a release blocker. Other unselected models remain comparison evidence, not required rollout gates. No provider switch or environment change is needed. This records the phase 2 model choice without starting the next implementation phase or choosing the phase 4 explainer.
 
-**Done when (selected GPT path):** replaying the 16 META and 15 AVGO batches passes 16/16 and 15/15 for GPT-5.4 with at most 5% of items repaired, and 3 days live on GPT-5.4 show at least 97% of checks completing. META passes; GPT-5.4 AVGO responses and the three-day observation remain unverified. The earlier all-model gate is superseded by the owner's GPT selection; retain all comparison results.
+**Done when (selected GPT path):** replaying the 16 META and 15 AVGO batches passes 16/16 and 15/15 for GPT-5.4 with at most 5% of items repaired, and 3 days live on GPT-5.4 show at least 97% of checks completing. META passes16/16; the separately approved17October GPT-5.4 AVGO run passes15/15,64items,0repairs for US$0.5073675. The three-day observation remains pending (start12:38:12SGT17October). The earlier all-model gate is superseded by the owner's GPT selection; retain all comparison results.
 
 ### Phase 2 — choose the bulk and quick-check models
 
@@ -118,6 +118,10 @@ in Terminal. HTTP200/two combined checks verified12:38:12SGT, the conservative
 phase1/2 observation start. Lanes/metrics remain off, so phase3's live measurement
 has not started. No new Telegram delivery or environment change.
 
+At12:55:59SGT, backed up `.env` and enabled only the dynamically read passive
+source-status counter. The24-hour denial baseline starts then. No restart,
+model/schedule/account preference change; lanes and new alerts remain off.
+
 **17 October 2026: implementation prepared; live acceptance pending (not done).**
 Owner approved additive migrations and continuing the entire plan without
 phase-boundary confirmation. Migrations056/057 add independent fast runtime
@@ -137,6 +141,25 @@ provider-denial baseline unverified. [Contract/results](../features/watch-lanes.
 **Done when:** fast-lane checks have a median of 60 s or less and slow-lane checks 180 s or less over 3 days, with no increase in provider denials.
 
 ### Phase 4 — price-move trigger and "why is it moving" (from option b)
+
+**17 October 2026: implementation prepared; acceptance pending (not done).**
+Migrations058–060 are tested only in disposable databases; live schema57.
+Price-only references, Decimal3/2/5rules, grouping, immutable private previews,
+a separately disabled explainer role and cited evidence together in the existing
+Updates/review design are prepared. No new Telegram delivery. Full offline suite
+2308pass/93optional skips; final citation/worker regressions125pass, trial-runner
+regressions101pass (overlapping); frontend202pass/build and8isolated browser
+groups1440/390/320pass. User CSS preserved. [Contract and limits](../features/price-move-alerts.md).
+
+The retrospective produces3events across4sessions; the14October market group
+includes NVDA/AMZN/GOOGL (AMZN/GOOGL context-only). No15October trigger: NVDA's
+two-session fall is4.94049%, below5%. Thresholds are unchanged; the literal
+14–15October acceptance wording remains unresolved with the owner. All10paid explainer answers now pass citation checks: five saved answers
+revalidated for free after a repeated-source validator fix, then five previously
+unattempted cases in a separately approved continuation. Phase4 tests cost
+US$0.116235 with0unresolved holds; no automatic paid retry. These checks do not
+establish semantic accuracy. Live model/threshold/cadence/shadow choices remain
+unapproved; phase4 is not installed or marked done.
 
 1. **Move detector (code only).** For each watched stock, compare today's change with the Nasdaq-100 (QQQ), the S&P 500 (SPY) and a sector fund (SOXX for semiconductors, otherwise the closest sector fund). Trigger on:
    - a move of ±3% or more in a session;

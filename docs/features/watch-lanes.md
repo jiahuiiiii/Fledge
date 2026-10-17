@@ -117,3 +117,9 @@ by the implementation tools. New lanes and passive source metrics remain off;
 their baseline/three-day acceptance has not started. No new alert delivery was
 enabled. Backup `.local/backups/redesign-core-20261017T043032Z/`; preparation and
 startup evidence `.local/live-tests/redesign-core-install-20261017/`.
+
+At12:55:59SGT, only `THESIS_SOURCE_METRICS=true` was enabled after a fresh
+`.env` backup (`.local/backups/redesign-metrics-20261017T045559Z/env.before`).
+This flag is read dynamically, so no restart was needed. The selected models
+and all schedules/account preferences remained exact. This begins the24-hour
+passive denial baseline; lanes, moves and new delivery remain off.

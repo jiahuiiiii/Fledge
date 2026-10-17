@@ -65,6 +65,18 @@ async def lifespan(app):
     for watch_thread in watch_threads:
         watch_thread.start()
 
+    def move_loop():
+        from .monitoring.move_watch import run_once
+        while not stop.wait(5):
+            try:
+                for owner in auth.background_owners():
+                    run_once(owner)
+            except Exception:
+                logging.getLogger("thesis").warning("Price preview check failed")
+
+    move_thread = threading.Thread(target=move_loop, daemon=True)
+    move_thread.start()
+
     def filing_loop():
         from .monitoring.filing_watch import run_once
 
@@ -152,6 +164,7 @@ async def lifespan(app):
     thread.join(timeout=5)
     for watch_thread in watch_threads:
         watch_thread.join(timeout=5)
+    move_thread.join(timeout=5)
     filing_thread.join(timeout=5)
     review_thread.join(timeout=5)
     telegram_thread.join(timeout=5)
@@ -914,6 +927,31 @@ def review_research_alert(alert_id: UUID, payload: ReviewAction):
     from .monitoring.news_watch import review
 
     return {"result": review(auth.current_owner(), str(alert_id), payload.action)}
+
+
+@app.post("/api/v1/move-alerts/{alert_id}/review")
+def review_move_alert(alert_id: UUID, payload: ReviewAction):
+    from .monitoring.move_alerts import review
+    return {"result": review(auth.current_owner(), str(alert_id), payload.action)}
+
+
+class SectorReferenceSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    symbol: str | None
+
+
+@app.get("/api/v1/companies/{instrument_id}/price-references")
+def price_references(instrument_id: UUID):
+    from .db import transaction
+    from .research.reference_prices import present
+    with transaction(auth.current_owner(), consistent=True) as conn:
+        return {"result": present(conn, auth.current_owner(), str(instrument_id))}
+
+
+@app.post("/api/v1/companies/{instrument_id}/price-references")
+def change_price_reference(instrument_id: UUID, payload: SectorReferenceSettings):
+    from .research.reference_prices import set_sector
+    return {"result": set_sector(auth.current_owner(), str(instrument_id), payload.symbol)}
 
 
 class EventWatchSettings(BaseModel):

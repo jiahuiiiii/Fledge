@@ -1,0 +1,162 @@
+.move-alert-card {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-4);
+  overflow-wrap: anywhere;
+}
+.move-alert-card p {
+  margin: 0;
+}
+.move-evidence-header {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.move-comparison {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.move-comparison caption {
+  text-align: left;
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  padding-bottom: var(--space-3);
+}
+.move-comparison caption span {
+  display: block;
+  margin-top: var(--space-1);
+}
+.move-comparison th,
+.move-comparison td {
+  padding: var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--color-line);
+  text-align: right;
+}
+.move-comparison th:first-child {
+  padding-left: 0;
+  text-align: left;
+}
+.move-comparison thead th {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  font-weight: 500;
+}
+.move-comparison tbody th {
+  font-weight: 500;
+}
+.move-comparison .text-button {
+  padding: 0;
+  min-height: 32px;
+}
+.move-context-label {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  font-weight: 400;
+}
+.move-explanation {
+  display: grid;
+  gap: var(--space-3);
+}
+.move-explanation h4 {
+  margin: 0;
+  font-size: var(--text-base);
+}
+.move-evidence-point {
+  display: grid;
+  gap: var(--space-3);
+}
+.move-evidence-point figure {
+  margin: 0;
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--color-line-strong);
+}
+.move-evidence-point blockquote {
+  margin: 0 0 var(--space-2);
+  white-space: pre-wrap;
+  color: var(--color-text-2);
+}
+.move-evidence-point figcaption {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+.move-evidence-point figcaption span {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+.move-price-details,
+.move-comparison-settings {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.move-price-details > summary,
+.move-comparison-settings > summary {
+  min-height: 44px;
+  font-size: var(--text-sm);
+  display: flex;
+  align-items: center;
+}
+.move-price-register {
+  display: grid;
+  gap: var(--space-4);
+  padding-top: var(--space-3);
+}
+.move-price-register section + section {
+  border-top: 1px solid var(--color-line);
+  padding-top: var(--space-3);
+}
+.move-price-register h4 {
+  margin: 0 0 var(--space-3);
+}
+.move-price-register dl {
+  margin: 0;
+  display: grid;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+.move-price-register dl > div {
+  display: grid;
+  grid-template-columns: minmax(7rem, 1fr) minmax(0, 2fr);
+  gap: var(--space-3);
+}
+.move-price-register dt {
+  color: var(--color-muted);
+}
+.move-price-register dd {
+  margin: 0;
+}
+.move-sector-choice,
+.move-comparison-settings label {
+  margin-top: var(--space-3);
+}
+.move-comparison-settings label,
+.move-sector-choice label {
+  display: grid;
+  gap: var(--space-2);
+  max-width: 28rem;
+}
+.move-review-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line);
+}
+@media (max-width: 450px) {
+  .move-comparison th,
+  .move-comparison td {
+    padding: var(--space-2) var(--space-1);
+    font-size: var(--text-sm);
+  }
+  .move-price-register dl > div {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+  .move-explanation {
+    padding: var(--space-4);
+  }
+}

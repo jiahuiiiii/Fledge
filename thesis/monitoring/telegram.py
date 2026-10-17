@@ -194,9 +194,12 @@ def run_once(owner):
             if not cfg.get("chat_id") or not key or cfg.get("bot_fingerprint") != fingerprint(key):
                 return False
             if cfg.get("enabled"):
+                from .move_watch import option
+                moves_enabled = str(option('THESIS_MOVE_TELEGRAM_ENABLED') or 'false').lower() in {'true','1','on'}
                 candidates = rows(conn, review_digest.EVENTS + """SELECT e.* FROM events e WHERE created_at>%(start)s AND created_at>%(fresh)s
+                  AND (e.kind<>'move' OR (%(moves_enabled)s AND EXISTS(SELECT 1 FROM move_events m WHERE m.owner_id=e.owner_id AND m.id=e.id AND NOT m.preview)))
                   AND NOT EXISTS(SELECT 1 FROM telegram_deliveries d WHERE d.owner_id=e.owner_id AND d.kind=e.kind AND d.event_id=e.id)
-                  ORDER BY created_at,id LIMIT 100""", dict(owner=owner, start=cfg["enabled_at"], fresh=now-timedelta(hours=24)))
+                  ORDER BY created_at,id LIMIT 100""", dict(owner=owner, start=cfg["enabled_at"], fresh=now-timedelta(hours=24), moves_enabled=moves_enabled))
                 for item in candidates:
                     conn.execute("INSERT INTO telegram_deliveries(id,owner_id,kind,event_id,event_at) VALUES(%s,%s,%s,%s,%s) ON CONFLICT(owner_id,kind,event_id) DO NOTHING", (uuid4(), owner, item["kind"], item["id"], item["created_at"]))
             if cfg.get("next_send_at") and cfg["next_send_at"] > now:
@@ -209,6 +212,8 @@ def run_once(owner):
                 why = "Alert is older than 24 hours; review it in Updates."
             elif job["kind"] != "test" and not cfg["enabled"]:
                 why = "Telegram delivery is paused."
+            elif job['kind']=='move' and str(option('THESIS_MOVE_TELEGRAM_ENABLED') or 'false').lower() not in {'true','1','on'}:
+                why = 'New price-alert delivery is off. Review it in Updates.'
             elif job["kind"] != "test":
                 try:
                     record = event(conn, owner, job["kind"], job["event_id"])

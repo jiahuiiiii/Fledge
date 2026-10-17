@@ -97,8 +97,9 @@ instances in 16 batches per model; AVGO contains 64 in 15 Opus batches.
 | META / GPT-5.5 | 16/16 | 0/119 | 0% | Passed |
 | META / GPT-5.4 | 16/16 | 0/119 | 0% | Passed |
 | AVGO / Opus | 15/15 | 0/64 | 0% | Passed |
-| AVGO / Sonnet, Haiku, GPT-5.5, GPT-5.4 | 0/15 replayed for each | Unknown | Unknown | **Not verified: no saved responses** |
-| Three days live on GPT-5.4 at ≥97% completion | 0 days observed with this implementation | — | — | **Not verified: not installed** |
+| AVGO / GPT-5.4 (approved 17 October run) | 15/15 | 0/64 | 0% | Passed |
+| AVGO / Sonnet, Haiku, GPT-5.5 | 0/15 replayed for each | Unknown | Unknown | Comparison only; not selected |
+| Three days live on GPT-5.4 at ≥97% completion | 0.9351/72 hours; 3/3 checks at 13:34 SGT | — | — | **Pending: partial window** |
 
 Haiku's two failures exceed the per-batch repair limit. Its 9 repaired items
 include those in rejected batches; rejected items are not hidden from the rate.
@@ -189,3 +190,17 @@ change the setting or `.env`. Retain the preceding frontend bundle for rollback.
 
 Private evidence: `.local/live-tests/redesign-phase-1-20261017/`. It retains
 replay results, test/build logs, initial diagnostics and final browser screenshots.
+
+## Selected GPT follow-up — 17 October 2026
+
+The owner separately approved the bounded AVGO test. GPT-5.4 passes **15/15
+batches, 64 items, zero repairs**, costing **US$0.5073675** through the ledger.
+No paid retry, app reading, watch preference or environment change. Private
+evidence: `.local/live-tests/gpt-avgo-redesign-20261017/run1/validation.json`.
+The META and AVGO replay gates now both pass for the selected model.
+
+The matching core was installed and the owner started the app in Terminal.
+Conservative observation start: **17 October 2026, 12:38:12 SGT**. At13:34 SGT,
+3/3 recorded checks completed under the new policy; only0.9351/72hours elapsed.
+This is a small partial observation, not the three-day acceptance gate.
+Earlier preparation-only and unapproved-test statements above are historical.

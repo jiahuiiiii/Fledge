@@ -73,3 +73,21 @@ investigation cost US$0.053381665 with US$0.011598500 additionally held for its
 unresolved HTTP 400 attempt. Keep that hold and the failed/interrupted evidence.
 The GPT-5.4 AVGO paid replay was not approved and was not run. No phase 3 work
 has started. Private evidence: `.local/live-tests/redesign-phase-2-20261017/`.
+
+## Installation and approved replay follow-up — 17 October 2026
+
+The owner started the installed core in Terminal; HTTP200 was verified at
+**12:38:12 SGT**, the conservative observation start. Approved056/057 are applied
+(schema57). The new fast cadence and price alerts remain off. Earlier statements
+that installation or phase3 preparation had not happened are historical.
+
+At **13:34 SGT**, the read-only report records **0.9351/48hours**, **3/3completed
+checks**,0failures/stops/unfinished, all3using the new reliability policy.
+There are0complete daily cost windows;25normal app calls total US$0.79584675,
+with0unsettled calls in this window. These normal watch costs exclude experiments.
+Completion and daily cost gates remain pending; no switch still means US$0catch-up.
+
+The separately approved GPT-5.4 AVGO experiment passes15/15batches,64items,
+0repairs for US$0.5073675. It saves no app research. This resolves the missing
+selected-model replay, not the48/72-hour live gates. Evidence:
+`.local/live-tests/redesign-core-install-20261017/readiness-after-approved-tests.json`.

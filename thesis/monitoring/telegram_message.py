@@ -39,12 +39,30 @@ def render(record):
     if d.get("withheld"):
         raise ValueError("Source access changed; do not forward this alert.")
     symbol = plain(d.get("symbol"), 18)
-    label = {"company": "Company update", "idea": "Saved idea", "condition": "Monitored condition"}[kind]
+    label = {"company": "Company update", "idea": "Saved idea", "condition": "Monitored condition", "move": "Price move"}[kind]
     parts = [f"<b>{escape(symbol)} · {label}</b>", f"<b>{escape(plain(record['title'], 180))}</b>"]
     if d.get("fictional"):
         parts.insert(0, "<b>Fictional demo · not actual company news</b>")
     source_ids = []
-    if kind == "company":
+    if kind == "move":
+        if d.get('preview'):
+            raise ValueError('Preview price events must never be sent.')
+        from .move_alerts import percent
+        numbers=' · '.join(f"{m['symbol']} {percent(m['change_percent'])}" for m in d['members'])+' today'
+        index=d['members'][0]['indexes'].get('QQQ')
+        numbers+=(f" · Nasdaq {percent(index['change_percent'])}" if index else ' · Nasdaq unavailable')
+        if visible_units(escape(numbers))>3000:
+            raise ValueError('The full market-event member list exceeds the message bound.')
+        parts=[f'<b>{escape(numbers)}</b>']
+        context=[m['symbol'] for m in d['members'] if m['context_only']]
+        if context:
+            parts.append('Market context only; no individual threshold crossed: '+escape(', '.join(context)))
+        explanation=d.get('explanation') or {}
+        cause={'market':'Possible market connection','sector':'Possible sector connection',
+               'company':'Possible company connection','no_clear':'No clear cause found'}.get(explanation.get('cause'),'No clear cause found')
+        parts.append('<b>'+cause+'</b>\n'+escape(plain(explanation.get('text') or 'No verified explanation is saved.',800)))
+        source_ids.extend(s['id'] for s in d.get('sources',[]))
+    elif kind == "company":
         payload = d["payload"]
         for shift in payload.get("shifts", [])[:3]:
             parts.append(escape(plain(shift.get("title"), 120)) + ": " + escape(plain(shift["before"]["tone"], 30)) + " → " + escape(plain(shift["after"]["tone"], 30)))
