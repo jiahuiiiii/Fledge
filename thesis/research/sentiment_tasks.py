@@ -19,7 +19,7 @@ from .citations import model_source
 POLICY = 'sentiment-small-tasks-1'
 PROMPT = 'thesis-source-sentiment-tasks-1'
 SCHEMA_POLICY = 'sentiment-task-schema-3'
-HEADLINE_POLICY = 'news-editorial-headlines-3'
+HEADLINE_POLICY = 'news-editorial-headlines-4'
 EVENT_POLICY = 'news-article-purpose-2'
 MAX_PAIRS = 16
 
@@ -236,11 +236,13 @@ def editorial_headline(title):
         and not re.search(r'\b(?:jury|court|lawsuit|licens\w*|verdict|trial)\b',title,re.I)) or (
         re.search(r'\banalyst\b',title,re.I) and re.search(r'\b(?:upside|price target|top pick)\b',title,re.I)):
         return True
-    primary=re.split(r'[;.!?]|\b(?:after|following|amid|because|despite|as|when)\b',title,maxsplit=1,flags=re.I)[0]
-    direct_announcement=bool(re.search(
+    # A decimal amount or a company abbreviation is not a sentence boundary.
+    primary=re.split(r'[;!?]|\b(?:after|following|amid|because|despite|as|when)\b',title,maxsplit=1,flags=re.I)[0]
+    announcement=re.search(
         r'\b(?:approves?|authori[sz]es?|announces?|declares?|raises?|increases?|cuts?|suspends?|'
-        r'launches|introduces|recalls|withdraws)\b.{0,45}\b(?:buyback|repurchase|dividend|guidance|product|device)\b',primary,re.I))
-    if direct_announcement:return False
+        r'launches|introduces|recalls|withdraws)\b.{0,45}\b(?:buyback|repurchase|dividend|guidance|product|device)\b',primary,re.I)
+    valuation_position=re.search(r'\b(?:cheap|expensive|undervalued|overvalued)\b',primary,re.I)
+    if announcement and (valuation_position is None or announcement.start()<valuation_position.start()):return False
     # Quoted management judgments are not automatically the author's valuation
     # thesis. Leave their actual importance to the stated-development evidence.
     if re.search(r'\b(?:ceo|cfo|chief executive|management|chair)\b.{0,25}\b(?:says?|calls?|sees|believes?)\b',title,re.I):return False

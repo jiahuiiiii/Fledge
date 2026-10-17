@@ -371,10 +371,11 @@ Expected additionalUS$1.50–3, combined capUS$6includingUS$2.43838875; not
 executed, owner approval required. New prompt/routing/delivery remain off;
 **phase5not done**. [Results and limits](../testing/news-noise-replay.md#completed-approved-revision-and-failed-noise-gate--17-october-2026).
 
-Further offline correction17October: guard3preserves factual buyback/dividend/
+Further offline correction17October: guard4preserves factual buyback/dividend/
 product announcements that happened to contain valuation adjectives or a price
-reaction; explicit investment advice still stays low.238affected tests plus
-68current-policy checks pass (overlap), no paid calls. The pending new-purpose
+reaction, including decimal amounts/company abbreviations; explicit investment
+advice and editorial-first headlines still stay low. Final241affected tests
+pass, no paid calls. The pending new-purpose
 plan is refreshed without changing its history/models/prompt/budget; saved-only
 preflight checks4cached answers,0new calls. Old failed gate/guard2diagnostic are
 retained, no new noise or owner-quality pass claimed. Paid approval still pending.

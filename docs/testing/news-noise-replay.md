@@ -234,16 +234,18 @@ a dividend increase followed by an analyst valuation, and a cheap product launch
 followed by a share-price reaction. A valuation word anywhere in a headline did
 not establish that the article was an investment thesis.
 
-`news-editorial-headlines-3` retains explicit advice/comparison/thesis rules,
+`news-editorial-headlines-4` retains explicit advice/comparison/thesis rules,
 but checks the primary announcement clause before soft valuation cues. News
 that directly announces a buyback, dividend, guidance or product remains for the
 model/evidence rules to assess. A management valuation quote alone is not
 automatically the author's thesis. An explicit “should you buy?” headline stays
-editorial even when it mentions a real buyback. Historical saved records remain
-exact; routing policy3keeps this correction distinct from earlier decisions.
+editorial even when it mentions a real buyback. Decimal amounts and company
+abbreviations do not split an announcement; an earlier valuation thesis cannot
+be excused by a later announcement. Historical saved records remain exact;
+routing policy4keeps this correction distinct from earlier decisions.
 
-**238 affected offline tests pass**, followed by **68 current-policy routing
-checks** after the policy-version update (overlap). The original56-tone request
+**241 affected offline tests pass**. Earlier238and68checks overlap and precede
+the final decimal/abbreviation/editorial-first cases. The original56-tone request
 plan/fingerprint remains exact, as do the blind page and protected CSS hashes.
 Fresh saved-only preflight rechecks4cached answers,0new calls and retains
 US$2.43838875/0unresolved. The pending plan is refreshed with the same frozen
@@ -253,5 +255,5 @@ this refresh; the existing new-test approval request remains pending.
 
 This correction tests announcement preservation, not model interpretation of
 the new purpose instructions. The paid noise gate remains failed15/23(65.22%);
-the earlier55%free diagnostic belongs to guard2and is not a new guard3score.
+the earlier55%free diagnostic belongs to guard2and is not a new guard4score.
 Owner labels0/50and forward observation/delivery approvals remain pending.

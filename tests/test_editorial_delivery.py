@@ -25,6 +25,7 @@ from test_alert_routing import scored
     'Example Stock Could Be Undervalued After Its Board Approves A Buyback',
     'Is Example (EX) Cheap Following Its New Product Launch?',
     'Example Stock Looks Cheap After Its Dividend Increase',
+    'Example Stock Looks Cheap. Its Board Approves A Buyback',
 ])
 def test_clear_editorial_wrappers_are_low_despite_factual_background(title):
     assert T.editorial_headline(title)
@@ -49,6 +50,8 @@ def test_clear_editorial_wrappers_are_low_despite_factual_background(title):
     'Example Launches A Cheap New AI Device; Shares Rise',
     'Example CEO Says Shares Are Undervalued',
     'Example Introduces An Expensive New Device As Shares Fall',
+    'Example Raises $1.50 Dividend After Analysts Call Shares Undervalued',
+    'Example Inc. Approves $2.5 Billion Buyback; Shares Look Undervalued',
 ])
 def test_real_or_uncertain_developments_are_not_rejected_by_keyword_alone(title):
     assert not T.editorial_headline(title)
