@@ -279,6 +279,18 @@ Seven-day independent replay0/7, owner labels0/50, new-prompt hard cases0/6 and
 live/shadow/approval/outcome gates remain; **phase5not done**.
 [Contract](../features/telegram-story-suppression.md).
 
+Quality-runner follow-up17October:56frozen one-source requests preserve the exact
+50owner review projections plus6original proofread cases. Read-only current-access
+preflight passes56/56. The operator-only runner uses selected GPT-5.4, hashes
+ledger identities independently of folders, enforces a combined cap no greater
+thanUS$2and stops at the first failure without retry. Explicit continuation reuses
+settled answers for free and sends only unattempted cases; owner labels remain
+separate.99related andfull2571offline tests pass (93optional skips), no paid run. Saved-news inventory covers
+7dates/1218versions with partial early-company coverage; it is not a replay or
+noise score. Real paid measurements, owner labels0/50, real hard cases0/6, noise replay0/7
+and live/shadow/outcome gates remain; **phase5not done**.
+[Contract](../testing/sentiment-quality-campaign.md).
+
 1. **Split the prompt into smaller tasks:**
    1. relevance (the existing quick check);
    2. tone and evidence basis;

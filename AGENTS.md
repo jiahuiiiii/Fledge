@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Frozen sentiment quality runner — 17 October 2026 (prepared)
+
+New operator-only quality runner binds the exact50owner cases plus6original proofread cases, selected GPT-5.4 bodies and required context. Read-only preflight/rechecks, hashed ledger identities independent of folders, one campaign lock, combinedUS$2maximum, stop-on-first-failure and explicit unattempted-only continuation preserve costs/holds and forbid automatic paid retries. Predictions retain repaired-label provenance and a sample fingerprint; owner answers are never read by the runner or replaced by AI labels. Review page/data/preferences remain exact.
+
+Final99related offline tests pass (20new runner cases plus1scorer-envelope case). Full offline2571pass/93optional skips. Real input matching50/50and6/6, all56access checks pass; no paid execution. Seven-day news inventory1218versions across7dates is preparation, not a noise result. US$0, no source refresh/schema/configuration/install/app-or-DBrestart change; user CSS exact. Phase5owner quality0/50, hard cases0/6, noise replay0/7and live/approval/shadow gates remain. [Contract](docs/testing/sentiment-quality-campaign.md).
+
 ## Stories once per account — 17 October 2026 (prepared)
 
 New066adds private append-only per-send-attempt story claims, committed before HTTP with intent. Only displayed evidence claims a story; account-wide guards cover company/private-idea publications, watched companies and immediate/recap directions. Exact content/URL/validated-repeat identities retain evidenced material updates and distinct social opinions. Rejected/failed attempts do not falsely become sent; uncertain sends stay protected, pending rate-limited copies wait, and confirmed retry members alone control claims/ratings. Actual recaps retain protection during routing rollback; old previews/research/preferences stay exact.

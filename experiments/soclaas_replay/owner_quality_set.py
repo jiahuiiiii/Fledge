@@ -29,29 +29,29 @@ def digest(value):
     return hashlib.sha256(canonical(value).encode()).hexdigest()
 
 
+def case_evidence(packet,source):
+    """The exact blind projection, shared by export and later input validation."""
+    from thesis.research import reddit_thread_context
+    context=[]
+    if source.get('conversation'):
+        context.append(dict(label='Saved parent context',passages=source['conversation']['passages']))
+    for thread in reddit_thread_context.wire(packet,[source],extras=False):
+        for message in thread['messages']:
+            if message.get('source_label')==source['label']:continue
+            context.append(dict(label='Saved discussion context · '+message['role'],passages=message['passages']))
+    return dict(company=packet['company']['symbol'],company_name=packet['company']['name'],
+        source_id=source['id'],channel=source['channel'],platform=source.get('platform'),title=source['title'],
+        passages=source['passages'],context=context,published_at=source['published_at'],
+        omitted_fragments=source.get('omitted_fragment_count',0))
+
+
 def build(packets):
     """Deterministic, balanced company/channel strata, with no model labels."""
-    from thesis.research import reddit_thread_context
     strata = defaultdict(dict)
     for packet in packets:
         company = packet['company']
         for source in packet['sources']:
-            context = []
-            if source.get('conversation'):
-                context.append(dict(label='Saved parent context',
-                                    passages=source['conversation']['passages']))
-            for thread in reddit_thread_context.wire(packet, [source], extras=False):
-                for message in thread['messages']:
-                    if message.get('source_label') == source['label']:
-                        continue
-                    context.append(dict(label='Saved discussion context · '+message['role'],
-                                        passages=message['passages']))
-            case = dict(company=company['symbol'], company_name=company['name'],
-                        source_id=source['id'], channel=source['channel'],
-                        platform=source.get('platform'), title=source['title'],
-                        passages=source['passages'], context=context,
-                        published_at=source['published_at'],
-                        omitted_fragments=source.get('omitted_fragment_count', 0))
+            case = case_evidence(packet,source)
             strata[(company['symbol'], source['channel'])][source['id']] = case
     if len(strata) < 2:
         raise ValueError('Use at least two populated company/channel strata.')
@@ -79,6 +79,10 @@ def validate_manifest(manifest):
 
 def score(manifest, labels, predictions):
     validate_manifest(manifest)
+    if set(predictions)=={'fingerprint','predictions'}:
+        if predictions['fingerprint']!=manifest['fingerprint']:
+            raise ValueError('Predictions belong to a different frozen review sample.')
+        predictions=predictions['predictions']
     ids = {case['id'] for case in manifest['cases']}
     if (labels.get('fingerprint') != manifest['fingerprint']
             or labels.get('independently_labelled_by_owner') is not True):

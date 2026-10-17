@@ -59,6 +59,14 @@ def test_changed_or_invalid_labels_and_predictions_cannot_shrink_denominator():
     with pytest.raises(ValueError,match='manifest changed'):Q.score(m,human,pred)
 
 
+def test_runner_predictions_retain_their_sample_fingerprint():
+    m=Q.build(packets());human=labels(m)
+    wrapped=dict(fingerprint=m['fingerprint'],predictions=deepcopy(human['answers']))
+    assert Q.score(m,human,wrapped)['exact_matches']==50
+    wrapped['fingerprint']='another sample'
+    with pytest.raises(ValueError,match='different frozen'):Q.score(m,human,wrapped)
+
+
 def test_html_has_no_external_dependencies_or_executable_source_text():
     m=Q.build(packets());m['cases'][0]['title']='</script><img src=x onerror=alert(1)>'
     m['fingerprint']=Q.digest(m['cases']);html=Q.render(m)

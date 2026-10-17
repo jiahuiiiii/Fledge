@@ -98,3 +98,14 @@ result. Current access checks, the six fixed hard cases, approval/cost controls
 and the actual evaluated answers remain outstanding. Owner annotations0/50
 received; paid test costUS$0. Private evidence:
 `.local/live-tests/redesign-phase-5-20261017/story-guard-prepared/quality-inputs-summary.json`.
+
+
+## Bounded evaluation runner prepared — 17 October 2026
+
+[The frozen campaign runner](sentiment-quality-campaign.md) now validates all50
+review projections and the6original benchmark cases, with read-only current-access
+checks, a combined spending cap, durable folder-independent request identities,
+first-failure stop and explicit unattempted-only continuation. It never reads
+owner answers or changes the review page. The scorer accepts its fingerprinted
+prediction envelope and rejects another sample.99related offline tests pass;
+no paid run or real new-prompt quality result exists. Owner labels0/50remain.
