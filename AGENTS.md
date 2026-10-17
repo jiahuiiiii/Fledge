@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Approved purpose replay improves but misses noise target — 17 October 2026
+
+Same frozen7-day history completes172/172frames:162new event calls,128distinct quick/tone/duplicate answers reused,290distinct answers/293validations,0repairs/failures/automatic retries. AdditionalUS$1.87638250, combinedUS$4.31477125/US$6cap,0unresolved holds.54publications/18hypothetical messages(11immediate/7recaps). Separate assistant excerpt review retains33exact judgments and reads7new excerpts:38substantive/1opinion/1unclear.2/18messages(11.11%)flagged,0/11immediate/2of7recaps:≤10%gate still fails; old15/23failure retained, no relabelling to pass.
+
+27of30previously shown substantive excerpts remain and11others appear;3drop out, including a management-commentary report demoted to opinion. No recall/usefulness pass inferred. Same-history company-news scope, not owner truth or all-alert/live proof.241affected offline tests remain passing; no production change during/after test, owner answers0/50, phase5unfinished.20:37SGTcore observation30completed/0failed/0stopped/4unfinished at7.9955/48h; normalAIUS$1.920223,0unsettled/closed daily windows. No research/preference/settings/migration/install/restart/source collection/Telegram action; prepared prompt/live delivery off, protected CSS/review page exact. [Results and limits](docs/testing/news-noise-replay.md#approved-purpose-test-result--17-october-2026).
+
 ## Factual announcements survive editorial guards — 17 October 2026 (prepared)
 
 Three authored probes exposed valuation-word false positives on buyback, dividend and product announcements. Headline guard4now separates direct primary announcements from soft valuation cues, including decimal amounts and company abbreviations; an earlier valuation thesis cannot be excused by a later announcement. Explicit advice/thesis/comparison headlines stay low even when they repeat real news. Management quotes alone are not automatically author opinion. Routing policy4preserves old immutable decisions.

@@ -1,9 +1,68 @@
 # Saved-news replay readiness
 
 17 October 2026, `codex/redesign-phase-5`. The approved seven-day company-news
-counterfactual is complete and **fails the noise target**. Historical inventory
+counterfactual and its approved purpose revision are complete; the latest
+revision **still fails the noise target:2/18messages(11.11%)**. Historical inventory
 and preparation checkpoints follow; the latest measurements are at the end.
 Phase5remains unfinished.
+
+## Approved purpose test result — 17 October 2026
+
+The separately approved article-purpose test completes **172/172frames across
+7/7input dates**, using the same frozen history, inherited tones and selected
+GPT-5.4/mini pair. All162new paid requests are importance/event tasks;128distinct
+earlier requests are reused free (37quick,40tone,51duplicate).290distinct answers
+pass293evaluations including repetition, with0repairs,0failed requests and0automatic
+retries. Additional **US$1.87638250**, combined **US$4.31477125** including earlier
+attempts,0unresolved holds, within the approved combinedUS$6cap. No research or
+publication writes, source collection, Telegram HTTP, settings/migration changes,
+installation or app/DB restart.
+
+The output has54company publications and18hypothetical messages:11immediate and
+7daily recaps, compared with the earlier71publications/23messages. A separate
+source-form review covers all40displayed excerpts:33exact earlier judgments
+are retained and7newly displayed titles/full saved excerpts are read separately.
+All7new excerpts are substantive; the complete set has38substantive,1opinion and
+1unclear. No classifier importance fields supply these judgments, and no owner
+labels are read or inferred. The original review remains unchanged.
+
+**2/18messages(11.11%)** contain a low-value excerpt, so the≤10%target **fails**.
+The split is0/11immediate and2/7daily recaps(28.57%). One recap retains an
+investor-interpretation article whose lead repeats a real product integration;
+the other has a product headline with only a competitive/market-reaction
+description, previously judged insufficient to distinguish news from commentary.
+Both receive medium/event from the new prompt. Neither judgment is changed to
+obtain a passing percentage. The previous15/23(65.22%)failure is retained.
+
+Of the original30displayed substantive excerpts,27remain displayed and3do not;
+11other substantive excerpts now appear. The three absent items are not all
+proven false negatives: one remains medium but no longer reaches a displayed
+recap slot, one management-commentary report becomes low/opinion, and one thin
+startup-backing excerpt becomes low/event. This warrants a usefulness/coverage
+check, especially for management reporting; fewer noisy messages alone cannot
+prove recall. The comparison uses the same history after observing the earlier
+failure, not an untouched holdout. It remains a company-news counterfactual,
+excluding private ideas, conditions, social/price/cost alerts and actual timing.
+The source-form assessor is the coding assistant, not owner ground truth.
+
+Current affected offline verification remains241passing tests; no production
+code changed during or after this paid run. The56-tone contract and blank owner
+review page remain exact, with owner answers0/50received. The prepared prompt and
+live routing/daily delivery remain off. Phase5is **not done**; this result does
+not authorize another paid test or live delivery. No further paid call was made.
+
+Private immutable evidence is under
+`.local/live-tests/redesign-phase-5-20261017/news-purpose-v2-run1/`, including the
+plan, raw responses, evaluated frames, replay, excerpts, annotations and audit.
+Plan fingerprint`9b28a96731ead82837315ce235a5e98f4c9f58c7039f757ef893531318dbfea2`;
+replay fingerprint`dae66c478e964d62d62a54782ff2f101ddc93cb5dba4165af11f4170e3ba4939`.
+
+A separate read-only20:37SGTlive snapshot has30completed/0failed/0stopped/
+4unfinished checks in7.9955of48hours; all30completed use the reliability policy.
+Normal AI cost isUS$1.920223,0unsettled,0closed24-hour windows, excluding these
+experiments. Completion/daily-cost acceptance remains pending, not inferred
+from this partial observation. Protected CSS and the owner-quality page match
+their earlier checksums.
 
 ## Inputs and exact matching
 

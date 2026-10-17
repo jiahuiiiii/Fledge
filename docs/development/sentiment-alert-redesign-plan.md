@@ -380,6 +380,22 @@ plan is refreshed without changing its history/models/prompt/budget; saved-only
 preflight checks4cached answers,0new calls. Old failed gate/guard2diagnostic are
 retained, no new noise or owner-quality pass claimed. Paid approval still pending.
 
+Approved purpose-test result17October:172/172frames/7input dates complete with
+162new paid event requests and128distinct cached quick/tone/duplicate answers;
+290distinct answers/293evaluations pass,0repairs/failures/automatic retries.
+AdditionalUS$1.87638250, combinedUS$4.31477125withinUS$6cap,0unresolved holds.
+54publications/18hypothetical messages(11immediate/7daily). Separate assistant
+review retains33exact prior judgments and reads7new excerpts:38substantive,
+1opinion,1unclear. **2/18messages(11.11%)still fail≤10%**, split0/11immediate
+and2/7recaps. Original15/23failure retained; no label changed to pass.27of30
+earlier substantive excerpts remain displayed and11others appear;3drop out,
+including management commentary demoted to opinion, so usefulness/recall is not
+proven. Same-history company-news scope, not owner truth or all-alert/live proof.
+241affected offline tests remain passing; no production change during/after the
+run, owner answers0/50received. New prompt/routing/delivery off; no source,
+research/preference/settings/migration/install/restart/Telegram change.
+**Phase5not done.** [Complete result](../testing/news-noise-replay.md#approved-purpose-test-result--17-october-2026).
+
 1. **Split the prompt into smaller tasks:**
    1. relevance (the existing quick check);
    2. tone and evidence basis;
