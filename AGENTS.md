@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Complete-sample news replay prepared — 17 October 2026
+
+File-only company-news replay now requires complete baseline/frame evidence, uses production publication/routing and bounded immediate/recap formatters, and shares exact24-hour displayed-story identities. Seven input dates and nonzero messages alone do not pass: independent frozen-excerpt review remains separate from model importance. News-only counterfactual, no live-timeliness/private-idea/social/price claim.
+
+New bounded operator freezes1434old tone candidates among1489versions, clears future comparison caches, retains original models/calls, checks access before/per request, and uses a single lock/folder-independent ledger keys/cumulative cap/first-failure stop.162event requests before quick skips; expectedUS$2–5, capUS$6, cost disclosed before dispatch.266related offline tests pass (37new campaign/replay plus23earlier inventory); serialization/recap-boundary/patch diagnostics retained. No paid noise campaign at this checkpoint; gate0/7, owner labels0/50and live approval/shadow/outcome gates remain. No migration/settings/install/restart/research/preference change; user CSS exact. [Contract](docs/testing/news-noise-replay.md#complete-sample-replay-and-bounded-evaluator--17-october-2026).
+
 ## Revised quality gate and replay inventory — 17 October 2026
 
 Owner-approved revision completes56/56validated GPT-5.4answers,0repairs, fixed hard cases4/6pass. Two old answers reused free;54new requests include1explicitly approved retest and53untouched cases. AdditionalUS$0.420225, combinedUS$0.445405,0unresolved holds/automatic retries. Owner defers labelling; blind page exact,0/50answers received, no accuracy claim.

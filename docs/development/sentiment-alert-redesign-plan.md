@@ -314,6 +314,18 @@ Importance/duplicate evaluation and independent noise replay0/7remain. No
 live setting, migration, installation, restart or research/preference change;
 **phase5not done**. [Replay inventory](../testing/news-noise-replay.md).
 
+Replay-engine follow-up17October: complete baseline/frame validator, production
+company publications/routing, bounded immediate/daily formatting, displayed-only
+24-hour story claims and separate fingerprint-bound noise auditing are prepared.
+New operator freezes exact inherited tones, source/model/file contracts and
+ledger-backed sequential tasks, with combined cap and no automatic retry.
+266related offline tests pass. Real frozen corpus1489versions has1434reusable
+tone candidates;162new-news event requests before new quick skips, plus bounded
+duplicate comparisons. ExpectedUS$2–5, cumulative test capUS$6; cost disclosed
+before dispatch. No paid news-noise run yet; independent replay/noise gate0/7,
+owner labels0/50and live gates remain. No live schema/settings/research change.
+[Scope and limits](../testing/news-noise-replay.md#complete-sample-replay-and-bounded-evaluator--17-october-2026).
+
 1. **Split the prompt into smaller tasks:**
    1. relevance (the existing quick check);
    2. tone and evidence basis;
