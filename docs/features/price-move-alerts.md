@@ -153,3 +153,14 @@ model, thresholds, cadence hours and shadow duration still need live approval.
 It is **prepared, not marked done**.
 
 Private evidence: `.local/live-tests/redesign-phase-4-20261017/`.
+
+## Approved preview choices — 17 October 2026
+
+The owner approved GPT-5.5 explanations, the unchanged3/2/5move rules, fast checks
+at15-minute intervals during08:30–17:00NewYork hours (adjusted for early closes),
+and five US trading days of previews. New Telegram delivery remains off.
+Fast cadence will wait until the24-hour passive provider baseline finishes,
+**18October2026 at12:55:59SGT**. These are approved choices, not proof of deployment.
+The backup/migration/asset/environment installer is prepared but not executed;
+normal watches are still active. It never starts/stops app or database processes.
+The owner must restart from Terminal after an idle/90-second due check.

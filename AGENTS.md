@@ -2,7 +2,15 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Blind sentiment review prepared — 17 October 2026
+
+Prepared smaller-task request/validator contracts (not connected to live readings): tone/event/duplicate instructions3924/3379/2497characters, shared schemas1921/1537/924characters,106related offline tests pass. Code-only low-importance rules and candidate-only duplicate guards tested. No dispatch, pipeline integration, schema or live prompt/routing change.
+
+Phase5's first task is a private50-source META/AVGO review, balanced25news/25discussion, deterministic selection and fingerprinted source evidence. One local evidence card at a time, no AI labels/suggestions or prefilled answers, browser-only saving and explicit download. Strict scorer requires all50owner labels and≥40exact relevance/tone matches; separate4/6hard-case gate remains. Read-only export/related41tests and7authored browser groups1440/390/320pass,0HTTPcalls. CostUS$0; owner labels0/50received, no quality result or live prompt/routing change. [Workflow](docs/testing/owner-sentiment-quality.md).
+
 ## Price-move previews and cited explanations — 17 October 2026 (prepared)
+
+Live-choice follow-up: owner approved GPT-5.5 explainer,3/2/5rules,08:30–17:00NewYork fast hours (early-close adjusted) and5UStrading days of previews; no new Telegram delivery. Fast cadence waits for the passive baseline ending18October12:55:59SGT. Installer prepared, not run;2normal watches still active at13:49SGT, so no restart/configuration change.
 
 `codex/redesign-phase-4` prepares separate QQQ/SPY/SOXX references, Decimal3/2/5move rules, same-index market grouping, private append-only trigger/explanation/review records and independent price checks. Migrations058–060 tested only in disposable databases; live schema57. All new events are previews; explainer, cadence and new Telegram delivery stay off. Updates/review use existing design tokens and one evidence card: numbers together, explanation beside exact quotes/headline links, optional details collapsed. User `app.css` preserved exactly. Full offline2308pass/93optional skips; final citation/worker125pass and runner101pass (overlap); frontend202pass/build/scopedformat and8isolated browser groups1440/390/320pass. Retain initial reset/FK failures and paid validator stop.
 

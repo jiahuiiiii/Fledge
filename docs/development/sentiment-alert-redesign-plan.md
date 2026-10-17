@@ -158,8 +158,11 @@ two-session fall is4.94049%, below5%. Thresholds are unchanged; the literal
 revalidated for free after a repeated-source validator fix, then five previously
 unattempted cases in a separately approved continuation. Phase4 tests cost
 US$0.116235 with0unresolved holds; no automatic paid retry. These checks do not
-establish semantic accuracy. Live model/threshold/cadence/shadow choices remain
-unapproved; phase4 is not installed or marked done.
+establish semantic accuracy. Owner subsequently approved GPT-5.5,3/2/5rules,08:30–17:00NewYork fast hours
+(adjusted early closes), and5UStrading days of previews. Fast cadence waits for
+the24-hour baseline; no new Telegram delivery. Installation is prepared, waiting
+for normal active watches to finish and an owner Terminal restart. Phase4 is not
+yet installed or marked done.
 
 1. **Move detector (code only).** For each watched stock, compare today's change with the Nasdaq-100 (QQQ), the S&P 500 (SPY) and a sector fund (SOXX for semiconductors, otherwise the closest sector fund). Trigger on:
    - a move of ±3% or more in a session;
@@ -173,6 +176,16 @@ unapproved; phase4 is not installed or marked done.
 **Done when:** a replay over saved 13–17 October prices and headlines produces an alert for the 14–15 October NVDA, AMZN and GOOGL moves, unit tests cover the thresholds and grouping, and the explainer passes its citation checks on 10 authored and real cases.
 
 ### Phase 5 — smaller prompts, importance and severity
+
+**17 October 2026: first task prepared; not done.** A private blind50-source
+review page and strict scorer are prepared from permitted saved META/AVGO news
+and discussion. No AI suggestions or prefilled labels. Read-only export and
+related suites41pass;7authored browser groups1440/390/320pass with0HTTPrequests.
+Owner annotations0/50received; no accuracy claim, new prompt or live route change.
+[Review workflow](../testing/owner-sentiment-quality.md). Smaller-task request/validator
+contracts are also prepared (instructions3924/3379/2497characters, related106tests
+pass), with no dispatch or live pipeline integration yet. Routing/ratings/digest
+and all quality/replay gates remain outstanding.
 
 1. **Split the prompt into smaller tasks:**
    1. relevance (the existing quick check);
