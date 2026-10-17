@@ -2,6 +2,10 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Responsive split-window header — 17 October 2026
+
+Owner reported clipped Account and wrapped My ideas at half-screen width. New isolated `styles/header.css` uses the existing980px breakpoint: logo/tools above,44px navigation below, labels kept together; desktop/phone design unchanged. Source imports it last; user `app.css` is byte-for-byte preserved. Both actual App header templates (loaded/loading, Beginner/Pro) pass64resize cases320–1440plus4menu/navigation checks; source and installed-CSS runs each68pass,0HTTPrequests, screenshots inspected.202frontend tests/build/scopedformat/diff pass. CSS-only atomic install16:12:38SGT, existing assets/scripts and app process exact, backup `.local/backups/header-responsive-20261017T081238Z/`. No app/DBrestart, environment/data/preference change, source/AIcall; phase5preparations remain uninstalled. [Review](docs/reviews/2026-10-17/responsive-header.md).
+
 ## Daily Telegram transport — 17 October 2026 (prepared)
 
 New064prepares recap/cost outbox kinds and private immutable shown-member mappings per send attempt. Recaps recheck source access/private revisions, show≤5complete numbered updates with excerpts/links together (≤2links), retain remaining counts and bind each rating to its original alert. Known rate-limit retries can change shown members safely; callbacks wait for send acknowledgement, unsent buttons never acquire mappings, uncertain/interrupted sends never retry. Cost messages are owner-only, separate exact confirmed charges from unresolved maxima, and require a matching explicit level. New-queue failures cannot abort ordinary delivery. History labels/descriptions follow the existing UI; descriptions appear only for active types.
