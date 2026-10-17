@@ -11,7 +11,7 @@ from uuid import uuid4
 from thesis.db import transaction, one, rows
 from thesis.providers import settings
 from thesis.research import market, reference_prices, price_history
-from . import move_alerts, price_moves
+from . import move_alerts, price_moves, move_assessment_log
 from .us_session import NEW_YORK, bounds
 
 
@@ -44,32 +44,42 @@ def retained_history(conn,iid):
     return dict(snapshot['series'],snapshot_id=str(snapshot['id']),retrieved_at=snapshot['retrieved_at'].isoformat()) if snapshot else None
 
 
-def snapshot(conn,owner,now):
+def snapshot(conn,owner,now,*,observations=None):
     """No source/model requests: measure only current permitted saved prices."""
-    if not reference_prices.allowed(conn,'quote'):return []
+    companies=rows(conn,'SELECT i.id,i.symbol FROM news_watches w JOIN instruments i ON i.id=w.instrument_id '
+        'JOIN sec_companies s ON s.instrument_id=i.id WHERE w.owner_id=%s AND w.enabled ORDER BY i.symbol',(owner,))
+    limits=thresholds()
+    if not reference_prices.allowed(conn,'quote'):
+        if observations is not None:
+            observations.extend(dict(instrument_id=c['id'],quote_id=None,status='references_withheld',
+                measure=None,already_claimed=False,thresholds=limits.record()) for c in companies)
+        return []
     refs={}
     for symbol in ('QQQ','SPY'):
         saved=reference_prices.latest(conn,symbol)
         if saved and saved['retrieved_at']<=now:refs[symbol]=dict(saved['payload'],id=str(saved['id']))
     result=[]
-    companies=rows(conn,'SELECT i.id,i.symbol FROM news_watches w JOIN instruments i ON i.id=w.instrument_id '
-        'JOIN sec_companies s ON s.instrument_id=i.id WHERE w.owner_id=%s AND w.enabled ORDER BY i.symbol',(owner,))
     for company in companies:
         iid=company['id']
         saved=one(conn,'SELECT * FROM market_quotes WHERE instrument_id=%s AND retrieved_at<=%s '
             'ORDER BY retrieved_at DESC,id DESC LIMIT 1',(iid,now))
-        if not saved:continue
+        if not saved:
+            if observations is not None:observations.append(dict(instrument_id=iid,quote_id=None,status='no_quote',
+                measure=None,already_claimed=False,thresholds=limits.record()))
+            continue
         mapping=reference_prices.sector(conn,owner,iid)
         sector=None
         if mapping['symbol']:
             ref=reference_prices.latest(conn,mapping['symbol'])
             if ref and ref['retrieved_at']<=now:sector=dict(symbol=mapping['symbol'],quote=dict(ref['payload'],id=str(ref['id'])))
         measured=price_moves.measure(company['symbol'],dict(saved['quote'],id=str(saved['id'])),indexes=refs,
-            sector=sector,history=retained_history(conn,iid),now=now,thresholds=thresholds())
-        if not measured:continue
-        if one(conn,'SELECT event_id FROM move_trigger_claims WHERE owner_id=%s AND instrument_id=%s AND session_date=%s AND direction=%s',
-               (owner,iid,measured['session'],measured.get('trigger_direction',measured['direction']))):
-            continue
+            sector=sector,history=retained_history(conn,iid),now=now,thresholds=limits)
+        claimed=bool(measured and one(conn,'SELECT event_id FROM move_trigger_claims WHERE owner_id=%s AND instrument_id=%s AND session_date=%s AND direction=%s',
+               (owner,iid,measured['session'],measured.get('trigger_direction',measured['direction']))))
+        if observations is not None:observations.append(dict(instrument_id=iid,quote_id=saved['id'],
+            status='measured' if measured else 'invalid_quote',measure=measured,
+            already_claimed=claimed,thresholds=limits.record()))
+        if not measured or claimed:continue
         result.append(measured)
     return result
 
@@ -110,8 +120,20 @@ def run_once(owner, *, now=None, refresh=None, explainer=None):
     try:
         (refresh or refresh_context)(companies,started)
         measured_at=now or datetime.now(timezone.utc)
+        observations=[]
         with transaction(owner,consistent=True) as conn:
-            measured=snapshot(conn,owner,measured_at)
+            measured=snapshot(conn,owner,measured_at,observations=observations)
+        with transaction(owner) as conn:
+            state=one(conn,'SELECT * FROM move_watch_state WHERE owner_id=%s FOR UPDATE',(owner,))
+            if not enabled() or not state or state['claim_token']!=token or not state['lease_until'] or state['lease_until']<=measured_at:
+                status='stopped';return True
+            try:
+                with conn.transaction():
+                    from .alert_routing import live_active
+                    move_assessment_log.record(conn,owner,token,observations,at=measured_at,preview=not live_active(measured_at))
+            except Exception:
+                # Telemetry must not stop the underlying numeric detector.
+                error='Price assessment log unavailable; detection continued.'
         checked=len(measured)
         for event in price_moves.group(measured):
             with transaction(owner,consistent=True) as conn:

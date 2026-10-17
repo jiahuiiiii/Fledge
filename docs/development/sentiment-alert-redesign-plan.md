@@ -373,6 +373,22 @@ Weight Reddit tone by thread and cap per author, so one busy thread can't swing 
 
 Measured over 10 US trading days after phase 4 is live. Baselines are from 13–17 October 2026.
 
+Measurement preparation17October: new unapplied067retains private append-only
+price assessments before publication, including non-triggers and unavailable
+inputs. Logging failure continues detection with an explicit coverage gap.
+The read-only outcome operator separates preview/actual deployment, first ten
+whole US sessions, full24-hour cost buckets, confirmed sends, grouped triggering
+members, repeated observations, unresolved costs and latest ratings. Missing
+evidence and separate owner-quality/independent-noise reviews remain pending.
+Broad2656offline tests pass/93optional skips; final57outcome/readiness checks
+cover late report guards, with earlier105price-related pass (overlapping);
+worker/migration remain uninstalled. No real ten-session outcome is claimed.
+Read-only19:30SGTdeployment verification finds schema64(all applied checksums
+exact), app started15:54:29SGT, new task/live-routing/daily-report flags unset,
+lanes/new move delivery false. Earlier schema60statements describe the previously
+recorded checkpoint;065–067are currently pending. No restart by this work.
+[Measurement contract](../testing/redesign-outcomes.md).
+
 | Metric | Baseline | Target (success) | How it is measured |
 | --- | --- | --- | --- |
 | Big moves alerted (rules in phase 4) | 0 timely alerts for the 14–15 Oct moves | 90% or more of qualifying moves | Move detector log against alerts sent |

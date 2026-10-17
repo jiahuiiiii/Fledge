@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Price-assessment and outcome evidence — 17 October 2026 (prepared)
+
+Unapplied067prepares private immutable all-company price assessments before event publication. Missing/stale/withheld inputs and already-claimed moves remain distinguishable; publication failure retains its qualifying denominator. Lease/quote/watch membership enforced; audit failure continues detection and records a coverage gap. New read-only aggregate operator measures ten whole US sessions plus the final spending bucket, actual confirmed sends, grouping/latency, repair/attempt/ratings/cost evidence and rollback flags. Unknown observations, deferred owner quality and independent noise review remain pending; it never installs, pays, sends or rolls back.
+
+Broad offline2656pass/93optional skips, plus final57outcome/readiness checks covering late report guards (overlap); earlier105price-related pass, fixture-only missing-company diagnostic retained. Read-only19:30SGTverification finds applied001–064with all checksums exact, app PID72560started15:54:29SGT, task/live-routing/daily-report flags unset and lanes/new move delivery false. This corrects the earlier schema60assumption without attributing or repeating that restart.065–067remain unapplied; assessment worker uninstalled. No live-schema/configuration/research/preference/environment/app-or-DBrestart change by this work; user CSS exact. Approved revised news replay is running separately under its original cap; no outcome or phase5completion claim. [Contract](docs/testing/redesign-outcomes.md).
+
 ## News-replay paid stop and event schema fix — 17 October 2026
 
 First one-pass replay stops at13paid requests/12valid answers/5of172frames: headline text supplied as a passage ID fails own-source validation. US$0.119564confirmed,0unresolved holds/automatic retries. New schema3shares event variants by identical own-ID sets, binding both evidence fields to the correct item labels. Same answer format/instructions; tone requests and strict runtime citation checks remain exact.
