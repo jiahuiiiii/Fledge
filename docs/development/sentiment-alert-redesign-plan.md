@@ -340,6 +340,24 @@ owner labels0/50, live approval/shadow/outcome gates remain; **phase5not done**.
 No live setting, migration, install/restart, research/preference or delivery
 change. [Record](../testing/news-noise-replay.md#first-paid-stop-and-source-bound-schemas--17-october-2026).
 
+Completed approved replay17October:172/172frames,7/7input dates,23hypothetical
+messages (16immediate/7recaps),278new paid requests,12distinct valid prior
+answers reused. AdditionalUS$2.31882475, combinedUS$2.43838875,0unresolved holds
+or automatic retries. Separate assistant excerpt review flags15/23messages
+(65.22%;11/16immediate,4/7recaps), so≤10%noise acceptance **fails**. Clear
+recommendation/valuation/comparison cases alone flag6/23(26.09%). This is a
+company-news counterfactual, not owner ground truth or an all-alert/live claim.
+
+Prepared guards fix mixed recaps and explicit editorial wrappers without
+rewriting saved readings; a free same-history diagnostic still fails11/20(55%).
+New purpose-specific importance instructions/version are prepared for a separate
+test, with unchanged56-tone bodies/hard cases4/6and owner labels0/50pending.
+Final229affected offline tests pass; real saved-only preflight checks4cached
+answers,0new calls, retains all prior cost and stops at uncached work.
+Expected additionalUS$1.50–3, combined capUS$6includingUS$2.43838875; not
+executed, owner approval required. New prompt/routing/delivery remain off;
+**phase5not done**. [Results and limits](../testing/news-noise-replay.md#completed-approved-revision-and-failed-noise-gate--17-october-2026).
+
 1. **Split the prompt into smaller tasks:**
    1. relevance (the existing quick check);
    2. tone and evidence basis;

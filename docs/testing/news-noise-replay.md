@@ -1,7 +1,9 @@
 # Saved-news replay readiness
 
-17 October 2026, `codex/redesign-phase-5`. This is a read-only input and saved-
-label inventory, **not a completed routing/noise replay**. Phase5remains unfinished.
+17 October 2026, `codex/redesign-phase-5`. The approved seven-day company-news
+counterfactual is complete and **fails the noise target**. Historical inventory
+and preparation checkpoints follow; the latest measurements are at the end.
+Phase5remains unfinished.
 
 ## Inputs and exact matching
 
@@ -140,3 +142,86 @@ US$35.881205is not spending authorization. **No revised paid execution yet;
 the no-automatic-paid-retry rule requires explicit owner approval.** No app
 publication, source refresh, environment/preference/migration/install/restart
 change or Telegram call. Preserve both stops and all free-check/test diagnostics.
+
+## Completed approved revision and failed noise gate — 17 October 2026
+
+The owner-approved revision completes **172/172 frames across seven input
+dates**, producing71publications and23hypothetical messages:16immediate and7daily
+recaps.278new paid requests plus12distinct earlier valid answers give290distinct
+validated calls (293evaluations including free repetition). New calls include
+the one explicitly approved failed-request retest; there are no automatic
+retries. AdditionalUS$2.31882475, **combinedUS$2.43838875** including the original
+failure, zero unresolved holds. No research/publication/settings changes or
+Telegram HTTP requests. New calls use the selected GPT-5.4/mini pair; inherited
+tones retain their original model/provenance. This is not live timeliness proof.
+
+A separate coding-assistant review reads all53displayed titles and complete
+saved excerpts before inspecting classifier importance fields. It labels30
+substantive,18opinion,1comparison,1trading recap and3unclear. Any low-value source
+makes its containing message low. **15/23messages (65.22%)** are flagged:
+11/16immediate and4/7daily recaps. The≤10%gate **fails**. This is an independently
+performed source-form judgment, not owner ground truth. Even restricting the
+review to seven clear recommendation/valuation/comparison sources flags6/23
+messages (26.09%); the failure does not depend on every borderline judgment.
+The private fingerprint-bound excerpts, reasons and annotations remain beside
+the frozen output, separate from the owner's blind50-source review.
+
+The model often calls a source `event` because it contains a genuine product,
+financing or legal fact, even when the article's purpose is valuation or
+commentary. Separately, a daily recap could display a low-rated companion item
+from a publication whose highest item deserved a higher route.
+
+## Free diagnostic and prepared purpose revision — 17 October 2026
+
+Prepared routing revision2filters scored-low companions before recap formatting
+and claiming. Explicit investment wrappers (valuation, buy/sell advice, stock
+comparisons, analyst upside and investor-thesis framing) cannot promote a story,
+including when an older saved importance label says high. A legal `A vs B`,
+cheap product, uncertain acquisition, management quote or question alone is not
+automatically blocked. These are news guards; unscored private discussion
+matches retain their prior daily-review handling. Carried-over labels are copied
+and demoted locally, with a versioned reading identity; originals stay exact.
+
+A file-only diagnostic recomputes the same frozen answers with those guards,
+without dispatch:67publications,20messages (13immediate/7recaps). Four newly
+displayed excerpts were separately read and classified substantive. **11/20
+messages (55%)** remain low-value (7/13immediate,4/7recaps). This is a same-history
+diagnostic after observing the failures, not a fresh acceptance sample; it still
+fails. No percentage is substituted for the original failed gate.
+
+Prepared `news-article-purpose-2` asks for article purpose before importance,
+explicitly distinguishing background facts from the article's editorial form.
+Reporting can acknowledge a real background event while importance stays low
+for opinion/comparison; genuine announcements are not rejected for a question,
+uncertainty or a price-reaction headline alone. Tone instructions/schema remain
+exact. Event outputs gain a purpose-policy version; old importance must be
+rechecked while unchanged tones stay saved. **No paid test of this prompt yet.**
+The original56-tone plan still validates its exact fingerprint: hard cases4/6
+remain, owner labels0/50pending. No owner answers were opened or inferred.
+
+The operator's explicit post-completion mode binds the verified completed prior
+campaign, exact captured sources/inherited tones/models and a new purpose
+version. It reuses only exact cached requests, retains all previous campaign
+costs and the global lock, stops at first failure and cannot automatically
+retry. Saved-only mode cannot dispatch. This supports a separately approved
+semantic test; it does not broaden the earlier schema-retry approval.
+
+Proposed next test: same frozen history, cached quick/tone requests, revised
+GPT-5.4importance and only changed/uncached comparison work. Expected additional
+US$1.50–3, **combined cap staysUS$6includingUS$2.43838875already spent**. Not
+executed; explicit owner approval is required. The new prompt/routing and
+delivery remain off, no installation/restart or preferences changed.
+
+Final **229 affected offline tests pass**. Earlier225and107runs overlap and
+predate the final purpose-version/continuation changes. The broader2,656-pass/
+93-skip backend result predates this follow-up. Preserve the initial nonexistent
+suite selector, empty-baseline fixture and cached-event expectation diagnostics;
+corrected authored tests pass, including legal-news counterexamples, news-only
+scope, copied label demotions, event-only refresh, cumulative costs and explicit
+completed-parent/saved-only guards.
+
+Real saved-only preflight validates4cached requests, attempts0new calls and stops
+at the first uncached request, retaining the fullUS$2.43838875prior charge and
+zero unresolved holds. Tone56plan and blind-page/protected-CSS hashes stay
+exact. Frozen purpose plan is private; only a new explicit approval can authorize
+its paid execution. No paid inference result for the revised prompt is claimed.

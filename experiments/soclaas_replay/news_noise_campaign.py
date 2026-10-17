@@ -27,7 +27,7 @@ PREFIX='experiment:news-noise-v1:'
 def contract():
     from thesis.monitoring import news_watch,alert_routing,telegram_stories,telegram_message,daily_telegram
     modules=(S,T,TR,B,P,reporting_basis,coverage,E,N,news_watch,alert_routing,telegram_stories,telegram_message,daily_telegram)
-    return dict(models=list(settings._models()),schema_policy=T.SCHEMA_POLICY,
+    return dict(models=list(settings._models()),schema_policy=T.SCHEMA_POLICY,event_policy=T.EVENT_POLICY,
         runner=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         modules={m.__name__:hashlib.sha256(Path(m.__file__).read_bytes()).hexdigest() for m in modules})
 
@@ -143,12 +143,12 @@ def access(packet):
 class Stopped(Exception):pass
 
 
-def run(plan,output,cap,*,approved_plan,transport=None,remaining_after=None,revised_after=None,saved_only=False):
+def run(plan,output,cap,*,approved_plan,transport=None,remaining_after=None,revised_after=None,after_completed=None,saved_only=False):
     capture=validate(plan)
     if approved_plan!=plan['fingerprint']:raise ValueError('Execution needs the exact frozen plan binding.')
     if not isinstance(cap,Decimal) or not cap.is_finite() or not 0<cap<=8:
         raise ValueError('Choose an explicit combined cap from above zero to US$8.')
-    if remaining_after is not None and revised_after is not None:raise ValueError('Choose one explicit continuation mode.')
+    if sum(v is not None for v in (remaining_after,revised_after,after_completed))>1:raise ValueError('Choose one explicit continuation mode.')
     if not saved_only and transport is None and os.environ.get('THESIS_TEST_OFFLINE')=='true':
         raise ValueError('Offline tests cannot dispatch a provider request.')
     output=Path(output)
@@ -157,7 +157,17 @@ def run(plan,output,cap,*,approved_plan,transport=None,remaining_after=None,revi
         if not one(lock,"SELECT pg_try_advisory_xact_lock(hashtextextended('experiment:news-noise-v1',0)) locked")['locked']:
             raise ValueError('A news-noise campaign is already running.')
         old=saved_calls()
-        if old and remaining_after is None and revised_after is None:raise ValueError('A prior campaign exists; explicit same-plan continuation is required.')
+        if old and all(v is None for v in (remaining_after,revised_after,after_completed)):raise ValueError('A prior campaign exists; explicit same-plan continuation is required.')
+        if after_completed is not None:
+            prior=Path(after_completed);before=json.loads((prior/'campaign.json').read_text());previous=json.loads((prior/'plan.json').read_text())
+            if (not before.get('completed') or before.get('fingerprint')!=previous.get('fingerprint')
+                    or N.digest({k:v for k,v in previous.items() if k!='fingerprint'})!=previous['fingerprint']):
+                raise ValueError('A new-purpose test requires a verified completed prior campaign.')
+            if (plan.get('previous_plan') or plan.get('retry_hashes') or plan['capture']!=previous['capture']
+                    or plan['reused']!=previous['reused'] or plan['contract']['models']!=previous['contract']['models']):
+                raise ValueError('A new-purpose test must retain the exact sources, inherited tones and models.')
+            if plan['contract']['event_policy']==previous['contract'].get('event_policy'):
+                raise ValueError('An identical purpose must use the original continuation, not a new test.')
         if remaining_after is not None:
             prior=Path(remaining_after)
             if json.loads((prior/'plan.json').read_text())!=plan:
@@ -174,6 +184,7 @@ def run(plan,output,cap,*,approved_plan,transport=None,remaining_after=None,revi
         (output/'plan.json').write_text(json.dumps(plan,ensure_ascii=False,indent=2)+'\n')
         report=dict(fingerprint=plan['fingerprint'],completed=False,attempted=0,calls=[],frames_completed=0,
             paid_usd='0',unresolved_maximum_usd='0',cap_usd=str(cap),automatic_retries=0,app_writes=0,telegram_http_calls=0)
+        if after_completed is not None:report['after_completed_fingerprint']=previous['fingerprint']
         def save():
             paid,pending=spend(saved_calls());report.update(paid_usd=str(Decimal(paid)/ledger.NANO),
                 unresolved_maximum_usd=str(Decimal(pending)/ledger.NANO))
@@ -339,6 +350,7 @@ if __name__=='__main__':
     parser.add_argument('--output',type=Path);parser.add_argument('--cap-usd',type=Decimal)
     parser.add_argument('--approved-plan');parser.add_argument('--remaining-after',type=Path)
     parser.add_argument('--revised-after',type=Path);parser.add_argument('--saved-only',action='store_true')
+    parser.add_argument('--after-completed',type=Path,help='Explicit new-purpose evaluation after a completed campaign, retaining sources/tones/models/costs.')
     args=parser.parse_args()
     if args.capture:
         if args.execute or args.plan.exists():parser.error('Freeze to a new plan path without --execute.')
@@ -354,6 +366,6 @@ if __name__=='__main__':
     if args.execute:
         if args.output is None or args.cap_usd is None:parser.error('Choose a new output and explicit combined cap.')
         result=run(plan,args.output,args.cap_usd,approved_plan=args.approved_plan,remaining_after=args.remaining_after,
-            revised_after=args.revised_after,saved_only=args.saved_only)
+            revised_after=args.revised_after,after_completed=args.after_completed,saved_only=args.saved_only)
         print(json.dumps({k:v for k,v in result.items() if k!='calls'},indent=2))
     else:print(json.dumps(estimate(plan),indent=2))

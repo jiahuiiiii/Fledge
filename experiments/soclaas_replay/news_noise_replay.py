@@ -21,7 +21,7 @@ from thesis.monitoring import (news_watch as W, alert_routing as R, telegram_sto
 from thesis.research import sentiment as S, sentiment_tasks as T, coverage  # noqa:E402
 from thesis.research.catalogue import mentions  # noqa:E402
 
-POLICY = 'company-news-noise-replay-1'
+POLICY = 'company-news-noise-replay-3'
 SGT = ZoneInfo('Asia/Singapore')
 FOOTER = ('Open Fledge on your Mac → Updates → Daily recaps for all saved updates and evidence.\n'
           'Research alerts · not buy/sell instructions.')
@@ -89,7 +89,8 @@ def check_reading(reading, capture, company, cutoff, *, new=(), expected_sources
             raise ValueError('A replay item lacks valid saved tone/evidence provenance.')
         if item['source_id'] in new and not item.get('prefilter'):
             value = item.get('importance') or {}
-            if value.get('policy') != T.POLICY or value.get('level') not in {'high','medium','low'}:
+            if (value.get('policy') != T.POLICY or value.get('event_policy') != T.EVENT_POLICY
+                    or value.get('level') not in {'high','medium','low'}):
                 raise ValueError('New replay news has no evaluated importance; do not assume low.')
             own = {p['id']:p['quote'] for p in source['passages']}
             for citation in value.get('citations',[]):
@@ -134,8 +135,11 @@ def filtered(record, reading, claims, now, *, local=(), immediate=False):
     done = set(local) | {key for sent,keys in claims if sent > now-timedelta(hours=24) for key in keys}
     kept=[]; within=set(); mapping={}
     for item in record['detail']['payload']['items']:
-        if immediate and R.importance(item) != 'high': continue
         source = sources[item['source_id']]
+        if T.editorial_headline(source['title']):continue
+        scored=(item.get('importance') or {}).get('policy')
+        level=R.importance(item,source)
+        if (immediate and level!='high') or (not immediate and scored and level=='low'):continue
         if G.source_keys(reading,source) & (done|within): continue
         keys = G.source_keys(reading,source,for_claim=True)
         kept.append(item); mapping[source['id']]=keys;within.update(keys)

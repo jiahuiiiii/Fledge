@@ -9,8 +9,8 @@ from psycopg.types.json import Jsonb
 from thesis.db import transaction,one,rows
 from thesis.research import coverage,reporting_basis,sentiment_tasks
 
-POLICY='alert-severity-preview-1'
-LIVE_POLICY='alert-severity-live-1'
+POLICY='alert-severity-preview-2'
+LIVE_POLICY='alert-severity-live-2'
 CHANNELS={'high':'telegram','medium':'digest','low':'app'}
 RANK={'low':0,'medium':1,'high':2}
 
@@ -53,8 +53,9 @@ def delivery_reason(conn,owner,record,*,now):
     return None
 
 
-def importance(item):
+def importance(item,source=None):
     """Never promote from tone, a money amount or an unvalidated model field."""
+    if item.get('channel')=='news' and source and sentiment_tasks.editorial_headline(source.get('title')):return 'low'
     value=item.get('importance') or {};basis=item.get('reporting_basis') or {}
     citations=value.get('citations') or []
     if (item.get('channel')!='news' or item.get('relevance')!='relevant'
@@ -79,8 +80,8 @@ def important_reporting(previous,current,seen=None):
     sources={s['id']:s for s in current['packet']['sources']}
     selected=[]
     for item in current['result']['items']:
-        if importance(item)=='low':continue
         source=sources[item['source_id']]
+        if importance(item,source)=='low':continue
         if any(('news',key) in observed for key in coverage.keys(current,source)):continue
         selected.append(item)
     if not selected:return []
@@ -100,10 +101,13 @@ def classify(record,*,idea_items=None):
     if kind=='condition':
         return dict(severity='medium',channel='digest',reason='A saved comparison changed; no importance score is inferred.',items=[])
     items=detail.get('payload',{}).get('items',[]) if kind=='company' else list(idea_items or [])
-    levels=[dict(source_id=i['source_id'],level=importance(i),
+    sources={s['id']:s for s in detail.get('sources',[])}
+    levels=[dict(source_id=i['source_id'],level=importance(i,sources.get(i['source_id'])),
                  category=(i.get('importance') or {}).get('category')) for i in items]
     if not items or not any((i.get('importance') or {}).get('policy')==sentiment_tasks.POLICY for i in items):
-        level='medium';reason='Importance has not been scored; include in the daily review rather than assume high.'
+        editorial=bool(items) and all(i.get('channel')=='news' and sentiment_tasks.editorial_headline(sources.get(i['source_id'],{}).get('title')) for i in items)
+        level='low' if editorial else 'medium'
+        reason='Explicit investment commentary stays in the app.' if editorial else 'Importance has not been scored; include in the daily review rather than assume high.'
     else:
         level=max((i['level'] for i in levels),key=RANK.get)
         reason={'high':'At least one cited company development has high importance.',

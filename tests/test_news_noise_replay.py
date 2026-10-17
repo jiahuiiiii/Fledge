@@ -24,7 +24,7 @@ def reading(capture,company,sources,at,levels):
     result=E.S.render(TR.response(raw),packet)
     result.update(prompt_version=E.T.PROMPT,batching=dict(policy=E.T.POLICY))
     for item in result['items']:
-        item['importance']=dict(policy=E.T.POLICY,level=levels.get(item['source_id'],'low'),
+        item['importance']=dict(policy=E.T.POLICY,event_policy=E.T.EVENT_POLICY,level=levels.get(item['source_id'],'low'),
             proposed_level=levels.get(item['source_id'],'low'),category='product',form='event',
             low_by_rule=False,citations=deepcopy(item['citations']))
     return dict(packet=packet,result=result)

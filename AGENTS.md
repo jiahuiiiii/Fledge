@@ -2,6 +2,14 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## News replay fails noise gate; purpose revision prepared — 17 October 2026
+
+Approved revision completes172/172frames/7input dates,71publications and23hypothetical messages (16immediate/7daily).278new paid requests,12distinct old valid answers reused; additionalUS$2.31882475, combinedUS$2.43838875,0unresolved holds/automatic retries/research writes/Telegram HTTP. Separate assistant review of53excerpts flags15/23messages(65.22%), including11/16immediate:≤10%gate fails. Clear recommendation/valuation/comparison cases alone flag6/23(26.09%); not owner ground truth or an all-alert/live result.
+
+Prepared guards remove low recap companions and explicit news editorial wrappers, preserving legal/uncertain/product/management news and unscored private discussions. Free same-history diagnostic still fails11/20(55%); no acceptance claimed. New versioned article-purpose importance prompt preserves56-tone bodies/fingerprint and4/6hard cases; owner labels0/50pending. Explicit post-completion test mode retains sources/tones/models/prior costs and saved-only/no-retry safeguards. Proposed additionalUS$1.50–3within combinedUS$6cap including prior cost; not executed, owner approval required. No live prompt/routing/delivery/configuration/migration/install/restart change; user CSS exact. Phase5not done. [Record](docs/testing/news-noise-replay.md#completed-approved-revision-and-failed-noise-gate--17-october-2026).
+
+Final229affected offline tests pass; earlier225/107overlap, broad2656pass/93optional skips predates these guards/purpose changes. Real saved-only preflight rechecks4cached answers,0new calls, stops before uncached work and retains prior charges. Source-purpose/continuation fixtures and initial selector diagnostics retained. No paid test of the new prompt; owner-quality page exact.
+
 ## Price-assessment and outcome evidence — 17 October 2026 (prepared)
 
 Unapplied067prepares private immutable all-company price assessments before event publication. Missing/stale/withheld inputs and already-claimed moves remain distinguishable; publication failure retains its qualifying denominator. Lease/quote/watch membership enforced; audit failure continues detection and records a coverage gap. New read-only aggregate operator measures ten whole US sessions plus the final spending bucket, actual confirmed sends, grouping/latency, repair/attempt/ratings/cost evidence and rollback flags. Unknown observations, deferred owner quality and independent noise review remain pending; it never installs, pays, sends or rolls back.

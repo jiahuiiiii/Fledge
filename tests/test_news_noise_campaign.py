@@ -33,6 +33,36 @@ def run(plan,path,transport,**kwargs):
     return C.run(plan,path,Decimal('6'),approved_plan=plan['fingerprint'],transport=transport,**kwargs)
 
 
+def next_purpose(plan,monkeypatch):
+    monkeypatch.setattr(C.T,'EVENT_POLICY','authored-next-purpose')
+    monkeypatch.setattr(C.T,'EVENT_INSTRUCTION',C.T.EVENT_INSTRUCTION+'\nAuthored next purpose.')
+    monkeypatch.setitem(C.T.INSTRUCTIONS,'event',C.T.EVENT_INSTRUCTION)
+    core=dict(policy=C.POLICY,contract=C.contract(),capture=deepcopy(plan['capture']),reused=deepcopy(plan['reused']))
+    return dict(core,fingerprint=C.N.digest(core))
+
+
+def test_new_purpose_requires_completed_prior_plan_and_saved_only_never_pays(tmp_path,access,monkeypatch):
+    _,_,plan=inputs();first=run(plan,tmp_path/'first',provider([]));assert first['completed']
+    new=next_purpose(plan,monkeypatch)
+    free=run(new,tmp_path/'free',lambda _:pytest.fail('Saved-only paid'),after_completed=tmp_path/'first',saved_only=True)
+    assert free['attempted']==0 and free['stopped']=='new_request_needed_saved_only'
+    assert free['paid_usd']==first['paid_usd'] and free['after_completed_fingerprint']==plan['fingerprint']
+    paid=run(new,tmp_path/'next',provider([]),after_completed=tmp_path/'first')
+    assert paid['completed'] and Decimal(paid['paid_usd'])>Decimal(first['paid_usd'])
+    assert not paid['automatic_retries']
+
+
+def test_new_purpose_cannot_change_sources_tones_or_ignore_an_unfinished_run(tmp_path,access,monkeypatch):
+    _,_,plan=inputs();run(plan,tmp_path/'first',provider([]))
+    with pytest.raises(ValueError,match='identical purpose'):run(plan,tmp_path/'identical',provider([]),after_completed=tmp_path/'first')
+    new=next_purpose(plan,monkeypatch)
+    changed=deepcopy(new);sid=next(iter(changed['reused']));changed['reused'][sid]['analysis_id']='another-origin'
+    changed['fingerprint']=C.N.digest({k:v for k,v in changed.items() if k!='fingerprint'})
+    with pytest.raises(ValueError,match='exact sources'):run(changed,tmp_path/'changed',provider([]),after_completed=tmp_path/'first')
+    report_path=tmp_path/'first/campaign.json';report=json.loads(report_path.read_text());report['completed']=False;report_path.write_text(json.dumps(report))
+    with pytest.raises(ValueError,match='completed prior'):run(new,tmp_path/'unfinished',provider([]),after_completed=tmp_path/'first')
+
+
 def test_frozen_plan_keeps_exact_old_tones_and_contracts_without_dispatch():
     capture,records,plan=inputs();before=deepcopy(records)
     report=C.estimate(plan)

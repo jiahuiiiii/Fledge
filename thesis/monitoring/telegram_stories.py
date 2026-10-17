@@ -130,11 +130,18 @@ def prepare(conn,owner,record,delivery_id,now,*,local=(),immediate=False,legacy=
     done.update(legacy_keys(conn,owner,delivery_id,now) if legacy is None else legacy)
     pending={r['story_key'] for r in held if r['status']=='queued'}
     detail=record['detail'];kind=record['kind']
-    if immediate and kind in {'company','idea'} and '__event' not in mapping:
+    if kind in {'company','idea'} and '__event' not in mapping:
         analysis=analysis_for(conn,owner,record)
-        high={i['source_id'] for i in analysis['result']['items'] if R.importance(i)=='high'}
-        mapping={sid:v for sid,v in mapping.items() if sid in high}
-        if not mapping:raise Suppressed('No high-importance evidence remains for immediate delivery. Review the alert in Updates.')
+        sources={s['id']:s for s in analysis['packet']['sources']}
+        def eligible(item):
+            source=sources.get(item['source_id'])
+            if source and source.get('channel')=='news' and R.sentiment_tasks.editorial_headline(source.get('title')):return False
+            if not immediate and not (item.get('importance') or {}).get('policy'):return True
+            level=R.importance(item,source)
+            return level=='high' if immediate else level!='low'
+        allowed={i['source_id'] for i in analysis['result']['items'] if eligible(i)}
+        mapping={sid:v for sid,v in mapping.items() if sid in allowed}
+        if not mapping:raise Suppressed('No qualifying importance evidence remains for this delivery. Review the alert in Updates.')
     claim_mapping=groups(conn,owner,record,for_claim=True)
     kept={};within=set()
     for sid,value in mapping.items():

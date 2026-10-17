@@ -25,7 +25,7 @@ def enabled():
 
 
 def identity(packet):
-    value = dict(policy=T.POLICY, schema_policy=T.SCHEMA_POLICY,instructions=T.INSTRUCTIONS, model=T.REASONING_MODEL,
+    value = dict(policy=T.POLICY, schema_policy=T.SCHEMA_POLICY,headline_policy=T.HEADLINE_POLICY,instructions=T.INSTRUCTIONS, model=T.REASONING_MODEL,
                  company=packet['company'], sources=[sentiment_reuse.content_key(s) for s in packet['sources']],
                  comparisons=[sentiment_reuse.content_key(s) for s in packet.get('comparison_sources',[])],
                  policies={key:packet.get(key) for key in ('reporting_policy','context_policy','reddit_thread_policy','guard_policy')},
@@ -214,7 +214,8 @@ def run(packet, reused=None, *, transport=None, progress=None, prefilter=None, s
             origins[item['id']]=dict(model=call['model'],call_id=str(call['id']),prompt_version=T.PROMPT)
     if fresh:stage('tone',plan('tone',packet,fresh),tone_result)
     news=[s for s in packet['sources'] if s['channel']=='news' and s['id'] not in skipped]
-    missing_events=[s for s in news if (checked.get(s['label'],{}).get('importance') or {}).get('policy')!=T.POLICY]
+    missing_events=[s for s in news if (checked.get(s['label'],{}).get('importance') or {}).get('policy')!=T.POLICY
+                    or (checked.get(s['label'],{}).get('importance') or {}).get('event_policy')!=T.EVENT_POLICY]
     def event_result(call,part):
         for label,value in T.event_labels(call,part,list(tones.values())).items():
             value['importance'].update(model=call['model'],call_id=str(call['id']))
@@ -242,6 +243,12 @@ def run(packet, reused=None, *, transport=None, progress=None, prefilter=None, s
             repair['reasons']=list(dict.fromkeys(repair['reasons']+event['importance']['event_repair']))
             repair['reporting_original']=deepcopy(event['reporting'])
             item['repair']['reporting_call_id']=event['importance']['call_id']
+    # Reapply code-owned demotions to carried-over importance without paying
+    # to relabel unchanged tones/events or mutating the original reading.
+    for source in news:
+        item=checked[source['label']]
+        if item.get('importance') and T.editorial_headline(source['title']):
+            item['importance']=dict(item['importance'],level='low',low_by_rule=True,headline_policy=T.HEADLINE_POLICY)
     current=[s for s in packet['sources'] if s['id'] not in skipped]
     comparison_packet=dict(packet,sources=current)
     pairs=T.candidates(comparison_packet,list(checked.values()))
