@@ -25,21 +25,26 @@ def assess(baseline_since, since, as_of, checks, observations, *, deployment_con
     hours=(until-since).total_seconds()/3600
     baseline_hours=(since-baseline_since).total_seconds()/3600
     before,after=Counter(),Counter()
-    baseline_responses=0
+    baseline_counts,rollout_counts=Counter(),Counter()
     providers=set()
     for row in observations:
         at=row['observed_at'];provider=row['provider']
         if not baseline_since<=at<until:continue
         providers.add(provider)
-        baseline_responses+=at<since
+        (baseline_counts if at<since else rollout_counts)[provider]+=1
         if row['http_status'] in (401,403,429):
             (before if at<since else after)[provider]+=1
     full=hours>=72
     provider_rows=[dict(provider=p,baseline_denials=before[p],rollout_denials=after[p],
+                        baseline_responses=baseline_counts[p],rollout_responses=rollout_counts[p],
+                        coverage=('observed_both' if baseline_counts[p] and rollout_counts[p] else
+                                  'missing_baseline' if not baseline_counts[p] else 'missing_rollout'),
                         baseline_per_day=round(before[p]*24/baseline_hours,4),
                         rollout_per_day=round(after[p]*24/hours,4) if hours else None)
                    for p in sorted(providers)]
-    stable=all(Decimal(after[p])*Decimal(str(baseline_hours))<=Decimal(before[p])*Decimal(str(hours)) for p in providers)
+    comparable={p for p in providers if baseline_counts[p] and rollout_counts[p]}
+    stable=all(Decimal(after[p])*Decimal(str(baseline_hours))<=Decimal(before[p])*Decimal(str(hours)) for p in comparable)
+    coverage_complete=bool(providers) and comparable==providers
     lanes={}
     for lane,maximum in (('fast',60),('slow',180)):
         selected=[c for c in checks if c['lane']==lane and since<=c['started_at']<until]
@@ -55,14 +60,16 @@ def assess(baseline_since, since, as_of, checks, observations, *, deployment_con
     gates=dict(deployment='passed' if deployment_confirmed else 'pending',
                fast=lanes['fast']['status'],slow=lanes['slow']['status'],
                completion='pending' if not full else 'passed' if total and completed*100>=total*97 else 'failed',
-               provider_denials=('pending' if not full or baseline_hours<24 or not baseline_responses else
-                                'passed' if stable else 'failed'))
+               provider_denials=('pending' if not full or baseline_hours<24 else
+                                 'failed' if not stable else 'passed' if coverage_complete else 'pending'))
     return dict(since=since.isoformat(),measured_until=until.isoformat(),elapsed_hours=hours,
-                baseline_hours=baseline_hours,baseline_http_responses=baseline_responses,
+                baseline_hours=baseline_hours,baseline_http_responses=sum(baseline_counts.values()),
+                rollout_http_responses=sum(rollout_counts.values()),provider_coverage_complete=coverage_complete,
                 lanes=lanes,completion_percent=completion,providers=provider_rows,
                 gates=gates,passed=all(g=='passed' for g in gates.values()),
                 limitations=['Recorded attempts only; missing scheduled slots are not reconstructed.',
                              'Provider denials are HTTP 401/403/429 responses per day, not local cooldowns.',
+                             'Each observed provider needs HTTP responses in both windows; absent traffic is unknown, not zero denials.',
                              'A separate baseline with metrics enabled and lanes disabled is required.'])
 
 

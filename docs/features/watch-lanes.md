@@ -67,7 +67,10 @@ metrics and collect at least 24 hours of baseline. Then use
 `experiments/soclaas_replay/lane_readiness.py` with that baseline start and the
 confirmed lane-start timestamp. It reads one consistent read-only snapshot and
 requires three full days, fast median ≤60s, slow median ≤180s, completion ≥97%,
-and no increase in HTTP401/403/429 responses per day for any provider. Missing
+and no increase in HTTP401/403/429 responses per day for any provider. Each
+observed provider must have HTTP responses in both periods; a baseline-only or
+rollout-only provider remains unknown, including a new provider with a denial.
+A proven increase for another comparable provider still fails the gate. Missing
 baseline, empty lanes, incomplete windows and missing deployment confirmation
 cannot pass. It reports recorded attempts; missed schedule slots are not inferred.
 
@@ -123,3 +126,19 @@ At12:55:59SGT, only `THESIS_SOURCE_METRICS=true` was enabled after a fresh
 This flag is read dynamically, so no restart was needed. The selected models
 and all schedules/account preferences remained exact. This begins the24-hour
 passive denial baseline; lanes, moves and new delivery remain off.
+
+## Provider comparison coverage follow-up — 17 October 2026
+
+The read-only report previously could pass with baseline traffic but no rollout
+traffic, or silently treat a provider absent from one period as having zero
+denials. It now counts responses per provider on both sides, reports missing
+coverage explicitly and cannot award a pass from absent observations. This
+changes reporting only; collection, pacing and saved data remain untouched.
+**43 related offline tests pass**, including per-provider missing periods and
+known increases despite another provider's incomplete coverage.
+
+At20:03SGT, passive baseline coverage is7.1219/24hours:1,184HTTPresponses
+across15providers,0observed401/403/429denials. This partial result is not
+acceptance. Metrics remain enabled, lanes disabled; the baseline cannot finish
+before18October12:55:59SGT. No provider/AI request, schedule/settings change,
+migration, install or restart by this follow-up.

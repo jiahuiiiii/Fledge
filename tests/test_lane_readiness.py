@@ -51,6 +51,35 @@ def test_denial_comparison_uses_each_provider_and_equal_day_rates():
     assert assessment(events=[event(-1),event(1,503)])['gates']['provider_denials']=='passed'
 
 
+@pytest.mark.parametrize('events,missing',[
+    ([event(-1)],'missing_rollout'),
+    ([event(1)],'missing_baseline'),
+])
+def test_no_responses_in_either_window_cannot_be_counted_as_no_denials(events,missing):
+    value=assessment(events=events)
+    assert value['gates']['provider_denials']=='pending' and not value['passed']
+    assert not value['provider_coverage_complete']
+    assert value['providers'][0]['coverage']==missing
+    assert value['baseline_http_responses']+value['rollout_http_responses']==1
+
+
+def test_one_observed_provider_does_not_cover_another_or_hide_a_known_increase():
+    known=[event(-1),event(1)]
+    before_only=dict(event(-2),provider='publisher')
+    value=assessment(events=known+[before_only])
+    assert value['gates']['provider_denials']=='pending'
+    assert {p['provider']:p['coverage'] for p in value['providers']}=={
+        'finnhub':'observed_both','publisher':'missing_rollout'}
+    value=assessment(events=known+[before_only,event(2,429)])
+    assert value['gates']['provider_denials']=='failed'
+    assert not value['provider_coverage_complete']
+
+
+def test_new_provider_without_a_baseline_is_unknown_even_with_a_denial():
+    value=assessment(events=[event(-1),event(1),dict(event(2,429),provider='new-provider')])
+    assert value['gates']['provider_denials']=='pending'
+
+
 def test_metrics_are_off_until_requested_and_http_denials_record_no_body_or_keys(owner,monkeypatch):
     prepare(owner)
     monkeypatch.setenv('THESIS_SENTIMENT_LANES','false')

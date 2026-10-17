@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Provider comparison requires both observation periods — 17 October 2026
+
+Read-only lane report no longer awards zero-denial success when rollout traffic is missing, or when a provider exists in only one period. Per-provider counts/coverage remain unknown until both sides are observed; a known increase for another provider still fails.43related offline tests pass; no collection/pacing/schema/app change.
+
+At20:03SGTbaseline is7.1219/24hours,1184HTTPresponses/15providers/0denials; lanes off, rollout0/72hours. Core48-hour observation at20:01SGT:29completed/0failed/0stopped/3unfinished,7.3938hours, normalAIUS$1.893521with0unresolved and0closed daily windows. Partial90.625%includes unfinished work; no acceptance/failure extrapolation. No paid test/source request/settings/migration/install/restart, user CSS exact. New-purpose paid approval and deferred owner labels remain pending. [Measurement](docs/features/watch-lanes.md#provider-comparison-coverage-follow-up--17-october-2026).
+
 ## News replay fails noise gate; purpose revision prepared — 17 October 2026
 
 Approved revision completes172/172frames/7input dates,71publications and23hypothetical messages (16immediate/7daily).278new paid requests,12distinct old valid answers reused; additionalUS$2.31882475, combinedUS$2.43838875,0unresolved holds/automatic retries/research writes/Telegram HTTP. Separate assistant review of53excerpts flags15/23messages(65.22%), including11/16immediate:≤10%gate fails. Clear recommendation/valuation/comparison cases alone flag6/23(26.09%); not owner ground truth or an all-alert/live result.

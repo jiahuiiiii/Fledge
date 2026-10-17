@@ -140,6 +140,19 @@ provider-denial baseline unverified. [Contract/results](../features/watch-lanes.
 
 **Done when:** fast-lane checks have a median of 60 s or less and slow-lane checks 180 s or less over 3 days, with no increase in provider denials.
 
+Read-only coverage follow-up17October20:03SGT:43related offline tests pass for
+requiring HTTPresponses for every observed provider in both comparison periods.
+Missing traffic is unknown, not zero denials; a known increase elsewhere still
+fails. Passive baseline7.1219/24hours,1184responses/15providers/0denials so far;
+lanes remain off,0/72rollout hours. No timing/denial acceptance claim.
+
+Core rollout observation at20:01SGT is7.3938/48hours:29completed,0failed,
+0stopped,3unfinished; all29completed readings use the reliability policy.
+Recorded completion90.625%includes the still-unfinished checks, not a final
+failure. Normal AIchargesUS$1.893521,0unresolved,0closed daily cost windows;
+48-hour/three-day completion and daily-cost gates remain pending. No new paid
+experiment, configuration change or restart by these observations.
+
 ### Phase 4 — price-move trigger and "why is it moving" (from option b)
 
 **17 October 2026: implementation prepared; acceptance pending (not done).**
