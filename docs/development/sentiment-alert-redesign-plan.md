@@ -302,6 +302,18 @@ charges. It has not executed. Review evidence/answers remain blind and unchanged
 owner labels0/50, hard cases0/6, noise replay0/7and live gates remain;
 **phase5not done**. No install/restart/live-setting or saved-research change.
 
+Approved quality follow-up17October: owner approved the revised paid test.
+56/56answers validate,0repairs, fixed hard cases4/6pass. Two old answers reused
+free;54new requests include the one explicitly approved retest plus53untouched
+cases. AdditionalUS$0.420225, combinedUS$0.445405,0unresolved holds/automatic
+retries. Owner will label later; review page remains blind,0/50answers received.
+New read-only replay-readiness checker passes23new/128related offline tests;
+145saved readings yield1055exact tone candidates for1066news opportunities,
+all saved after their source-availability frame (no historical-timeliness claim).
+Importance/duplicate evaluation and independent noise replay0/7remain. No
+live setting, migration, installation, restart or research/preference change;
+**phase5not done**. [Replay inventory](../testing/news-noise-replay.md).
+
 1. **Split the prompt into smaller tasks:**
    1. relevance (the existing quick check);
    2. tone and evidence basis;

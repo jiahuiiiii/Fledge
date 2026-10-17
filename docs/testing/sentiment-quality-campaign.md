@@ -1,7 +1,7 @@
 # Frozen sentiment quality campaign
 
-Prepared 17 October 2026 on `codex/redesign-phase-5`. **First paid run stopped;
-revised test awaits explicit approval. Not installed or enabled.** This operator tool prepares the remaining phase5quality evidence;
+Prepared 17 October 2026 on `codex/redesign-phase-5`. **Approved revised test
+completed; owner accuracy check pending. Not installed or enabled.** This operator tool prepares the remaining phase5quality evidence;
 it supplies no owner labels or completed acceptance gate.
 
 ## Fixed inputs
@@ -139,3 +139,24 @@ revised cap. Full2571pass/93optional skips above predates this schema revision.
 No live migration, environment/preference change, installation or restart;
 user CSS remains exact. Noise replay remains0/7; inventory/input freezing does
 not count as a replay.
+
+## Approved revised run completed — 17 October 2026
+
+After explicit owner approval, the stricter frozen plan completed56/56validated
+answers with0repairs. Two original answers were reused for free;54requests were
+sent, comprising the one approved failed-case retest and53never-attempted cases.
+The six fixed hard cases score4/6and pass their gate. This does not substitute
+for owner accuracy: all50predictions remain separate from the unchanged blind
+review page, and no owner answers have been received or read.
+
+Additional confirmed costUS$0.420225; combined cost including the initial failed
+runUS$0.445405, below theUS$2cap. Zero unresolved holds and automatic retries.
+No research/preference/live-setting change, installation or restart. Private
+results are retained in `quality-campaign-run2/` beside the original failed run.
+The runner's related offline checks remain passing; the subsequent replay-
+inventory change passes128affected offline tests. A read-only inventory finds
+1,055exact saved-tone candidates among1,066news opportunities; it does not count
+as a noise replay. [Inventory and limits](news-noise-replay.md).
+
+Current gates: structural validation56/56passed, fixed hard cases4/6passed,
+owner labels0/50pending, independent noise replay0/7pending. Phase5is not done.

@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Revised quality gate and replay inventory — 17 October 2026
+
+Owner-approved revision completes56/56validated GPT-5.4answers,0repairs, fixed hard cases4/6pass. Two old answers reused free;54new requests include1explicitly approved retest and53untouched cases. AdditionalUS$0.420225, combinedUS$0.445405,0unresolved holds/automatic retries. Owner defers labelling; blind page exact,0/50answers received, no accuracy claim.
+
+New read-only replay checker passes23new/128related offline tests: fingerprints/cutoffs, exact text/passages/policies/citations, initial quiet samples, quick-model provenance and no future-label availability claims.145saved readings yield1055exact tone candidates among1066news opportunities;11missing. All candidates were saved after their source-availability frames. Inventory only, not production reuse or importance/duplicate/noise results; replay0/7. Retain initial sandbox setup and stale-passage test diagnostics. No source fetch/live configuration/migration/install/app-or-DBrestart/research/preference change; user CSS exact. Phase5not done. [Quality](docs/testing/sentiment-quality-campaign.md#approved-revised-run-completed--17-october-2026) · [Replay limits](docs/testing/news-noise-replay.md).
+
 ## Quality-test stop and stricter evidence schema — 17 October 2026
 
 First paid campaign stopped after3settled GPT-5.4requests:2valid answers, third rejected for parent context on a parentless source. US$0.02518confirmed,0unresolved holds,0paid retries;53cases including6hard cases untouched. New shared schema restricts supplied source/passage IDs and empty impossible fields; strict runtime citations remain. Schema policy enters reading identity; old raw responses/research remain exact.

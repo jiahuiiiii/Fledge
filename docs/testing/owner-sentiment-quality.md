@@ -121,3 +121,19 @@ paid-retry approval and the original combinedUS$2cap. It has not executed.
 [Current campaign record](sentiment-quality-campaign.md#paid-stop-and-stricter-schema--17-october-2026).
 The review page and frozen evidence remain unchanged; no predictions are shown.
 Actual owner annotations are still0/50received, so accuracy remains unmeasured.
+
+## Approved revised evaluation completed — 17 October 2026
+
+The explicitly approved revision passes56/56structural/evidence checks with
+zero repairs and4/6fixed hard cases. It reuses two valid answers for free and
+made54new paid requests, including the single approved retest. Additional cost
+US$0.420225; combinedUS$0.445405, zero unresolved holds or automatic retries.
+The50owner predictions stay private and separate; no review choice is prefilled.
+
+The owner will label later. Each selection saves in the same browser's local
+storage; reopening the same file/browser resumes saved choices unless that
+storage is cleared or unavailable (the page displays a warning on failure).
+Once all50are answered, the owner confirms independent labelling and downloads
+the JSON. For this shared local workspace, providing the downloaded file's path
+is sufficient; uploading a second copy is optional. The scorer still waits for
+those actual answers. Owner labels0/50received; no80%accuracy claim yet.
