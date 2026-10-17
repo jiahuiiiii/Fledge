@@ -291,6 +291,17 @@ noise score. Real paid measurements, owner labels0/50, real hard cases0/6, noise
 and live/shadow/outcome gates remain; **phase5not done**.
 [Contract](../testing/sentiment-quality-campaign.md).
 
+Quality-run follow-up17October: first run stopped after3settled requests,
+US$0.02518confirmed and0unresolved holds;2answers validated, third rejected for
+parent context on a parentless source. No paid retry;53cases remain untouched,
+including all6hard cases. A stricter supplied-evidence schema and explicit
+revised-plan continuation pass174related offline tests. Proposed retest requires
+owner approval: reuse2valid answers free, retest1failed case once and send53new
+cases, expected additionalUS$0.40–1.20within the combinedUS$2cap including prior
+charges. It has not executed. Review evidence/answers remain blind and unchanged;
+owner labels0/50, hard cases0/6, noise replay0/7and live gates remain;
+**phase5not done**. No install/restart/live-setting or saved-research change.
+
 1. **Split the prompt into smaller tasks:**
    1. relevance (the existing quick check);
    2. tone and evidence basis;

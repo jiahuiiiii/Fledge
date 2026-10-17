@@ -25,7 +25,7 @@ def enabled():
 
 
 def identity(packet):
-    value = dict(policy=T.POLICY, instructions=T.INSTRUCTIONS, model=T.REASONING_MODEL,
+    value = dict(policy=T.POLICY, schema_policy=T.SCHEMA_POLICY,instructions=T.INSTRUCTIONS, model=T.REASONING_MODEL,
                  company=packet['company'], sources=[sentiment_reuse.content_key(s) for s in packet['sources']],
                  comparisons=[sentiment_reuse.content_key(s) for s in packet.get('comparison_sources',[])],
                  policies={key:packet.get(key) for key in ('reporting_policy','context_policy','reddit_thread_policy','guard_policy')},

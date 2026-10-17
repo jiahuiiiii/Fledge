@@ -235,3 +235,92 @@ def test_quality_prediction_uses_the_repaired_label_without_modifying_raw_output
     before=deepcopy(raw)
     label,repaired=V.parse(dict(response_body=raw),case['packet'])
     assert label==dict(relevance='unrelated',sentiment='unclear') and repaired==1 and raw==before
+
+
+def legacy_plan(monkeypatch):
+    with monkeypatch.context() as old:
+        old.setattr(V.T,'bounded_schema',lambda task,sources:V.T.strict_schema(V.T.MODELS[task]))
+        return fixtures()
+
+
+def test_revised_schema_requires_explicit_named_retry_and_reuses_valid_paid_answers(tmp_path,access,monkeypatch):
+    m,old=legacy_plan(monkeypatch);seen=[];normal=provider(seen)
+    def bad_parent(body):
+        raw=normal(body)
+        if len(seen)==3:
+            value=json.loads(raw['output'][0]['content'][0]['text']);value['items'][0]['context_passages']=['p1']
+            raw['output'][0]['content'][0]['text']=json.dumps(value)
+        return raw
+    with monkeypatch.context() as previous:
+        previous.setattr(V.T,'bounded_schema',lambda task,sources:V.T.strict_schema(V.T.MODELS[task]))
+        first=execute(m,old,tmp_path/'old',bad_parent)
+    assert first['attempted']==3 and len(seen)==3
+    bad=first['results'][-1];identity=bad['scope']+':'+bad['id']
+    revised=V.revised_plan(old,m,[identity])
+    with pytest.raises(ValueError,match='already attempted'):
+        execute(m,revised,tmp_path/'missing-mode',normal)
+    result=execute(m,revised,tmp_path/'revised',normal,revised_after=tmp_path/'old')
+    assert result['completed'] and result['attempted']==54 and len(seen)==57
+    assert sum(r['inherited_schema'] for r in result['results'])==2
+    assert sum(bool(r['retested_call_id']) for r in result['results'])==1
+    assert Decimal(result['paid_usd'])>Decimal(first['paid_usd'])
+    funding=revised['requests']+old['requests']
+    assert Decimal(result['paid_usd'])==sum(Decimal(c['charged_nano_usd'])/ledger.NANO for c in V.saved_calls(funding))
+
+
+def test_schema_revision_without_retry_permission_stops_before_new_paid_work(tmp_path,access,monkeypatch):
+    m,old=legacy_plan(monkeypatch);seen=[];normal=provider(seen)
+    def invalid(body):
+        raw=normal(body);value=json.loads(raw['output'][0]['content'][0]['text'])
+        value['items'][0]['context_passages']=['p1'];raw['output'][0]['content'][0]['text']=json.dumps(value)
+        return raw
+    with monkeypatch.context() as previous:
+        previous.setattr(V.T,'bounded_schema',lambda task,sources:V.T.strict_schema(V.T.MODELS[task]))
+        execute(m,old,tmp_path/'old',invalid)
+    revised=V.revised_plan(old,m,[])
+    result=execute(m,revised,tmp_path/'no-retry',normal,revised_after=tmp_path/'old')
+    assert result['attempted']==0 and result['stopped']=='prior_saved_answer_invalid_no_retry' and len(seen)==1
+
+
+def test_schema_revision_cannot_change_inputs_expectations_or_weaken_constraints(monkeypatch):
+    m,old=legacy_plan(monkeypatch)
+    revised=V.revised_plan(old,m,[])
+    changed=deepcopy(revised);changed['requests'][0]['body']['input'][1]['content']='{}'
+    with pytest.raises(ValueError):V.equivalent(changed,old)
+    assert not V.narrows({'maxItems':3},{'maxItems':2})
+    assert not V.narrows({'enum':['a','b']},{'enum':['a']})
+    assert V.narrows({'maxItems':0},{'maxItems':2})
+    with pytest.raises(ValueError,match='Identical'):V.equivalent(revised,revised)
+
+
+def test_revised_cap_retains_original_paid_failures_before_another_dispatch(tmp_path,access,monkeypatch):
+    m,old=legacy_plan(monkeypatch);seen=[];normal=provider(seen)
+    def bad(body):
+        raw=normal(body);value=json.loads(raw['output'][0]['content'][0]['text'])
+        value['items'][0]['context_passages']=['p1'];raw['output'][0]['content'][0]['text']=json.dumps(value)
+        return raw
+    with monkeypatch.context() as previous:
+        previous.setattr(V.T,'bounded_schema',lambda task,sources:V.T.strict_schema(V.T.MODELS[task]))
+        first=execute(m,old,tmp_path/'old',bad)
+    case=old['requests'][0];retry=case['scope']+':'+case['id']
+    revised=V.revised_plan(old,m,[retry])
+    cap=Decimal(first['paid_usd'])+Decimal(ledger.estimate(revised['requests'][0]['body']))/ledger.NANO/2
+    result=V.run(revised,m,tmp_path/'bounded',cap,approved_plan=revised['fingerprint'],transport=normal,revised_after=tmp_path/'old')
+    assert result['attempted']==0 and result['stopped']=='combined_cap_before_dispatch' and len(seen)==1
+    assert result['paid_usd']==first['paid_usd']
+
+
+def test_revised_plan_cannot_pay_again_for_a_previously_valid_case(tmp_path,access,monkeypatch):
+    m,old=legacy_plan(monkeypatch);seen=[];normal=provider(seen);parse=V.parse;checked=[]
+    def stop_second(call,packet):
+        checked.append(True)
+        if len(checked)==2:raise ValueError('Authored validator stop')
+        return parse(call,packet)
+    with monkeypatch.context() as previous:
+        previous.setattr(V.T,'bounded_schema',lambda task,sources:V.T.strict_schema(V.T.MODELS[task]))
+        previous.setattr(V,'parse',stop_second)
+        execute(m,old,tmp_path/'old',normal)
+    valid=old['requests'][0];revised=V.revised_plan(old,m,[valid['scope']+':'+valid['id']])
+    with pytest.raises(ValueError,match='explicitly named failed'):
+        execute(m,revised,tmp_path/'invalid-retry',normal,revised_after=tmp_path/'old')
+    assert len(seen)==2 and not (tmp_path/'invalid-retry').exists()

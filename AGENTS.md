@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Quality-test stop and stricter evidence schema — 17 October 2026
+
+First paid campaign stopped after3settled GPT-5.4requests:2valid answers, third rejected for parent context on a parentless source. US$0.02518confirmed,0unresolved holds,0paid retries;53cases including6hard cases untouched. New shared schema restricts supplied source/passage IDs and empty impossible fields; strict runtime citations remain. Schema policy enters reading identity; old raw responses/research remain exact.
+
+Final174related offline tests pass. Full2571pass/93optional skips predates this revision. Free checks56/56access,2old answers valid under new schema, failed answer still rejected. Frozen proposed continuation reuses2free, explicitly retests1failed case and sends53new; additionalUS$0.40–1.20expected, combined capUS$2including prior charges. **Not executed; paid retry needs owner approval.** Owner labels0/50, hard cases0/6, noise replay0/7; phase5not done. No migration/configuration/install/app-or-DBrestart/preference change; user CSS exact. [Record](docs/testing/sentiment-quality-campaign.md#paid-stop-and-stricter-schema--17-october-2026).
+
 ## Frozen sentiment quality runner — 17 October 2026 (prepared)
 
 New operator-only quality runner binds the exact50owner cases plus6original proofread cases, selected GPT-5.4 bodies and required context. Read-only preflight/rechecks, hashed ledger identities independent of folders, one campaign lock, combinedUS$2maximum, stop-on-first-failure and explicit unattempted-only continuation preserve costs/holds and forbid automatic paid retries. Predictions retain repaired-label provenance and a sample fingerprint; owner answers are never read by the runner or replaced by AI labels. Review page/data/preferences remain exact.

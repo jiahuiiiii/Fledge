@@ -109,3 +109,15 @@ first-failure stop and explicit unattempted-only continuation. It never reads
 owner answers or changes the review page. The scorer accepts its fingerprinted
 prediction envelope and rejects another sample.99related offline tests pass;
 no paid run or real new-prompt quality result exists. Owner labels0/50remain.
+
+## First paid run stopped — 17 October 2026
+
+Three requests costUS$0.02518with zero unresolved holds. Two answers passed;
+the third failed the parent-context citation guard and stopped the run. No retry
+occurred. A stricter generation schema and explicit revised-continuation guards
+pass174related offline tests. The proposed run reuses the first two answers for
+free, retests only the failed case and sends53untouched cases, subject to explicit
+paid-retry approval and the original combinedUS$2cap. It has not executed.
+[Current campaign record](sentiment-quality-campaign.md#paid-stop-and-stricter-schema--17-october-2026).
+The review page and frozen evidence remain unchanged; no predictions are shown.
+Actual owner annotations are still0/50received, so accuracy remains unmeasured.

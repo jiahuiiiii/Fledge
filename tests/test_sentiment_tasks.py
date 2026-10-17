@@ -98,3 +98,29 @@ def test_duplicate_candidates_need_specific_headline_overlap_and_earlier_referen
     assert T.candidates(p,values)==[]
     p['sources'][1]['title']='Lumen stock today market share company'
     assert T.candidates(p,tones(p))==[]
+
+
+def test_parentless_task_schema_forbids_parent_claims_and_binds_supplied_labels():
+    p=packet();p['sources']=[p['sources'][0]]
+    body=T.request_for('tone',p);properties=body['text']['format']['schema']['$defs']['ToneItem']['properties']
+    assert properties['context_passages']['maxItems']==0
+    assert properties['id']['enum']==[p['sources'][0]['label']]
+    assert properties['previous_passages']['maxItems']==0 and properties['price_claims']['maxItems']==0
+    assert set(properties['passages']['items']['enum'])=={x['id'] for x in p['sources'][0]['passages']}
+    assert len(T.INSTRUCTIONS['tone'])<=6000 and len(ledger.canonical(body).encode())<=48000
+
+
+def test_supplied_parents_keep_their_actual_context_ids_and_mixed_runtime_guards():
+    p=controls();p['sources']=[p['sources'][5]]
+    body=T.request_for('tone',p);properties=body['text']['format']['schema']['$defs']['ToneItem']['properties']
+    assert properties['context_passages']['maxItems']==2
+    assert properties['context_passages']['items']['enum']==['p1']
+    raw=tones(p);raw[0]['context_passages']=['invented-parent']
+    with pytest.raises(ValueError):T.tone_labels(call(dict(items=raw)),p)
+
+
+def test_schema_revision_changes_reading_identity_without_changing_source_text(monkeypatch):
+    from thesis.research import sentiment_task_runner as R
+    p=packet();new=R.identity(p)
+    monkeypatch.setattr(T,'SCHEMA_POLICY','authored-previous-schema')
+    assert R.identity(p)!=new

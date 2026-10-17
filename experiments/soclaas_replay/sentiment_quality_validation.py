@@ -116,9 +116,87 @@ def validate(plan,manifest):
         elif case['scope']=='hard6':
             hard.append(dict(case,source_id=case['packet']['sources'][0]['id']))
         else:raise ValueError('Unknown evaluation scope.')
-    if make_plan(manifest,owner,hard)!=plan:
+    rebuilt=make_plan(manifest,owner,hard)
+    supplied={k:v for k,v in plan.items() if k not in {'fingerprint','previous_plan','retry_cases'}}
+    if {k:v for k,v in rebuilt.items() if k!='fingerprint'}!=supplied:
         raise ValueError('The plan no longer matches the production task contract.')
+    if plan.get('previous_plan'):
+        previous=plan['previous_plan']
+        for parent in ancestors(plan):
+            if digest({k:v for k,v in parent.items() if k!='fingerprint'})!=parent.get('fingerprint'):
+                raise ValueError('An earlier frozen plan changed.')
+        chain=[plan]+ancestors(plan)
+        for child,parent in zip(chain,chain[1:]):equivalent(child,parent)
+        identities={c['scope']+':'+c['id'] for c in plan['requests']}
+        if not set(plan.get('retry_cases',[]))<=identities:raise ValueError('Unknown explicitly retried case.')
     return plan['requests']
+
+
+def ancestors(plan):
+    result=[];parent=plan.get('previous_plan')
+    while parent:
+        result.append(parent)
+        if len(result)>3:raise ValueError('Too many quality-plan revisions; review the experiment separately.')
+        parent=parent.get('previous_plan')
+    return result
+
+
+def narrows(new,old):
+    if isinstance(old,dict):
+        if not isinstance(new,dict) or not set(old)<=set(new):return False
+        if not (set(new)-set(old))<={'enum','maxItems','minItems'}:return False
+        for k,v in old.items():
+            if k=='enum':
+                if not set(new[k])<=set(v):return False
+            elif k=='maxItems':
+                if new[k]>v:return False
+            elif k=='minItems':
+                if new[k]<v:return False
+            elif not narrows(new[k],v):return False
+        return True
+    return new==old
+
+
+def equivalent(plan,previous):
+    if plan['owner_fingerprint']!=previous['owner_fingerprint'] or plan['model']!=previous['model']:
+        raise ValueError('A schema revision cannot change the sample or model.')
+    if len(plan['requests'])!=len(previous['requests']):raise ValueError('A schema revision cannot change the cases.')
+    changed=False
+    for new,old in zip(plan['requests'],previous['requests']):
+        if {k:v for k,v in new.items() if k!='body'}!={k:v for k,v in old.items() if k!='body'}:
+            raise ValueError('A schema revision cannot change source text, context or expectations.')
+        a,b=deepcopy(new['body']),deepcopy(old['body'])
+        sa=a['text']['format'].pop('schema');sb=b['text']['format'].pop('schema')
+        if a!=b or not narrows(sa,sb):raise ValueError('Only stricter output constraints may change.')
+        changed=changed or sa!=sb
+    if not changed:raise ValueError('Identical paid requests cannot be retried as a schema revision.')
+
+
+def revised_plan(previous,manifest,retry_cases):
+    if digest({k:v for k,v in previous.items() if k!='fingerprint'})!=previous['fingerprint']:
+        raise ValueError('The earlier frozen plan changed.')
+    owner={c['id']:c['packet'] for c in previous['requests'] if c['scope']=='owner50'}
+    hard=[dict(c,source_id=c['packet']['sources'][0]['id']) for c in previous['requests'] if c['scope']=='hard6']
+    plan=make_plan(manifest,owner,hard)
+    equivalent(plan,previous)
+    core={k:v for k,v in plan.items() if k!='fingerprint'}
+    core.update(previous_plan=previous,retry_cases=sorted(set(retry_cases)))
+    result=dict(core,fingerprint=digest(core));validate(result,manifest)
+    return result
+
+
+def fits_schema(call,body):
+    properties=body['text']['format']['schema']['$defs']['ToneItem']['properties']
+    items=T.ToneResult.model_validate_json(sentiment.response_text(call)).model_dump()['items']
+    for item in items:
+        for field in ('id','passages','previous_passages','context_passages','price_claims'):
+            rule=properties[field];value=item[field]
+            if 'enum' in rule and value not in rule['enum']:return False
+            if isinstance(value,list):
+                if len(value)>rule.get('maxItems',len(value)):return False
+                allowed=rule.get('items',{}).get('enum')
+                if allowed is not None and not set(value)<=set(allowed):return False
+    return True
 
 
 def estimate(plan,manifest):
@@ -168,8 +246,10 @@ def parse(call,packet):
     return dict(relevance=item['relevance'],sentiment=item['sentiment']),result['repairs']['repaired']
 
 
-def run(plan,manifest,output,cap,*,approved_plan,transport=None,remaining_after=None):
+def run(plan,manifest,output,cap,*,approved_plan,transport=None,remaining_after=None,revised_after=None):
     prepared=validate(plan,manifest)
+    funding=prepared+[c for parent in ancestors(plan) for c in parent['requests']]
+    if remaining_after is not None and revised_after is not None:raise ValueError('Choose one explicit continuation mode.')
     if approved_plan!=plan['fingerprint']:raise ValueError('Execution needs approval for this exact frozen plan.')
     if not isinstance(cap,Decimal) or not cap.is_finite() or not 0<cap<=Decimal('2'):
         raise ValueError('Use an explicit positive combined campaign cap of at most US$2.')
@@ -180,8 +260,8 @@ def run(plan,manifest,output,cap,*,approved_plan,transport=None,remaining_after=
     with transaction(consistent=True) as lock:
         if not one(lock,"SELECT pg_try_advisory_xact_lock(hashtextextended('experiment:sentiment-quality-v1',0)) locked")['locked']:
             raise ValueError('A quality campaign is already running.')
-        existing=saved_calls(prepared)
-        if existing and remaining_after is None:
+        existing=saved_calls(funding)
+        if existing and remaining_after is None and revised_after is None:
             raise ValueError('A campaign request was already attempted; use an explicitly approved continuation.')
         if remaining_after is not None:
             previous=Path(remaining_after)
@@ -189,16 +269,28 @@ def run(plan,manifest,output,cap,*,approved_plan,transport=None,remaining_after=
                 raise ValueError('A continuation must retain the identical frozen plan.')
             prior=json.loads((previous/'validation.json').read_text())
             if prior['fingerprint']!=plan['fingerprint']:raise ValueError('The prior campaign identity changed.')
+        if revised_after is not None:
+            previous=Path(revised_after)
+            if json.loads((previous/'plan.json').read_text())!=plan.get('previous_plan'):
+                raise ValueError('A revised continuation must retain the exact earlier plan.')
+            prior=json.loads((previous/'validation.json').read_text())
+            failed={r['scope']+':'+r['id'] for r in prior['results'] if not r['passed']}
+            if prior['fingerprint']!=plan['previous_plan']['fingerprint'] or not set(plan['retry_cases'])<=failed:
+                raise ValueError('Only explicitly named failed cases may receive a revised paid attempt.')
         output=Path(output);output.mkdir(parents=True,exist_ok=False)
         report=dict(fingerprint=plan['fingerprint'],owner_fingerprint=manifest['fingerprint'],planned=56,
             cap_usd=str(cap),paid_usd='0',unresolved_maximum_usd='0',attempted=0,results=[],completed=False,
             automatic_retries=0,app_research_writes=0,owner_labels_read=0)
         (output/'plan.json').write_text(json.dumps(plan,ensure_ascii=False,indent=2)+'\n')
         def save():
-            paid,pending=costs(saved_calls(prepared))
+            paid,pending=costs(saved_calls(funding))
             report.update(paid_usd=str(Decimal(paid)/ledger.NANO),unresolved_maximum_usd=str(Decimal(pending)/ledger.NANO))
             (output/'validation.json').write_text(json.dumps(report,indent=2)+'\n')
         save()
+        if any(c['status']!='settled' for c in existing):
+            report['stopped']='prior_attempt_unsettled_or_changed';save();return report
+        if any(ledger.REDISPATCH in c['request_key'] for c in existing):
+            report['stopped']='prior_redispatch_refused';save();return report
         try:
             with transaction(consistent=True) as conn:
                 for case in prepared:verify_access(conn,case['packet'])
@@ -206,11 +298,29 @@ def run(plan,manifest,output,cap,*,approved_plan,transport=None,remaining_after=
             report['stopped']='source_access_or_context_changed';save();return report
         for case in prepared:
             key=PREFIX+digest(case['body']);filename=case['scope']+'-'+case['id']
-            calls=saved_calls(prepared);matching=[c for c in calls if c['request_key']==key]
+            calls=saved_calls(funding);matching=[c for c in calls if c['request_key']==key]
             if any(c['request_key'].startswith(key) and c['request_key']!=key for c in calls):
                 report['stopped']='prior_redispatch_refused';break
             old=matching[0] if matching else None
-            if old and (old['request_hash']!=digest(case['body']) or old['status']!='settled'):
+            inherited=False;retested=None
+            if old is None:
+                for parent in ancestors(plan):
+                    previous_case=next(c for c in parent['requests'] if (c['scope'],c['id'])==(case['scope'],case['id']))
+                    prior_key=PREFIX+digest(previous_case['body'])
+                    prior_call=next((c for c in calls if c['request_key']==prior_key),None)
+                    if prior_call is None:continue
+                    if prior_call['request_hash']!=digest(previous_case['body']):
+                        report['stopped']='prior_attempt_unsettled_or_changed';save();return report
+                    try:
+                        parse(prior_call,case['packet'])
+                        valid=fits_schema(prior_call,case['body'])
+                    except (ValueError,KeyError,TypeError):valid=False
+                    if valid:old=prior_call;inherited=True
+                    elif case['scope']+':'+case['id'] in plan.get('retry_cases',[]):retested=str(prior_call['id'])
+                    else:
+                        report['stopped']='prior_saved_answer_invalid_no_retry';save();return report
+                    break
+            if old and ((not inherited and old['request_hash']!=digest(case['body'])) or old['status']!='settled'):
                 report['stopped']='prior_attempt_unsettled_or_changed';break
             try:
                 with transaction(consistent=True) as conn:verify_access(conn,case['packet'])
@@ -228,7 +338,8 @@ def run(plan,manifest,output,cap,*,approved_plan,transport=None,remaining_after=
                     report['stopped']='paid_request_failed_no_retry';save();break
             save()  # Record settled cost before any response-file or validator work.
             (output/(filename+'.response.json')).write_text(json.dumps(call['response_body'],ensure_ascii=False,indent=2)+'\n')
-            row=dict(scope=case['scope'],id=case['id'],call_id=str(call['id']),reused=old is not None,passed=False)
+            row=dict(scope=case['scope'],id=case['id'],call_id=str(call['id']),reused=old is not None,passed=False,
+                inherited_schema=inherited,retested_call_id=retested,request_hash=call['request_hash'])
             try:prediction,repaired=parse(call,case['packet'])
             except (ValueError,KeyError,TypeError):
                 report['results'].append(row);report['stopped']='validator_failure_no_retry';save();break
@@ -251,9 +362,10 @@ if __name__=='__main__':
     parser.add_argument('--execute',action='store_true');parser.add_argument('--output',type=Path)
     parser.add_argument('--cap-usd',type=Decimal);parser.add_argument('--approved-plan')
     parser.add_argument('--remaining-after',type=Path)
+    parser.add_argument('--revised-after',type=Path)
     args=parser.parse_args();plan=json.loads(args.plan.read_text());manifest=json.loads(args.manifest.read_text())
     if args.execute:
         if args.output is None or args.cap_usd is None:parser.error('Execution requires a new output folder and explicit cap.')
-        result=run(plan,manifest,args.output,args.cap_usd,approved_plan=args.approved_plan,remaining_after=args.remaining_after)
+        result=run(plan,manifest,args.output,args.cap_usd,approved_plan=args.approved_plan,remaining_after=args.remaining_after,revised_after=args.revised_after)
         print(json.dumps({k:v for k,v in result.items() if k!='results'},indent=2))
     else:print(json.dumps(estimate(plan,manifest),indent=2))
