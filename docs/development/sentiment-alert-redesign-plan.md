@@ -196,6 +196,18 @@ contracts are also prepared (instructions3924/3379/2497characters, related106tes
 pass), with no dispatch or live pipeline integration yet. Routing/ratings/digest
 and all quality/replay gates remain outstanding.
 
+**Further preparation, 17 October 2026:** the smaller-task contracts now have an
+opt-in runner with old tone carry-over, importance backfill, cached duplicate
+comparisons, ledger reuse and explicit retry/terminal-split recovery; related
+integration suites164pass. New061 prepares append-only private usefulness ratings
+and a shared Telegram connection/callback cursor, with controls beside Updates
+evidence. Full offline2398pass/93optional skips, final affected164pass after the
+last repair-provenance addition;202frontend/build and17browser groups pass.
+Both features default off;061is not applied live. No new-prompt paid
+evaluation, owner labels, saved-research change or restart. Severity routing,
+daily digest/cost alerts, the one-week replay and all quality/live gates remain
+outstanding. [Contract](../features/sentiment-tasks-and-alert-ratings.md).
+
 1. **Split the prompt into smaller tasks:**
    1. relevance (the existing quick check);
    2. tone and evidence basis;

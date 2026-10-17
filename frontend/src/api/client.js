@@ -264,6 +264,11 @@ export const api = {
     }),
   reviewMoveAlert: (id, action) =>
     request(`/move-alerts/${id}/review`, { method: "POST", body: { action } }),
+  rateAlert: (kind, id, value) =>
+    request(`/alerts/${kind}/${id}/rating`, {
+      method: "POST",
+      body: { value },
+    }),
   priceReferences: (id) => request(`/companies/${id}/price-references`),
   setPriceReference: (id, symbol) =>
     request(`/companies/${id}/price-references`, {

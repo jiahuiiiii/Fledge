@@ -622,6 +622,8 @@ def present(conn, record):
             sources=[],
             summary={},
         )
+    from . import sentiment_task_runner, sentiment_tasks
+    current_prompt=sentiment_tasks.PROMPT if sentiment_task_runner.enabled() else PROMPT
     return dict(
         record["result"],
         id=str(record["id"]),
@@ -634,7 +636,7 @@ def present(conn, record):
         earlier_method=any(
             record["result"].get(key) != value
             for key, value in (
-                ("prompt_version", PROMPT),
+                ("prompt_version", current_prompt),
                 ("model", REASONING_MODEL),
                 ("summary_policy", POLICY),
             )
@@ -739,7 +741,7 @@ def _generate(iid, *, transport, now, lookback_days, progress, retry_failed, rer
                                                    progress=progress, retry_failed=retry_failed,
                                                    prefilter=False if reread_token else None,
                                                    split_failed=split_failed)
-    packet["batching"] = dict(policy=sentiment_batching.POLICY,
+    packet["batching"] = dict(policy=result.get('batching',{}).get('policy',sentiment_batching.POLICY),
                              call_ids=[str(call["id"]) for call in calls])
     if result.get("source_reuse"):
         packet["source_reuse"] = result["source_reuse"]

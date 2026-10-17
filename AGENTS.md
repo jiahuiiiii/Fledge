@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Smaller sentiment tasks and private alert ratings — 17 October 2026 (prepared)
+
+Phase5now connects separate tone, news-importance and candidate-only duplicate tasks through an opt-in runner. Unchanged old tones retain original prompt/model/calls; importance backfill can still cost once. Ledger reuse, source/context bounds, explicit single retry/terminal split and no automatic paid retry remain. Negative comparisons cache exact pairs; both old tone and new event repair reasons remain inspectable. Final related164offline tests pass; no new-prompt paid evaluation or owner labels (0/50).
+
+New061prepares forced-RLS append-only usefulness ratings for all4alert kinds and a host-only shared Telegram cursor. Useful/Not useful sits beside Updates evidence; current-bot/private-chat/sent-message checks, durable callback idempotency and acknowledgement handling tested. Full offline2398pass/93optional skips; final affected164pass after repair-provenance addition (overlap), initial rating-related86pass;202frontend/build/scopedformat and17isolated browser groups1440/390/320pass,0HTTPcalls, screenshots inspected. Retain initial split-guard and browser-fixture navigation failures. Both switches defaultoff;061not applied live. US$0, no environment/install/restart/research/preference change; user CSS preserved. Routing/digest/cost alerts, replay and all quality/live gates remain outstanding. [Contract](docs/features/sentiment-tasks-and-alert-ratings.md).
+
 ## Preview installation and price-rule edge cases — 17 October 2026
 
 Owner Terminal installation completed13:56:17SGT: approved058–060 applied (schema60; never edit),264,076,069-byte database archive/catalogue and.env backup,30tested assets,10guarded research/preference/ledger fingerprints exact. Owner started app; HTTP200/asset hashes verified14:03SGT. Move preview/GPT-5.5/3–2–5rules enabled; fast cadence waits until18October12:55:59SGT, new Telegram delivery off.0move events at verification (Saturday). No app/DB start/stop by agent; duplicate installer invocation refused without changes.

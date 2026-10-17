@@ -39,8 +39,9 @@ api.priceReferences=async(id)=>{window.actions.push({kind:'read-sector',id});ret
 api.setPriceReference=async(id,symbol)=>{window.actions.push({kind:'save-sector',id,symbol});return {symbol,origin:'owner'};};
 api.reviewMoveAlert=async(id,action)=>{window.actions.push({kind:'review-move',id,action});reviewed=action;};
 api.reviewAlert=async()=>{throw new Error('Move routed to company review');};
+api.rateAlert=async(kind,id,value)=>{window.actions.push({kind:'rate',alertKind:kind,id,value});return {value};};
 api.researchReview=async(filters)=>({instrument_id:filters.instrument_id||null,review:filters.review,page:filters.page,
- page_size:20,total:1,cutoff:'2026-10-15T00:00:00Z',records:[{kind:'move',id:detail.id,title:detail.title,
+ page_size:20,total:1,cutoff:'2026-10-15T00:00:00Z',records:[{kind:'move',id:detail.id,title:detail.title,feedback_enabled:true,
  created_at:'2026-10-14T20:00:00Z',review_action:reviewed,detail:{...detail,review_action:reviewed}}],
  companies:members.map(m=>({id:m.instrument_id,symbol:m.symbol,name:'Authored company',mode:'sec',
  coverage:{concerns:[],watch:{enabled:true},social_feeds:[]}})),totals:{pending_count:reviewed?0:1}});
@@ -119,15 +120,21 @@ try{
  await page.evaluate(()=>window.showFixture({inbox:true}));
  const record=page.locator('[data-kind="move"]');
  await record.locator(':scope > summary').click();
+ await record.getByRole('button',{name:'Useful',exact:true}).click();
+ await record.getByText('Rating saved.',{exact:true}).waitFor();
+ assert.deepEqual((await page.evaluate(()=>window.actions)).find(a=>a.kind==='rate'),{kind:'rate',alertKind:'move',id:'authored-move',value:'useful'});
  await record.getByRole('button',{name:'Mark reviewed',exact:true}).click();
  await page.getByText('Review recorded. Your idea is unchanged.',{exact:true}).waitFor();
  assert.ok((await page.evaluate(()=>window.actions)).some(a=>a.kind==='review-move'&&a.id==='authored-move'&&a.action==='reviewed'));
+ await record.locator(':scope > summary').click();
+ await record.getByRole('region',{name:'Rate this alert'}).waitFor();
  for(const width of [1440,390,320]){
   await page.setViewportSize({width,height:1100});
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-  await page.screenshot({path:path.join(out,'inbox-'+width+'.png'),fullPage:true});
+  await record.getByRole('region',{name:'Rate this alert'}).scrollIntoViewIfNeeded();
+  await page.screenshot({path:path.join(out,'inbox-'+width+'.png'),animations:'disabled'});
  }
  assert.deepEqual(errors,[]);assert.deepEqual(requests,[]);
- console.log(JSON.stringify({passed:8,viewports:[1440,390,320],network_requests:0,output:out}));
+ console.log(JSON.stringify({passed:9,viewports:[1440,390,320],network_requests:0,output:out}));
 }catch(error){console.error(JSON.stringify({errors,output:out,body:(await page.locator('body').innerText()).slice(0,2200)}));throw error;}
 finally{await browser.close();}

@@ -166,6 +166,8 @@ def change_detail(conn, owner, event):
 
 
 def details(conn, owner, events):
+    from .monitoring import alert_feedback
+    feedback_enabled=alert_feedback.enabled()
     result = []
     for event in events:
         if event["kind"] == "idea":
@@ -188,7 +190,8 @@ def details(conn, owner, events):
             title = detail["summary"]
         if detail.get("withheld"):
             title = "Source access changed — details withheld"
-        result.append(dict(event, title=title, detail=detail))
+        result.append(dict(event, title=title, detail=detail,feedback_enabled=feedback_enabled,
+            feedback=alert_feedback.latest(conn,owner,event['kind'],event['id']) if feedback_enabled else None))
     return result
 
 

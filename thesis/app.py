@@ -105,11 +105,13 @@ async def lifespan(app):
 
     def telegram_loop():
         from .monitoring.telegram import run_once
+        from .monitoring.telegram_updates import poll_feedback
 
         while not stop.wait(5):
             try:
                 for owner in auth.background_owners():
                     run_once(owner)
+                poll_feedback()
             except Exception:
                 # Do not log external transport URLs, tokens or private messages.
                 logging.getLogger("thesis").warning("Telegram delivery check failed")
@@ -933,6 +935,17 @@ def review_research_alert(alert_id: UUID, payload: ReviewAction):
 def review_move_alert(alert_id: UUID, payload: ReviewAction):
     from .monitoring.move_alerts import review
     return {"result": review(auth.current_owner(), str(alert_id), payload.action)}
+
+
+class AlertRating(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    value: Literal["useful", "not_useful"]
+
+
+@app.post("/api/v1/alerts/{kind}/{alert_id}/rating")
+def rate_saved_alert(kind: str, alert_id: UUID, payload: AlertRating):
+    from .monitoring.alert_feedback import rate
+    return {"result": rate(auth.current_owner(),kind,str(alert_id),payload.value)}
 
 
 class SectorReferenceSettings(BaseModel):

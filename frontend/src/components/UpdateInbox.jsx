@@ -7,6 +7,7 @@ import { stamp } from "./MarketResearch";
 import IdeaAlertChecks from "./IdeaAlertChecks";
 import { ResearchAlerts } from "./SentimentPanel";
 import MoveAlertCard from "./MoveAlertCard";
+import AlertRating from "./AlertRating";
 import { ConditionChange } from "./IdeasAndChanges";
 import { inboxSummary, recordKey } from "../lib/inbox";
 import "./UpdateInbox.css";
@@ -282,6 +283,7 @@ export default function UpdateInbox({
                   >
                     <div className="inbox-kind">{kindName[record.kind]}</div>
                     <ConditionChange change={d} onOpen={onOpen} />
+                    <AlertRating record={record} />
                   </article>
                 );
               return (
@@ -384,6 +386,7 @@ export default function UpdateInbox({
                         }
                       />
                     )}
+                    <AlertRating record={record} />
                   </div>
                 </details>
               );

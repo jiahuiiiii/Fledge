@@ -53,8 +53,13 @@ def compatible(record, packet):
     from thesis.providers.settings import REASONING_MODEL
 
     result, saved = record["result"], record["packet"]
+    from . import sentiment_task_runner, sentiment_tasks
+    accepted_prompts={PROMPT}
+    if sentiment_task_runner.enabled():
+        accepted_prompts={sentiment_tasks.PROMPT}
+        if sentiment_reliability.enabled():accepted_prompts.add(PROMPT)
     return (
-        result.get("prompt_version") == PROMPT
+        result.get("prompt_version") in accepted_prompts
         and (sentiment_reliability.enabled() or result.get("model") == REASONING_MODEL)
         and result.get("summary_policy") == SUMMARY_POLICY
         and result.get("guard_policy") == packet.get("guard_policy")
@@ -107,6 +112,9 @@ def find(conn, packet):
                 original_model = ((record["result"].get("prefilter") or {}).get("model")
                                   if item.get("prefilter") else record["result"].get("model"))
                 copied["model"] = copied.get("model") or original_model
+                from . import sentiment_task_runner
+                if sentiment_task_runner.enabled():
+                    copied.setdefault('prompt_version',record['result'].get('prompt_version'))
                 if item.get("prefilter"):
                     copied.setdefault("call_ids", (record["result"].get("prefilter") or {}).get("call_ids", []))
                 else:

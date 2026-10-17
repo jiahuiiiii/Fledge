@@ -1,9 +1,8 @@
-"""Prepared smaller-task contracts. Not connected to the live pipeline yet.
+"""Bounded smaller-task contracts, enabled only through the opt-in runner.
 
 Request construction/validation only: no dispatch, source collection or saved
-data mutation. Every task retains the existing selected bulk model and ledger
-profile. The current production prompt remains unchanged until integration and
-the blind owner-quality checks pass.
+data mutation here. Every task retains the selected bulk model and ledger
+profile. Live activation remains off until the blind owner-quality checks pass.
 """
 from collections import Counter
 from copy import deepcopy
@@ -94,6 +93,7 @@ def strict_schema(model):
 def candidates(packet, items):
     """Wording candidates only; no inferred relationship or paid call."""
     relevance = {item['id']: item['relevance'] for item in items}
+    by_item={item['id']:item for item in items}
     news = [s for s in packet['sources'] if s['channel'] == 'news'
             and relevance.get(s['label']) == 'relevant']
     references = news + packet.get('comparison_sources', [])
@@ -110,9 +110,19 @@ def candidates(packet, items):
             overlap = len(left & right)
             similarity = overlap/max(1, len(left | right))
             if overlap >= 3 and similarity >= .35:
-                pairs.append((similarity, current['label'], prior['label']))
+                pair=dict(item_id=current['label'],reference_id=prior['label'])
+                if pair_key(packet,pair) not in by_item[current['label']].get('duplicate_candidates_checked',[]):
+                    pairs.append((similarity, current['label'], prior['label']))
     pairs.sort(key=lambda pair: (-pair[0], pair[1], pair[2]))
     return [dict(item_id=a, reference_id=b) for _, a, b in pairs[:MAX_PAIRS]]
+
+
+def pair_key(packet,pair):
+    import hashlib
+    from .sentiment_reuse import content_key
+    sources={s['label']:s for s in packet['sources']+packet.get('comparison_sources',[])}
+    return hashlib.sha256(ledger.canonical([POLICY,*[content_key(sources[pair[k]])
+        for k in ('item_id','reference_id')]]).encode()).hexdigest()
 
 
 def request_for(task, packet, *, pairs=None):
@@ -123,8 +133,13 @@ def request_for(task, packet, *, pairs=None):
         sources = [s for s in sources if s['channel'] == 'news']
     if not sources or len(sources) > 8:
         raise ValueError('A task needs one to eight complete sources.')
+    parents=[s['conversation'] for s in sources if s.get('conversation')]
+    if (len(parents)>sentiment_context.MAX_PARENTS or
+            sum(len(ledger.canonical(p['passages']).encode()) for p in parents)>sentiment_context.MAX_BYTES):
+        raise ValueError('Required parent context exceeds the existing task limits.')
     payload = dict(company=packet['company'], sources=[dict(model_source(s),label=s['label'],
                     channel=s['channel'],platform=s.get('platform'),
+                    **{k:s[k] for k in ('social_kind','discovery_match') if k in s},
                     **({'conversation':sentiment_context.wire(s['conversation'])} if s.get('conversation') else {})) for s in sources])
     if task == 'tone':
         threads = reddit_thread_context.wire(packet, sources, extras=packet.get('thread_extras',True))
@@ -164,13 +179,17 @@ def event_labels(call, packet, tones):
         raise ValueError('Every news source needs exactly one event/importance result.')
     by_id = {item['id']:item for item in tones}
     result = {}
+    repaired=0
     for item in output.items:
         source=sources[item.id]; own={p['id']:p['quote'] for p in source['passages']}
         importance=item.importance
         if (len(set(importance.passages)) != len(importance.passages)
                 or any(p not in own for p in importance.passages)):
             raise ValueError('Importance evidence must match its own supplied source.')
-        reporting=reporting_basis.render(item.reporting,source,by_id[item.id]['relevance'])
+        from . import sentiment_reliability
+        repairs=[] if sentiment_reliability.enabled() else None
+        reporting=reporting_basis.render(item.reporting,source,by_id[item.id]['relevance'],repairs=repairs)
+        repaired+=bool(repairs)
         forced_low = (importance.form != 'event' or importance.category in {'analyst_opinion','market_commentary'}
                       or not reporting['eligible'] or by_id[item.id]['relevance'] != 'relevant'
                       or bool(LOW_HEADLINE.search(source['title'])))
@@ -181,6 +200,9 @@ def event_labels(call, packet, tones):
             policy=POLICY,level=level,proposed_level=importance.level,
             category=importance.category,form=importance.form,low_by_rule=forced_low,
             citations=[dict(source_id=source['id'],passage_id=p,quote=own[p]) for p in importance.passages]))
+        if repairs:result[item.id]['importance']['event_repair']=repairs
+    if repaired>max(1,len(output.items)//4):
+        raise ValueError('Too many news event items need repair in this task.')
     return result
 
 

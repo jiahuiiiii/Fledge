@@ -107,6 +107,9 @@ def part_identity(part):
 
 
 def plan_identity(packet):
+    from . import sentiment_task_runner
+    if sentiment_task_runner.enabled():
+        return sentiment_task_runner.identity(packet)
     keys = [part_identity(part) for part in plan(packet)]
     return "sentiment-batched:" + hashlib.sha256(ledger.canonical(keys).encode()).hexdigest()
 
@@ -256,7 +259,10 @@ def combine(packet, parts, calls):
 def run(packet, *, transport=None, progress=None, retry_failed=False, prefilter=None, split_failed=False):
     """Return (result, calls). A cheap quick check first drops only sources it
     calls clearly unrelated; everything else gets the full reading."""
-    from . import relevance_prefilter
+    from . import relevance_prefilter, sentiment_task_runner
+    if sentiment_task_runner.enabled():
+        return sentiment_task_runner.run(packet,transport=transport,progress=progress,prefilter=prefilter,
+                                         retry_failed=retry_failed,split_failed=split_failed)
     full = packet
     record, quick = None, []
     if prefilter is None:
@@ -289,7 +295,11 @@ def run(packet, *, transport=None, progress=None, retry_failed=False, prefilter=
 
 def fully_saved(packet, *, prefilter=None):
     """True when the quick check and every full-reading batch are settled and usable."""
-    from . import relevance_prefilter
+    from . import relevance_prefilter, sentiment_task_runner
+    if sentiment_task_runner.enabled():
+        try:sentiment_task_runner.run(packet,prefilter=prefilter,saved_only=True)
+        except Exception:return False
+        return True
     from .sentiment import render
     if prefilter is None:
         prefilter = relevance_prefilter.enabled()
@@ -321,7 +331,10 @@ def run_reusing(packet, reused, *, transport=None, progress=None, retry_failed=F
     Earlier news still goes along as comparison context, so a new report can be
     linked to an older one. Counts are recalculated over the whole sample.
     """
-    from . import sentiment_reuse
+    from . import sentiment_reuse, sentiment_task_runner
+    if sentiment_task_runner.enabled():
+        return sentiment_task_runner.run(packet,reused,transport=transport,progress=progress,prefilter=prefilter,
+                                         retry_failed=retry_failed,split_failed=split_failed)
     from .sentiment import POLICY as SUMMARY_POLICY, PROMPT
     from thesis.providers.settings import REASONING_MODEL
     # When every request of the whole-sample reading is already saved (e.g. only

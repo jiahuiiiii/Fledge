@@ -57,6 +57,21 @@ the existing citation, number/status and temporal guards still validate results.
 New contract tests and related tone/reporting/coverage/batching suites:106pass.
 These authored tests do not establish semantic quality or measured cost savings.
 
-Still unimplemented here: pipeline integration/reuse across task versions,
-rating/routing storage and UI, daily digest/cost alerts and the one-week replay.
-No new migration or live setting accompanies this preparation.
+At this checkpoint pipeline integration/reuse, ratings, routing, daily digest/
+cost alerts and the one-week replay were not implemented. The dated follow-up
+below records subsequent preparation; no quality result is implied.
+
+## Pipeline and ratings follow-up — 17 October 2026
+
+The smaller contracts are now connected through an opt-in runner (default off),
+with unchanged tone carry-over, separate importance backfill, durable ledger
+results, bounded parallel stages and explicit retry/split recovery. Related
+integration suites pass164offline tests. New migration061 prepares private
+append-only alert ratings and a shared Telegram callback cursor; it is not live.
+Updates places the same Useful / Not useful choices beside existing evidence.
+[Implementation and limits](../features/sentiment-tasks-and-alert-ratings.md).
+
+Neither switch is enabled. There has been no new-prompt paid evaluation, live
+migration, saved-research change or restart. Owner annotations remain0/50, so
+neither semantic quality nor phase5acceptance is verified. Routing, daily digest,
+cost alerts and the one-week replay remain to implement.

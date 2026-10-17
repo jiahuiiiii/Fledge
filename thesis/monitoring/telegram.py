@@ -102,6 +102,11 @@ def check_connection(owner):
             return status(owner)
         if not cfg.get("link_hash") or cfg["link_expires_at"] <= clock() or cfg.get("bot_fingerprint") != fingerprint(key):
             raise ValueError("The connection link expired. Create a new link and press Start in Telegram.")
+        from . import alert_feedback
+        if alert_feedback.enabled():
+            from .telegram_updates import receive
+            receive(force=True)
+            return status(owner)
         updates = transport.call(key, "getUpdates", dict(offset=cfg["update_offset"], limit=100, timeout=5, allowed_updates=["message"]))
         if not isinstance(updates, list):
             raise ValueError("Telegram did not return connection updates. Try again.")
@@ -235,7 +240,10 @@ def run_once(owner):
         # Intent is committed, while serial() still fences pause/disconnect and
         # other workers. No message body or destination is stored in the outbox.
         try:
-            result = transport.call(key, "sendMessage", dict(chat_id=cfg["chat_id"], text=message, parse_mode="HTML", link_preview_options=dict(is_disabled=True), protect_content=True, allow_paid_broadcast=False))
+            from .alert_feedback import keyboard
+            markup=keyboard(job)
+            result = transport.call(key, "sendMessage", dict(chat_id=cfg["chat_id"], text=message, parse_mode="HTML", link_preview_options=dict(is_disabled=True), protect_content=True, allow_paid_broadcast=False,
+                **({'reply_markup':markup} if markup else {})))
             if not isinstance(result, dict) or type(result.get("message_id")) is not int or result.get("chat", {}).get("id") != cfg["chat_id"]:
                 raise transport.TelegramError("uncertain", "Telegram did not confirm delivery. Check your chat; no automatic retry.")
         except Exception as exc:
