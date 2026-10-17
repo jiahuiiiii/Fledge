@@ -83,3 +83,18 @@ button mappings preserve original-alert ratings after a known rejected send is
 re-rendered. [Current daily-update contract](../features/daily-updates.md).
 This supplies no new owner annotations or prompt-quality result; actual routing,
 independent replay and live gates remain pending.
+
+
+## Exact evaluation inputs located — 17 October 2026
+
+Read-only historical-packet checks found the exact original passages and matching
+review context for all50frozen cases. A private input plan now prepares50separate
+GPT-5.4 tone requests, each with one selected source, its required saved context
+and no optional siblings. The owner's manifest/review page remains exact; the
+plan contains no owner answers or AI predictions and dispatches nothing.
+
+This is input preparation only, not a tested paid evaluation runner or a quality
+result. Current access checks, the six fixed hard cases, approval/cost controls
+and the actual evaluated answers remain outstanding. Owner annotations0/50
+received; paid test costUS$0. Private evidence:
+`.local/live-tests/redesign-phase-5-20261017/story-guard-prepared/quality-inputs-summary.json`.

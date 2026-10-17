@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Stories once per account — 17 October 2026 (prepared)
+
+New066adds private append-only per-send-attempt story claims, committed before HTTP with intent. Only displayed evidence claims a story; account-wide guards cover company/private-idea publications, watched companies and immediate/recap directions. Exact content/URL/validated-repeat identities retain evidenced material updates and distinct social opinions. Rejected/failed attempts do not falsely become sent; uncertain sends stay protected, pending rate-limited copies wait, and confirmed retry members alone control claims/ratings. Actual recaps retain protection during routing rollback; old previews/research/preferences stay exact.
+
+Full offline2547pass/93optional skips precedes the final non-article URL-key guard/3late regression cases; subsequent152affected pass (41new) checks final code. Earlier249related pass, frontend202/build pass.066unapplied live, new delivery off, US$0, no source/AIcall/environment/install/app-or-DBrestart change; user CSS exact. Independent noise replay0/7, owner labels0/50, hard cases0/6 and approval/live/shadow/outcome gates remain; phase5not done. [Contract and limits](docs/features/telegram-story-suppression.md).
+
 ## Actual severity routing connection — 17 October 2026 (prepared)
 
 New065prepares new actual importance/move publications and separate actual routing/recap/cost policies, behind a default-off switch plus explicit start. Old previews stay immutable; preview calendars/backoff cannot skip actual work. High routes alone enter immediate Telegram, medium recaps and low app-only; dispatch rechecks start/routes, rollback blocks new importance messages from legacy delivery. Existing account preferences and separate new-type switches remain.

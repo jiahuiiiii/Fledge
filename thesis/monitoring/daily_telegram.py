@@ -66,7 +66,7 @@ def usd(nano,*,exact=False):
     return 'US$'+format(value,'.2f')
 
 
-def summary(record,number):
+def summary(record,number,*,shown=None):
     """Short evidence stays beside its company; whole blocks are length checked."""
     detail=record['detail'];kind=record['kind']
     label={'company':'Company update','idea':'Saved idea','condition':'Monitored condition','move':'Price move'}[kind]
@@ -113,6 +113,7 @@ def summary(record,number):
         source_ids.extend(s['id'] for s in detail.get('sources',[])[:2])
     text='\n'.join(parts)
     if visible_units(text)>680:return None
+    if shown is not None:shown.extend(source_ids)
     sources={str(s['id']):s for s in detail.get('sources',[])}
     links=[]
     for sid in dict.fromkeys(map(str,source_ids)):
@@ -121,8 +122,9 @@ def summary(record,number):
     return text,links
 
 
-def digest_record(conn,owner,identity,now):
+def digest_record(conn,owner,identity,now,*,delivery_id=None):
     from . import telegram as T
+    from . import telegram_stories as G
     digest=one(conn,'SELECT * FROM daily_digests WHERE owner_id=%s AND id=%s',(owner,identity))
     if not digest or digest['preview']:return None
     members=rows(conn,'SELECT m.* FROM daily_digest_members m JOIN alert_routing_decisions r ON r.owner_id=m.owner_id AND r.id=m.route_id '
@@ -130,14 +132,21 @@ def digest_record(conn,owner,identity,now):
     if not members or len(members)>1000:return None
     footer='Open Fledge on your Mac → Updates → Daily recaps for all saved updates and evidence.\nResearch alerts · not buy/sell instructions.'
     parts=['<b>Fledge · Daily recap</b>',escape(stamp(digest['window_start'])+'–'+stamp(digest['window_end']))]
-    shown=[];linked=set();unavailable=0;remaining=0
+    shown=[];linked=set();unavailable=0;remaining=0;duplicates=0;story_keys=set();deferred=[]
+    guarded=delivery_id is not None and (G.enabled(now) or digest['policy']==D.LIVE_POLICY)
+    legacy=G.legacy_keys(conn,owner,delivery_id,now) if guarded else set()
     for member in members:
         if len(shown)>=MAX_ITEMS:
             remaining+=1;continue
         record=T.event(conn,owner,member['kind'],member['event_id'])
         if not record or record['detail'].get('withheld') or record['detail'].get('preview'):
             unavailable+=1;continue
-        block=summary(record,len(shown)+1)
+        if guarded:
+            try:record=G.prepare(conn,owner,record,delivery_id,now,local=story_keys,legacy=legacy,force=True)
+            except G.Suppressed:duplicates+=1;continue
+            except G.Deferred as exc:deferred.append(exc.when);remaining+=1;continue
+        primary=[]
+        block=summary(record,len(shown)+1,shown=primary)
         if not block:
             remaining+=1;continue
         text=block[0];new_links=[]
@@ -147,14 +156,21 @@ def digest_record(conn,owner,identity,now):
         if visible_units('\n\n'.join(parts+[text,footer]))>3400:
             remaining+=1;continue
         parts.append(text);linked.update(url for url,_ in new_links)
+        if guarded:story_keys.update(G.shown_keys(record,primary))
         shown.append(dict(position=len(shown),member_position=member['position']))
-    if not shown:return None
+    if not shown:
+        if deferred:raise G.Deferred(min(deferred))
+        if duplicates:raise G.Suppressed(G.ALREADY)
+        return None
     if unavailable:parts.append(f'{unavailable} saved updates could not be forwarded with current evidence or idea access.')
     if remaining:parts.append(f'{remaining} more saved updates are in this recap in Fledge.')
+    if duplicates:
+        noun='update is' if duplicates==1 else 'updates are'
+        parts.append(f'{duplicates} repeated {noun} omitted here; the full recap remains in Fledge.')
     parts.append(footer);message='\n\n'.join(parts)
     if visible_units(message)>3800:raise ValueError('The complete recap exceeds the message bound.')
     return dict(kind='digest',id=str(identity),created_at=digest['created_at'],title='Daily recap',
-                detail=dict(preview=False,withheld=False,message=message,shown=shown))
+                detail=dict(preview=False,withheld=False,message=message,shown=shown),_story_keys=story_keys,_story_guarded=guarded)
 
 
 def cost_record(conn,owner,identity,now):
@@ -171,9 +187,9 @@ def cost_record(conn,owner,identity,now):
                 detail=dict(preview=False,withheld=False,message=text))
 
 
-def record(conn,owner,kind,identity,now):
+def record(conn,owner,kind,identity,now,*,delivery_id=None):
     if not enabled(kind,now=now):return None
-    value=(digest_record if kind=='digest' else cost_record)(conn,owner,identity,now)
+    value=(digest_record(conn,owner,identity,now,delivery_id=delivery_id) if kind=='digest' else cost_record(conn,owner,identity,now))
     since=start()
     return value if value and since<=value['created_at']<=now else None
 

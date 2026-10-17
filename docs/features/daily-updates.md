@@ -213,3 +213,17 @@ Still required: cross-publication/story suppression across 24 hours (the current
 same-reading/source-set guard is narrower), independent seven-day noise replay,
 owner labels (0/50), new-prompt hard cases (0/6), quality/cost evaluation, owner
 live choices and forward shadow/outcome measurements. **Phase 5 is not done.**
+
+
+## Story guard follow-up — 17 October 2026
+
+[Private 24-hour story claims](telegram-story-suppression.md) now connect actual
+immediate delivery and recap rendering. Only primary evidence actually displayed
+is claimed before HTTP; repeated members stay in the full saved recap and numbered
+ratings retain their original members. Known rejected attempts cannot falsely
+claim omitted evidence after a changed retry. An actual-policy recap retains its
+protection during ordinary routing rollback.066is unapplied, delivery stays off,
+no new live approval is inferred. Final152affected cases pass (41new). The full
+2547pass/93optional-skip run precedes the final non-article URL-key guard and
+three late regression cases; final affected checks cover that code. The independent
+noise/quality and forward outcome gates remain outstanding.

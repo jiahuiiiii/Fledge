@@ -165,9 +165,9 @@ def test_rate_limited_retry_rechecks_members_and_callback_uses_confirmed_attempt
     rating_bot.failure=HTTP.TelegramError('rate_limited','Authored known rejection.',60)
     assert T.run_once(owner) and delivery(owner)['status']=='queued'
     original=T.event
-    def changed(c,o,k,i):
+    def changed(c,o,k,i,**kwargs):
         if k=='idea' and str(i)==str(ids[0]):return None
-        return original(c,o,k,i)
+        return original(c,o,k,i,**kwargs)
     monkeypatch.setattr(T,'event',changed);monkeypatch.setattr(T,'clock',lambda:now+timedelta(seconds=63))
     rating_bot.failure=None;assert T.run_once(owner)
     job=delivery(owner);assert job['attempts']==2

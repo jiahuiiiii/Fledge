@@ -265,6 +265,20 @@ call. Cross-publication24-hour story suppression, seven-day noise replay,
 owner labels0/50, new-prompt hard cases0/6 and live approval/shadow/outcome gates
 remain; **phase5not done**. [Contract](../features/daily-updates.md#actual-routing-connection--17-october-2026-prepared).
 
+Story-guard follow-up17October:066prepares immutable private story claims per
+actual send attempt, covering only displayed evidence and shared across immediate
+messages/recaps and watched companies in an account. Known rejections, changed
+retry members, uncertain sends, exact24-hour expiry and routing rollback are
+tested. Validated repeat keys/canonical article URLs retain evidenced updates;
+no semantic guarantee for all paraphrases or unverifiable pre-install messages.
+Full offline2547pass/93optional skips precedes the final non-article URL-key guard
+and3late test cases; subsequent152affected pass (41new) verifies final code.
+Earlier249related and202frontend/build pass.
+066unapplied live, US$0, no source/AIcall, configuration/install/restart change.
+Seven-day independent replay0/7, owner labels0/50, new-prompt hard cases0/6 and
+live/shadow/approval/outcome gates remain; **phase5not done**.
+[Contract](../features/telegram-story-suppression.md).
+
 1. **Split the prompt into smaller tasks:**
    1. relevance (the existing quick check);
    2. tone and evidence basis;

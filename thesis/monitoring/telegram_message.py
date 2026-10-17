@@ -33,7 +33,7 @@ def safe_url(value):
         return None
 
 
-def render(record):
+def render(record,*,shown=None):
     d = record["detail"]
     kind = record["kind"]
     if d.get("withheld"):
@@ -49,6 +49,7 @@ def render(record):
     if d.get("fictional"):
         parts.insert(0, "<b>Fictional demo · not actual company news</b>")
     source_ids = []
+    primary_parts = {}
     if kind == "move":
         if d.get('preview'):
             raise ValueError('Preview price events must never be sent.')
@@ -79,6 +80,7 @@ def render(record):
             if quotes:
                 prefix = "Unconfirmed report" if basis.get("kind") == "unconfirmed_event" else "Source excerpt"
                 parts.append(f"<b>{prefix}</b>\n“{escape(plain(quotes[0].get('quote'), 320))}”")
+                primary_parts[len(parts)-1]=item['source_id']
         if payload.get("cutoff"):
             parts.append("Sample cutoff: " + stamp(payload["cutoff"]))
     elif kind == "idea":
@@ -86,6 +88,7 @@ def render(record):
         for item in [i for i in d["items"] if i["relation"] in RELATIONS][:2]:
             source_ids.append(item["source_id"])
             parts.append("<b>" + RELATIONS[item["relation"]] + "</b>\n" + escape(plain(item.get("explanation"), 350)))
+            primary_parts[len(parts)-1]=item['source_id']
         parts.append("Source interpretation; it does not resolve your idea or verify a social claim.")
     else:
         source_ids.extend(s["id"] for s in d.get("sources", [])[:2])
@@ -118,10 +121,11 @@ def render(record):
     # with emoji. Drop whole optional sections, never split tags or entities.
     footer = parts[-2:]
     selected = []
-    for part in parts[:-2]:
+    for index,part in enumerate(parts[:-2]):
         candidate = "\n\n".join(selected + [part] + footer)
         if visible_units(candidate) <= 3800:
             selected.append(part)
+            if shown is not None and index in primary_parts:shown.append(primary_parts[index])
     return "\n\n".join(selected + footer)
 
 

@@ -169,10 +169,10 @@ def test_message(owner):
     return status(owner)
 
 
-def event(conn, owner, kind, identity):
+def event(conn, owner, kind, identity,*,delivery_id=None):
     if kind in {'digest','cost'}:
         from .daily_telegram import record
-        return record(conn,owner,kind,identity,clock())
+        return record(conn,owner,kind,identity,clock(),delivery_id=delivery_id)
     row = one(conn, review_digest.EVENTS + "SELECT * FROM events WHERE kind=%(kind)s AND id=%(id)s", dict(owner=owner, kind=kind, id=identity))
     if not row:
         return None
@@ -192,6 +192,7 @@ def event(conn, owner, kind, identity):
 
 
 def run_once(owner):
+    from . import telegram_stories as stories
     with serial(owner, wait=False) as acquired:
         if not acquired:
             return False
@@ -225,7 +226,7 @@ def run_once(owner):
             job = one(conn, "SELECT * FROM telegram_deliveries WHERE owner_id=%s AND status='queued' AND (retry_at IS NULL OR retry_at<=%s) ORDER BY created_at,id LIMIT 1", (owner, now))
             if not job:
                 return False
-            why = None
+            why = None;defer=None;story_keys=set();guarded=stories.enabled(now)
             if job["event_at"] < now-timedelta(hours=24):
                 why = "Alert is older than 24 hours; review it in Updates."
             elif job["kind"] != "test" and not cfg["enabled"]:
@@ -238,9 +239,14 @@ def run_once(owner):
                     why='Daily Telegram delivery is off. Review the saved update in Fledge.'
                 else:
                     try:
-                        record=event(conn,owner,job['kind'],job['event_id'])
+                        record=event(conn,owner,job['kind'],job['event_id'],delivery_id=job['id'])
                         if not record:why='This daily update has no eligible evidence or is unavailable.'
-                        else:message=render(record)
+                        else:
+                            message=render(record)
+                            story_keys=record.get('_story_keys',set())
+                            guarded=guarded or record.get('_story_guarded',False)
+                    except stories.Deferred as exc:defer=exc.when
+                    except stories.Suppressed as exc:why=str(exc)
                     except (ValueError,KeyError,TypeError,IndexError):
                         why='This daily update could not be prepared safely. Review it in Fledge.'
             elif job["kind"] != "test":
@@ -255,15 +261,27 @@ def run_once(owner):
                     else:
                         from . import alert_routing as routing
                         why = routing.delivery_reason(conn,owner,record,now=now)
-                        if not why:message = render(record)
+                        if not why:
+                            if guarded:
+                                record=stories.prepare(conn,owner,record,job['id'],now,immediate=True)
+                                shown=[];message=render(record,shown=shown)
+                                story_keys=stories.shown_keys(record,shown)
+                                if not story_keys:why='No eligible story evidence fits this message. Review the alert in Updates.'
+                            else:message = render(record)
+                except stories.Deferred as exc:defer=exc.when
+                except stories.Suppressed as exc:why=str(exc)
                 except (ValueError, KeyError, TypeError, IndexError):
                     why = "This alert could not be prepared safely. Review its evidence in Updates."
             else:
                 message = TEST_MESSAGE
+            if defer:
+                conn.execute('UPDATE telegram_deliveries SET retry_at=%s WHERE owner_id=%s AND id=%s',(defer,owner,job['id']))
+                return True
             if why:
                 conn.execute("UPDATE telegram_deliveries SET status='skipped',error=%s WHERE id=%s AND owner_id=%s", (why, job["id"], owner))
                 return True
             conn.execute("UPDATE telegram_deliveries SET status='sending',attempts=attempts+1,attempted_at=%s,retry_at=NULL,error=NULL WHERE id=%s AND owner_id=%s", (now, job["id"], owner))
+            if guarded:stories.save(conn,owner,job,story_keys,now)
             if job['kind']=='digest':
                 from .daily_telegram import save_shown
                 from .alert_feedback import keyboard
