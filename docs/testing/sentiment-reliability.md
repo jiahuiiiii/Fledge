@@ -77,11 +77,18 @@ browser. It starts a temporary browser fixture, never the Fledge server.
 
 ## Done-when results
 
+**Owner decision, 17 October 2026:** retain GPT-5.4 bulk readings and GPT-5.4 mini
+quick checks; exclude Haiku. The selected rollout gate now concerns GPT-5.4,
+not the comparison models. Haiku's failure below remains a benchmark result,
+not a blocker for the GPT rollout. GPT-5.4 AVGO replay and three days live are
+still unverified. The provider configuration already selects this OpenAI pair;
+no environment edit, restart, paid call or phase 2 implementation was needed.
+
 `experiments/soclaas_replay/phase1_offline.py` replays frozen answers through the
 production validator, without a database or network. META contains 119 item
 instances in 16 batches per model; AVGO contains 64 in 15 Opus batches.
 
-| Corpus / model | Batches passing | Repaired items | Repair rate | Required gate |
+| Corpus / model | Batches passing | Repaired items | Repair rate | Replay result |
 | --- | --- | --- | --- | --- |
 | META / Opus | 16/16 | 1/119 | 0.84% | Passed |
 | META / Sonnet | 16/16 | 0/119 | 0% | Passed |

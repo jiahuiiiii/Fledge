@@ -2,6 +2,10 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## GPT selected for sentiment redesign — 17 October 2026
+
+Owner chose GPT after reviewing phase 1: keep GPT-5.4 bulk readings and GPT-5.4 mini quick relevance checks; exclude Haiku. Private configuration already selects this OpenAI pair, so no environment change or restart was made. Haiku's recorded replay failure and other unselected-model gaps are comparison evidence, not rollout blockers. The selected GPT-5.4 AVGO replay and three-day live completion gate remain unverified. This approves the bulk/quick model choice, not phase 2 implementation, the phase 4 explainer or new Telegram routing. Historical phase 1 test results below remain exact. [Updated plan](docs/development/sentiment-alert-redesign-plan.md).
+
 ## Sentiment redesign phase 1 — 17 October 2026 (implementation prepared)
 
 `codex/redesign-phase-1` adds bounded item repair (`sentiment-item-repair-1`), free rechecking of saved failed responses, cross-model label reuse with original item models/calls, explicit full re-reading and one terminal split after the existing paid retry. Structural/citation failures and more than `max(1,floor(batch size/4))` repaired items still reject the batch. Prompt/summary/batch policies remain; historical readings and raw paid responses stay immutable. Watches no longer retry paid failures; unfinished quick/full calls are never automatically redispatched. No migration, model, environment, watch preference or Telegram preference change. `THESIS_SENTIMENT_RELIABILITY=false` disables new repairs/cross-model reuse/splits; it does not erase saved records or permit automatic paid retries. [Verification and limits](docs/testing/sentiment-reliability.md).

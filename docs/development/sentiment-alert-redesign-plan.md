@@ -87,9 +87,13 @@ or app restart. See [phase 1 verification](../testing/sentiment-reliability.md).
 2. **Label carry-over across models.** When the main model changes, reuse saved labels for unchanged sources if the prompt and policies match, and record the original model on each item. Only new sources go to the new model. An explicit "re-read everything" action stays available.
 3. **Stuck batches.** If a batch still fails after its one retry, an explicit paid recovery action can re-send its sources once as two half-size batches before giving up. No automatic paid retry; child batches cannot retry or split again.
 
-**Done when:** replaying the saved 16 META and 15 AVGO batches passes 16/16 and 15/15 for Opus, Sonnet, Haiku, GPT-5.5 and GPT-5.4 with at most 5% of items repaired, and 3 days live on GPT-5.4 show at least 97% of checks completing.
+**Owner decision, 17 October 2026:** use GPT: retain GPT-5.4 for bulk readings and GPT-5.4 mini for the quick relevance check. Haiku is excluded from the selected rollout; its benchmark failure is not a release blocker. Other unselected models remain comparison evidence, not required rollout gates. No provider switch or environment change is needed. This records the phase 2 model choice without starting the next implementation phase or choosing the phase 4 explainer.
+
+**Done when (selected GPT path):** replaying the 16 META and 15 AVGO batches passes 16/16 and 15/15 for GPT-5.4 with at most 5% of items repaired, and 3 days live on GPT-5.4 show at least 97% of checks completing. META passes; GPT-5.4 AVGO responses and the three-day observation remain unverified. The earlier all-model gate is superseded by the owner's GPT selection; retain all comparison results.
 
 ### Phase 2 — choose the bulk and quick-check models
+
+**Model choice approved, 17 October 2026:** stay on GPT-5.4 + GPT-5.4 mini. Do not switch to Haiku or Sonnet. The validation below remains pending; phase 2 implementation has not started.
 
 Decide between the OpenAI path (stay on GPT-5.4 + GPT-5.4 mini) and the Anthropic path (Sonnet 5.5 + Haiku 5.5), using [Model choice by provider](#model-choice-by-provider). Re-run the 16-batch comparison with item-level repair on before deciding (the OpenRouter DeepSeek run is already included). The default is to **stay on GPT-5.4**: equal reliability in the tests, about the same cost, and no switch cost. Move to Sonnet if the fast lane (phase 3) needs faster AI responses. For the Anthropic path, set `THESIS_MODEL_PROVIDER=anthropic` and `ANTHROPIC_REASONING_MODEL=claude-sonnet-5-5` with an idle restart; label carry-over keeps the switch cost near zero.
 
