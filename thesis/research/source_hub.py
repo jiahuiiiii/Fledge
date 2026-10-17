@@ -35,6 +35,8 @@ FEEDS = {
  'korea_business': ('Korea Times · Business', 'https://feed.koreatimes.co.kr/k/business.xml', 25),
 }
 FEED_LOCKS = {provider: Lock() for provider in FEEDS}
+# Feeds whose item description is not the article's own text.
+AGGREGATOR_FEEDS = {'google_business'}
 LABELS = {key: val[0] for key,val in FEEDS.items()} | {'alpha_vantage':'Alpha Vantage', 'x':'X / Twitter'}
 RECENT_CHECK = 'This source was checked recently; saved data is retained.'
 
@@ -160,7 +162,10 @@ def parse_feed(provider, body, company, now):
         try:
             prefix=atom if root.tag!= 'rss' else ''
             title=provider_text(plain_summary(entry.findtext(prefix+'title') or ''),600)
-            summary=provider_text(plain_summary(entry.findtext(prefix+'description') or entry.findtext(prefix+'summary') or entry.findtext(prefix+'content') or ''),6000,allow_empty=True)
+            # Google News descriptions are a rotating list of other outlets'
+            # headlines from the same story cluster, not this article's text:
+            # keep only its own headline (which ends with the outlet).
+            summary='' if provider in AGGREGATOR_FEEDS else provider_text(plain_summary(entry.findtext(prefix+'description') or entry.findtext(prefix+'summary') or entry.findtext(prefix+'content') or ''),6000,allow_empty=True)
             link=entry.findtext('link') if not prefix else next((l.get('href') for l in entry.findall(atom+'link') if l.get('rel','alternate')=='alternate'),'')
             url=safe_url(link)
             date=entry.findtext('pubDate') if not prefix else entry.findtext(atom+'published') or entry.findtext(atom+'updated')
