@@ -95,6 +95,16 @@ or app restart. See [phase 1 verification](../testing/sentiment-reliability.md).
 
 **Model choice approved, 17 October 2026:** stay on GPT-5.4 + GPT-5.4 mini. Do not switch to Haiku or Sonnet. The validation below remains pending; phase 2 implementation has not started.
 
+**Follow-up, 17 October 2026:** owner requested fixing Haiku first, then continuing
+phase 2. The compact Anthropic format now passes **16/16 META batches, 119 items,
+0 repairs**, using six successful revised responses and ten separately approved
+remaining responses after an HTTP 400 stop. Hard-case interpretation is 3/6;
+GPT remains selected. Three approved runs cost US$0.053381665 plus an unresolved
+maximum hold of US$0.011598500. No automatic paid retry, model switch or app
+restart. This authorises phase 2 preparation while phase 1's GPT AVGO and
+three-day live gates remain unverified; phase 1 is not marked done.
+[Details](../testing/sentiment-reliability.md#haiku-transport-follow-up--17-october-2026-meta-format-gate-passed).
+
 Decide between the OpenAI path (stay on GPT-5.4 + GPT-5.4 mini) and the Anthropic path (Sonnet 5.5 + Haiku 5.5), using [Model choice by provider](#model-choice-by-provider). Re-run the 16-batch comparison with item-level repair on before deciding (the OpenRouter DeepSeek run is already included). The default is to **stay on GPT-5.4**: equal reliability in the tests, about the same cost, and no switch cost. Move to Sonnet if the fast lane (phase 3) needs faster AI responses. For the Anthropic path, set `THESIS_MODEL_PROVIDER=anthropic` and `ANTHROPIC_REASONING_MODEL=claude-sonnet-5-5` with an idle restart; label carry-over keeps the switch cost near zero.
 
 **Done when:** 48 hours at 97% or more check completion on the chosen models, any switch catch-up costs under US$1, and daily AI cost is within the section 6 target.

@@ -3,7 +3,8 @@
 Implementation is on `codex/redesign-phase-1`, based on `3bbcf01`. **Acceptance
 is pending; phase 1 is not marked done and phase 2 has not started.** No model,
 provider, watch preference, Telegram preference, historical reading, applied
-migration or environment file was changed. No paid test or source fetch ran.
+migration or environment file was changed. No source fetch ran. Initial phase 1
+verification was free; the separately approved Haiku follow-up costs are below.
 
 ## Implemented behavior
 
@@ -109,8 +110,68 @@ neutral validator metadata and leaves absent price captures unknown; it never
 borrows current sources. This verifies structural/consistency handling, not
 semantic correctness or complete historical packet reconstruction.
 
-**Paid test cost: US$0.** Missing model comparisons require separately scoped
+**Initial paid test cost: US$0.** Missing model comparisons require separately scoped
 paid testing. No automatic paid retry or fresh collection was used to fill gaps.
+
+## Haiku transport follow-up — 17 October 2026 (META format gate passed)
+
+The owner requested fixing Haiku before continuing phase 2, while retaining GPT
+for the app. All nine historical Haiku repairs concerned reporting fields:
+five social items carried news reporting and four non-events carried reporting
+passages. Those responses used instruction-only JSON after the provider rejected
+the original large grammar. This identifies a format problem; it does not prove
+the model's semantic labels correct.
+
+The Anthropic adapter now encodes sentiment items and optional coverage links
+as fixed source-keyed objects, shares repeated field types and prohibits news
+reporting on social items. Non-events omit reporting passages, decoded to the
+existing empty list. Empty price direction strings decode to null. Per-source
+evidence membership remains enforced by the unchanged production validator;
+fabricated evidence still fails. Exact provider text and billed usage are kept.
+Original paid request bodies, prompt identities and historical responses stay
+unchanged. The phase 1 rollback setting restores the legacy wire format.
+
+Grammar rejection caching now uses model plus schema identity. The existing
+no-charge compiler fallback also recognises the documented “Schema is too
+complex for compilation” rejection. Other HTTP errors stop without retry.
+[Anthropic documents](https://platform.claude.com/docs/en/build-with-claude/structured-outputs)
+internal grammar-size limits even when explicit field limits are satisfied.
+Recognising this additional rejection is an offline-tested fix; the seventh
+call's generic saved HTTP 400 code cannot establish its exact cause.
+
+| Approved test | Result | Confirmed cost |
+| --- | --- | --- |
+| First compact format | 2/3 batches passed; stopped on invalid news reporting; 0 automatic paid retries | US$0.008481760 |
+| Shared compact format, first run | 6 batches passed, 42 items, 0 repairs; seventh attempt stopped on HTTP 400 | US$0.016165600 |
+| Separately approved remaining batches | 10/10 passed, 77 items, 0 repairs; no automatic paid retry | US$0.028734305 |
+
+Combined disjoint revised results pass **16/16 batches, 119 items, 0 repairs
+(0%)**. Thirteen responses used provider-enforced structured output; three
+used instruction-only JSON. The revised schemas are 4–8 KB. The historical
+six-case developer check is **3/6**, against the older Haiku run's 4/6, so
+format reliability does not establish better interpretation. GPT remains the
+selected model; neither the quick relevance task nor a live Haiku watch was
+benchmarked here.
+
+Confirmed combined spend is **US$0.053381665**, with **US$0.011598500**
+additionally held by the ledger for the unresolved HTTP 400 attempt (maximum
+total US$0.064980165), below the approved US$0.30 combined cap. The hold is
+retained. All new attempts after a stopped run had separate owner approval.
+
+The bounded experiment runner refuses an existing output directory, checks the
+next maximum charge against its cap, stops at the first failure and records
+uncertain holds. Importing its replay helper no longer changes offline mode.
+Final related offline provider, experiment, sentiment, batching, parallelism,
+relevance and ledger suites pass **171 tests**, with mocked providers and
+disposable databases; these overlap the earlier phase 1 totals.
+Outputs remain in `.local/live-tests/haiku-structured-20261017/`; the failed
+first attempt and interrupted revised attempt are preserved separately. Only
+ledger entries were written, with no app reading, alert or watch result.
+
+No provider switch, environment edit, app restart or frontend installation was
+made. The owner authorised continuing phase 2 after this fix. The earlier
+GPT-5.4 AVGO and three-day live gates remain unverified; this does not mark
+phase 1 done. Further paid GPT testing was not approved.
 
 ## Installation and rollback
 

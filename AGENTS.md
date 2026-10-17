@@ -2,6 +2,10 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Haiku format fix — 17 October 2026 (META gate passed)
+
+Owner requested fixing Haiku before continuing phase 2, keeping GPT selected. Anthropic sentiment transport now uses source-keyed slots and shared field definitions (4–8 KB), preserves exact provider output and billed usage, and retains runtime citation/repair checks. Grammar rejection cache is specific to model/schema; the free compiler fallback recognises the documented complexity rejection too. Final related offline suites171pass. Revised META results pass16/16 batches,119items,0repairs; six-case interpretation3/6, so no model switch. Three separately approved runs cost US$0.053381665 plus unresolved maximum hold US$0.011598500; retain the first invalid result and HTTP400 stop, no automatic paid retry or hold release. No migration, environment, watch/Telegram preference, saved-research change, app restart or frontend installation. Owner authorised phase2 after this fix; GPT AVGO and three-day live gates remain unverified and phase1 is not marked done. [Evidence and limits](docs/testing/sentiment-reliability.md#haiku-transport-follow-up--17-october-2026-meta-format-gate-passed).
+
 ## GPT selected for sentiment redesign — 17 October 2026
 
 Owner chose GPT after reviewing phase 1: keep GPT-5.4 bulk readings and GPT-5.4 mini quick relevance checks; exclude Haiku. Private configuration already selects this OpenAI pair, so no environment change or restart was made. Haiku's recorded replay failure and other unselected-model gaps are comparison evidence, not rollout blockers. The selected GPT-5.4 AVGO replay and three-day live completion gate remain unverified. This approves the bulk/quick model choice, not phase 2 implementation, the phase 4 explainer or new Telegram routing. Historical phase 1 test results below remain exact. [Updated plan](docs/development/sentiment-alert-redesign-plan.md).
