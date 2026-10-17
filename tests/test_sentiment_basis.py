@@ -119,6 +119,15 @@ def test_invalid_basis_or_source_roles_publish_nothing(owner, fault):
             )
         return items
 
+    repairable = fault in {"news_previous", "description_positive", "outcome_neutral", "unclear_direction", "irrelevant_previous"}
+    if repairable:
+        result = S.generate(iid, transport=provider(mutate=change))
+        assert result["repairs"]["repaired"] == 1
+        repaired = next(i for i in result["items"] if i.get("repair"))
+        assert repaired["previous_citations"] == []
+        if fault in {"description_positive", "outcome_neutral", "unclear_direction"}:
+            assert repaired["basis"] == repaired["sentiment"] == "unclear"
+        return
     with pytest.raises(ValueError):
         S.generate(iid, transport=provider(mutate=change))
     with transaction() as c:

@@ -183,6 +183,11 @@ def test_invalid_sentiment_batch_publishes_nothing(owner, fault):
             items[0]["relevance"] = "unrelated"
         return items
 
+    if fault == "wrong_direction":
+        result = sentiment.generate(iid, transport=provider(mutate=mutate))
+        assert result["repairs"]["repaired"] == 1
+        assert result["items"][0]["sentiment"] == result["items"][0]["basis"] == "unclear"
+        return
     with pytest.raises(ValueError):
         sentiment.generate(iid, transport=provider(mutate=mutate))
     with transaction() as c:

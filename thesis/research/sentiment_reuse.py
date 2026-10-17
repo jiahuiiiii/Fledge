@@ -4,7 +4,7 @@ A reading covers every eligible source in its window, so hourly readings used
 to send the same texts to the AI again and again (each text ~3.7 times on
 average across 11-13 Oct 2026). A source whose model-visible content is
 unchanged keeps the label from the latest earlier reading made with the same
-prompt, model and policies. Only new or changed sources are sent.
+prompt and policies. Original item models remain recorded across model switches.
 
 Coverage links only point from a newer report to an earlier one, so a link
 saved with its newer report stays valid while both reports remain in the
@@ -15,6 +15,7 @@ from copy import deepcopy
 
 from thesis.db import rows
 from thesis.providers import ledger
+from . import sentiment_reliability
 
 POLICY = "sentiment-source-reuse-1"
 # Earlier readings searched for saved labels: enough to cover a 30-day window
@@ -37,6 +38,7 @@ def content_key(source):
         social_kind=source.get("social_kind"),
         discovery_match=source.get("discovery_match"),
         price_reference=source.get("price_reference"),
+        thread_context_key=source.get("thread_context_key"),
         conversation=(
             sentiment_context.wire(source["conversation"])
             if source.get("conversation")
@@ -53,11 +55,12 @@ def compatible(record, packet):
     result, saved = record["result"], record["packet"]
     return (
         result.get("prompt_version") == PROMPT
-        and result.get("model") == REASONING_MODEL
+        and (sentiment_reliability.enabled() or result.get("model") == REASONING_MODEL)
         and result.get("summary_policy") == SUMMARY_POLICY
         and result.get("guard_policy") == packet.get("guard_policy")
         and saved.get("reporting_policy") == packet.get("reporting_policy")
         and saved.get("context_policy") == packet.get("context_policy")
+        and saved.get("reddit_thread_policy") == packet.get("reddit_thread_policy")
     )
 
 
@@ -99,8 +102,17 @@ def find(conn, packet):
             current = wanted.get(key)
             if not current or current["id"] in found or current["id"] != source["id"]:
                 continue
+            copied = deepcopy(item)
+            if sentiment_reliability.enabled():
+                original_model = ((record["result"].get("prefilter") or {}).get("model")
+                                  if item.get("prefilter") else record["result"].get("model"))
+                copied["model"] = copied.get("model") or original_model
+                if item.get("prefilter"):
+                    copied.setdefault("call_ids", (record["result"].get("prefilter") or {}).get("call_ids", []))
+                else:
+                    copied["call_id"] = copied.get("call_id") or str(record["call_id"])
             found[current["id"]] = dict(
-                item=item,
+                item=copied,
                 links=links.get(source["id"], []),
                 analysis_id=str(record["id"]),
                 call_id=record["call_id"],
@@ -150,4 +162,6 @@ def merge(packet, reused, fresh):
         record["skipped"] = sum(1 for i in items if i.get("prefilter"))
         record["checked"] = record["checked_now"] + len(reused)
         result["prefilter"] = record
+    if sentiment_reliability.enabled():
+        result["repairs"] = sentiment_reliability.counts(items)
     return result

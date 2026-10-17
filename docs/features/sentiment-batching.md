@@ -1,5 +1,17 @@
 # Sentiment batching
 
+## Reliability redesign phase 1 — 17 October 2026 (not installed)
+
+The [phase 1 verification](../testing/sentiment-reliability.md) describes bounded
+item repairs, zero-spend revalidation, cross-model label reuse with per-item
+provenance, explicit full re-reading and one terminal smaller-batch recovery.
+Prompt, summary policy and raw paid responses remain unchanged. This supersedes
+the 13 October permission for scheduled paid retries: watches only re-check
+saved responses; paid retry/split actions require an explicit user action.
+Unsettled calls are never automatically redispatched. No migration or model
+change. Offline implementation is prepared; the full acceptance gate is still
+open, including the three-day live observation.
+
 The [9 October price/evidence checks](sentiment-price-guards.md) advance the current
 method to sentiment v23 / `sentiment-whole-source-batches-5` /
 `sentiment-coverage-9`. Price extraction is part of the existing request; historical

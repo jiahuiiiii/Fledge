@@ -5,6 +5,12 @@ export default function SentimentBasis({ item }) {
   return (
     <div className="sentiment-basis">
       <p className="fine">{item.explanation}</p>
+      {item.repair && (
+        <p className="fine">
+          The AI's label and its evidence disagreed. Inconsistent fields were
+          removed or marked unclear.
+        </p>
+      )}
       {item.guard?.applied && (
         <p className="fine">
           Evidence check changed the AI's {item.guard.model_sentiment} label to

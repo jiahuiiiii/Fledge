@@ -100,7 +100,10 @@ def plan(packet, *, max_sources=MAX_SOURCES, max_bytes=MAX_BYTES):
 
 def part_identity(part):
     from .sentiment import model_identity
-    return model_identity(part) + ":" + POLICY
+    if part.get("_request_key"):
+        return part["_request_key"]
+    key = model_identity(part) + ":" + POLICY
+    return key + ":reread:" + part["reread_token"] if part.get("reread_token") else key
 
 
 def plan_identity(packet):
@@ -117,14 +120,69 @@ def check_access(conn, packet):
 
 
 def prior_attempt(part):
+    from .sentiment import render
+    from . import sentiment_reliability
     base = part_identity(part)
+    latest = None
     with transaction() as conn:
-        for attempt in range(MAX_EXPLICIT_RETRIES, -1, -1):
+        for attempt in range(0 if part.get("_split_child") else MAX_EXPLICIT_RETRIES, -1, -1):
             key = base if not attempt else base + f":retry:{attempt}"
             call = ledger.find(conn, key)
             if call:
+                if latest is None:
+                    latest = (call, attempt)
+                if not sentiment_reliability.enabled():
+                    return call, attempt
+                try:
+                    render(call, part)
+                except ValueError:
+                    continue
                 return call, attempt
-    return None, 0
+    return latest or (None, 0)
+
+
+def split_parts(part):
+    """One terminal split, with identities tied to the exhausted original request."""
+    middle = (len(part["sources"]) + 1) // 2
+    parent = hashlib.sha256(part_identity(part).encode()).hexdigest()
+    children = []
+    for index, sources in enumerate((part["sources"][:middle], part["sources"][middle:])):
+        child = part_for(part, sources, max_bytes=MAX_BYTES)
+        child["_request_key"] = part_identity(child) + f":split:{parent}:{index}"
+        child["_split_child"] = True
+        children.append(child)
+    return children
+
+
+def has_attempt(key):
+    # The ledger permits redispatch after failures. This pipeline requires an
+    # explicit retry key instead; uncertain charges must never be resent here.
+    with transaction() as conn:
+        return bool(one(conn, "SELECT 1 FROM model_calls WHERE request_key=%s OR starts_with(request_key,%s) LIMIT 1",
+                        (key, key + ledger.REDISPATCH)))
+
+
+def recovery_parts(parts, *, split_failed=False):
+    from . import sentiment_reliability
+    from .sentiment import render
+    if not sentiment_reliability.enabled():
+        return parts
+    expanded = []
+    for part in parts:
+        saved, attempt = prior_attempt(part)
+        invalid = False
+        if saved:
+            try:
+                render(saved, part)
+            except ValueError:
+                invalid = True
+        if invalid and attempt == MAX_EXPLICIT_RETRIES and len(part["sources"]) > 1:
+            children = split_parts(part)
+            if split_failed or any(has_attempt(part_identity(child)) for child in children):
+                expanded.extend(children)
+                continue
+        expanded.append(part)
+    return expanded
 
 
 def raw(call):
@@ -174,8 +232,11 @@ def combine(packet, parts, calls):
         raise ValueError("All sentiment batches must finish before combining results.")
     merged = dict(items=[], coverage_links=[])
     contexts = {}
+    provenance = {}
     for part, call in zip(parts, calls):
         checked = render(call, part)
+        provenance.update({i["source_id"]: {k: i[k] for k in ("model", "call_id", "repair") if k in i}
+                           for i in checked["items"]})
         if part.get('reddit_thread_context'):
             contexts.update({item['source_id']: item['thread_context'] for item in checked['items'] if item.get('thread_context')})
         output = raw(call)
@@ -184,14 +245,15 @@ def combine(packet, parts, calls):
     # Recheck cross-batch relations and count groups once against all sources.
     result = render({"response_body": {"status": "completed", "output": [
         {"type": "message", "content": [{"type": "output_text", "text": json.dumps(merged)}]}
-    ]}}, packet)
+    ]}}, packet, enforce_repair_limit=False)
     for item in result['items']:
         if item['source_id'] in contexts:
             item['thread_context'] = contexts[item['source_id']]
+        item.update(provenance[item['source_id']])
     return result
 
 
-def run(packet, *, transport=None, progress=None, retry_failed=False, prefilter=None):
+def run(packet, *, transport=None, progress=None, retry_failed=False, prefilter=None, split_failed=False):
     """Return (result, calls). A cheap quick check first drops only sources it
     calls clearly unrelated; everything else gets the full reading."""
     from . import relevance_prefilter
@@ -205,6 +267,9 @@ def run(packet, *, transport=None, progress=None, retry_failed=False, prefilter=
         plan(packet)
         with transaction() as conn:
             check_access(conn, packet)
+            if split_failed and any(ledger.find(conn, relevance_prefilter.request_key(body)) is None
+                                    for body in relevance_prefilter.plan(packet)):
+                raise ValueError("Saved inputs changed. Refresh & analyse before requesting smaller-batch recovery.")
         if progress:
             progress(dict(completed=0, total=0, source_counts=[], failed=None,
                           message=f"Quick relevance check · {len(packet['sources'])} sources"))
@@ -212,7 +277,7 @@ def run(packet, *, transport=None, progress=None, retry_failed=False, prefilter=
         keep = set(kept)
         packet = dict(packet, sources=[s for s in packet["sources"] if s["id"] in keep])
     if packet["sources"]:
-        result, calls = _run(packet, transport=transport, progress=progress, retry_failed=retry_failed)
+        result, calls = _run(packet, transport=transport, progress=progress, retry_failed=retry_failed, split_failed=split_failed)
     else:
         result, calls = relevance_prefilter_empty(packet), []
         result["batching"] = dict(policy=POLICY, completed=0, total=0, source_counts=[],
@@ -240,7 +305,7 @@ def fully_saved(packet, *, prefilter=None):
                 found = relevance_prefilter.labels(call, body) or {}
                 skip |= {by_label[label] for label, value in found.items() if value == "unrelated"}
             packet = dict(packet, sources=[s for s in packet["sources"] if s["id"] not in skip])
-        for part in plan(packet) if packet["sources"] else []:
+        for part in recovery_parts(plan(packet)) if packet["sources"] else []:
             call, attempt = prior_attempt(part)
             if not call or attempt:
                 return False
@@ -250,7 +315,7 @@ def fully_saved(packet, *, prefilter=None):
     return True
 
 
-def run_reusing(packet, reused, *, transport=None, progress=None, retry_failed=False, prefilter=None):
+def run_reusing(packet, reused, *, transport=None, progress=None, retry_failed=False, prefilter=None, split_failed=False):
     """Send only sources without a saved label; reused labels keep their reading.
 
     Earlier news still goes along as comparison context, so a new report can be
@@ -264,7 +329,7 @@ def run_reusing(packet, reused, *, transport=None, progress=None, retry_failed=F
     # reading tied to the same paid calls.
     if not reused or fully_saved(packet, prefilter=prefilter):
         return run(packet, transport=transport, progress=progress,
-                   retry_failed=retry_failed, prefilter=prefilter)
+                   retry_failed=retry_failed, prefilter=prefilter, split_failed=split_failed)
     fresh_sources = [s for s in packet["sources"] if s["id"] not in reused]
     if fresh_sources:
         sub = dict(packet, sources=fresh_sources, comparison_sources=[
@@ -275,7 +340,7 @@ def run_reusing(packet, reused, *, transport=None, progress=None, retry_failed=F
             progress(dict(completed=0, total=0, source_counts=[], failed=None,
                           message=f"{len(reused)} sources already read · reading {len(fresh_sources)} new"))
         fresh, calls = run(sub, transport=transport, progress=progress,
-                           retry_failed=retry_failed, prefilter=prefilter)
+                           retry_failed=retry_failed, prefilter=prefilter, split_failed=split_failed)
     else:
         with transaction() as conn:
             check_access(conn, packet)
@@ -300,10 +365,19 @@ class BatchFailed(Exception):
         self.index, self.call, self.error = index, call, error
 
 
-def _run(packet, *, transport=None, progress=None, retry_failed=False):
+def _run(packet, *, transport=None, progress=None, retry_failed=False, split_failed=False):
     from . import parallel
     from .sentiment import request_for, render, PROMPT
-    parts = plan(packet)
+    parts = recovery_parts(plan(packet), split_failed=split_failed)
+    if split_failed and not any(p.get("_split_child") for p in parts):
+        # A stale recovery button must not turn into a fresh full-pool reading.
+        for part in parts:
+            saved, _ = prior_attempt(part)
+            if saved is None:
+                if has_attempt(part_identity(part)):
+                    raise ledger.BudgetBlocked("An earlier AI request has no settled response. Smaller-batch recovery cannot resend it.")
+                raise ValueError("No saved batch is ready for smaller-batch recovery. Refresh & analyse first.")
+            render(saved, part)
     total = len(parts)
     calls = [None] * total
     sizes = [len(p["sources"]) for p in parts]
@@ -330,17 +404,27 @@ def _run(packet, *, transport=None, progress=None, retry_failed=False):
             try:
                 render(previous, part)
             except ValueError as exc:
-                if not retry_failed or attempt >= MAX_EXPLICIT_RETRIES:
+                if not retry_failed or attempt >= MAX_EXPLICIT_RETRIES or part.get("_split_child"):
                     details = failure_details(previous, exc)
+                    if attempt == MAX_EXPLICIT_RETRIES and not part.get("_split_child") and len(part["sources"]) > 1:
+                        details["split_available"] = True
                     message = failure_message(index + 1, total, done(), details, saved=True,
                                               unsent=total - done() - 1)
                     message += " The one explicit retry has also been used." if attempt else " Refresh & analyse can retry this batch once if its inputs are unchanged; paid AI uses the existing allowance."
                     report(message, index + 1, details)
                     raise ValueError(message) from None
                 key += f":retry:{attempt + 1}"
+                if has_attempt(key):
+                    raise ledger.BudgetBlocked("The explicit retry has no usable settled response. It was not resent.")
             else:
                 calls[index] = previous
                 continue
+        elif has_attempt(key):
+            raise ledger.BudgetBlocked("An earlier AI request has no settled response. It was not resent; review its charge before starting a separate re-read.")
+        elif part.get("_split_child") and not split_failed:
+            message = "Smaller-batch recovery is unfinished. Choose Retry with smaller batches to continue explicitly."
+            report(message, index + 1, dict(code="split_unfinished", reason=message, split_available=True))
+            raise ledger.BudgetBlocked(message)
         pending.append((index, part, key))
     if done():
         report(f"{done()} of {total} batches complete · reused saved results")
@@ -375,6 +459,9 @@ def _run(packet, *, transport=None, progress=None, retry_failed=False):
             raise blocked.error
         first = ordered[0]
         details = failure_details(first.call, first.error)
+        if (first.call and first.call.get("request_key", "").endswith(":retry:1")
+                and not parts[first.index].get("_split_child") and len(parts[first.index]["sources"]) > 1):
+            details["split_available"] = True
         unsent = sum(result is parallel.SKIPPED for i, result in enumerate(results) if i not in errors)
         message = failure_message(first.index + 1, total, done(), details, unsent=unsent)
         if len(ordered) > 1:
@@ -387,6 +474,7 @@ def _run(packet, *, transport=None, progress=None, retry_failed=False):
     report("All batches complete · checking the combined result")
     result = combine(packet, parts, calls)
     result["batching"] = dict(policy=POLICY, completed=total, total=total, source_counts=sizes,
+                             split_batches=sum(bool(p.get("_split_child")) for p in parts),
                              comparison_limit=MAX_COMPARISONS,
                              comparison_context_bounded=any(p['comparison_selection']['supplied'] < p['comparison_selection']['available'] for p in parts))
     return result, calls

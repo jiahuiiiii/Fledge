@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Sentiment redesign phase 1 — 17 October 2026 (implementation prepared)
+
+`codex/redesign-phase-1` adds bounded item repair (`sentiment-item-repair-1`), free rechecking of saved failed responses, cross-model label reuse with original item models/calls, explicit full re-reading and one terminal split after the existing paid retry. Structural/citation failures and more than `max(1,floor(batch size/4))` repaired items still reject the batch. Prompt/summary/batch policies remain; historical readings and raw paid responses stay immutable. Watches no longer retry paid failures; unfinished quick/full calls are never automatically redispatched. No migration, model, environment, watch preference or Telegram preference change. `THESIS_SENTIMENT_RELIABILITY=false` disables new repairs/cross-model reuse/splits; it does not erase saved records or permit automatic paid retries. [Verification and limits](docs/testing/sentiment-reliability.md).
+
+Broad offline related tests: 488 pass/3 optional skips; later affected tests: 150 pass, final recovery suites68pass (overlapping). Frontend 198 tests, 8 component behavior groups at 1440/390/320 and temporary build pass; screenshots inspected, no browser network requests. META Opus/Sonnet/GPT-5.5/GPT-5.4 each pass16/16; Haiku passes14/16 with9/119 repairs (7.56%), failing the5% gate. AVGO Opus passes15/15; four other required model corpora are missing. **Not done:** full acceptance and three days live at≥97%; no phase2, app restart or frontend installation. Paid tests US$0. Evidence `.local/live-tests/redesign-phase-1-20261017/`. Leave the running app and the unrelated uncommitted `frontend/src/styles/app.css` edits alone. Restart only from the owner's Terminal panel after the required idle/90-second due checks; never run the historical sandbox restart script.
+
 ## Your list today (portfolio read) — 16 October 2026
 
 Home shows the whole watchlist together when it has 2+ companies: lights for today's move, sector spread on file and the account's world-news links, bars grouped by sector, and an optional **Explain my list** (one bounded AI request; every driver cites saved headline IDs; advice-like wording and unknown IDs dropped; answers reused; private per account, migration 055). [Contract](docs/features/portfolio-read.md) · [Testing](docs/testing/portfolio-read.md).

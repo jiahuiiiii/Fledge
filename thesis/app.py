@@ -1337,6 +1337,8 @@ class ResearchLoadSettings(BaseModel):
     initial: bool = False
     analyze: bool = False
     lookback_days: Literal[1, 7, 30] = 7
+    reread: bool = False
+    split_failed: bool = False
 
 
 @app.get("/api/v1/companies/{instrument_id}/loading")

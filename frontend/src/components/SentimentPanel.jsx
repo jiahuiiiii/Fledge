@@ -183,6 +183,19 @@ export default function SentimentPanel({
           </button>
         </div>
       </div>
+      <details className="secondary-details">
+        <summary>Read saved sources again</summary>
+        <p className="fine">
+          Re-read every saved source with the current model. This is a new paid
+          reading; previous readings stay in History.
+        </p>
+        <button
+          disabled={!!loadingRun?.active || availability.blocked}
+          onClick={() => onAnalyze(days, { reread: true })}
+        >
+          Re-read everything · paid AI
+        </button>
+      </details>
       {disabledReason && (
         <p
           id="sentiment-disabled-reason"
@@ -217,6 +230,14 @@ export default function SentimentPanel({
               and context are unchanged.
             </p>
           )}
+          {!loadingRun.active && batchProgress.failure?.split_available && (
+            <button
+              disabled={availability.blocked}
+              onClick={() => onAnalyze(days, { split_failed: true })}
+            >
+              Retry with smaller batches · paid AI
+            </button>
+          )}
         </div>
       )}
       {(a || watch?.enabled) && (
@@ -229,6 +250,11 @@ export default function SentimentPanel({
           {a?.social_lookback_days && a.social_lookback_days !== 7
             ? ". This exploratory window does not publish watch alerts."
             : ""}
+        </p>
+      )}
+      {a && !a.withheld && a.repairs?.repaired > 0 && (
+        <p className="fine" role="status">
+          {`${a.repairs.repaired} of ${a.repairs.total} labels needed repair: the AI's label and its evidence disagreed.`}
         </p>
       )}
       {a && !a.withheld && (

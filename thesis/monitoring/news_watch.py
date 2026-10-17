@@ -609,11 +609,10 @@ def run_once(
                     raise WatchStopped()
             stage = "sentiment analysis"
             watch_context.require_active(owner, iid, token, supplied_clock)
-            # retry_failed: like Refresh & analyse, a batch whose earlier answer
-            # failed the evidence checks may be sent once more.
+            # Recheck saved responses for free; paid retries require a manual action.
             record = analyzer(iid) if analyzer else sentiment.generate(
                 iid, progress=lambda _: watch_context.require_active(owner, iid, token, supplied_clock, renew=True),
-                retry_failed=True,
+                retry_failed=False,
             )
             analysis_id = record["id"]
             details["analysis"] = "completed"

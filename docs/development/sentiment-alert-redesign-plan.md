@@ -69,6 +69,15 @@ Each phase ships on its own, is tested offline first, and restarts the app only 
 
 ### Phase 1 — reliability foundation (no model change)
 
+**17 October 2026: implementation prepared; acceptance pending (not done).**
+Offline related suites: 488 passed / 3 optional skips; later affected suites:
+150 passed, final recovery suites 68 passed (overlapping). Frontend: 198 tests and 8 isolated component behavior
+groups pass; build passes. META replay: Opus/Sonnet/GPT-5.5/GPT-5.4 each 16/16;
+Haiku 14/16 with 9/119 repaired items (7.56%), above the 5% gate. AVGO Opus
+15/15; the other four required models have no saved AVGO responses. Three-day
+live measurement and installation remain pending. No model change, paid test
+or app restart. See [phase 1 verification](../testing/sentiment-reliability.md).
+
 1. **Item-level repair** in `sentiment.render` and `reporting_basis.render`. When a single item breaks a consistency rule, keep the batch and repair that item instead of rejecting everything:
    - tone and basis disagree, or a non-relevant item has a direction → tone and basis become `unclear`;
    - event fields inconsistent with the kind or relevance → event becomes `insufficient_detail` / `not_applicable` with no impact, so it can never trigger an alert;
@@ -76,7 +85,7 @@ Each phase ships on its own, is tested offline first, and restarts the app only 
 
    Structural failures still reject the batch: missing or duplicate labels, passages not from the source, broken or unfinished output. A batch that needs more than a quarter of its items repaired (at least 1) is also rejected. Each repaired item records `repair: {policy, reasons, original}`, is counted in the reading, and shows "the AI's label and its evidence disagreed" in the app. Previously failed saved batches are re-checked under the new rules before anything is re-sent, so stuck companies recover without new spend. The summary policy name stays the same, so saved labels remain reusable.
 2. **Label carry-over across models.** When the main model changes, reuse saved labels for unchanged sources if the prompt and policies match, and record the original model on each item. Only new sources go to the new model. An explicit "re-read everything" action stays available.
-3. **Stuck batches.** If a batch still fails after its one retry, re-send its sources once as two half-size batches before giving up.
+3. **Stuck batches.** If a batch still fails after its one retry, an explicit paid recovery action can re-send its sources once as two half-size batches before giving up. No automatic paid retry; child batches cannot retry or split again.
 
 **Done when:** replaying the saved 16 META and 15 AVGO batches passes 16/16 and 15/15 for Opus, Sonnet, Haiku, GPT-5.5 and GPT-5.4 with at most 5% of items repaired, and 3 days live on GPT-5.4 show at least 97% of checks completing.
 

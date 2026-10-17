@@ -128,14 +128,15 @@ def test_unsupported_price_recovery_reuses_original_paid_batches_without_retry(o
             assert one(conn, "SELECT * FROM model_calls WHERE id=%s", (original["id"],)) == original
 
 
-def test_unknown_charge_is_sent_again_on_the_next_explicit_run(owner):
+def test_unknown_charge_is_not_resent_by_the_sentiment_pipeline(owner):
     p=packet()
     def broken(body):raise TimeoutError()
     with patch.object(B,'check_access'):
         with pytest.raises(ledger.BudgetBlocked):B.run(p,transport=broken)
         assert ledger.snapshot()['calls']==1
-        B.run(p,transport=provider())
-    assert ledger.snapshot()['unresolved']==1 and ledger.snapshot()['calls']>1
+        with pytest.raises(ledger.BudgetBlocked):
+            B.run(p,transport=lambda _:pytest.fail('unknown request resent'))
+    assert ledger.snapshot()['unresolved']==1 and ledger.snapshot()['calls']==1
 
 
 def test_only_one_explicit_retry_of_settled_invalid_batch(owner):
@@ -163,7 +164,8 @@ def test_global_result_revalidates_cross_batch_constraints(owner):
     p=packet(); parts=B.plan(p)
     good=provider('neutral')
     calls=[{'response_body':good(S.request_for(part))} for part in parts]
-    with patch.object(S,'render',side_effect=[{}, {}, ValueError('cross-batch inconsistency')]) as render:
+    checked=[S.render(call,part) for part,call in zip(parts,calls)]
+    with patch.object(S,'render',side_effect=checked + [ValueError('cross-batch inconsistency')]) as render:
         with pytest.raises(ValueError,match='cross-batch'):B.combine(p,parts,calls)
         assert render.call_count==3
     with pytest.raises(ValueError,match='All sentiment batches'):B.combine(p,parts,calls[:-1])
