@@ -40,21 +40,33 @@ def rating_callback(conn,callback,fingerprint,update_id):
     if not alert_feedback.enabled():return 'paused'
     data=callback.get('data');message=callback.get('message') or {};sender=callback.get('from') or {}
     match=re.fullmatch(r'f:([0-9a-f]{32}):([un])',data) if isinstance(data,str) else None
+    digest_match=re.fullmatch(r'd:([0-9a-f]{32}):([0-4]):([un])',data) if isinstance(data,str) else None
+    match=match or digest_match
     if not match or not isinstance(message,dict) or not isinstance(sender,dict) or not private_sender(message,sender):
         return 'unavailable'
     delivery=one(conn,'SELECT d.*,s.chat_id,s.bot_fingerprint FROM telegram_deliveries d '
         'JOIN telegram_settings s ON s.owner_id=d.owner_id WHERE d.id=%s',(str(UUID(match[1])),))
-    if (not delivery or delivery['kind'] not in alert_feedback.KINDS
+    if (not delivery or delivery['kind'] not in alert_feedback.KINDS|{'digest'}
             or delivery['bot_fingerprint']!=fingerprint or delivery['chat_id']!=sender['id']):
         return 'unavailable'
     if delivery['status']=='sending':return 'pending'
     if (delivery['status']!='sent' or type(message.get('message_id')) is not int
             or delivery['message_id']!=message['message_id']):
         return 'unavailable'
+    kind=delivery['kind'];event_id=delivery['event_id'];choice=match[2]
+    if digest_match:
+        if kind!='digest':return 'unavailable'
+        shown=one(conn,'SELECT m.kind,m.event_id FROM telegram_digest_items i JOIN daily_digest_members m '
+            'ON m.owner_id=i.owner_id AND m.digest_id=%s AND m.position=i.member_position '
+            'WHERE i.owner_id=%s AND i.delivery_id=%s AND i.attempt=%s AND i.position=%s',
+            (delivery['event_id'],delivery['owner_id'],delivery['id'],delivery['attempts'],int(match[2])))
+        if not shown:return 'unavailable'
+        kind,event_id,choice=shown['kind'],shown['event_id'],match[3]
+    elif kind=='digest':return 'unavailable'
     from thesis import service
     try:
-        alert_feedback.rate(delivery['owner_id'],delivery['kind'],str(delivery['event_id']),
-            'useful' if match[2]=='u' else 'not_useful',source='telegram',
+        alert_feedback.rate(delivery['owner_id'],kind,str(event_id),
+            'useful' if choice=='u' else 'not_useful',source='telegram',
             request_key='telegram:'+fingerprint+':'+str(update_id))
     except service.Missing:return 'unavailable'
     return 'saved'

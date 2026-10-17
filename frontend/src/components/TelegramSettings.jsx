@@ -20,6 +20,9 @@ const kinds = {
   company: "Company update",
   idea: "Saved idea",
   condition: "Monitored condition",
+  move: "Price move",
+  digest: "Daily recap",
+  cost: "AI spending notice",
   test: "Connection test",
 };
 const time = (value) => formatTimestamp(value, { fallback: "Not recorded" });
@@ -317,6 +320,17 @@ export default function TelegramSettings() {
                     Changes to monitored figures, event evidence or reporting
                     coverage.
                   </li>
+                  {data.daily_recaps_enabled && (
+                    <li>
+                      Daily recaps of medium-priority updates, with evidence.
+                    </li>
+                  )}
+                  {data.cost_notices_enabled && (
+                    <li>
+                      AI spending notices when confirmed charges cross your
+                      chosen daily level.
+                    </li>
+                  )}
                 </ul>
                 <p>
                   Messages include the ticker, reason, timestamps and available

@@ -241,6 +241,18 @@ failure overlapped unapplied migration edits; retained diagnostic, clean rerun.
 actual approved routing, quality/noise replay and live gates remain pending;
 **phase5not done**. [Contract](../features/daily-updates.md).
 
+Transport follow-up17October:064prepares daily recap/cost outbox types, guarded
+actual-record membership and immutable per-attempt rating-button mappings.
+Rendering rechecks source/private-revision access, preserves complete evidence
+blocks and binds ratings only to actually sent buttons. Final166related offline/
+202frontend/build/scopedformat and6browser groups pass. Broad offline2495pass/
+93optional skips precedes the final button-presence guard; final166affectedpass
+after it. New-type switches remain off and require an explicit delivery start;
+normal daily records remain previews. No live test, setting change, source/AI
+call, migration or restart. Actual routing/record production, live-choice approval,
+owner quality/noise replay and live gates remain; **phase5not done**.
+[Contract](../features/daily-updates.md#telegram-transport-follow-up--17-october-2026).
+
 1. **Split the prompt into smaller tasks:**
    1. relevance (the existing quick check);
    2. tone and evidence basis;

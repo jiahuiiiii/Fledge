@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Daily Telegram transport — 17 October 2026 (prepared)
+
+New064prepares recap/cost outbox kinds and private immutable shown-member mappings per send attempt. Recaps recheck source access/private revisions, show≤5complete numbered updates with excerpts/links together (≤2links), retain remaining counts and bind each rating to its original alert. Known rate-limit retries can change shown members safely; callbacks wait for send acknowledgement, unsent buttons never acquire mappings, uncertain/interrupted sends never retry. Cost messages are owner-only, separate exact confirmed charges from unresolved maxima, and require a matching explicit level. New-queue failures cannot abort ordinary delivery. History labels/descriptions follow the existing UI; descriptions appear only for active types.
+
+Broad offline2495pass/93optional skips before final button-presence guard; subsequent166affected/202frontend tests, build/scopedformat and6isolated browser groups1440/390/320pass;0HTTPcalls, screenshots inspected.061–064unapplied live; new delivery switches off, explicit start required, normal daily records still previews. Actual routing/record production, quality0/50, noise replay and live gates remain; no new delivery/cost-level approval inferred. US$0, no source fetch/environment/account-setting/install/app-or-DBrestart change; user CSS exact. [Contract](docs/features/daily-updates.md#telegram-transport-follow-up--17-october-2026).
+
 ## Daily recap and spending previews — 17 October 2026 (prepared)
 
 New063prepares immutable private medium-route recap membership, closed-day spending observations and once-per-day cost notices. Existing evidence cards/ratings stay together in one collapsed Updates panel, with current access checked on every reopening; reading never reviews or pays. Only the installation owner sees aggregate AI charges, with unresolved maxima separate, Singapore dispatch-day boundaries and late settlements revisited even after failure/backoff. No implicit cost threshold; prepared07:00SGTrecap schedule remains for activation review. All generated records are previews; Telegram digest/cost transport remains outstanding.

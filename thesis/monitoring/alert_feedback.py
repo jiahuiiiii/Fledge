@@ -36,8 +36,12 @@ def rate(owner,kind,event_id,value,*,source='app',request_key=None):
         return latest(conn,owner,kind,event_id)
 
 
-def keyboard(delivery):
-    if not enabled() or delivery['kind'] not in KINDS:return None
+def keyboard(delivery,*,digest_items=None):
+    if not enabled():return None
+    if delivery['kind']=='digest':
+        from .daily_telegram import keyboard as digest_keyboard
+        return digest_keyboard(delivery,digest_items)
+    if delivery['kind'] not in KINDS:return None
     token=UUID(str(delivery['id'])).hex
     return dict(inline_keyboard=[[
         dict(text='Useful',callback_data='f:'+token+':u'),

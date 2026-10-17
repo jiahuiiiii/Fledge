@@ -76,3 +76,10 @@ migration, saved-research change or restart. Owner annotations remain0/50, so
 neither semantic quality nor phase5acceptance is verified. Subsequent preview
 routing is recorded in the linked contract; live routing, daily digest, cost
 alerts and the one-week replay remain to implement.
+
+Daily-update follow-up17October: private recap/spending previews and the guarded
+Telegram transport are now prepared, still off and unapplied live. Per-attempt
+button mappings preserve original-alert ratings after a known rejected send is
+re-rendered. [Current daily-update contract](../features/daily-updates.md).
+This supplies no new owner annotations or prompt-quality result; actual routing,
+independent replay and live gates remain pending.

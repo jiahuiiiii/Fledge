@@ -40,6 +40,9 @@ def render(record):
         raise ValueError("Source access changed; do not forward this alert.")
     if d.get('preview'):
         raise ValueError('Preview alerts must never be sent.')
+    if kind in {'digest','cost'}:
+        from .daily_telegram import render as daily_render
+        return daily_render(record)
     symbol = plain(d.get("symbol"), 18)
     label = {"company": "Company update", "idea": "Saved idea", "condition": "Monitored condition", "move": "Price move"}[kind]
     parts = [f"<b>{escape(symbol)} · {label}</b>", f"<b>{escape(plain(record['title'], 180))}</b>"]

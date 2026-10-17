@@ -132,7 +132,7 @@ element/viewport captures with the expanded evidence and rating visible together
 
 | Phase5 acceptance item | Result | Evidence |
 | --- | --- | --- |
-| One-week replay has at most10%low-value Telegram-bound alerts | **Failed / unverified** | Live routing/digest/replay not implemented;0/7replay days |
+| One-week replay has at most10%low-value Telegram-bound alerts | **Failed / unverified** | Actual routing and independent noise replay remain;0/7replay days |
 | Owner-labelled quality remains at least80%, plus4/6hard cases | **Failed / unverified** |0/50owner labels;0/6new-prompt hard-case measurements |
 
 Cost US$0; no paid call, real-source fetch, live migration, configuration change,
@@ -151,3 +151,9 @@ related/13integration/202frontend tests and22browser groups pass. Final stable f
 offline2468pass/93optional skips. The earlier broad run's2464passes/93skipsand
 checksum failure from overlapping unapplied-migration edits remain as diagnostics.
 This is preparation, not acceptance.
+
+Further follow-up17October: [daily Telegram transport](daily-updates.md#telegram-transport-follow-up--17-october-2026)
+now prepares digest/cost outbox types and immutable mappings from sent numbered
+buttons to original private alerts. Final166affected offline tests and6browser
+groups pass; delivery is still off,064unapplied, normal records still previews.
+Actual routing/record production and all quality/noise/live approval gates remain.

@@ -81,7 +81,77 @@ Cost US$0, zero paid/provider calls, no real database migration, environment cha
 app/DB restart or frontend install. User `app.css` preserved. Private evidence:
 `.local/live-tests/redesign-phase-5-20261017/daily-updates-prepared/`.
 
-Still outstanding: Telegram digest/cost transport, actual severity routing,
+At this checkpoint, outstanding work included Telegram digest/cost transport, actual severity routing,
 owner approval of delivery and cost level, owner-labelled quality checks,
 one-week noise replay and live/shadow/outcome measurements. Existing 061/062 and
 new 063 remain unapplied; this does not mark any phase acceptance item passed.
+
+## Telegram transport follow-up — 17 October 2026
+
+Migration 064 prepares the `digest` and `cost` outbox kinds and a private,
+append-only `telegram_digest_items` mapping. It is **unapplied live**. Existing
+settings and preview rows are untouched; a preview publication cannot acquire a
+live route, a real recap cannot include a shadow route, and preview/empty recaps
+cannot enter the outbox. Migration 064 allows new actual route records without
+promoting any old proposal. Normal record creation still produces previews;
+connecting the approved live routing mode remains separate work.
+
+`THESIS_DIGEST_TELEGRAM_ENABLED` and `THESIS_COST_TELEGRAM_ENABLED` both default
+off. Delivery additionally requires daily reports enabled, an explicit
+`THESIS_DAILY_TELEGRAM_STARTED_AT`, and the account's existing connected/enabled
+chat. Cost notices require the installation owner and a currently matching,
+explicit cost level. Records before the delivery start/account activation or
+older than 24 hours are not newly queued. Missing/future/invalid delivery starts
+keep delivery off. Turning a switch off after queuing is rechecked before send.
+These settings do not authorize themselves: new alert types and severity routing
+still need the owner's explicit live approval.
+
+A recap rechecks each underlying publication's source permissions and current
+private-idea revision. It includes up to five complete numbered updates, with
+the excerpt and source link beside the relevant company, at most two links in
+the message, and a count directing the reader to the remaining saved items.
+Withheld/changed records are not forwarded; no eligible records means no message.
+Grouped move member lists are never partially truncated to fit. HTML is escaped
+and parsed text is limited to 3,800 UTF-16 units. Rendering calls neither AI nor
+original sources, marks no alert reviewed and does not regenerate a recap.
+
+Each displayed update can have its own Useful / Not useful buttons. Before HTTP,
+send intent and the exact shown-member mapping commit together. The confirmed
+message's send attempt determines which original alert a button rates. A known
+rate-limit rejection may re-render after current access changes; it cannot
+silently reuse the old mapping. Disabled ratings create neither buttons nor a
+mapping. Current-bot/private-sender/exact-sent-message checks, durable callback
+idempotency and acknowledgement handling remain; cost notices have no rating
+buttons. A callback arriving before send acknowledgement waits without advancing
+the shared cursor. Interrupted or uncertain sends are never retried automatically.
+
+Owner cost messages show the exact saved confirmed charge, the chosen level,
+Singapore dispatch date, and unresolved maximum separately. Changing the level
+after queuing makes an obsolete notice ineligible. There is no new spending cap
+or paid retry. Other accounts receive neither the cost type description nor
+installation-wide figures. Delivery history uses plain labels for recap, cost
+and price records; new-type descriptions appear only when those delivery switches
+are active. Viewing history never enables delivery or sends a test.
+
+New-queue errors roll back only their savepoint and log a fixed safe message;
+ordinary alert delivery can continue. Existing account pause/disconnect, pacing,
+bounded known-rejection retries and uncertain-send recovery remain in force.
+
+Final affected suites: **166 pass**, including the final button-presence and
+cross-account mapping guards. Frontend 202 tests/build/scoped format and six
+isolated browser groups at 1440/390/320 pass, with zero HTTP requests; screenshots
+inspected. The broad offline run passes **2,495 tests / 93 optional skips**; it
+was collected before the final button-presence guard. The subsequent 166-test
+affected run checks that final guard and cross-account mapping access. All
+transport tests use an authored mock bot; no live delivery test has been
+authorized or performed.
+
+Cost US$0. No paid call, source refresh, environment/account-setting change,
+live migration, app/DB restart or frontend installation. The user's `app.css`
+remains exact. Private evidence is retained under
+`.local/live-tests/redesign-phase-5-20261017/daily-telegram-prepared/`.
+
+Phase 5 remains **not done**: actual routing/record production, independent
+one-week noise replay, owner-labelled quality (0/50), new-prompt hard-case
+evaluation and live/shadow/outcome gates remain outstanding. None of these
+preparations supplies the owner's delivery or cost-level approval.
