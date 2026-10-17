@@ -1,8 +1,9 @@
 # Price moves and cited explanations
 
-Prepared17October2026 on `codex/redesign-phase-4`. **Not live; acceptance pending.**
-Additive migrations058–060 are covered by the owner's migration approval but
-have only run in disposable tests. The live installation remains schema57.
+Prepared17October2026 on `codex/redesign-phase-4`. **Preview installed; acceptance pending.**
+Approved additive migrations058–060 are now applied (live schema60); never edit
+them. Installation completed at13:56:17SGT after a264,076,069-byte archive backup.
+The owner started the app in Terminal; HTTP200 and all30tested assets are verified.
 No watch, Telegram preference or saved research is changed by installation.
 
 ## Price rules and references
@@ -55,8 +56,8 @@ freshness and exact saved numbers.
 The explainer is a separate role, disabled unless `THESIS_MOVE_EXPLAINER_MODEL`
 is explicitly chosen. Supported proposed models are GPT-5.5 snapshot
 `gpt-5.5-2026-04-23` and the existing priced Opus5.5. Bulk/quick models remain
-unchanged; a cross-provider explainer uses its own provider key. No environment
-model choice has been made for this role.
+unchanged; a cross-provider explainer uses its own provider key. The owner chose
+GPT-5.5 for live previews; it is configured in the owner-started app.
 
 GPT-5.5's bounded profile uses standard US$5input / US$0.50cached input /
 US$30output per million tokens, low effort,2,000output tokens and the existing
@@ -146,11 +147,12 @@ and links together, and expandable price/rule/settings details. The user's
 `app.css` edits remain byte-for-byte unchanged. Initial full-suite reset/FK
 fixture failures and the paid validator stop remain retained as diagnostics.
 
-No phase4 migration, frontend installation, restart or live activation has happened.
-The app remains on the owner-started phase1–3 core with new cadence/alerts off.
-Phase4 requires058–060, a matching frontend install and owner Terminal restart;
-model, thresholds, cadence hours and shadow duration still need live approval.
-It is **prepared, not marked done**.
+The owner-started app now includes phase4preview, schema60 and the30-file frontend.
+Ten guarded research/preference/ledger table fingerprints were exact across
+installation, and user CSS remains exact. Fast cadence waits for the24-hour
+baseline; new Telegram delivery stays off. No move events existed at the14:03SGT
+verification (Saturday). Live timeliness/coverage and5trading-day preview gates
+remain unverified. This does not mark the whole redesign done.
 
 Private evidence: `.local/live-tests/redesign-phase-4-20261017/`.
 
@@ -164,3 +166,28 @@ Fast cadence will wait until the24-hour passive provider baseline finishes,
 The backup/migration/asset/environment installer is prepared but not executed;
 normal watches are still active. It never starts/stops app or database processes.
 The owner must restart from Terminal after an idle/90-second due check.
+
+## Threshold and rebound review — 17 October 2026
+
+The recommendation is to accept the14October replay as coverage of the named
+sell-off, preserving3/2/5rules and explicitly identifying AMZN/GOOGL as context.
+The owner asked for the engineering judgement; no threshold was lowered or
+rounded and no separate15October trigger is claimed. A hard threshold has
+near misses. For example, a stock and index both falling2.5%daily give
+−4.9375%over any two sessions but−7.3140625%over three, with no current rule
+trigger. This is a documented longer-window limitation, to measure during
+preview before proposing a new rule. Retrospective closes cannot prove timely
+detection or delivery.
+
+That review found a separate grouping bug: a two-session-only decline could
+join a rising-market event when today's price rebounded. `price-move-rules-2`
+keeps daily direction and trigger direction separate, groups only compatible
+directions, deduplicates against the trigger direction and shows the two-session
+figure beside today's number in Updates and message text. Reverse rebounds
+(two-session gain with a small daily fall) are covered too. No stored event or
+applied migration is rewritten. **Prepared for the next installation, not live
+in the currently running process.** Related offline127pass; frontend202pass,
+build/scopedformat and8isolated browser groups pass. Frozen replay remains
+3events/4sessions,14October covers the named companies,15October has0events.
+No paid calls or restart for this follow-up. Initial missing-source fixture
+failure is retained and fixed.

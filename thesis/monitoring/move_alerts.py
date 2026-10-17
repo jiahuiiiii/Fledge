@@ -192,9 +192,16 @@ def percent(value):
 
 def title(event):
     members=event['payload']['members']
-    start=' · '.join(f"{m['symbol']} {percent(m['change_percent'])}" for m in members)
+    start=numbers(members)
     primary=members[0]['indexes'].get('QQQ')
-    return start+(f" today · Nasdaq {percent(primary['change_percent'])}" if primary else ' today · Nasdaq unavailable')
+    return start+(f" · Nasdaq {percent(primary['change_percent'])} today" if primary else ' · Nasdaq unavailable')
+
+
+def numbers(members):
+    start=' · '.join(f"{m['symbol']} {percent(m['change_percent'])}" for m in members)+' today'
+    two=[f"{m['symbol']} {percent(m['two_sessions']['change_percent'])}" for m in members
+         if 'two_session_move' in m.get('reasons',[]) and m.get('two_sessions')]
+    return start+(' · Over 2 sessions: '+', '.join(two) if two else '')
 
 
 def present(conn, owner, eid, *, now=None):

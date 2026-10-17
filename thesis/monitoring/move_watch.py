@@ -68,7 +68,7 @@ def snapshot(conn,owner,now):
             sector=sector,history=retained_history(conn,iid),now=now,thresholds=thresholds())
         if not measured:continue
         if one(conn,'SELECT event_id FROM move_trigger_claims WHERE owner_id=%s AND instrument_id=%s AND session_date=%s AND direction=%s',
-               (owner,iid,measured['session'],measured['direction'])):
+               (owner,iid,measured['session'],measured.get('trigger_direction',measured['direction']))):
             continue
         result.append(measured)
     return result

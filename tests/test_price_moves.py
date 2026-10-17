@@ -70,6 +70,24 @@ def test_exact_two_session_boundary():
     assert value['reasons']==['session_move','two_session_move']
 
 
+def test_gradual_three_day_slide_is_a_documented_limit_not_rounded_into_a_trigger():
+    daily=Decimal('-2.5');two=(Decimal('.975')**2-1)*100
+    assert two==Decimal('-4.937500')
+    assert (Decimal('.975')**3-1)*100 < -7
+    assert M.evaluate_thresholds(daily,{'QQQ':dict(gap_points='0')},
+                                 dict(change_percent=str(two)),M.Thresholds())==[]
+
+
+@pytest.mark.parametrize('price,base,direction',[('101','107','down'),('99','94','up')])
+def test_rebound_cannot_reverse_two_session_trigger_or_join_opposite_market(price,base,direction):
+    saved=history();saved['bars'][0]['close']=base
+    a=measure(price,index=price,history=saved);b=deepcopy(a);b['symbol']='AVGO'
+    assert a['reasons']==['two_session_move']
+    assert a['trigger_direction']==direction and a['direction']!=direction
+    events=M.group([a,b])
+    assert len(events)==2 and all(e['kind']=='company' and e['direction']==direction for e in events)
+
+
 @pytest.mark.parametrize('change', [
     lambda h:h.update(currency='SGD'),lambda h:h.update(interval='1wk'),
     lambda h:h.update(exchange_timezone='UTC'),lambda h:h.update(basis='adjusted close'),

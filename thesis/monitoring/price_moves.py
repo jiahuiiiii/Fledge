@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from .us_session import NEW_YORK, bounds
 
-POLICY = "price-move-rules-1"
+POLICY = "price-move-rules-2"
 MAX_AGE = timedelta(minutes=30)
 MAX_CLOCK_GAP = timedelta(minutes=15)
 
@@ -124,11 +124,12 @@ def measure(symbol,quote,*,indexes,now,sector=None,history=None,thresholds=None)
                               quote_id=sector['quote'].get('id'))
     two=two_session_move(current,history,now)
     reasons=evaluate_thresholds(current['change'],index_values,two,thresholds)
-    direction='up' if current['change']>0 else 'down' if current['change']<0 else 'flat'
+    direction=sign(current['change'])
     return dict(policy=POLICY,symbol=symbol,session=current['session'].isoformat(),
                 quoted_at=current['dated'].isoformat(),price=str(current['price']),
                 previous_close=str(current['previous']),change_percent=str(current['change']),
-                direction=direction,indexes=index_values,sector=sector_value,two_sessions=two,
+                direction=direction,trigger_direction=trigger_direction(current['change'],two,reasons),
+                indexes=index_values,sector=sector_value,two_sessions=two,
                 reasons=reasons,triggered=bool(reasons),thresholds=thresholds.record(),quote_id=quote.get('id'))
 
 
@@ -144,6 +145,17 @@ def evaluate_thresholds(change,indexes,two,thresholds):
     return reasons
 
 
+def sign(change):
+    return 'up' if change>0 else 'down' if change<0 else 'flat'
+
+
+def trigger_direction(change,two,reasons):
+    # A small rebound cannot turn a two-session loss into an upward trigger.
+    if reasons==['two_session_move']:
+        return sign(Decimal(two['change_percent']))
+    return sign(change)
+
+
 def group(measures):
     """Group ≥2 qualifying stocks moving with QQQ; label other members context."""
     values=[v for v in measures if v is not None]
@@ -153,6 +165,7 @@ def group(measures):
     for session in sorted({v['session'] for v in values}):
         for direction,sign in (('up',1),('down',-1)):
             matching=[v for v in values if v['session']==session and v['direction']==direction
+                      and (not v['triggered'] or v.get('trigger_direction',v['direction'])==direction)
                       and v['indexes'].get('QQQ')
                       and Decimal(v['indexes']['QQQ']['change_percent'])*sign>0]
             # A common sign alone cannot join unrelated reference vintages.
@@ -168,7 +181,7 @@ def group(measures):
                 results.append(dict(kind='market',session=session,direction=direction,members=members,
                                     triggered_symbols=sorted(v['symbol'] for v in triggers)))
                 grouped.update(v['symbol'] for v in cohort)
-    results.extend(dict(kind='company',session=v['session'],direction=v['direction'],
+    results.extend(dict(kind='company',session=v['session'],direction=v.get('trigger_direction',v['direction']),
                         members=[dict(v,context_only=False)],triggered_symbols=[v['symbol']])
                    for v in sorted(values,key=lambda v:v['symbol']) if v['triggered'] and v['symbol'] not in grouped)
     return results

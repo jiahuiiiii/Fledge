@@ -46,9 +46,11 @@ api.researchReview=async(filters)=>({instrument_id:filters.instrument_id||null,r
  coverage:{concerns:[],watch:{enabled:true},social_feeds:[]}})),totals:{pending_count:reviewed?0:1}});
 function Wrapper({options}){
  const [filters,setFilters]=useState({company:'',review:'all',page:0,cutoff:''});
+ const visibleMembers=options.twoSessions ? [{...members[0],change_percent:'1',reasons:['two_session_move'],
+ two_sessions:{change_percent:'-5.6',from_session:'2026-10-13'}}] : members;
  return <div className="app-shell" style={{display:'block',padding:16,maxWidth:1000,margin:'auto'}}>
  {options.inbox ? <Inbox filters={filters} onFiltersChange={setFilters} catalogue={[]}
- onOpen={()=>{}} onReviewed={async()=>{}}/> : <Card alert={{...detail,withheld:!!options.withheld}} readOnly={!!options.readOnly}
+ onOpen={()=>{}} onReviewed={async()=>{}}/> : <Card alert={{...detail,members:visibleMembers,withheld:!!options.withheld}} readOnly={!!options.readOnly}
  onOpen={(id,view)=>window.actions.push({kind:'open',id,view})}
  onReview={(id,action)=>window.actions.push({kind:'review-move',id,action})}/>}
  </div>;
@@ -104,6 +106,9 @@ try{
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await page.screenshot({path:path.join(out,'preview-'+width+'.png'),fullPage:true});
  }
+ await page.evaluate(()=>window.showFixture({twoSessions:true}));
+ await page.getByRole('cell',{name:/−5.6% over 2 sessions/}).waitFor();
+ assert.equal(await page.getByRole('columnheader',{name:'Today',exact:true}).count(),1);
  await page.evaluate(()=>window.showFixture({withheld:true}));
  await page.getByText(/Price details and the explanation are withheld/).waitFor();
  assert.equal(await page.getByText(/Investors rotate out of AI/).count(),0);

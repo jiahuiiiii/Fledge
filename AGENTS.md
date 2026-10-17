@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Preview installation and price-rule edge cases — 17 October 2026
+
+Owner Terminal installation completed13:56:17SGT: approved058–060 applied (schema60; never edit),264,076,069-byte database archive/catalogue and.env backup,30tested assets,10guarded research/preference/ledger fingerprints exact. Owner started app; HTTP200/asset hashes verified14:03SGT. Move preview/GPT-5.5/3–2–5rules enabled; fast cadence waits until18October12:55:59SGT, new Telegram delivery off.0move events at verification (Saturday). No app/DB start/stop by agent; duplicate installer invocation refused without changes.
+
+Owner asked whether accepting the14October replay hides other misses. Recommendation: accept that replay coverage, retain exact thresholds and record context-only members and slow-drift limits. New `price-move-rules-2` prevents a two-session-only loss joining today's rising-market group after a rebound (and reverse); trigger direction controls deduplication, and both timeframes appear together.127related backend/202frontend/build/scopedformat/8isolated browser groups pass; replay still3events/4sessions, no15October trigger. **Fix committed for next installation, not live yet**; no paid calls, saved-event change, migration or restart. Gradual2.5%daily declines can miss the2-day5%rule despite a3-day7.31%fall; measure during preview, do not silently add a threshold. [Details](docs/features/price-move-alerts.md).
+
 ## Blind sentiment review prepared — 17 October 2026
 
 Prepared smaller-task request/validator contracts (not connected to live readings): tone/event/duplicate instructions3924/3379/2497characters, shared schemas1921/1537/924characters,106related offline tests pass. Code-only low-importance rules and candidate-only duplicate guards tested. No dispatch, pipeline integration, schema or live prompt/routing change.

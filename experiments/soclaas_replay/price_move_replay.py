@@ -46,6 +46,7 @@ def replay(prices,index,headlines,*,symbols):
         value=dict(policy=M.POLICY,symbol=item['symbol'],session=day,quoted_at=at.isoformat(),
             price=str(current['price']),previous_close=str(current['previous']),change_percent=str(current['change']),
             direction='up' if current['change']>0 else 'down' if current['change']<0 else 'flat',
+            trigger_direction=M.trigger_direction(current['change'],two,reasons),
             indexes=indexes,sector=None,two_sessions=two,reasons=reasons,triggered=bool(reasons),
             thresholds=thresholds.record(),quote_id=None,timing_eligible=False,
             quote_saved_at=item['retrieved_at'])

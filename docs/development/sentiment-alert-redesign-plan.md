@@ -160,9 +160,18 @@ unattempted cases in a separately approved continuation. Phase4 tests cost
 US$0.116235 with0unresolved holds; no automatic paid retry. These checks do not
 establish semantic accuracy. Owner subsequently approved GPT-5.5,3/2/5rules,08:30–17:00NewYork fast hours
 (adjusted early closes), and5UStrading days of previews. Fast cadence waits for
-the24-hour baseline; no new Telegram delivery. Installation is prepared, waiting
-for normal active watches to finish and an owner Terminal restart. Phase4 is not
-yet installed or marked done.
+the24-hour baseline; no new Telegram delivery. Preview installed13:56:17SGT after a264,076,069-byte archive backup; schema60
+(058–060 immutable),30tested assets,10guarded saved-data fingerprints exact.
+Owner started the app in Terminal; HTTP200 verified. Fast cadence/new Telegram
+stay off. Phase4acceptance remains pending; no live timeliness/recall proof.
+
+Follow-up: `price-move-rules-2` fixes a two-session-only trigger being grouped
+with today's opposite-direction rebound. Trigger direction is separate from
+daily direction, durable deduplication uses it, and both timeframes are visible
+together. Related127tests/frontend202/build/8browser groups pass; no paid calls,
+saved-record edits or migration. Prepared for next installation, not yet live.
+A2.5%daily slide can evade all current thresholds despite losing7.31%over3days;
+track this limit in preview instead of lowering thresholds to fit one example.
 
 1. **Move detector (code only).** For each watched stock, compare today's change with the Nasdaq-100 (QQQ), the S&P 500 (SPY) and a sector fund (SOXX for semiconductors, otherwise the closest sector fund). Trigger on:
    - a move of ±3% or more in a session;

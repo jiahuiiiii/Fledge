@@ -283,7 +283,7 @@ export default function MoveAlertCard({
         <thead>
           <tr>
             <th scope="col">Company</th>
-            <th scope="col">Move</th>
+            <th scope="col">Today</th>
             <th scope="col">Gap vs Nasdaq</th>
           </tr>
         </thead>
@@ -306,7 +306,16 @@ export default function MoveAlertCard({
                   <span className="move-context-label">Context only</span>
                 )}
               </th>
-              <td>{movePercent(member.change_percent)}</td>
+              <td>
+                {movePercent(member.change_percent)}
+                {member.reasons.includes("two_session_move") &&
+                  member.two_sessions && (
+                    <span className="move-context-label">
+                      {movePercent(member.two_sessions.change_percent)} over 2
+                      sessions
+                    </span>
+                  )}
+              </td>
               <td>
                 {member.indexes.QQQ
                   ? movePercent(member.indexes.QQQ.gap_points, true)

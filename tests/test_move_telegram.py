@@ -16,6 +16,12 @@ def detail(owner,eid):
     with transaction(owner,consistent=True) as c:return A.present(c,owner,eid,now=NOW)
 
 
+def test_two_session_decline_stays_visible_beside_a_positive_daily_move():
+    member=dict(symbol='EXMP',change_percent='1',reasons=['two_session_move'],
+                two_sessions=dict(change_percent='-5.6'))
+    assert A.numbers([member])=='EXMP +1.0% today · Over 2 sessions: EXMP −5.6%'
+
+
 def test_preview_cannot_be_rendered_queued_or_sent_even_with_existing_telegram_on(owner,bot,monkeypatch):
     eid,event,ids=stored(owner,grouping=True)
     link(owner,bot);T.configure(owner,True)

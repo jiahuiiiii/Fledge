@@ -47,8 +47,8 @@ def render(record):
     if kind == "move":
         if d.get('preview'):
             raise ValueError('Preview price events must never be sent.')
-        from .move_alerts import percent
-        numbers=' · '.join(f"{m['symbol']} {percent(m['change_percent'])}" for m in d['members'])+' today'
+        from .move_alerts import percent, numbers as move_numbers
+        numbers=move_numbers(d['members'])
         index=d['members'][0]['indexes'].get('QQQ')
         numbers+=(f" · Nasdaq {percent(index['change_percent'])}" if index else ' · Nasdaq unavailable')
         if visible_units(escape(numbers))>3000:
