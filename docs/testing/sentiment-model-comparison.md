@@ -148,7 +148,7 @@ AVGO and QCOM, watched by two accounts, arrived twice. The demo account's AMD al
 
 ## Explanation: four possible setups
 
-All costs are estimates at the owner's current 5 watches (about 60 AI batches a day once caught up), using per-batch costs measured above. The table uses Claude models; the equivalent OpenAI and DeepSeek choices for each role are in the [redesign plan](../development/sentiment-alert-redesign-plan.md#model-choice-by-provider).
+All costs are estimates at the owner's current 5 watches (about 60 AI batches a day once caught up), using per-batch costs measured above. The table uses Claude models; the equivalent OpenAI and DeepSeek choices for each role are in the [archived provider comparison](../archive/status/2026-10-17-sentiment-redesign-progress.md#model-choice-by-provider). The [current plan](../development/sentiment-alert-redesign-plan.md) records the selected models and outstanding cost gate.
 
 | | **(a) Current** | **(b) Most effective** | **(c) Most cost-effective** | **(d) Cheapest** |
 | --- | --- | --- | --- | --- |

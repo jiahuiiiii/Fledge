@@ -35,6 +35,11 @@ def session_token():
 
 @asynccontextmanager
 async def lifespan(app):
+    from .runtime_status import record_start
+    try:
+        record_start()
+    except OSError:
+        logging.getLogger('thesis').warning('Startup source record unavailable; running version is unverified.')
     stop = threading.Event()
 
     def loop():
