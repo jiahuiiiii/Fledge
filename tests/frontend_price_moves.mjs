@@ -25,6 +25,7 @@ import ${JSON.stringify(path.join(frontend,"src/styles/mobile.css"))};
 window.actions=[];
 let reviewed=null;
 let companyMode=false;
+let dailyMode=false;
 const members=['NVDA','AVGO','AMZN','GOOGL'].map((symbol,i)=>({symbol,instrument_id:symbol,
  price:i<2?'96.8':'98.3',previous_close:'100',change_percent:i<2?'-3.2':'-1.7',quoted_at:'2026-10-14T20:00:00Z',
  context_only:i>1,triggered:i<2,thresholds:{session:'3',relative:'2',two_sessions:'5'},reasons:i<2?['session_move']:[],
@@ -50,7 +51,9 @@ api.setPriceReference=async(id,symbol)=>{window.actions.push({kind:'save-sector'
 api.reviewMoveAlert=async(id,action)=>{window.actions.push({kind:'review-move',id,action});reviewed=action;};
 api.reviewAlert=async()=>{throw new Error('Move routed to company review');};
 api.rateAlert=async(kind,id,value)=>{window.actions.push({kind:'rate',alertKind:kind,id,value});return {value};};
+api.dailyUpdates=async()=>{window.actions.push({kind:'read-daily'});return {enabled:true,today_spend:null,digests:[],spending:[],notices:[]};};
 api.researchReview=async(filters)=>({instrument_id:filters.instrument_id||null,review:filters.review,page:filters.page,
+ daily_reports_enabled:dailyMode,
  page_size:20,total:1,cutoff:'2026-10-15T00:00:00Z',records:companyMode ? [{kind:'company',id:companyDetail.id,
  title:companyDetail.payload.title,created_at:companyDetail.created_at,detail:companyDetail,feedback_enabled:true,
  routing:{preview:true,channel:'telegram',reason:'At least one cited company development has high importance.'}}] : [{kind:'move',id:detail.id,title:detail.title,feedback_enabled:true,
@@ -58,7 +61,7 @@ api.researchReview=async(filters)=>({instrument_id:filters.instrument_id||null,r
  companies:members.map(m=>({id:m.instrument_id,symbol:m.symbol,name:'Authored company',mode:'sec',
  coverage:{concerns:[],watch:{enabled:true},social_feeds:[]}})),totals:{pending_count:reviewed?0:1}});
 function Wrapper({options}){
- const [filters,setFilters]=useState({company:'',review:'all',page:0,cutoff:''});
+ const [filters,setFilters]=useState({company:options.scoped?'NVDA':'',review:'all',page:0,cutoff:''});
  const visibleMembers=options.twoSessions ? [{...members[0],change_percent:'1',reasons:['two_session_move'],
  two_sessions:{change_percent:'-5.6',from_session:'2026-10-13'}}] : members;
  return <div className="app-shell" style={{display:'block',padding:16,maxWidth:1000,margin:'auto'}}>
@@ -71,6 +74,7 @@ function Wrapper({options}){
 const root=createRoot(document.getElementById('root'));let serial=0;
 window.showFixture=(options={})=>{
  companyMode=!!options.company;
+ dailyMode=!!options.daily;
  if(options.clean){
   detail.explanation.sentences[0].citations[0].quote='Investors rotate out of AI on spending worries.';
   detail.sources[0].title='Investors weigh AI spending as technology shares fall';
@@ -165,7 +169,15 @@ try{
   await company.getByRole('region',{name:'Rate this alert'}).screenshot({path:path.join(out,'company-rating-'+width+'.png'),animations:'disabled'});
   await page.screenshot({path:path.join(out,'company-routing-'+width+'.png'),animations:'disabled'});
  }
+ const beforeDaily=(await page.evaluate(()=>window.actions)).filter(a=>a.kind==='read-daily').length;
+ await page.evaluate(()=>window.showFixture({inbox:true,daily:true}));
+ await page.getByRole('group',{name:'Daily recaps and AI spending'}).waitFor();
+ assert.equal((await page.evaluate(()=>window.actions)).filter(a=>a.kind==='read-daily').length,beforeDaily+1);
+ await page.evaluate(()=>window.showFixture({inbox:true,daily:true,scoped:true}));
+ await page.locator('[data-kind="move"]').waitFor();
+ assert.equal(await page.getByRole('group',{name:'Daily recaps and AI spending'}).count(),0);
+ assert.equal((await page.evaluate(()=>window.actions)).filter(a=>a.kind==='read-daily').length,beforeDaily+1);
  assert.deepEqual(errors,[]);assert.deepEqual(requests,[]);
- console.log(JSON.stringify({passed:10,viewports:[1440,390,320],network_requests:0,output:out}));
+ console.log(JSON.stringify({passed:12,viewports:[1440,390,320],network_requests:0,output:out}));
 }catch(error){console.error(JSON.stringify({errors,output:out,body:(await page.locator('body').innerText()).slice(0,2200)}));throw error;}
 finally{await browser.close();}

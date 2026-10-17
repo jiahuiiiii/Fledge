@@ -210,6 +210,7 @@ def prepare(
     exporting=False,
     window_start=None,
 ):
+    from .monitoring.daily_updates import enabled as daily_enabled
     now = clock(now or datetime.now(timezone.utc))
     end = clock(cutoff) if cutoff else now
     if type(days) is not int or days not in (0, 1, 7, 30):
@@ -339,6 +340,7 @@ def prepare(
             totals=dict(totals, quiet_checks=sum(c['quiet_checks'] for c in scoped)),
             companies=companies,
             records=records,
+            daily_reports_enabled=daily_enabled(),
             limitation="This review uses saved records. It does not fetch sources or call AI. Record dates are when this app recorded an update, not when the underlying event happened. Review status and source coverage are read now; a quiet list does not establish that nothing important happened.",
         )
 

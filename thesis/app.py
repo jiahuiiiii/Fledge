@@ -107,11 +107,13 @@ async def lifespan(app):
         from .monitoring.telegram import run_once
         from .monitoring.telegram_updates import poll_feedback
         from .monitoring.alert_routing import poll_preview as preview_routes
+        from .monitoring.daily_updates import poll as prepare_daily_updates
 
         while not stop.wait(5):
             try:
                 for owner in auth.background_owners():
                     preview_routes(owner)
+                    prepare_daily_updates(owner)
                     run_once(owner)
                 poll_feedback()
             except Exception:
@@ -942,6 +944,18 @@ def review_move_alert(alert_id: UUID, payload: ReviewAction):
 class AlertRating(BaseModel):
     model_config = ConfigDict(extra="forbid")
     value: Literal["useful", "not_useful"]
+
+
+@app.get('/api/v1/daily-updates')
+def daily_update_history():
+    from .monitoring.daily_updates import history
+    return {'result':history(auth.current_owner())}
+
+
+@app.get('/api/v1/daily-updates/{digest_id}')
+def daily_update_detail(digest_id:UUID,page:int=0):
+    from .monitoring.daily_updates import read
+    return {'result':read(auth.current_owner(),str(digest_id),page=page)}
 
 
 @app.post("/api/v1/alerts/{kind}/{alert_id}/rating")

@@ -229,6 +229,18 @@ isolated inbox/browser groups pass. Route capture defaults off and needs an
 explicit start;061/062remain unapplied live. Daily digest/cost alerts, actual
 approved routing, one-week replay and owner-quality/live gates remain pending.
 
+Daily-update follow-up17October:063prepares private frozen medium-route recaps,
+owner-only aggregate spending and preview cost notices, with existing evidence
+and ratings together in Updates. Daily dispatch-date costs distinguish confirmed
+charges from unresolved maxima; late settlements survive failure/backoff without
+rewriting snapshots. No implicit approved cost level. Final155related/13integration/
+202frontend tests, build and22daily/inbox browser groups pass. Final stable full
+offline2468pass/93optional skips. Earlier broad run2464pass/93skips/1checksum
+failure overlapped unapplied migration edits; retained diagnostic, clean rerun.
+061–063remain unapplied and all new flags off/unset. Telegram digest/cost transport,
+actual approved routing, quality/noise replay and live gates remain pending;
+**phase5not done**. [Contract](../features/daily-updates.md).
+
 1. **Split the prompt into smaller tasks:**
    1. relevance (the existing quick check);
    2. tone and evidence basis;

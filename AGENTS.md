@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-12. Project root is the directory containing this file. **Keep all Fledge work here (the repository directory remains `Thesis`), separate from the unrelated Fork project.**
 
+## Daily recap and spending previews — 17 October 2026 (prepared)
+
+New063prepares immutable private medium-route recap membership, closed-day spending observations and once-per-day cost notices. Existing evidence cards/ratings stay together in one collapsed Updates panel, with current access checked on every reopening; reading never reviews or pays. Only the installation owner sees aggregate AI charges, with unresolved maxima separate, Singapore dispatch-day boundaries and late settlements revisited even after failure/backoff. No implicit cost threshold; prepared07:00SGTrecap schedule remains for activation review. All generated records are previews; Telegram digest/cost transport remains outstanding.
+
+Final full offline2468pass/93optional skips;155related/13integration/202frontend tests, build/scopedformat and22isolated daily/inbox browser groups1440/390/320pass;0HTTPcalls, screenshots inspected. Earlier broad run2464pass/93skips/1checksum failure overlapped unapplied063edits; diagnostic retained, final stable full rerun passes.061–063unapplied live, all new switches off/unset, US$0, no environment/install/app-or-DBrestart/research/preference change, user CSS preserved. Phase5quality/replay/live acceptance remains pending. [Contract and limits](docs/features/daily-updates.md).
+
 ## Offline drawdown comparison — 17 October 2026
 
 Owner proposed recent-high/low episodes with volatility scaling. New file-only replay plus database-enforced read-only capture compares8saved histories:189–192common scored sessions after60prior-return warm-up,0gaps. Fixed7adds11NVDA candidate days beyond3/5; scaled4×floor2adds9. NVDA's14October close is7.49875%below6October's high; both enter then, neither follows up15October. AMZN/GOOGL remain context-only. QQQ has only5saved probe closes; full-year2-point-gap comparison remains unverified, no fetch to fill it.

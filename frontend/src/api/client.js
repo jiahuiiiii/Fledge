@@ -269,6 +269,8 @@ export const api = {
       method: "POST",
       body: { value },
     }),
+  dailyUpdates: () => request("/daily-updates"),
+  dailyDigest: (id, page = 0) => request(`/daily-updates/${id}?page=${page}`),
   priceReferences: (id) => request(`/companies/${id}/price-references`),
   setPriceReference: (id, symbol) =>
     request(`/companies/${id}/price-references`, {

@@ -142,3 +142,12 @@ Still outstanding: owner annotations (0/50 received), new-prompt quality/cost
 evaluation, live severity routing and daily digest, cost summary/alert, one-week noise
 replay and live/shadow/outcome measurements. These changes do not mark phase 5
 or the redesign done.
+
+Follow-up17October: [daily recap/spending preparation](daily-updates.md) now adds
+unapplied063and the optional read-only Updates panel. Private recap membership,
+owner-only exact costs and preview threshold notices are tested, still off.
+Telegram digest/cost transport and live activation remain outstanding. Final155
+related/13integration/202frontend tests and22browser groups pass. Final stable full
+offline2468pass/93optional skips. The earlier broad run's2464passes/93skipsand
+checksum failure from overlapping unapplied-migration edits remain as diagnostics.
+This is preparation, not acceptance.

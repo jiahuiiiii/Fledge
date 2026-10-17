@@ -9,6 +9,7 @@ import { ResearchAlerts } from "./SentimentPanel";
 import MoveAlertCard from "./MoveAlertCard";
 import AlertRating from "./AlertRating";
 import AlertRoutingPreview from "./AlertRoutingPreview";
+import DailyUpdates from "./DailyUpdates";
 import { ConditionChange } from "./IdeasAndChanges";
 import { inboxSummary, recordKey } from "../lib/inbox";
 import "./UpdateInbox.css";
@@ -174,6 +175,9 @@ export default function UpdateInbox({
           </button>
         </div>
       </div>
+      {!company && data?.daily_reports_enabled && (
+        <DailyUpdates refresh={refresh} onOpen={onOpen} onSource={onSource} />
+      )}
       <details className="inbox-filter-disclosure">
         <summary>
           Filter updates{" "}
