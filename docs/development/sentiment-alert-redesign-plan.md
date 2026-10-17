@@ -93,7 +93,7 @@ or app restart. See [phase 1 verification](../testing/sentiment-reliability.md).
 
 ### Phase 2 — choose the bulk and quick-check models
 
-**Model choice approved, 17 October 2026:** stay on GPT-5.4 + GPT-5.4 mini. Do not switch to Haiku or Sonnet. The validation below remains pending; phase 2 implementation has not started.
+**17 October 2026: model choice approved; verification prepared, acceptance pending (not done).** Stay on GPT-5.4 + GPT-5.4 mini. Do not switch to Haiku or Sonnet. A read-only 48-hour report and related suites pass111tests. No switch (US$0 catch-up); 0/48 hours after confirmed installation and 0 complete daily cost windows. Phase1 still needs its matching frontend install and idle backend restart; the 11:56 SGT idle check deferred restart because4watches were due within90seconds. [Phase 2 verification](../testing/sentiment-model-rollout.md).
 
 **Follow-up, 17 October 2026:** owner requested fixing Haiku first, then continuing
 phase 2. The compact Anthropic format now passes **16/16 META batches, 119 items,
