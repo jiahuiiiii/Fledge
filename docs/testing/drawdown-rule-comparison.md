@@ -82,6 +82,25 @@ Mean60-return typical daily moves across the scored dates are1.16%AAPL,
 baseline cannot reduce its volume: the combined MU rate is14.18. This is evidence
 of unequal threshold frequency, not proof that every MU alert is noise.
 
+The frozen replay also records the proposed adaptive daily rule: at least
+2.5 times the prior 60-return typical move, with a 2% floor. Counting that daily
+rule together with scaled drawdown episodes, **without retaining the old 3/5
+rules**, gives a different trade-off:
+
+| Company | Scored sessions | Stock-only 3/5 days | Adaptive daily or episode days | Baseline days absent from adaptive candidate |
+| --- | ---: | ---: | ---: | ---: |
+| AAPL | 190 | 19 | 35 | 3 |
+| MU | 191 | 128 | 45 | 84 |
+| NVDA | 192 | 48 | 31 | 26 |
+
+These are exact set unions of the already-frozen per-day fields, using the
+scaled4×/2%floor episode candidate and its unchanged 5-point follow-ups. They
+exclude the index-gap rule because full QQQ coverage is unavailable. An absent
+baseline day is not automatically a missed important event; an added adaptive
+day is not automatically useful. Both groups need independent review before
+replacing any live rule. This comparison supports testing the trade-off, not
+selecting the adaptive version solely because MU's count is lower.
+
 The scaled2%floor candidate increases AAPL's additional opportunities from8to15
 relative to fixed7. A volatile stock can instead need a higher absolute entry.
 Stock-specific scaling is a trade-off, not an automatic improvement on every
