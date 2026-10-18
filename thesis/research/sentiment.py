@@ -25,6 +25,11 @@ from . import sentiment_guards
 PROMPT = "thesis-source-sentiment-24"
 EVIDENCE_POLICY = "sentiment-source-extracts-1"
 POLICY = "sentiment-coverage-9"
+# Displayed lean, derived from each reading's saved counts when it is shown.
+# Saved summaries, reuse and opinion-change alerts keep POLICY's stored tone.
+LEAN_POLICY = "sentiment-lean-1"
+LEAN_RATIO = 2
+LEAN_MINIMUM = 5
 SELECTION_POLICY = "sentiment-all-eligible-1"
 
 
@@ -445,6 +450,39 @@ def summarize(
     return result
 
 
+def lean(sample):
+    """Positive vs negative only; neutral and mixed are shown separately.
+
+    A side leads when it has at least LEAN_RATIO times the other, with at least
+    LEAN_MINIMUM directional groups. Fewer directional groups read as mostly
+    neutral when neutral is the largest group.
+    """
+    counts = sample.get("counts")
+    if sample.get("tone") in ("thin sample", "separate platform samples") or not isinstance(counts, dict):
+        return sample.get("tone")
+    positive, negative = counts.get("positive", 0), counts.get("negative", 0)
+    if positive + negative < LEAN_MINIMUM:
+        others = max(positive, negative, counts.get("mixed", 0))
+        return "mostly neutral" if counts.get("neutral", 0) > others else "mixed / balanced"
+    if positive >= LEAN_RATIO * negative:
+        return "positive leaning"
+    if negative >= LEAN_RATIO * positive:
+        return "negative leaning"
+    return "mixed / balanced"
+
+
+def displayed(summary):
+    """A display copy with the lean; the saved majority tone stays beside it."""
+    shown = deepcopy(summary or {})
+    samples = [shown.get(c) for c in ("news", "social")] + list((shown.get("social_platforms") or {}).values())
+    for sample in samples:
+        if isinstance(sample, dict) and "tone" in sample:
+            counts = sample.get("counts") or {}
+            sample.update(majority_tone=sample["tone"], tone=lean(sample), lean_policy=LEAN_POLICY,
+                          directional_groups=counts.get("positive", 0) + counts.get("negative", 0))
+    return shown
+
+
 class IncompleteResponse(ValueError):
     """A settled response can be paid for without containing a usable result."""
 
@@ -626,6 +664,7 @@ def present(conn, record):
     current_prompt=sentiment_tasks.PROMPT if sentiment_task_runner.enabled() else PROMPT
     return dict(
         record["result"],
+        summary=displayed(record["result"].get("summary")),
         id=str(record["id"]),
         cutoff=p["cutoff"],
         social_lookback_days=p.get("social_lookback_days", 7),
