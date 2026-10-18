@@ -5,6 +5,7 @@ owner's blind answers are never read here. Responses stay in private output.
 """
 import argparse
 from copy import deepcopy
+from datetime import datetime
 from decimal import Decimal
 import hashlib
 import json
@@ -16,8 +17,8 @@ ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
 from thesis.db import transaction,one,rows  # noqa:E402
 from thesis.providers import ledger,settings  # noqa:E402
-from thesis.research import sentiment,sentiment_tasks as T,sentiment_batching as B,reddit_thread_context as threads  # noqa:E402
-from thesis.research.citations import model_source  # noqa:E402
+from thesis.research import sentiment,sentiment_tasks as T,sentiment_batching as B,reddit_thread_context as threads,sentiment_context,social  # noqa:E402
+from thesis.research.citations import model_source,source_passages  # noqa:E402
 from experiments.soclaas_replay import owner_quality_set as Q  # noqa:E402
 
 POLICY='sentiment-quality-validation-1'
@@ -31,8 +32,36 @@ def digest(value):return hashlib.sha256(ledger.canonical(value).encode()).hexdig
 
 # 'review' reproduces the blind page (topic + reply only). 'thread' also sends the
 # other saved messages of the same discussion, as the live app does, so a short
-# reply is read with its conversation. Hard cases keep their fixed benchmark.
-THREAD_CONTEXTS=('review','thread')
+# reply is read with its conversation. 'parents' keeps the reviewed topic + reply
+# and adds each reply's verified immediate parent from Reddit's context feed, as
+# the live app now does; unordered siblings are not sent. Hard cases keep their
+# fixed benchmark.
+THREAD_CONTEXTS=('review','thread','parents')
+
+
+def iso(value):return datetime.fromisoformat(str(value)).isoformat()
+
+
+def with_parent(packet,check):
+    """Attach one privately checked parent exactly as sentiment_context.attach would."""
+    packet=deepcopy(packet);source=packet['sources'][0];parent=check['parent']
+    if check.get('outcome')!='available' or check.get('source_id')!=source['id'] or source.get('platform')!='reddit':
+        raise ValueError('A parent check must be an available parent of this exact Reddit reply.')
+    passages,omitted=source_passages(parent['title'],parent['body'])
+    if parent['parent_type']=='comment':passages=[p for p in passages if p['id']!='p0']
+    if not passages or len(ledger.canonical(passages).encode())>sentiment_context.MAX_PARENT_BYTES:return packet
+    context=dict(private_check=True,post_id=source['id'],parent_key=parent['parent_key'],parent_type=parent['parent_type'],
+        title=parent['title'],body=parent['body'],url=parent['url'],published_at=iso(parent['published_at']),
+        checked_at=iso(check['fetched_at']),passages=passages,omitted_fragment_count=omitted)
+    context['content_key']=digest(sentiment_context.wire(context))
+    # Evidence records need an identity; it is not on the model wire.
+    context['result_id']='private-check:'+digest(check)
+    source.update(conversation=context,context_status='included')
+    if source.get('timestamp_basis')=='feed_updated':source['source_note']=social.FEED_NOTE_WITH_PARENT
+    for thread in packet.get('reddit_thread_context',[]):
+        for message in thread['messages']:
+            if message['source_id']==source['id']:message['parent_key']=parent['parent_key']
+    return packet
 
 
 def selected(packet,source_id,*,thread_extras=False):
@@ -80,8 +109,9 @@ def hard_case(body,packet,index):
         benchmark=dict(batch=batch,label=label,request_hash=digest(body),evidence=expected))
 
 
-def make_plan(manifest,owner_packets,hard_cases,*,thread_context='review'):
+def make_plan(manifest,owner_packets,hard_cases,*,thread_context='review',parents=None):
     if thread_context not in THREAD_CONTEXTS:raise ValueError('Unknown thread-context option.')
+    if (thread_context=='parents')!=(parents is not None):raise ValueError('Parent checks belong only to the parents option.')
     Q.validate_manifest(manifest)
     expected={c['id'] for c in manifest['cases']}
     if set(owner_packets)!=expected or len(hard_cases)!=6:
@@ -91,6 +121,11 @@ def make_plan(manifest,owner_packets,hard_cases,*,thread_context='review'):
         packet=selected(owner_packets[case['id']],case['source_id'],thread_extras=thread_context=='thread')
         if Q.case_evidence(packet,packet['sources'][0])!={k:v for k,v in case.items() if k!='id'}:
             raise ValueError('A quality source or review context changed.')
+        if thread_context=='parents':
+            reviewed=packet
+            packet=with_parent(reviewed,parents[case['id']]) if case['id'] in parents else reviewed
+            requests.append(dict(scope='owner50',id=case['id'],packet=packet,reviewed_packet=reviewed))
+            continue
         requests.append(dict(scope='owner50',id=case['id'],packet=packet))
     for index,case in enumerate(hard_cases):
         if case['id']!=f'hard-{index+1:02d}' or case['expected_tone']!=HARD_TONES[index]:
@@ -108,6 +143,9 @@ def make_plan(manifest,owner_packets,hard_cases,*,thread_context='review'):
             raise ValueError('Quality evaluation retains the selected GPT-5.4 bulk model.')
     plan=dict(policy=POLICY,owner_fingerprint=manifest['fingerprint'],model=settings.OPENAI_REASONING_MODEL,requests=requests)
     if thread_context!='review':plan['thread_context']=thread_context  # earlier plans keep their exact fingerprint
+    if parents is not None:
+        if not set(parents)<=expected:raise ValueError('Unknown parent-check case.')
+        plan['parents']=parents
     return dict(plan,fingerprint=digest(plan))
 
 
@@ -120,11 +158,11 @@ def validate(plan,manifest):
     for case in plan['requests']:
         if case['scope']=='owner50':
             if case['id'] in owner:raise ValueError('Repeated owner case.')
-            owner[case['id']]=case['packet']
+            owner[case['id']]=case.get('reviewed_packet',case['packet'])
         elif case['scope']=='hard6':
             hard.append(dict(case,source_id=case['packet']['sources'][0]['id']))
         else:raise ValueError('Unknown evaluation scope.')
-    rebuilt=make_plan(manifest,owner,hard,thread_context=plan.get('thread_context','review'))
+    rebuilt=make_plan(manifest,owner,hard,thread_context=plan.get('thread_context','review'),parents=plan.get('parents'))
     supplied={k:v for k,v in plan.items() if k not in {'fingerprint','previous_plan','retry_cases'}}
     if {k:v for k,v in rebuilt.items() if k!='fingerprint'}!=supplied:
         raise ValueError('The plan no longer matches the production task contract.')
@@ -206,6 +244,21 @@ def thread_plan(previous,manifest):
     return plan
 
 
+def parents_plan(previous,manifest,checks):
+    """Same reviewed cases, re-frozen with each reply's verified immediate parent.
+
+    Only available checks are used; removed, changed or unverified parents stay absent.
+    A separate development comparison: no earlier answer is reused.
+    """
+    if digest({k:v for k,v in previous.items() if k!='fingerprint'})!=previous['fingerprint']:
+        raise ValueError('The earlier frozen plan changed.')
+    owner={c['id']:c.get('reviewed_packet',c['packet']) for c in previous['requests'] if c['scope']=='owner50'}
+    hard=[dict(c,source_id=c['packet']['sources'][0]['id']) for c in previous['requests'] if c['scope']=='hard6']
+    available={k:v for k,v in checks.items() if v.get('outcome')=='available'}
+    plan=make_plan(manifest,owner,hard,thread_context='parents',parents=available);validate(plan,manifest)
+    return plan
+
+
 def fits_schema(call,body):
     properties=body['text']['format']['schema']['$defs']['ToneItem']['properties']
     items=T.ToneResult.model_validate_json(sentiment.response_text(call)).model_dump()['items']
@@ -231,6 +284,9 @@ def estimate(plan,manifest):
 def consumed(packet):
     """Permission checks cover exactly the target and required wire context."""
     used=deepcopy(packet);used['comparison_sources']=[]
+    for source in used['sources']:
+        # A privately checked parent has no live result row; withdrawal is checked separately.
+        if (source.get('conversation') or {}).get('private_check'):source.pop('conversation')
     wire=threads.wire(packet,packet['sources'],extras=packet.get('thread_extras',False))
     wanted={c['thread_key']:{m['message_key'] for m in c['messages']} for c in wire}
     used['reddit_thread_context']=[dict(c,messages=[m for m in c['messages'] if m['message_key'] in wanted[c['thread_key']]])
@@ -238,7 +294,11 @@ def consumed(packet):
     return used
 
 
-def verify_access(conn,packet):B.check_access(conn,consumed(packet))
+def verify_access(conn,packet):
+    B.check_access(conn,consumed(packet))
+    private=[s['conversation']['parent_key'] for s in packet['sources'] if (s.get('conversation') or {}).get('private_check')]
+    if private and one(conn,'SELECT 1 FROM social_withdrawals WHERE post_key=ANY(%s)',(private,)):
+        raise ValueError('A privately checked parent was withdrawn.')
 
 
 def saved_calls(prepared):
@@ -267,7 +327,7 @@ def parse(call,packet):
     return dict(relevance=item['relevance'],sentiment=item['sentiment']),result['repairs']['repaired']
 
 
-def run(plan,manifest,output,cap,*,approved_plan,transport=None,remaining_after=None,revised_after=None):
+def run(plan,manifest,output,cap,*,approved_plan,transport=None,remaining_after=None,revised_after=None,reuse_settled=False):
     prepared=validate(plan,manifest)
     funding=prepared+[c for parent in ancestors(plan) for c in parent['requests']]
     if remaining_after is not None and revised_after is not None:raise ValueError('Choose one explicit continuation mode.')
@@ -282,7 +342,9 @@ def run(plan,manifest,output,cap,*,approved_plan,transport=None,remaining_after=
         if not one(lock,"SELECT pg_try_advisory_xact_lock(hashtextextended('experiment:sentiment-quality-v1',0)) locked")['locked']:
             raise ValueError('A quality campaign is already running.')
         existing=saved_calls(funding)
-        if existing and remaining_after is None and revised_after is None:
+        # reuse_settled lets a new frozen plan read settled answers to byte-identical
+        # requests for free. Unsettled, failed or redispatched requests still stop below.
+        if existing and remaining_after is None and revised_after is None and not reuse_settled:
             raise ValueError('A campaign request was already attempted; use an explicitly approved continuation.')
         if remaining_after is not None:
             previous=Path(remaining_after)
@@ -384,15 +446,23 @@ if __name__=='__main__':
     parser.add_argument('--cap-usd',type=Decimal);parser.add_argument('--approved-plan')
     parser.add_argument('--remaining-after',type=Path)
     parser.add_argument('--revised-after',type=Path)
+    parser.add_argument('--reuse-settled',action='store_true',help='Read settled answers to identical requests free; never re-send one.')
     parser.add_argument('--thread-variant',type=Path,help='Write a full-thread-context plan built from PLAN to this new file.')
+    parser.add_argument('--parents-variant',type=Path,help='Write a verified-parent plan built from PLAN to this new file.')
+    parser.add_argument('--parent-checks',type=Path,help='Private reply-chain results used by --parents-variant.')
     args=parser.parse_args();plan=json.loads(args.plan.read_text());manifest=json.loads(args.manifest.read_text())
     if args.thread_variant:
         if args.thread_variant.exists():parser.error('Choose a new file for the thread-context plan.')
         variant=thread_plan(plan,manifest)
         args.thread_variant.write_text(json.dumps(variant,ensure_ascii=False,indent=2)+'\n')
         print(json.dumps(estimate(variant,manifest),indent=2));sys.exit()
+    if args.parents_variant:
+        if args.parents_variant.exists() or args.parent_checks is None:parser.error('Choose a new plan file and the parent-check results.')
+        variant=parents_plan(plan,manifest,json.loads(args.parent_checks.read_text()))
+        args.parents_variant.write_text(json.dumps(variant,ensure_ascii=False,indent=2)+'\n')
+        print(json.dumps(estimate(variant,manifest),indent=2));sys.exit()
     if args.execute:
         if args.output is None or args.cap_usd is None:parser.error('Execution requires a new output folder and explicit cap.')
-        result=run(plan,manifest,args.output,args.cap_usd,approved_plan=args.approved_plan,remaining_after=args.remaining_after,revised_after=args.revised_after)
+        result=run(plan,manifest,args.output,args.cap_usd,approved_plan=args.approved_plan,remaining_after=args.remaining_after,revised_after=args.revised_after,reuse_settled=args.reuse_settled)
         print(json.dumps({k:v for k,v in result.items() if k!='results'},indent=2))
     else:print(json.dumps(estimate(plan,manifest),indent=2))

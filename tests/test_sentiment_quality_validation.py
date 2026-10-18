@@ -374,3 +374,73 @@ def test_thread_plan_is_a_separate_frozen_plan_and_review_plans_keep_their_ident
     tampered=deepcopy(variant);tampered['thread_context']='review'
     with pytest.raises(ValueError):V.validate(tampered,m)
     with pytest.raises(ValueError):V.make_plan(m,{},[],thread_context='everything')
+
+
+def parent_check(source_id='src-t1_tgt', **change):
+    check=dict(source_id=source_id,outcome='available',fetched_at='2026-10-07 12:10:00+00:00',
+        parent=dict(parent_key='t1_one',parent_type='comment',title='Parent comment',body='EXA guidance looked strong to me.',
+                    url='https://example.invalid/t1_one',published_at='2026-10-07 12:01:00+00:00'))
+    return dict(check,**change)
+
+
+def test_parent_variant_sends_the_verified_parent_but_not_siblings():
+    reviewed=V.selected(threaded_packet(),'src-t1_tgt')
+    before=deepcopy(reviewed)
+    packet=V.with_parent(reviewed,parent_check())
+    assert reviewed==before  # The reviewed packet itself is never modified.
+    assert supplied_messages(packet)==['t3_abc','t1_one','t1_tgt']
+    payload=json.loads(V.T.request_for('tone',packet)['input'][1]['content'])
+    source=payload['sources'][0]
+    assert source['conversation']['parent_key']=='t1_one' and source['conversation']['parent_type']=='comment'
+    assert source['conversation']['published_at']=='2026-10-07T12:01:00+00:00'
+    assert next(m for m in payload['reddit_threads'][0]['messages'] if m['message_key']=='t1_tgt')['parent_key']=='t1_one'
+    # A parent comment's generic title is not a citable passage, as in the live app.
+    assert [p['id'] for p in packet['sources'][0]['conversation']['passages']]==['p1']
+    # Permission checks skip the private parent row; its withdrawal is checked separately.
+    assert 'conversation' not in V.consumed(packet)['sources'][0]
+    # An answer citing the parent renders with its evidence, like a live parent.
+    item=dict(id='item_1',relevance='relevant',sentiment='positive',statement='opinion',topic='general',passages=['p1'],
+              previous_passages=[],context_passages=['p1'],basis='expressed_evaluation',price_claims=[])
+    call=dict(response_body=dict(status='completed',output=[dict(type='message',content=[dict(type='output_text',text=json.dumps(dict(items=[item])))])]))
+    assert V.parse(call,packet)[0]==dict(relevance='relevant',sentiment='positive')
+
+
+@pytest.mark.parametrize('change',[dict(outcome='unavailable'),dict(source_id='src-other')])
+def test_parent_variant_rejects_checks_for_other_replies_or_unavailable_parents(change):
+    with pytest.raises(ValueError):
+        V.with_parent(V.selected(threaded_packet(),'src-t1_tgt'),parent_check(**change))
+
+
+def test_parent_plan_keeps_reviewed_packets_and_is_frozen_separately():
+    m,p=fixtures()
+    case=next(c for c in m['cases'] if c['platform']=='reddit')
+    check=parent_check(case['source_id'],parent=dict(parent_check()['parent'],parent_key='t3_abc',parent_type='story',
+                       title='Authored EXA topic',body='EXA results are out.'))
+    variant=V.parents_plan(p,m,{case['id']:check,'case-unused':dict(outcome='unavailable')})
+    assert variant['thread_context']=='parents' and set(variant['parents'])=={case['id']}
+    assert V.validate(variant,m) and V.estimate(variant,m)['requests']==56
+    changed=[c for c in variant['requests'] if c.get('reviewed_packet') and c['packet']!=c['reviewed_packet']]
+    assert [c['id'] for c in changed]==[case['id']]
+    assert changed[0]['packet']['sources'][0]['conversation']['parent_type']=='story'
+    original=next(c for c in p['requests'] if c['id']==case['id'])
+    assert changed[0]['reviewed_packet']==original['packet']
+    tampered=deepcopy(variant);tampered['parents'][case['id']]['parent']['body']='Different words.'
+    with pytest.raises(ValueError):V.validate(tampered,m)
+    with pytest.raises(ValueError):V.make_plan(m,{},[],thread_context='parents')
+
+
+def test_reuse_settled_reads_identical_answers_free_and_sends_nothing(tmp_path,access):
+    m,p=fixtures();seen=[]
+    execute(m,p,tmp_path/'first',provider(seen))
+    before=ledger.snapshot()['calls']
+    again=execute(m,p,tmp_path/'reused',provider(seen),reuse_settled=True)
+    assert again['completed'] and again['attempted']==0 and len(seen)==56
+    assert all(r['reused'] for r in again['results']) and ledger.snapshot()['calls']==before
+
+
+@pytest.mark.parametrize('failure',['timeout','invalid'])
+def test_reuse_settled_never_resends_a_failed_request(tmp_path,access,failure):
+    m,p=fixtures();seen=[]
+    execute(m,p,tmp_path/'first',provider(seen,failure=failure))
+    result=execute(m,p,tmp_path/'reused',provider(seen),reuse_settled=True)
+    assert len(seen)==1 and result['attempted']==0 and not result['completed']

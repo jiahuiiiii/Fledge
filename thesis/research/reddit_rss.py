@@ -29,6 +29,9 @@ UA = 'Thesis/0.1 (Deus-derived public RSS research)'
 LOCK = Lock()
 PREFIX = 'reddit-rss:'
 ATOM = social.ATOM
+CONTEXT_DEPTH = 8
+# Reply-parent checks stop early so posts and thread feeds keep their requests.
+CONTEXT_DAILY_LIMIT = 200
 
 
 def xml(body):
@@ -61,6 +64,12 @@ def endpoint(kind, value):
         match = re.fullmatch(r'https://www\.reddit\.com/r/([A-Za-z0-9_]+)/comments/([a-z0-9]+)/([A-Za-z0-9_-]+)/?', value.get('url', ''))
         if match and match[1].lower() == value.get('feed') and match[1].lower() in social.FEEDS and 't3_' + match[2] == value.get('post_key'):
             return value['url'].rstrip('/') + '/.rss'
+    if kind == 'context' and isinstance(value, dict):
+        # One saved reply: Reddit's own context view lists its ancestor line.
+        match = re.fullmatch(r'https://www\.reddit\.com/r/([A-Za-z0-9_]+)/comments/([a-z0-9]+)/([A-Za-z0-9_-]+)/([a-z0-9]+)/', value.get('url', ''))
+        if (match and match[1].lower() == value.get('feed') and match[1].lower() in social.FEEDS
+                and 't3_' + match[2] == value.get('thread_key') and 't1_' + match[4] == value.get('post_key')):
+            return value['url'] + '.rss?context=' + str(CONTEXT_DEPTH)
     raise ValueError('Unsupported Reddit RSS destination.')
 
 
@@ -124,6 +133,8 @@ def read(kind, value, *, transport=None, cache_only=False):
             used = global_clock['requests'] if global_clock['usage_date'] == now.date() else 0
             if used >= 240:
                 raise Conflict('The daily Reddit RSS request limit has been reached.')
+            if kind == 'context' and used >= CONTEXT_DAILY_LIMIT:
+                raise Conflict('Reply-parent checks pause near the daily Reddit RSS request limit.')
             start = max(now, global_clock['next_at'], quota['next_at'])
             # Defer long backlogs rather than spending the company's entire
             # collection lease asleep. Cached sources remain available.
@@ -242,7 +253,8 @@ def replies(body, post, now, days):
             continue
         author = entry.findtext(ATOM+'author/'+ATOM+'name')
         # Reddit comment Atom entries expose updated, not published, and no
-        # immediate-parent ID. Preserve that date basis, never invent a parent.
+        # immediate-parent ID. Preserve that date basis, never invent a parent;
+        # reddit_parents checks each reply's own context feed separately.
         try:
             dated = datetime.fromisoformat((entry.findtext(ATOM+'updated') or '').replace('Z','+00:00'))
         except ValueError:

@@ -213,7 +213,7 @@ def test_comments_preserve_missing_parent_and_feed_date_basis(owner):
         from thesis.research import conversation
         context=conversation.present(c,child['id'])
         assert not context['can_refresh'] and context['result'] is None
-        assert 'does not identify the immediate reply parent' in context['unavailable_reason']
+        assert 'has not been checked yet' in context['unavailable_reason']
 
 
 def test_short_reply_is_retained_with_topic_but_no_invented_parent(owner):

@@ -61,7 +61,7 @@ def present(conn, identity, now=None):
         result=None,
     )
     if original.get('discovery_method') == 'reddit-comment-rss-updated-1' and not result:
-        value['unavailable_reason'] = 'The Reddit feed does not identify the immediate reply parent. Open the original thread for context; refreshing this feed cannot reconstruct the reply tree.'
+        value['unavailable_reason'] = 'This reply\'s immediate parent has not been checked yet. Each Reddit refresh checks a few replies through their own context feed; open the original thread meanwhile.'
     if result:
         withheld = result["parent_key"] and one(
             conn,

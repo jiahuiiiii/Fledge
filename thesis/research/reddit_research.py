@@ -149,7 +149,7 @@ def replies(raw, post, now, days):
     return result,removed
 
 
-def refresh(iid, *, lookback_days=7, fetcher=None, now=None, collector=None, incremental=None):
+def refresh(iid, *, lookback_days=7, fetcher=None, now=None, collector=None, incremental=None, check_parents=None):
     from thesis.providers.settings import settings
     from . import reddit_html, reddit_rss
     if incremental is None:
@@ -242,7 +242,7 @@ def refresh(iid, *, lookback_days=7, fetcher=None, now=None, collector=None, inc
             for kind,check in rss_result['checks'].items():
                 check['matched']=len(posts if kind=='posts' else comments)
                 message=(f'{check["matched"]} company posts retained from ticker/name search and any saved hot feeds.' if kind=='posts' else
-                        f'{check["matched"]} comments retained from company discussion threads. RSS supplies update times; immediate reply parents are unavailable. The saved topic is required to analyse replies without their own company mention.' if posts else 'No matching posts in this feed sample; no comment requests were made.')
+                        f'{check["matched"]} comments retained from company discussion threads. RSS supplies update times. Immediate reply parents come only from a separate per-reply check, a few per refresh; unchecked replies have none. The saved topic is required to analyse replies without their own company mention.' if posts else 'No matching posts in this feed sample; no comment requests were made.')
                 if check['errors']:
                     message += ' ' + ' '.join(dict.fromkeys(check['errors']))
                 if cache_only:
@@ -260,6 +260,17 @@ def refresh(iid, *, lookback_days=7, fetcher=None, now=None, collector=None, inc
         if not error:
             result['message'] = reddit_sample_message(len(posts), len(comments), lookback_days, cache_only)
         result['status']='partial' if error and retained else 'blocked' if error else 'cached' if cache_only else 'ready'
+        # Saved sources are already published. A few reply parents follow, as
+        # separate paced requests; a wait or refusal never alters this result.
+        if (fetcher is None if check_parents is None else check_parents) and not cache_only and not error:
+            from . import reddit_parents
+            try:
+                result['parents']=reddit_parents.check(iid,fetcher=fetcher,now=supplied)
+            except (Conflict,ValueError,TypeError,KeyError) as exc:
+                # A parent-check fault leaves replies unchecked, never the refresh failed.
+                result['parents']=dict(checked=0,available=0,unavailable=0,stopped=str(exc) if isinstance(exc,(Conflict,ValueError)) else 'Reply-parent checks could not run; replies remain unchecked.')
+            if result['parents']['available']:
+                result['message'] += f" {result['parents']['available']} reply parents verified."
         return result
     if error and ('Reddit denied access.' in error or 'HTTP 403' in error or 'HTTP 401' in error or 'switched off' in error):
         result['status']='blocked'
