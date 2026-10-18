@@ -110,3 +110,19 @@ owner clarification and has not received a paid evaluation; the candidate remain
 This uses the distinction between prompt examples and evaluations described in
 OpenAI's [prompt engineering](https://developers.openai.com/api/docs/guides/prompt-engineering)
 and [evaluation guidance](https://developers.openai.com/api/docs/guides/evaluation-best-practices).
+
+## Owner decisions and version 4 — 18 October 2026
+
+A full review of all 26 disagreements against this rubric found that most came from labelling conventions rather than model mistakes. Missing conversation context also played a large part. The owner then agreed these rules:
+
+1. **Market-wide news is not company tone.** A market or sector story that doesn't name the company or a concrete relationship is unrelated, even when it is useful background. Price-move explanations (phase 4) are where market context belongs.
+2. **Mixed needs both sides stated** about the company now. Only one side stated means positive or negative, not mixed.
+3. **Small cases:** a former-employer career mention is unrelated; a description without direction is neutral; an intelligible claim is neutral, not unclear, even when its truth is unverified.
+
+The owner did **not** accept that short Reddit replies should be judged without their conversation. Those replies are answers inside longer discussions. The 50-case test and the blind review page had sent only the topic and the reply (`extras=False`), although threads had 13–30 saved messages. The live app already sends other saved messages from the same discussion, up to 12 KB.
+
+**Version 4** (`thesis-source-sentiment-tasks-4`, still off) changes one rule. A short reply's own favourable **or** adverse wording sets its attitude once context makes the question clear. Explicit agreement adopts the stance it agrees with; a bare laugh does not. One invented teaching example is added. The instruction stays under 6,000 characters (5,973).
+
+The quality runner gains a separate **thread context** plan (`--thread-variant`) that sends the same saved discussion messages as the live app. The review-page evidence shown to the owner is unchanged, and earlier review-context plans keep their exact identity. Hard cases keep their fixed benchmark context.
+
+Still undecided: whether a large bullish trade such as a "yolo" position counts as positive; whether a company CEO criticising others is negative for the company or a neutral report; and what case 08 should be (mixed is not supported). Original owner labels remain unchanged. A separate private reference applies only the agreed rules to the nine cases they cover. Scores against it are same-set development results, not independent validation.

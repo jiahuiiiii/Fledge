@@ -324,3 +324,53 @@ def test_revised_plan_cannot_pay_again_for_a_previously_valid_case(tmp_path,acce
     with pytest.raises(ValueError,match='explicitly named failed'):
         execute(m,revised,tmp_path/'invalid-retry',normal,revised_after=tmp_path/'old')
     assert len(seen)==2 and not (tmp_path/'invalid-retry').exists()
+
+
+def threaded_packet():
+    """An authored Reddit reply inside a saved four-message discussion."""
+    p=controls();p['company']=dict(symbol='EXA',name='EXA Example')
+    def message(key,role,text,minute):
+        passages,_=source_passages('Reddit comment' if role=='comment' else 'Authored EXA topic',text)
+        return dict(source_id='src-'+key,message_key=key,role=role,parent_key=None,author_key='author-'+key,
+            passages=passages,published_at=f'2026-10-07T12:{minute:02}:00+00:00',
+            available_at=f'2026-10-07T12:{minute:02}:00+00:00',url='https://example.invalid/'+key)
+    topic=message('t3_abc','topic','EXA results are out. Holding for years.',0)
+    earlier=message('t1_one','comment','EXA guidance looked strong to me.',1)
+    sibling=message('t1_two','comment','Same view, holding too.',2)
+    target=message('t1_tgt','comment','Same here.',3)
+    source=dict(id='src-t1_tgt',label='item_1',channel='social',platform='reddit',social_kind='comment',
+        thread_key='t3_abc',post_key='t1_tgt',title='Reddit comment',text='Same here.',passages=target['passages'],
+        published_at=target['published_at'],available_at=target['available_at'],url=target['url'],
+        content_hash=hashlib.sha256(b'tgt').hexdigest(),author_hash='author-t1_tgt')
+    p['sources']=[source];p['reddit_thread_context']=[dict(thread_key='t3_abc',messages=[topic,earlier,sibling,target])]
+    return p
+
+
+def supplied_messages(packet):
+    payload=json.loads(V.T.request_for('tone',packet)['input'][1]['content'])
+    return [m['message_key'] for m in payload['reddit_threads'][0]['messages']]
+
+
+def test_thread_context_sends_saved_discussion_but_keeps_review_page_evidence():
+    base=threaded_packet()
+    review=V.selected(base,'src-t1_tgt')
+    thread=V.selected(base,'src-t1_tgt',thread_extras=True)
+    assert supplied_messages(review)==['t3_abc','t1_tgt']
+    assert supplied_messages(thread)==['t3_abc','t1_one','t1_two','t1_tgt']
+    # The blind review projection is the same in both modes, so owner labels stay comparable.
+    assert Q.case_evidence(review,review['sources'][0])==Q.case_evidence(thread,thread['sources'][0])
+    # Permission checks cover every message actually sent.
+    keys=lambda p:[m['message_key'] for m in V.consumed(p)['reddit_thread_context'][0]['messages']]
+    assert keys(review)==['t3_abc','t1_tgt'] and keys(thread)==['t3_abc','t1_one','t1_two','t1_tgt']
+
+
+def test_thread_plan_is_a_separate_frozen_plan_and_review_plans_keep_their_identity():
+    m,p=fixtures()
+    assert 'thread_context' not in p
+    variant=V.thread_plan(p,m)
+    assert variant['thread_context']=='thread' and variant['fingerprint']!=p['fingerprint']
+    assert V.validate(variant,m) and V.estimate(variant,m)['requests']==56
+    assert all(c['packet']['thread_extras'] is (c['scope']=='owner50') for c in variant['requests'])
+    tampered=deepcopy(variant);tampered['thread_context']='review'
+    with pytest.raises(ValueError):V.validate(tampered,m)
+    with pytest.raises(ValueError):V.make_plan(m,{},[],thread_context='everything')

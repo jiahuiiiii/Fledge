@@ -103,3 +103,12 @@ def test_development_examples_are_separate_from_teaching_snippets_and_cover_all_
     for text, label in T.TONE_TEACHING_EXAMPLES:
         assert text in T.INSTRUCTIONS['tone'] and label in T.INSTRUCTIONS['tone']
         assert all(text != c['text'] for c in CASES)
+
+
+def test_short_reply_rule_is_symmetric_and_bare_laughs_stay_unclear():
+    tone=T.INSTRUCTIONS['tone']
+    assert "favourable or adverse wording then sets its attitude" in tone
+    assert 'Explicit agreement adopts the stance agreed with; a bare laugh does not.' in tone
+    assert ('Topic: Holding Aster for years. Reply: Same here.', 'relevant / positive / expressed_evaluation') in T.TONE_TEACHING_EXAMPLES
+    assert T.PROMPT=='thesis-source-sentiment-tasks-4' and 'thesis-source-sentiment-tasks-3' in T.REUSABLE_PROMPTS
+    assert len(tone)<=6000

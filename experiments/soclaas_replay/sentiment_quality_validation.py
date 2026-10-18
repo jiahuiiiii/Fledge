@@ -29,11 +29,17 @@ PREFIX='experiment:sentiment-quality-v1:'
 def digest(value):return hashlib.sha256(ledger.canonical(value).encode()).hexdigest()
 
 
-def selected(packet,source_id):
+# 'review' reproduces the blind page (topic + reply only). 'thread' also sends the
+# other saved messages of the same discussion, as the live app does, so a short
+# reply is read with its conversation. Hard cases keep their fixed benchmark.
+THREAD_CONTEXTS=('review','thread')
+
+
+def selected(packet,source_id,*,thread_extras=False):
     packet=deepcopy(packet)
     sources=[s for s in packet['sources'] if s['id']==source_id]
     if len(sources)!=1:raise ValueError('A frozen quality case needs its one exact source.')
-    packet.update(sources=sources,thread_extras=False,comparison_sources=[])
+    packet.update(sources=sources,thread_extras=thread_extras,comparison_sources=[])
     if model_source(sources[0])['passages']!=sources[0]['passages']:
         raise ValueError('Model-visible passages differ from the reviewed passages.')
     return packet
@@ -74,14 +80,15 @@ def hard_case(body,packet,index):
         benchmark=dict(batch=batch,label=label,request_hash=digest(body),evidence=expected))
 
 
-def make_plan(manifest,owner_packets,hard_cases):
+def make_plan(manifest,owner_packets,hard_cases,*,thread_context='review'):
+    if thread_context not in THREAD_CONTEXTS:raise ValueError('Unknown thread-context option.')
     Q.validate_manifest(manifest)
     expected={c['id'] for c in manifest['cases']}
     if set(owner_packets)!=expected or len(hard_cases)!=6:
         raise ValueError('Use all fifty owner cases and the six fixed hard cases.')
     requests=[]
     for case in manifest['cases']:
-        packet=selected(owner_packets[case['id']],case['source_id'])
+        packet=selected(owner_packets[case['id']],case['source_id'],thread_extras=thread_context=='thread')
         if Q.case_evidence(packet,packet['sources'][0])!={k:v for k,v in case.items() if k!='id'}:
             raise ValueError('A quality source or review context changed.')
         requests.append(dict(scope='owner50',id=case['id'],packet=packet))
@@ -100,6 +107,7 @@ def make_plan(manifest,owner_packets,hard_cases):
         if case['body']['model']!=settings.OPENAI_REASONING_MODEL:
             raise ValueError('Quality evaluation retains the selected GPT-5.4 bulk model.')
     plan=dict(policy=POLICY,owner_fingerprint=manifest['fingerprint'],model=settings.OPENAI_REASONING_MODEL,requests=requests)
+    if thread_context!='review':plan['thread_context']=thread_context  # earlier plans keep their exact fingerprint
     return dict(plan,fingerprint=digest(plan))
 
 
@@ -116,7 +124,7 @@ def validate(plan,manifest):
         elif case['scope']=='hard6':
             hard.append(dict(case,source_id=case['packet']['sources'][0]['id']))
         else:raise ValueError('Unknown evaluation scope.')
-    rebuilt=make_plan(manifest,owner,hard)
+    rebuilt=make_plan(manifest,owner,hard,thread_context=plan.get('thread_context','review'))
     supplied={k:v for k,v in plan.items() if k not in {'fingerprint','previous_plan','retry_cases'}}
     if {k:v for k,v in rebuilt.items() if k!='fingerprint'}!=supplied:
         raise ValueError('The plan no longer matches the production task contract.')
@@ -177,12 +185,25 @@ def revised_plan(previous,manifest,retry_cases):
         raise ValueError('The earlier frozen plan changed.')
     owner={c['id']:c['packet'] for c in previous['requests'] if c['scope']=='owner50'}
     hard=[dict(c,source_id=c['packet']['sources'][0]['id']) for c in previous['requests'] if c['scope']=='hard6']
-    plan=make_plan(manifest,owner,hard)
+    plan=make_plan(manifest,owner,hard,thread_context=previous.get('thread_context','review'))
     equivalent(plan,previous)
     core={k:v for k,v in plan.items() if k!='fingerprint'}
     core.update(previous_plan=previous,retry_cases=sorted(set(retry_cases)))
     result=dict(core,fingerprint=digest(core));validate(result,manifest)
     return result
+
+
+def thread_plan(previous,manifest):
+    """Same 50 owner cases and 6 hard cases, re-frozen with full saved thread context.
+
+    A separate development comparison, not a continuation: no earlier answer is reused.
+    """
+    if digest({k:v for k,v in previous.items() if k!='fingerprint'})!=previous['fingerprint']:
+        raise ValueError('The earlier frozen plan changed.')
+    owner={c['id']:c['packet'] for c in previous['requests'] if c['scope']=='owner50'}
+    hard=[dict(c,source_id=c['packet']['sources'][0]['id']) for c in previous['requests'] if c['scope']=='hard6']
+    plan=make_plan(manifest,owner,hard,thread_context='thread');validate(plan,manifest)
+    return plan
 
 
 def fits_schema(call,body):
@@ -210,7 +231,7 @@ def estimate(plan,manifest):
 def consumed(packet):
     """Permission checks cover exactly the target and required wire context."""
     used=deepcopy(packet);used['comparison_sources']=[]
-    wire=threads.wire(packet,packet['sources'],extras=False)
+    wire=threads.wire(packet,packet['sources'],extras=packet.get('thread_extras',False))
     wanted={c['thread_key']:{m['message_key'] for m in c['messages']} for c in wire}
     used['reddit_thread_context']=[dict(c,messages=[m for m in c['messages'] if m['message_key'] in wanted[c['thread_key']]])
         for c in packet.get('reddit_thread_context',[]) if c['thread_key'] in wanted]
@@ -363,7 +384,13 @@ if __name__=='__main__':
     parser.add_argument('--cap-usd',type=Decimal);parser.add_argument('--approved-plan')
     parser.add_argument('--remaining-after',type=Path)
     parser.add_argument('--revised-after',type=Path)
+    parser.add_argument('--thread-variant',type=Path,help='Write a full-thread-context plan built from PLAN to this new file.')
     args=parser.parse_args();plan=json.loads(args.plan.read_text());manifest=json.loads(args.manifest.read_text())
+    if args.thread_variant:
+        if args.thread_variant.exists():parser.error('Choose a new file for the thread-context plan.')
+        variant=thread_plan(plan,manifest)
+        args.thread_variant.write_text(json.dumps(variant,ensure_ascii=False,indent=2)+'\n')
+        print(json.dumps(estimate(variant,manifest),indent=2));sys.exit()
     if args.execute:
         if args.output is None or args.cap_usd is None:parser.error('Execution requires a new output folder and explicit cap.')
         result=run(plan,manifest,args.output,args.cap_usd,approved_plan=args.approved_plan,remaining_after=args.remaining_after,revised_after=args.revised_after)
