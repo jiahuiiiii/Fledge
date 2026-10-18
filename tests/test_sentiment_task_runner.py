@@ -185,6 +185,29 @@ def test_real_generation_bridges_old_prompt_without_rereading_tones(owner,monkey
     assert repeat['id']==new['id']
 
 
+def test_rubric_revision_preserves_old_task_labels_and_their_actual_provenance(owner,monkeypatch):
+    from test_market import prepare
+    from thesis.db import transaction,one
+    iid=prepare(owner)
+    monkeypatch.setenv('THESIS_SENTIMENT_TASKS','true')
+    old_prompt='thesis-source-sentiment-tasks-1'
+    with monkeypatch.context() as earlier:
+        earlier.setattr(T,'PROMPT',old_prompt)
+        earlier.setattr(T,'INSTRUCTIONS',dict(T.INSTRUCTIONS,tone='Authored earlier tone instructions'))
+        before=S.generate(iid,transport=provider([]))
+    with transaction() as conn:
+        original=deepcopy(one(conn,'SELECT result FROM sentiment_analyses WHERE id=%s',(before['id'],))['result'])
+    after=S.generate(iid,transport=lambda _:pytest.fail('Prompt revision forced a paid reread'))
+    assert after['prompt_version']==T.PROMPT!=old_prompt
+    assert after['source_reuse']['reused']==len(before['items'])
+    for prior,current in zip(before['items'],after['items']):
+        for field in ('sentiment','model','call_id','prompt_version'):
+            assert current[field]==prior[field]
+        assert current['prompt_version']==old_prompt
+    with transaction() as conn:
+        assert one(conn,'SELECT result FROM sentiment_analyses WHERE id=%s',(before['id'],))['result']==original
+
+
 def test_duplicate_comparisons_run_only_for_candidates_and_save_negative_checks():
     p=packet();p['sources']=[p['sources'][0],p['sources'][2]]
     p['sources'][0]['title']='Lumen signs Cedar supply contract for factory chips'

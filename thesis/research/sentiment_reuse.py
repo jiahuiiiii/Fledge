@@ -57,7 +57,9 @@ def compatible(record, packet):
     accepted_prompts={PROMPT}
     if sentiment_task_runner.enabled():
         accepted_prompts={sentiment_tasks.PROMPT}
-        if sentiment_reliability.enabled():accepted_prompts.add(PROMPT)
+        if sentiment_reliability.enabled():
+            accepted_prompts.update(sentiment_tasks.REUSABLE_PROMPTS)
+            accepted_prompts.add(PROMPT)
     return (
         result.get("prompt_version") in accepted_prompts
         and (sentiment_reliability.enabled() or result.get("model") == REASONING_MODEL)
