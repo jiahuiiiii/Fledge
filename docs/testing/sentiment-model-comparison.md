@@ -175,3 +175,18 @@ DeepSeek V4.1 Flash is not in the table. Through OpenRouter (DeepInfra) it is a 
 **(d) Cheapest: Haiku plus code-only triggers.** The price-move detector is plain code. Haiku does relevance and labels; the explainer runs only when a move triggers; Reddit is checked every 4 hours. About US$0.20 a day, roughly 13× cheaper than now, with about 8% of labels dropped by repair and shallower explanations.
 
 All three depend on the same foundation, which matters more than the model choice: item-level repair, the price-move trigger, the fast/slow collection split and smaller prompts. Any model switch also costs a one-off re-read of the 7-day sources (US$4–13 depending on the model, as seen in section 5) unless labels can carry over between models.
+
+## Cheaper models on the 50-case quality set — 18 October 2026
+
+The owner asked for lower-cost options. Five OpenRouter models received the exact frozen plan behind GPT-5.4's 40/50 result: prompt `thesis-source-sentiment-tasks-4`, topic plus verified Reddit parent, the same strict JSON schema, and the app's own tone validator (`experiments/soclaas_replay/quality_openrouter.py`). A malformed answer counts as a miss; nothing was retried. One DeepSeek run first hit a too-low US$0.10 cap; only its 17 never-sent cases were sent afterwards. Score is against the owner-agreed reference.
+
+| Model | Exact | Relevance | Tone | Hard cases | Valid answers | Cost, 56 requests | vs GPT-5.4 | Median s |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| GPT-5.4 (current, OpenAI) | **40/50** | 45/50 | 44/50 | 4/6 | 56/56 | US$0.495 (list) | 100% | — |
+| **GPT-6 Luna** | **36/50** | 44/50 | 39/50 | 4/6 | 55/56 | **US$0.019** | **4%** | 3.3 |
+| Qwen 3.8 Flash | 29/50 | 43/50 | 33/50 | 4/6 | 56/56 | US$0.116 | 24% | 88.6 |
+| Claude Haiku 5.5 | 28/50 | 42/50 | 32/50 | 3/6 | 54/56 | US$0.036 | 7% | 6.4 |
+| DeepSeek V4.1 Flash | 25/50 | 38/50 | 30/50 | 4/6 | 50/56 | US$0.151 | 31% | 12.5 |
+| GLM 5.3 Flash | 18/50 | 31/50 | 28/50 | 5/6 | 48/56 | US$0.024 | 5% | 2.0 |
+
+OpenRouter spend for all five: US$0.346. GPT-6 Luna is the only candidate near GPT-5.4, about four points lower at about 4% of the cost; it is also listed on the owner's OpenAI account as `gpt-6-luna`, so no new provider is needed. DeepSeek and Qwen reason at length (about 2,150 output tokens per answer for DeepSeek, against about 260 for GPT-5.4), which erases most of their price advantage. These are single-source requests on a set the agreed reference was settled on; live batches and daily cost were not measured.
