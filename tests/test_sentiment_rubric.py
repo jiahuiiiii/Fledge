@@ -97,7 +97,7 @@ def test_prompt_revision_changes_tone_request_identity_but_not_event_or_source_i
 
 
 def test_development_examples_are_separate_from_teaching_snippets_and_cover_all_tones():
-    assert len({c['id'] for c in CASES}) == len(CASES) == 16
+    assert len({c['id'] for c in CASES}) == len(CASES) == 23
     assert {c['expected']['sentiment'] for c in CASES} == {'positive', 'negative', 'mixed', 'neutral', 'unclear'}
     assert 'Not owner labels' in DATA['provenance']
     for text, label in T.TONE_TEACHING_EXAMPLES:

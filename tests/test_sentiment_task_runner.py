@@ -185,12 +185,12 @@ def test_real_generation_bridges_old_prompt_without_rereading_tones(owner,monkey
     assert repeat['id']==new['id']
 
 
-def test_rubric_revision_preserves_old_task_labels_and_their_actual_provenance(owner,monkeypatch):
+@pytest.mark.parametrize('old_prompt',['thesis-source-sentiment-tasks-1','thesis-source-sentiment-tasks-2'])
+def test_rubric_revision_preserves_old_task_labels_and_their_actual_provenance(owner,monkeypatch,old_prompt):
     from test_market import prepare
     from thesis.db import transaction,one
     iid=prepare(owner)
     monkeypatch.setenv('THESIS_SENTIMENT_TASKS','true')
-    old_prompt='thesis-source-sentiment-tasks-1'
     with monkeypatch.context() as earlier:
         earlier.setattr(T,'PROMPT',old_prompt)
         earlier.setattr(T,'INSTRUCTIONS',dict(T.INSTRUCTIONS,tone='Authored earlier tone instructions'))
