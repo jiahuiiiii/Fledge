@@ -400,6 +400,17 @@ def publish(owner, iid, analysis_id, *, claim_token=None, now=None):
         return len(alerts)+len(proposals)
 
 
+def cited(sources, items, links=()):
+    """Only the sources an alert can display: its items, their citations and links.
+
+    Alert cards, the inbox and exports look sources up by these ids alone.
+    """
+    wanted = {i.get("source_id") for i in items}
+    wanted |= {c.get("source_id") for i in items for c in i.get("citations") or []}
+    wanted |= {l.get(k) for l in links for k in ("source_id", "reference_source_id")}
+    return [s for s in sources if s["id"] in wanted]
+
+
 def list_alerts(conn, owner, ids=None):
     data = rows(
         conn,
@@ -407,15 +418,20 @@ def list_alerts(conn, owner, ids=None):
         (owner, ids, ids),
     )
     result = []
+    # Consecutive alerts share readings; build each one once for this request.
+    wanted = list({str(a[k]) for a in data for k in ("current_id", "previous_id")})
+    records = {str(r["id"]): r for r in rows(conn, "SELECT * FROM sentiment_analyses WHERE id=ANY(%s::uuid[])", (wanted,))} if wanted else {}
+    presented = {}
+
+    def shown(identity):
+        identity = str(identity)
+        if identity not in presented:
+            presented[identity] = sentiment.present(conn, records.get(identity))
+        return presented[identity]
+
     for a in data:
-        current = one(
-            conn, "SELECT * FROM sentiment_analyses WHERE id=%s", (a["current_id"],)
-        )
-        previous = one(
-            conn, "SELECT * FROM sentiment_analyses WHERE id=%s", (a["previous_id"],)
-        )
-        visible = sentiment.present(conn, current)
-        prior = sentiment.present(conn, previous)
+        visible = shown(a["current_id"])
+        prior = shown(a["previous_id"])
         withheld = visible["withheld"] or prior["withheld"]
         result.append(
             dict(
@@ -428,7 +444,7 @@ def list_alerts(conn, owner, ids=None):
                 withheld=withheld,
                 preview=a.get('preview',False),
                 payload={} if withheld else a["payload"],
-                sources=[] if withheld else visible["sources"],
+                sources=[] if withheld else cited(visible["sources"], a["payload"].get("items", []), a["payload"].get("coverage_links", [])),
                 source_limits=(
                     {}
                     if withheld
@@ -438,7 +454,7 @@ def list_alerts(conn, owner, ids=None):
                     }
                 ),
                 previous_items=[] if withheld else prior["items"],
-                previous_sources=[] if withheld else prior["sources"],
+                previous_sources=[] if withheld else cited(prior["sources"], prior["items"]),
             )
         )
     return result
