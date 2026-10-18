@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from psycopg.types.json import Jsonb
 from thesis.db import transaction, one, rows
 from thesis.providers import ledger
-from thesis.providers.settings import REASONING_MODEL
+from thesis.providers.settings import SENTIMENT_MODEL
 from . import market_brief, social, coverage
 from . import sentiment_context, reporting_basis, reddit_thread_context, sentiment_reliability
 from .citations import source_passages, model_source, FINDING_GROUNDING
@@ -309,7 +309,7 @@ def request_for(packet):
     else:
         schema["properties"]["coverage_links"]["maxItems"] = 0
     return dict(
-        model=REASONING_MODEL,
+        model=SENTIMENT_MODEL,
         store=False,
         service_tier="default",
         max_output_tokens=ledger.SENTIMENT_LOW_MAX_OUTPUT,
@@ -523,7 +523,7 @@ def render(call, packet, *, enforce_repair_limit=True):
     items = []
     repairing = sentiment_reliability.enabled()
     origin_model = (call.get("model") or call.get("response_body", {}).get("model")
-                    or (call.get("request_body") or {}).get("model") or REASONING_MODEL)
+                    or (call.get("request_body") or {}).get("model") or SENTIMENT_MODEL)
     for item in result.items:
         source = sources[item.id]
         passages = {p["id"]: p["quote"] for p in source["passages"]}
@@ -616,7 +616,7 @@ def render(call, packet, *, enforce_repair_limit=True):
             items, packet["sources"], links, packet.get("comparison_sources", [])
         ),
         summary_policy=POLICY,
-        model=REASONING_MODEL,
+        model=SENTIMENT_MODEL,
         prompt_version=PROMPT,
         guard_policy=packet.get("guard_policy"),
         **(dict(repairs=sentiment_reliability.counts(items)) if repairing else {}),
@@ -676,7 +676,7 @@ def present(conn, record):
             record["result"].get(key) != value
             for key, value in (
                 ("prompt_version", current_prompt),
-                ("model", REASONING_MODEL),
+                ("model", SENTIMENT_MODEL),
                 ("summary_policy", POLICY),
             )
         ) or p.get('selection', {}).get('policy') != SELECTION_POLICY,

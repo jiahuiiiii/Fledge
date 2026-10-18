@@ -13,6 +13,7 @@ from .settings import (
     provider_for,
     OPENAI_EXPLAINER_MODEL,
     EXPLAINER_MODELS,
+    OPENAI_SENTIMENT_MODEL,
 )
 
 NANO = 1_000_000_000
@@ -167,6 +168,16 @@ PROFILES += (
 )
 
 
+# Sentiment-only route. GPT-6 Luna standard $0.10 input / $0.01 cached /
+# $0.125 cache write / $0.50 output per 1M, checked 2026-10-18:
+# https://developers.openai.com/api/docs/models/gpt-6-luna
+LUNA_SENTIMENT_PRICE_VERSION = "openai-gpt-6-luna-sentiment-low-12000-20261018"
+PROFILES += (
+    PriceProfile(OPENAI_SENTIMENT_MODEL, LUNA_SENTIMENT_PRICE_VERSION,
+                 100, 10, 500, SENTIMENT_LOW_MAX_OUTPUT, "low", 125),
+)
+
+
 def price_profile(model, version=None):
     for profile in PROFILES:
         if profile.model == model and (version is None or profile.version == version):
@@ -214,6 +225,10 @@ def request_profile(body):
         return price_profile(model, twin_version(provider, model, family))
     if family is not None and model == REASONING_MODEL:
         return price_profile(REASONING_MODEL, family)
+    if model == OPENAI_SENTIMENT_MODEL:
+        if family != SENTIMENT_LOW_PRICE_VERSION:
+            raise ValueError("This model is priced only for low-effort sentiment readings")
+        return price_profile(model, LUNA_SENTIMENT_PRICE_VERSION)
     return price_profile(model)
 
 

@@ -336,7 +336,7 @@ def run_reusing(packet, reused, *, transport=None, progress=None, retry_failed=F
         return sentiment_task_runner.run(packet,reused,transport=transport,progress=progress,prefilter=prefilter,
                                          retry_failed=retry_failed,split_failed=split_failed)
     from .sentiment import POLICY as SUMMARY_POLICY, PROMPT
-    from thesis.providers.settings import REASONING_MODEL
+    from thesis.providers.settings import SENTIMENT_MODEL as REASONING_MODEL
     # When every request of the whole-sample reading is already saved (e.g. only
     # the rendering policy changed), reading it again is free and keeps the new
     # reading tied to the same paid calls.
@@ -496,7 +496,7 @@ def _run(packet, *, transport=None, progress=None, retry_failed=False, split_fai
 def relevance_prefilter_empty(packet):
     """Every source was skipped by the quick check: no full-reading call is made."""
     from .sentiment import POLICY as SUMMARY_POLICY, PROMPT, summarize
-    from thesis.providers.settings import REASONING_MODEL
+    from thesis.providers.settings import SENTIMENT_MODEL as REASONING_MODEL
     return dict(items=[], coverage_links=[], summary=summarize([], packet["sources"], [], packet.get("comparison_sources", [])),
                 summary_policy=SUMMARY_POLICY, model=REASONING_MODEL, prompt_version=PROMPT,
                 guard_policy=packet.get("guard_policy"))

@@ -214,7 +214,7 @@ def test_model_switch_sends_only_new_sources_and_preserves_each_original_model(o
     assert len(json.loads(sent[0]["input"][1]["content"])["sources"]) == 1
     assert reading["source_reuse"]["reused"] == 2
     assert sum(i["model"] == "earlier-model" for i in reading["items"]) == 2
-    assert sum(i["model"] == S.REASONING_MODEL for i in reading["items"]) == 1
+    assert sum(i["model"] == S.SENTIMENT_MODEL for i in reading["items"]) == 1
 
 
 def test_explicit_reread_bypasses_labels_and_paid_cache_but_same_run_is_idempotent(owner):

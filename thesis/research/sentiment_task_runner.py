@@ -25,7 +25,7 @@ def enabled():
 
 
 def identity(packet):
-    value = dict(policy=T.POLICY, schema_policy=T.SCHEMA_POLICY,headline_policy=T.HEADLINE_POLICY,instructions=T.INSTRUCTIONS, model=T.REASONING_MODEL,
+    value = dict(policy=T.POLICY, schema_policy=T.SCHEMA_POLICY,headline_policy=T.HEADLINE_POLICY,instructions=T.INSTRUCTIONS, model=T.SENTIMENT_MODEL,
                  company=packet['company'], sources=[sentiment_reuse.content_key(s) for s in packet['sources']],
                  comparisons=[sentiment_reuse.content_key(s) for s in packet.get('comparison_sources',[])],
                  policies={key:packet.get(key) for key in ('reporting_policy','context_policy','reddit_thread_policy','guard_policy')},
@@ -305,7 +305,7 @@ def run(packet, reused=None, *, transport=None, progress=None, prefilter=None, s
     if [item['source_id'] for item in items]!=[s['id'] for s in packet['sources']]:
         raise ValueError('Every source must be read or reused exactly once.')
     result=dict(items=items,coverage_links=links,summary=sentiment.summarize(items,packet['sources'],links,packet.get('comparison_sources',[])),
-                summary_policy=sentiment.POLICY,prompt_version=T.PROMPT,model=T.REASONING_MODEL,
+                summary_policy=sentiment.POLICY,prompt_version=T.PROMPT,model=T.SENTIMENT_MODEL,
                 guard_policy=packet.get('guard_policy'),tasks=dict(policy=T.POLICY,stages=trace,duplicate_batches=len(pair_parts),recovery=recovery),
                 batching=dict(policy=T.POLICY,completed=len(calls),total=len(calls),source_counts=[],comparison_limit=T.MAX_PAIRS,
                               comparison_context_bounded=bool(pairs)),

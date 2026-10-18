@@ -314,7 +314,7 @@ def test_shift_needs_distinct_new_evidence_and_separates_news_social():
                 "summary": sentiment.summarize(items),
                 "summary_policy": sentiment.POLICY,
                 "prompt_version": sentiment.PROMPT,
-                "model": sentiment.REASONING_MODEL,
+                "model": sentiment.SENTIMENT_MODEL,
             },
         )
 

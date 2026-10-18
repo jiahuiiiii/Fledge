@@ -53,7 +53,7 @@ def test_tone_and_event_are_separate_and_saved_calls_are_reused(monkeypatch):
         assert seen==['tone','event'] and len(calls)==2
         assert len(result['items'])==4 and result['prompt_version']==T.PROMPT
         assert [i['importance']['level'] for i in result['items'] if i['channel']=='news']==['high','high']
-        assert all(i['call_id'] and i['model']==T.REASONING_MODEL for i in result['items'])
+        assert all(i['call_id'] and i['model']==T.SENTIMENT_MODEL for i in result['items'])
         again,old_calls=B.run(p,transport=lambda _:pytest.fail('Repeated paid request'),prefilter=False)
         assert [i['sentiment'] for i in again['items']]==[i['sentiment'] for i in result['items']]
         assert [c['id'] for c in old_calls]==[c['id'] for c in calls]
@@ -240,7 +240,7 @@ def test_duplicate_ids_or_labels_block_before_any_paid_task():
 
 def test_switch_bridge_is_whitelisted_and_rollback_does_not_reuse_new_prompt(monkeypatch):
     from thesis.research import sentiment_reuse as U
-    p=packet();record=dict(packet=p,result=dict(prompt_version=S.PROMPT,model=T.REASONING_MODEL,
+    p=packet();record=dict(packet=p,result=dict(prompt_version=S.PROMPT,model=T.SENTIMENT_MODEL,
         summary_policy=S.POLICY,guard_policy=p.get('guard_policy')))
     assert U.compatible(record,p)
     monkeypatch.setenv('THESIS_SENTIMENT_TASKS','true')

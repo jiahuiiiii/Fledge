@@ -50,7 +50,7 @@ def content_key(source):
 
 def compatible(record, packet):
     from .sentiment import PROMPT, POLICY as SUMMARY_POLICY
-    from thesis.providers.settings import REASONING_MODEL
+    from thesis.providers.settings import SENTIMENT_MODEL as REASONING_MODEL
 
     result, saved = record["result"], record["packet"]
     from . import sentiment_task_runner, sentiment_tasks

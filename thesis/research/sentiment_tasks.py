@@ -12,7 +12,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from thesis.providers import ledger
-from thesis.providers.settings import REASONING_MODEL
+from thesis.providers.settings import SENTIMENT_MODEL
 from . import sentiment, reporting_basis, coverage, sentiment_context, reddit_thread_context
 from .citations import model_source
 
@@ -221,7 +221,7 @@ def request_for(task, packet, *, pairs=None):
     instruction = INSTRUCTIONS[task]
     if len(instruction) > 6000:
         raise ValueError('Task instructions exceed the 6000-character bound.')
-    body = dict(model=REASONING_MODEL,store=False,service_tier='default',
+    body = dict(model=SENTIMENT_MODEL,store=False,service_tier='default',
                 max_output_tokens=ledger.SENTIMENT_LOW_MAX_OUTPUT,reasoning={'effort':'low'},
                 input=[dict(role='system',content=instruction),dict(role='user',content=ledger.canonical(payload))],
                 text={'format':dict(type='json_schema',name='source_sentiment',strict=True,schema=bounded_schema(task,sources))})

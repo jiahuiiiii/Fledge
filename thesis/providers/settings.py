@@ -6,6 +6,9 @@ from thesis.config import ROOT, DATA
 
 OPENAI_MODEL = "gpt-5.4-mini-2026-03-17"
 OPENAI_REASONING_MODEL = "gpt-5.4-2026-03-05"
+# Optional cheaper model for sentiment readings only (owner choice, 18 Oct 2026).
+# OpenAI lists no dated snapshot; responses must report exactly this name.
+OPENAI_SENTIMENT_MODEL = "gpt-6-luna"
 OPENAI_EXPLAINER_MODEL = "gpt-5.5-2026-04-23"
 EXPLAINER_MODELS = (OPENAI_EXPLAINER_MODEL, "claude-opus-5-5")
 # Prices in nano-USD per token: input, cache read, cache write, output.
@@ -39,7 +42,7 @@ API_KEYS = {
     "anthropic": "ANTHROPIC_API_KEY",
     "deepseek": "DEEPSEEK_API_KEY",
 }
-SELECTION_KEYS = ("THESIS_MODEL_PROVIDER", "THESIS_MOVE_EXPLAINER_MODEL") + tuple(
+SELECTION_KEYS = ("THESIS_MODEL_PROVIDER", "THESIS_MOVE_EXPLAINER_MODEL", "THESIS_SENTIMENT_MODEL") + tuple(
     f"{provider.upper()}_{role}"
     for provider in TWIN_PRICES
     for role in ("MODEL", "REASONING_MODEL")
@@ -124,6 +127,21 @@ def explainer_choice(values):
 EXPLAINER_MODEL = explainer_choice(_configured())
 
 
+def sentiment_choice(values, provider=None, reasoning=None):
+    """Sentiment readings use the main model unless the owner picks a priced alternative."""
+    provider, reasoning = provider or PROVIDER, reasoning or REASONING_MODEL
+    model = values.get("THESIS_SENTIMENT_MODEL") or reasoning
+    if model == reasoning:
+        return model
+    if provider != "openai" or model != OPENAI_SENTIMENT_MODEL:
+        raise ProviderConfigError("THESIS_SENTIMENT_MODEL must be the main model or " + OPENAI_SENTIMENT_MODEL + " with OpenAI")
+    return model
+
+
+# Chosen once at start-up, like the main model; a later .env edit needs a restart.
+SENTIMENT_MODEL = sentiment_choice(_configured())
+
+
 def provider_for(model):
     for provider, prices in TWIN_PRICES.items():
         if model in prices:
@@ -136,7 +154,7 @@ def live_key(model=MODEL):
         raise ProviderConfigError(
             "Live requests require the original persistent Fledge database"
         )
-    if model not in (MODEL, REASONING_MODEL) and (EXPLAINER_MODEL is None or model != EXPLAINER_MODEL):
+    if model not in (MODEL, REASONING_MODEL, SENTIMENT_MODEL) and (EXPLAINER_MODEL is None or model != EXPLAINER_MODEL):
         raise ProviderConfigError("The requested model has not been priced for this allowance")
     values = settings()
     if values.get("THESIS_LIVE_MODELS_ENABLED") != "true":
@@ -148,6 +166,8 @@ def live_key(model=MODEL):
         )
     if explainer_choice(values) != EXPLAINER_MODEL:
         raise ProviderConfigError("The explainer setting in .env changed; restart the app to use it")
+    if sentiment_choice(values) != SENTIMENT_MODEL:
+        raise ProviderConfigError("The sentiment model setting in .env changed; restart the app to use it")
     provider = provider_for(model)
     name = API_KEYS[provider]
     key = values.get(name, "")
