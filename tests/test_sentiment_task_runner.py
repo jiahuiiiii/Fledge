@@ -141,16 +141,17 @@ def test_whole_source_plans_split_by_count_and_size_without_losing_context():
 
 
 def test_explicit_retry_then_terminal_split_preserves_paid_results_and_cannot_repeat():
-    p=packet();seen=[];bad=provider(seen,fail='tone')
+    # The explicit recovery path, with the automatic half-split switched off.
+    p=packet();seen=[];bad=provider(seen,fail='tone');manual=dict(auto_split=False)
     with patch.object(B,'check_access'):
-        with pytest.raises(ValueError):R.run(p,transport=bad,prefilter=False)
-        with pytest.raises(ValueError):R.run(p,transport=bad,prefilter=False,retry_failed=True)
+        with pytest.raises(ValueError):R.run(p,transport=bad,prefilter=False,**manual)
+        with pytest.raises(ValueError):R.run(p,transport=bad,prefilter=False,retry_failed=True,**manual)
         assert seen==['tone','tone']
-        with pytest.raises(ValueError):R.run(p,transport=lambda _:pytest.fail('Unapproved split'),prefilter=False)
-        result,calls=R.run(p,transport=provider(seen),prefilter=False,split_failed=True)
+        with pytest.raises(ValueError):R.run(p,transport=lambda _:pytest.fail('Unapproved split'),prefilter=False,**manual)
+        result,calls=R.run(p,transport=provider(seen),prefilter=False,split_failed=True,**manual)
         assert seen==['tone','tone','tone','tone','event']
         assert len(result['items'])==4 and len(calls)==3 and result['tasks']['recovery']
-        again,calls=R.run(p,transport=lambda _:pytest.fail('Automatic repeated recovery'),prefilter=False)
+        again,calls=R.run(p,transport=lambda _:pytest.fail('Automatic repeated recovery'),prefilter=False,**manual)
         assert again['summary']==result['summary'] and len(calls)==3
     assert ledger.snapshot()['calls']==5
 
@@ -254,3 +255,67 @@ def test_switch_bridge_is_whitelisted_and_rollback_does_not_reuse_new_prompt(mon
     monkeypatch.setenv('THESIS_SENTIMENT_TASKS','false')
     record['result']['prompt_version']=T.PROMPT
     assert not U.compatible(record,p)
+
+
+
+def sized(seen, *, fail_sizes):
+    """Tone answers fail only for batches of the given sizes; everything else passes."""
+    good=provider([])
+    def send(body):
+        data=json.loads(body['input'][1]['content'])
+        is_tone=body['input'][0]['content'] not in (T.EVENT_INSTRUCTION,) and 'candidate_pairs' not in data
+        seen.append(('tone' if is_tone else 'event',len(data['sources'])))
+        reply=good(body)
+        if is_tone and len(data['sources']) in fail_sizes:
+            text=json.loads(reply['output'][0]['content'][0]['text']);text['items'][0]['passages']=['invented']
+            reply['output'][0]['content'][0]['text']=json.dumps(text)
+        return reply
+    return send
+
+
+def test_failed_batch_is_retried_once_as_two_halves_and_the_reading_completes():
+    p=packet();seen=[]
+    with patch.object(B,'check_access'):
+        result,calls=R.run(p,transport=sized(seen,fail_sizes={4}),prefilter=False,auto_split=True)
+        assert seen[0]==('tone',4) and sorted(seen[1:3])==[('tone',2),('tone',2)]
+        assert len(result['items'])==4
+        [recovery]=result['tasks']['recovery']
+        assert recovery['automatic'] and recovery['task']=='tone' and len(recovery['child_keys'])==2
+        # The next reading reuses the halves; nothing is resent.
+        again,_=R.run(p,transport=lambda _:pytest.fail('Repeated paid request'),prefilter=False,auto_split=True)
+        assert again['summary']==result['summary']
+    assert ledger.snapshot()['calls']==len(seen)
+
+
+def test_a_failed_half_stops_and_is_never_retried_again():
+    p=packet();seen=[]
+    with patch.object(B,'check_access'):
+        with pytest.raises(ValueError):R.run(p,transport=sized(seen,fail_sizes={4,2}),prefilter=False,auto_split=True)
+        sent=list(seen)
+        assert sent[0]==('tone',4) and all(size==2 for _,size in sent[1:]) and 2<=len(sent)<=3
+        # Later automatic readings stay stopped: no second automatic retry is sent.
+        for _ in range(2):
+            with pytest.raises(ValueError):
+                R.run(p,transport=lambda _:pytest.fail('Second automatic retry'),prefilter=False,auto_split=True)
+        assert ledger.snapshot()['calls']==len(sent)
+        # An explicit owner retry remains available, as before.
+        with pytest.raises(ValueError):R.run(p,transport=sized(seen,fail_sizes={4,2}),prefilter=False,retry_failed=True,auto_split=True)
+        assert len(seen)>len(sent)
+
+
+def test_a_single_source_batch_is_not_split():
+    p=packet();p['sources']=p['sources'][:1];seen=[]
+    with patch.object(B,'check_access'):
+        with pytest.raises(ValueError):R.run(p,transport=sized(seen,fail_sizes={1}),prefilter=False,auto_split=True)
+    assert seen==[('tone',1)]
+
+
+def test_automatic_split_can_be_switched_off(monkeypatch):
+    monkeypatch.setenv('THESIS_SENTIMENT_AUTO_SPLIT','false')
+    assert not R.auto_split_enabled()
+    p=packet();seen=[]
+    with patch.object(B,'check_access'):
+        with pytest.raises(ValueError):R.run(p,transport=sized(seen,fail_sizes={4}),prefilter=False)
+    assert seen==[('tone',4)]
+    monkeypatch.delenv('THESIS_SENTIMENT_AUTO_SPLIT')
+    assert R.auto_split_enabled()
