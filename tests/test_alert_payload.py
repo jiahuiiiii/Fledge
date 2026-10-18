@@ -116,3 +116,18 @@ def test_earlier_sample_endpoint_needs_a_session_and_returns_the_same_sample(own
     assert body['previous_items'] == alert['previous_items'] and not body['withheld']
     assert len(body['previous_sources']) == len(alert['previous_sources'])
     assert client.get('/api/v1/research-alerts/' + str(uuid4()) + '/previous-sample', headers=headers).status_code == 404
+
+
+def test_company_page_details_only_its_own_alerts(owner):
+    from uuid import uuid4
+    from thesis.db import transaction
+    iid = published_alert(owner)
+    with transaction(owner) as c:
+        full = N.list_alerts(c, owner, previous=False)
+        own = N.list_alerts(c, owner, previous=False, detail_instrument=iid)
+        other = N.list_alerts(c, owner, previous=False, detail_instrument=str(uuid4()))
+    assert own == full
+    assert other == [dict(id=a["id"], instrument_id=a["instrument_id"], symbol=a["symbol"], name=a["name"],
+                          created_at=a["created_at"], review_action=a["review_action"], preview=a["preview"],
+                          status_only=True) for a in full]
+    assert not any(k in other[0] for k in ("payload", "sources", "withheld"))

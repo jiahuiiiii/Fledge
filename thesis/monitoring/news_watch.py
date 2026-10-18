@@ -411,15 +411,18 @@ def cited(sources, items, links=()):
     return [s for s in sources if s["id"] in wanted]
 
 
-def list_alerts(conn, owner, ids=None, *, previous=True):
+def list_alerts(conn, owner, ids=None, *, previous=True, detail_instrument=None):
     data = rows(
         conn,
         "SELECT a.*,i.symbol,i.name,r.action review_action FROM research_alerts a JOIN instruments i ON i.id=a.instrument_id LEFT JOIN research_alert_reviews r ON r.owner_id=a.owner_id AND r.alert_id=a.id WHERE a.owner_id=%s AND (%s::uuid[] IS NULL OR a.id=ANY(%s::uuid[])) ORDER BY a.created_at DESC,a.id DESC LIMIT 100",
         (owner, ids, ids),
     )
     result = []
+    # A company page details only its own alerts. Others need only their
+    # review status for the updates badge; no evidence is sent for them.
+    detailed = [a for a in data if detail_instrument is None or str(a["instrument_id"]) == str(detail_instrument)]
     # Consecutive alerts share readings; build each one once for this request.
-    wanted = list({str(a[k]) for a in data for k in ("current_id", "previous_id")})
+    wanted = list({str(a[k]) for a in detailed for k in ("current_id", "previous_id")})
     records = {str(r["id"]): r for r in rows(conn, "SELECT * FROM sentiment_analyses WHERE id=ANY(%s::uuid[])", (wanted,))} if wanted else {}
     presented = {}
 
@@ -430,6 +433,11 @@ def list_alerts(conn, owner, ids=None, *, previous=True):
         return presented[identity]
 
     for a in data:
+        if detail_instrument is not None and str(a["instrument_id"]) != str(detail_instrument):
+            result.append(dict(id=str(a["id"]), instrument_id=str(a["instrument_id"]), symbol=a["symbol"], name=a["name"],
+                               created_at=a["created_at"].isoformat(), review_action=a["review_action"],
+                               preview=a.get("preview", False), status_only=True))
+            continue
         visible = shown(a["current_id"])
         prior = shown(a["previous_id"])
         withheld = visible["withheld"] or prior["withheld"]
