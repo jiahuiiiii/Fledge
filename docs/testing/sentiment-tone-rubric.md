@@ -126,3 +126,11 @@ The owner did **not** accept that short Reddit replies should be judged without 
 The quality runner gains a separate **thread context** plan (`--thread-variant`) that sends the same saved discussion messages as the live app. The review-page evidence shown to the owner is unchanged, and earlier review-context plans keep their exact identity. Hard cases keep their fixed benchmark context.
 
 Still undecided: whether a large bullish trade such as a "yolo" position counts as positive; whether a company CEO criticising others is negative for the company or a neutral report; and what case 08 should be (mixed is not supported). Original owner labels remain unchanged. A separate private reference applies only the agreed rules to the nine cases they cover. Scores against it are same-set development results, not independent validation.
+
+### Thread-context result — 18 October 2026
+
+One approved run of version 4 with full saved thread context completed 56/56 requests for **US$0.5958425**, with no failures, repairs, retries or unresolved cost. Hard cases stayed at **4/6**. Agreement **fell to 22/50** against the original owner labels (from 24/50). Against the agreed-rules reference it is 31/50.
+
+The 19 cases that gained thread messages (11–22 supplied each) now match the owner only 3 times. The model marked 11 of them as unclear relevance, against 5 before, including four replies it previously matched. Reddit RSS does not say which message a reply answers. Given many unordered siblings, the model follows its rule not to infer reply structure from order and abstains. With only the topic, it assumed the reply answered the topic.
+
+**Conclusion:** extra discussion messages without the reply chain make short replies harder to place, not easier. This result does not support sending more unordered thread context. Options are a real reply chain (Reddit's official API, which needs owner setup) or an owner rule that replies in a thread about the company count as about the company unless they clearly discuss something else. Version 4 stays off; no further paid attempt is authorised by this run. Raw requests, responses and the ledger record are in `.local/live-tests/redesign-phase-5-20261018/thread-context-run1/`.
