@@ -1,8 +1,11 @@
 # Frozen sentiment quality campaign
 
-Prepared 17 October 2026 on `codex/redesign-phase-5`. **Approved revised test
-completed; owner accuracy check pending. Not installed or enabled.** This operator tool prepares the remaining phase5quality evidence;
-it supplies no owner labels or completed acceptance gate.
+Prepared 17 October 2026 on `codex/redesign-phase-5`; owner scoring completed
+18 October. **Quality gate failed: 24/50 exact matches (48%), below 40/50.**
+Relevance 38/50; tone 29/50; fixed hard cases 4/6 pass. All original answers and
+predictions are preserved. No new paid call, installation or activation.
+[Current result](../reviews/2026-10-18/owner-sentiment-quality.md).
+The dated records below retain their original checkpoint wording.
 
 ## Fixed inputs
 

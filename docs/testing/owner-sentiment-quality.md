@@ -1,7 +1,12 @@
 # Blind owner review for the sentiment redesign
 
-Prepared 17 October 2026 on `codex/redesign-phase-5`. This is the first phase 5
-step, not a completed quality result. No prompt, live route or app data changed.
+Prepared 17 October 2026 on `codex/redesign-phase-5`; owner review completed
+18 October. **50/50 labels received; exact agreement 24/50 (48%) fails the 40/50
+gate.** Relevance 38/50, tone 29/50; fixed hard cases 4/6 pass. All 50 review/AI
+evidence projections match, including 17 cases with saved context. 56 cached
+answers revalidate free; no new paid call or app-data change.
+[Current results and feedback](../reviews/2026-10-18/owner-sentiment-quality.md).
+The dated preparation/run records below retain their original checkpoint wording.
 
 `experiments/soclaas_replay/owner_quality_set.py` exports 50 permitted saved
 sources in a database-enforced read-only transaction. The fixed sample balances

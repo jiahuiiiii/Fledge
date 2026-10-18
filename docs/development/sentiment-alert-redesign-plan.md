@@ -1,6 +1,6 @@
 # Sentiment and alert redesign
 
-Plan dated 16–17 October 2026; status reconciled 17 October. This file contains the design, acceptance tests and a short status table. Dated work records belong in [reviews](../reviews/2026-10-17/); the earlier inline progress is preserved in [the archived plan](../archive/status/2026-10-17-sentiment-redesign-progress.md).
+Plan dated 16–17 October 2026; status reconciled 18 October. This file contains the design, acceptance tests and a short status table. Dated work records belong in `docs/reviews/YYYY-MM-DD/`; the earlier inline progress is preserved in [the archived plan](../archive/status/2026-10-17-sentiment-redesign-progress.md).
 
 ## 1. Problem and scope
 
@@ -12,7 +12,7 @@ Prioritize faster checks and price-move previews before optional recaps, ratings
 
 ## 2. Current status
 
-These are verified checkpoints, not live telemetry. Schema/mode observation: 17 October, 23:25 SGT. Core observation: 23:21 SGT.
+These are verified checkpoints, not live telemetry. Schema/mode observation: 17 October, 23:25 SGT. Core observation: 23:21 SGT. Owner-quality scoring: 18 October.
 
 | Phase | Implemented / installed | Acceptance remaining |
 | --- | --- | --- |
@@ -21,7 +21,7 @@ These are verified checkpoints, not live telemetry. Schema/mode observation: 17 
 | 2 — model choice | GPT-5.4 / mini approved and retained; no switch cost | 48-hour completion and full-day cost gates |
 | 3 — collection lanes | Code and schema installed; cadence off, passive metrics on | Baseline ends no earlier than 18 October 12:55:59 SGT; then three-day timing/denial comparison |
 | 4 — price moves | Price previews enabled; GPT-5.5 approved; 10/10 explainer citation cases pass | Resolve literal replay coverage wording; verify deployed source, awake-Mac coverage and five trading days of previews; new Telegram delivery not approved |
-| 5 — smaller tasks / routing | Prepared, off; schema 061–064 applied | Noise 2/18 = 11.11% fails ≤10%; owner labels 0/50 received; usefulness, cost and live routing gates |
+| 5 — smaller tasks / routing | Prepared, off; schema 061–064 applied; all 50 owner labels received | Exact agreement 24/50 = 48% fails ≥80%; hard cases 4/6 pass; noise 2/18 = 11.11% fails ≤10%; usefulness, cost and live routing gates |
 | 6 — discussion weighting | Optional, deferred | Decide only after first useful alert path works |
 
 Current named summary is **Price previews**: combined news/social watches plus price detection; fast lanes, smaller prompts, severity routing, daily records and new Telegram types remain off. Existing account preferences are unchanged.
@@ -137,7 +137,7 @@ Measure ten US trading days after phase 4's actual delivery starts. The aim is o
 
 Rollback criteria: completion below 90% on a full day, AI cost above US$6/day for two days, fewer than 70% of qualifying moves alerted or more not-useful than useful ratings over a week. Unknown denominators cannot pass; a read-only report does not automatically change configuration.
 
-The blind owner review is prepared and voluntarily deferred. It remains 0/50 received. Preserve it independently of AI predictions, browser storage and replay annotations. [Labelling workflow](../testing/owner-sentiment-quality.md).
+The blind owner review is complete: all 50 labels were supplied on 18 October. Exact agreement is 24/50 (48%), relevance 38/50 and tone 29/50; the owner-quality gate fails while the fixed hard-case gate remains 4/6. Preserve the original labels and denominator. Evidence/context matches all 50 AI inputs; disagreement includes interpretation/rubric differences and does not prove 26 model errors. Clarify short-excerpt and topic-context limits before any revision; these exposed labels cannot become an untouched holdout again. [Results](../reviews/2026-10-18/owner-sentiment-quality.md).
 
 ## 7. Notes for whoever implements this
 

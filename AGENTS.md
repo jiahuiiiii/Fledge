@@ -1,6 +1,6 @@
 # Fledge — implementation guide
 
-Updated 17 October 2026. Keep all Fledge work in this repository (`Thesis`), separate from Fork.
+Updated 18 October 2026. Keep all Fledge work in this repository (`Thesis`), separate from Fork.
 
 ## Read first
 
@@ -61,7 +61,7 @@ Latest core observation at 23:21 SGT: 43 completed, zero failed/stopped and two 
 
 Phase 5's approved purpose replay completed 172/172 snapshots over seven input dates. Noise is **2/18 messages (11.11%)**, failing the ≤10% target: zero of 11 immediate messages and two of seven recaps. Additional cost US$1.87638250; cumulative news-test cost US$4.31477125, no unresolved holds. Same-history assistant review is not owner ground truth or an all-alert/live result. Coverage/usefulness remains uncertain. [Results](docs/testing/news-noise-replay.md).
 
-Owner review remains **0/50 received** and is voluntarily deferred. Do not inspect browser storage, scan Downloads or supply labels. The local review page saves in the same browser; completion can be exported and later read from an owner-provided path on this Mac. No upload is necessary merely because labelling happens later. [Workflow](docs/testing/owner-sentiment-quality.md).
+Owner review **50/50 received on 18 October** from the supplied file path. Exact relevance-and-tone agreement is **24/50 (48%)**, failing the required 40/50; relevance 38/50, tone 29/50. Hard cases remain 4/6. All 50 review/AI evidence projections match, including 17 cases with saved context; 56 cached answers revalidate free. Preserve the labels and failed gate: disagreements include rubric/coverage ambiguity and are not automatically AI errors. Do not inspect browser storage, scan Downloads, supply labels or change them to match the AI. Raw exports stay private and ignored by Git. [Result and owner feedback](docs/reviews/2026-10-18/owner-sentiment-quality.md).
 
 ## Immediate priorities
 
@@ -99,6 +99,6 @@ Beginner mode rewords saved evidence without inferring new conclusions; Pro reta
 | Account / UI | [Managed login](docs/features/managed-login.md), [onboarding review](docs/reviews/2026-10-16/onboarding-friction-personas.md), [Beginner mode](docs/features/beginner-mode.md), [portfolio read](docs/features/portfolio-read.md) |
 | General history | [Documentation index](docs/README.md), [provenance](PROVENANCE.md), [archived checkpoints](docs/archive/status/2026-10-17-implementation-history.md) |
 
-## Latest maintenance — 17 October 2026
+## Latest maintenance — 18 October 2026
 
-Operations review separates automatic schema upgrades from feature activation, archives superseded status logs and adds startup-source evidence plus a read-only mode/idle report. No new migration, settings, paid test, saved research/preference change or restart. Verification and any later deliberate restart belong in the [dated operations review](docs/reviews/2026-10-17/redesign-operations.md).
+Owner quality is now measured and fails at 24/50 exact matches. Record short-excerpt limitations and the owner's dependence on topic context; do not tune against these exposed labels and then call them unseen validation. No paid call, research/preference/settings change or restart. [Quality review](docs/reviews/2026-10-18/owner-sentiment-quality.md). The earlier startup/automatic-schema cleanup remains in the [operations review](docs/reviews/2026-10-17/redesign-operations.md).
