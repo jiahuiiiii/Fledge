@@ -17,7 +17,7 @@ Earlier checkpoints are preserved in [implementation history](docs/archive/statu
 - Tests are offline and make no network calls. Use `LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 .venv/bin/python -m pytest -q tests/<file>.py`. Test databases are disposable; never point them at the live workspace.
 - Never edit an applied migration. Add a new numbered file when a schema change is required. Startup **automatically applies all pending migrations**; schema approval and feature activation are separate.
 - The owner has approved additive migrations for the redesign. This covers 065–067. They are approved for the next deliberate restart, not blocked by an approval guard. No further schema changes are introduced by the operations cleanup.
-- Keep work on `codex/redesign-phase-5`. Do not check out or restart from `main` while it lacks the applied schema files. Do not merge, push or open a PR without the owner's request. Preserve unrelated work.
+- Keep work on `feat/sentiment-analysis-redesign` (renamed from `codex/redesign-phase-5` on 18 October at the owner's request). Do not check out or restart from `main` while it lacks the applied schema files. Do not merge, push or open a PR without the owner's request. Preserve unrelated work.
 - Leave `frontend/src/styles/app.css` alone, including staging. It contains someone else's uncommitted edits. Leave `.claude/` alone.
 - The owner authorized continuing the full redesign without phase-boundary stops. Still obtain the explicit live choices below; do not mark incomplete acceptance gates done.
 
@@ -27,7 +27,7 @@ Read-only observation, 17 October at 23:25 SGT. Recheck before operating; this t
 
 | Area | Verified state |
 | --- | --- |
-| Branch | `codex/redesign-phase-5`, unmerged |
+| Branch | `feat/sentiment-analysis-redesign`, unmerged |
 | App | Running since 15:54:29 SGT; exact startup source fingerprint was not recorded |
 | Database | Schema 064; all applied file checksums match |
 | Next startup | Automatically applies approved 065–067 |

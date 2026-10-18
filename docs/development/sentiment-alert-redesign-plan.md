@@ -26,7 +26,7 @@ These are verified checkpoints, not live telemetry. Schema/mode observation: 17 
 
 Current named summary is **Price previews**: combined news/social watches plus price detection; fast lanes, smaller prompts, severity routing, daily records and new Telegram types remain off. Existing account preferences are unchanged.
 
-Schema **064** is applied with matching checksums. **065–067 are approved additive changes and will apply automatically on the next startup.** There is no migration-approval guard. Activation of new behavior is separate. Do not launch an older checkout missing applied migration files; remain on `codex/redesign-phase-5` until a merge is requested and completed.
+Schema **064** is applied with matching checksums. **065–067 are approved additive changes and will apply automatically on the next startup.** There is no migration-approval guard. Activation of new behavior is separate. Do not launch an older checkout missing applied migration files; remain on `feat/sentiment-analysis-redesign` until a merge is requested and completed.
 
 The running app started at 15:54:29 SGT without a startup fingerprint. `price-move-rules-2` predates that restart; later fixes do not. Exact running source remains unverified. The prepared [status tool](../../thesis/runtime_status.py) records source at the next app startup and compares it with disk thereafter; it adds no configuration switches.
 
