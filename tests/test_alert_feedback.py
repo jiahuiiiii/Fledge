@@ -24,7 +24,7 @@ def fresh_feedback(db,monkeypatch):
 @pytest.fixture
 def rating_bot(bot,monkeypatch):
     def transport(key,method,body):
-        if method=='answerCallbackQuery':bot.calls.append((method,body));return True
+        if method in ('answerCallbackQuery','editMessageReplyMarkup'):bot.calls.append((method,body));return True
         return bot(key,method,body)
     monkeypatch.setattr(HTTP,'call',transport)
     return bot
@@ -252,3 +252,60 @@ def test_failed_callback_acknowledgement_does_not_repeat_vote(owner,rating_bot,m
     U.receive(force=True);U.receive(force=True)
     with transaction(owner,consistent=True) as c:
         assert len(rows(c,'SELECT * FROM alert_feedback'))==1
+
+
+def edits(bot):
+    return [body for method,body in bot.calls if method=='editMessageReplyMarkup']
+
+
+def test_tap_shows_the_saved_choice_and_a_later_tap_can_change_it(owner,rating_bot):
+    delivery=sent_alert(owner,rating_bot)
+    rating_bot.updates=[callback(delivery)];U.receive(force=True)
+    shown=edits(rating_bot)[-1]
+    assert shown['chat_id']==987654 and shown['message_id']==delivery['message_id']
+    buttons=shown['reply_markup']['inline_keyboard'][0]
+    assert [b['text'] for b in buttons]==['✓ Useful','Not useful']
+    # The ticked buttons still carry the same choices, so the rating stays changeable.
+    original=rating_bot.sent[-1]['reply_markup']['inline_keyboard'][0]
+    assert [b['callback_data'] for b in buttons]==[b['callback_data'] for b in original]
+    rating_bot.updates=[callback(delivery,update_id=10,value='n')];U.receive(force=True)
+    assert [b['text'] for b in edits(rating_bot)[-1]['reply_markup']['inline_keyboard'][0]]==['Useful','✓ Not useful']
+    with transaction(owner,consistent=True) as c:
+        assert F.latest(c,owner,'idea',delivery['event_id'])['value']=='not_useful'
+
+
+def test_failed_button_edit_keeps_the_saved_vote(owner,bot,monkeypatch):
+    def transport(key,method,body):
+        if method=='editMessageReplyMarkup':raise HTTP.TelegramError('authored edit failure')
+        if method=='answerCallbackQuery':return True
+        return bot(key,method,body)
+    monkeypatch.setattr(HTTP,'call',transport)
+    delivery=sent_alert(owner,bot)
+    bot.updates=[callback(delivery)]
+    assert U.receive(force=True)
+    with transaction(owner,consistent=True) as c:
+        assert F.latest(c,owner,'idea',delivery['event_id'])['value']=='useful'
+
+
+def test_rejected_tap_does_not_change_the_buttons(owner,rating_bot):
+    delivery=sent_alert(owner,rating_bot);update=callback(delivery)
+    update['callback_query']['from'].update(id=99)
+    rating_bot.updates=[update];U.receive(force=True)
+    assert not edits(rating_bot)
+
+
+def test_taps_are_checked_again_within_two_seconds(owner,rating_bot):
+    delivery=sent_alert(owner,rating_bot)
+    rating_bot.updates=[callback(delivery)];U.receive(force=True)
+    with transaction(admin=True) as c:
+        state=one(c,'SELECT next_poll_at,now() AS checked FROM telegram_poll_state')
+    assert U.POLL_SECONDS<=2 and (state['next_poll_at']-state['checked']).total_seconds()<=2
+
+
+def test_digest_buttons_tick_each_items_latest_rating():
+    from thesis.monitoring import daily_telegram as D
+    delivery=dict(id=uuid4())
+    markup=D.keyboard(delivery,[dict(position=0),dict(position=1)],{0:'not_useful'})
+    assert [[b['text'] for b in row] for row in markup['inline_keyboard']]==[
+        ['1 · Useful','1 · ✓ Not useful'],['2 · Useful','2 · Not useful']]
+    assert D.keyboard(delivery,[dict(position=0)])['inline_keyboard'][0][0]['text']=='1 · Useful'

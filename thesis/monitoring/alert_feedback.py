@@ -36,14 +36,16 @@ def rate(owner,kind,event_id,value,*,source='app',request_key=None):
         return latest(conn,owner,kind,event_id)
 
 
-def keyboard(delivery,*,digest_items=None):
+def keyboard(delivery,*,digest_items=None,chosen=None):
+    """chosen is the latest rating (a position map for a digest); its button shows a tick."""
     if not enabled():return None
     if delivery['kind']=='digest':
         from .daily_telegram import keyboard as digest_keyboard
-        return digest_keyboard(delivery,digest_items)
+        return digest_keyboard(delivery,digest_items,chosen)
     if delivery['kind'] not in KINDS:return None
     token=UUID(str(delivery['id'])).hex
+    mark=lambda value:'✓ ' if chosen==value else ''
     return dict(inline_keyboard=[[
-        dict(text='Useful',callback_data='f:'+token+':u'),
-        dict(text='Not useful',callback_data='f:'+token+':n'),
+        dict(text=mark('useful')+'Useful',callback_data='f:'+token+':u'),
+        dict(text=mark('not_useful')+'Not useful',callback_data='f:'+token+':n'),
     ]])

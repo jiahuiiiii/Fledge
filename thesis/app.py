@@ -110,7 +110,6 @@ async def lifespan(app):
 
     def telegram_loop():
         from .monitoring.telegram import run_once
-        from .monitoring.telegram_updates import poll_feedback
         from .monitoring.alert_routing import poll_preview as preview_routes
         from .monitoring.daily_updates import poll as prepare_daily_updates
 
@@ -120,12 +119,24 @@ async def lifespan(app):
                     preview_routes(owner)
                     prepare_daily_updates(owner)
                     run_once(owner)
-                poll_feedback()
             except Exception:
                 # Do not log external transport URLs, tokens or private messages.
                 logging.getLogger("thesis").warning("Telegram delivery check failed")
 
     telegram_thread = threading.Thread(target=telegram_loop, daemon=True)
+
+    # Rating taps get their own quick loop so a slow send never delays a confirmation.
+    def feedback_loop():
+        from .monitoring.telegram_updates import poll_feedback, POLL_SECONDS
+
+        while not stop.wait(POLL_SECONDS):
+            try:
+                poll_feedback()
+            except Exception:
+                logging.getLogger("thesis").warning("Telegram rating check failed")
+
+    feedback_thread = threading.Thread(target=feedback_loop, daemon=True)
+    feedback_thread.start()
     telegram_thread.start()
     from .research import loading
     load_lease = loading.WorkerLease(auth.background_owners)
@@ -179,6 +190,7 @@ async def lifespan(app):
     filing_thread.join(timeout=5)
     review_thread.join(timeout=5)
     telegram_thread.join(timeout=5)
+    feedback_thread.join(timeout=5)
     for worker in load_threads:
         worker.join(timeout=1)
     load_lease.close()
