@@ -5,6 +5,11 @@ Prepared 17 October 2026 on `codex/redesign-phase-5`; owner scoring completed
 Relevance 38/50; tone 29/50; fixed hard cases 4/6 pass. All original answers and
 predictions are preserved. No new paid call, installation or activation.
 [Current result](../reviews/2026-10-18/owner-sentiment-quality.md).
+The separately approved rubric-2 development comparison on 18 October also scores
+24/50 (48%); hard cases are 3/6, down from the original 4/6. All 56 requests pass
+structural checks with no repairs/retries, costing US$0.47429 and no unresolved
+amount. Original labels/results remain unchanged; the candidate stays off.
+[Development comparison](../reviews/2026-10-18/sentiment-rubric-candidate.md).
 The dated records below retain their original checkpoint wording.
 
 ## Fixed inputs

@@ -75,6 +75,12 @@ It changes requests for genuinely fresh or explicitly reread sources; it does
 not rewrite historical labels, force a full-pool reread or claim reused items
 were evaluated under the new rubric. The legacy live prompt is unchanged.
 
+The explicitly approved 18 October comparison completed 56/56 requests for
+US$0.47429, with no failures, repairs, retries or unresolved cost. It did not
+improve owner agreement: **24/50 (48%)**, unchanged. Hard cases fell from 4/6 to
+**3/6**. Both reference sets stay unchanged; the candidate remains off.
+[Results and limits](../reviews/2026-10-18/sentiment-rubric-candidate.md).
+
 This uses the distinction between prompt examples and evaluations described in
 OpenAI's [prompt engineering](https://developers.openai.com/api/docs/guides/prompt-engineering)
 and [evaluation guidance](https://developers.openai.com/api/docs/guides/evaluation-best-practices).
