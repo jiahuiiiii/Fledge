@@ -139,9 +139,10 @@ def make_plan(manifest,owner_packets,hard_cases,*,thread_context='review',parent
         requests.append(dict(scope='hard6',id=case['id'],packet=packet,expected_tone=case['expected_tone'],benchmark=reference))
     for case in requests:
         case['body']=T.request_for('tone',case['packet'])
-        if case['body']['model']!=settings.OPENAI_REASONING_MODEL:
+        # The configured sentiment model: GPT-5.4 by default, or the owner's Luna choice.
+        if case['body']['model']!=settings.SENTIMENT_MODEL:
             raise ValueError('Quality evaluation retains the selected GPT-5.4 bulk model.')
-    plan=dict(policy=POLICY,owner_fingerprint=manifest['fingerprint'],model=settings.OPENAI_REASONING_MODEL,requests=requests)
+    plan=dict(policy=POLICY,owner_fingerprint=manifest['fingerprint'],model=settings.SENTIMENT_MODEL,requests=requests)
     if thread_context!='review':plan['thread_context']=thread_context  # earlier plans keep their exact fingerprint
     if parents is not None:
         if not set(parents)<=expected:raise ValueError('Unknown parent-check case.')

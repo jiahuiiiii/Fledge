@@ -148,3 +148,17 @@ Free rescoring of saved predictions (no new AI calls) against that reference:
 | Version 4, full thread context | 32/50 |
 
 Topic-only context is better than unordered full threads. These are same-set development results: the reference was revised after seeing model answers, so it cannot act as independent validation. A release claim still needs a fresh labelled set under these rules. The remaining open rules (large bullish trades, a CEO criticising others, case 08) cover several of the remaining differences.
+
+## Version 5: direction follows the watched company — 18 October 2026
+
+Live failure: a QCOM alert ("New adverse or mixed company reporting") rested on two Arm articles about a jury finding that Arm breached its licence with Qualcomm and disrupted Qualcomm's business. GPT-6 Luna with version 4 labelled both negative for QCOM, judging the article's subject rather than the watched company.
+
+Version 5 adds: "When an article's subject is another company, judge only the target's stated outcome: the other company's loss in a dispute with the target is not adverse to the target." Several phrases were shortened to stay within 6,000 characters (5,941). Two fictional mirrored development cases were added (`rival-loses-dispute` positive, `rival-wins-dispute` negative). A draft teaching snippet ("Jury finds Birch breached its licence with Aster → positive") was dropped after testing.
+
+| Check (GPT-6 Luna) | Result |
+| --- | --- |
+| The five live QCOM verdict articles | Arm-loses articles positive, Qualcomm-wins articles positive, hung jury neutral, in all three trial wordings (was negative) |
+| 50 owner cases, old instructions, two runs | 36/50 and 34/50; the runs disagree on 9 cases |
+| 50 owner cases, version 5 drafts | 33/50, 33/50, 32/50; final scoped wording 33/50, hard cases 4/6 |
+
+Repeated Luna runs vary by about two points, so the general cost of the rule is between none and about two points; the rival-dispute failure is fixed consistently. Hard case 01 (sarcastic praise of Meta's legal tactics) is wrong in some old-instruction runs and in GPT-5.4's, so its flips are not attributed to the rule. Spend: US$0.028 OpenAI through the ledger, US$0.079 OpenRouter, no unresolved amounts. Same-set development results, not an unseen holdout.
