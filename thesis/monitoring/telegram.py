@@ -38,6 +38,7 @@ def config(conn, owner):
 
 
 def status(owner):
+    from . import daily_telegram
     key = transport.token()
     with transaction(owner) as conn:
         cfg = config(conn, owner)
@@ -52,6 +53,8 @@ def status(owner):
                     chat_label=cfg.get("chat_label"), bot_username=cfg.get("bot_username"),
                     pending=bool(cfg.get("link_hash") and cfg["link_expires_at"] > clock()),
                     deliveries=history,
+                    daily_recaps_enabled=daily_telegram.enabled('digest'),
+                    cost_notices_enabled=str(owner)==str(daily_telegram.D.OWNER) and daily_telegram.enabled('cost'),
                     watches=one(conn, "SELECT count(*) AS n FROM news_watches WHERE owner_id=%s AND enabled", (owner,))["n"])
 
 
@@ -102,6 +105,11 @@ def check_connection(owner):
             return status(owner)
         if not cfg.get("link_hash") or cfg["link_expires_at"] <= clock() or cfg.get("bot_fingerprint") != fingerprint(key):
             raise ValueError("The connection link expired. Create a new link and press Start in Telegram.")
+        from . import alert_feedback
+        if alert_feedback.enabled():
+            from .telegram_updates import receive
+            receive(force=True)
+            return status(owner)
         updates = transport.call(key, "getUpdates", dict(offset=cfg["update_offset"], limit=100, timeout=5, allowed_updates=["message"]))
         if not isinstance(updates, list):
             raise ValueError("Telegram did not return connection updates. Try again.")
@@ -161,7 +169,10 @@ def test_message(owner):
     return status(owner)
 
 
-def event(conn, owner, kind, identity):
+def event(conn, owner, kind, identity,*,delivery_id=None):
+    if kind in {'digest','cost'}:
+        from .daily_telegram import record
+        return record(conn,owner,kind,identity,clock(),delivery_id=delivery_id)
     row = one(conn, review_digest.EVENTS + "SELECT * FROM events WHERE kind=%(kind)s AND id=%(id)s", dict(owner=owner, kind=kind, id=identity))
     if not row:
         return None
@@ -181,6 +192,7 @@ def event(conn, owner, kind, identity):
 
 
 def run_once(owner):
+    from . import telegram_stories as stories
     with serial(owner, wait=False) as acquired:
         if not acquired:
             return False
@@ -194,21 +206,49 @@ def run_once(owner):
             if not cfg.get("chat_id") or not key or cfg.get("bot_fingerprint") != fingerprint(key):
                 return False
             if cfg.get("enabled"):
+                from .move_watch import option
+                from . import alert_routing as routing
+                moves_enabled = str(option('THESIS_MOVE_TELEGRAM_ENABLED') or 'false').lower() in {'true','1','on'}
                 candidates = rows(conn, review_digest.EVENTS + """SELECT e.* FROM events e WHERE created_at>%(start)s AND created_at>%(fresh)s
+                  AND (e.kind<>'move' OR (%(moves_enabled)s AND EXISTS(SELECT 1 FROM move_events m WHERE m.owner_id=e.owner_id AND m.id=e.id AND NOT m.preview)))
+                  AND (e.kind<>'company' OR EXISTS(SELECT 1 FROM research_alerts a WHERE a.owner_id=e.owner_id AND a.id=e.id AND NOT a.preview AND (a.kind<>'important_reporting' OR %(routing_active)s)))
+                  AND (NOT %(routing_requested)s OR (e.created_at>=%(routing_start)s AND EXISTS(SELECT 1 FROM alert_routing_decisions r
+                    WHERE r.owner_id=e.owner_id AND r.kind=e.kind AND r.event_id=e.id AND NOT r.preview AND r.policy=%(routing_policy)s AND r.channel='telegram')))
                   AND NOT EXISTS(SELECT 1 FROM telegram_deliveries d WHERE d.owner_id=e.owner_id AND d.kind=e.kind AND d.event_id=e.id)
-                  ORDER BY created_at,id LIMIT 100""", dict(owner=owner, start=cfg["enabled_at"], fresh=now-timedelta(hours=24)))
+                  ORDER BY created_at,id LIMIT 100""", dict(owner=owner, start=cfg["enabled_at"], fresh=now-timedelta(hours=24), moves_enabled=moves_enabled,
+                    routing_active=routing.live_active(now),routing_requested=routing.live_requested(),routing_start=routing.live_start(),routing_policy=routing.LIVE_POLICY))
                 for item in candidates:
                     conn.execute("INSERT INTO telegram_deliveries(id,owner_id,kind,event_id,event_at) VALUES(%s,%s,%s,%s,%s) ON CONFLICT(owner_id,kind,event_id) DO NOTHING", (uuid4(), owner, item["kind"], item["id"], item["created_at"]))
+                from .daily_telegram import enqueue
+                enqueue(conn,owner,cfg,now)
             if cfg.get("next_send_at") and cfg["next_send_at"] > now:
                 return False
             job = one(conn, "SELECT * FROM telegram_deliveries WHERE owner_id=%s AND status='queued' AND (retry_at IS NULL OR retry_at<=%s) ORDER BY created_at,id LIMIT 1", (owner, now))
             if not job:
                 return False
-            why = None
+            why = None;defer=None;story_keys=set();guarded=stories.enabled(now)
             if job["event_at"] < now-timedelta(hours=24):
                 why = "Alert is older than 24 hours; review it in Updates."
             elif job["kind"] != "test" and not cfg["enabled"]:
                 why = "Telegram delivery is paused."
+            elif job['kind']=='move' and str(option('THESIS_MOVE_TELEGRAM_ENABLED') or 'false').lower() not in {'true','1','on'}:
+                why = 'New price-alert delivery is off. Review it in Updates.'
+            elif job['kind'] in {'digest','cost'}:
+                from . import daily_telegram
+                if not daily_telegram.enabled(job['kind'],now=now):
+                    why='Daily Telegram delivery is off. Review the saved update in Fledge.'
+                else:
+                    try:
+                        record=event(conn,owner,job['kind'],job['event_id'],delivery_id=job['id'])
+                        if not record:why='This daily update has no eligible evidence or is unavailable.'
+                        else:
+                            message=render(record)
+                            story_keys=record.get('_story_keys',set())
+                            guarded=guarded or record.get('_story_guarded',False)
+                    except stories.Deferred as exc:defer=exc.when
+                    except stories.Suppressed as exc:why=str(exc)
+                    except (ValueError,KeyError,TypeError,IndexError):
+                        why='This daily update could not be prepared safely. Review it in Fledge.'
             elif job["kind"] != "test":
                 try:
                     record = event(conn, owner, job["kind"], job["event_id"])
@@ -216,21 +256,45 @@ def run_once(owner):
                         why = "The saved idea changed or the original alert is unavailable."
                     elif record["detail"].get("withheld"):
                         why = "Source access changed; alert details were not forwarded."
+                    elif record['detail'].get('preview'):
+                        why = 'Preview alerts are kept in Updates and are never forwarded.'
                     else:
-                        message = render(record)
+                        from . import alert_routing as routing
+                        why = routing.delivery_reason(conn,owner,record,now=now)
+                        if not why:
+                            if guarded:
+                                record=stories.prepare(conn,owner,record,job['id'],now,immediate=True)
+                                shown=[];message=render(record,shown=shown)
+                                story_keys=stories.shown_keys(record,shown)
+                                if not story_keys:why='No eligible story evidence fits this message. Review the alert in Updates.'
+                            else:message = render(record)
+                except stories.Deferred as exc:defer=exc.when
+                except stories.Suppressed as exc:why=str(exc)
                 except (ValueError, KeyError, TypeError, IndexError):
                     why = "This alert could not be prepared safely. Review its evidence in Updates."
             else:
                 message = TEST_MESSAGE
+            if defer:
+                conn.execute('UPDATE telegram_deliveries SET retry_at=%s WHERE owner_id=%s AND id=%s',(defer,owner,job['id']))
+                return True
             if why:
                 conn.execute("UPDATE telegram_deliveries SET status='skipped',error=%s WHERE id=%s AND owner_id=%s", (why, job["id"], owner))
                 return True
             conn.execute("UPDATE telegram_deliveries SET status='sending',attempts=attempts+1,attempted_at=%s,retry_at=NULL,error=NULL WHERE id=%s AND owner_id=%s", (now, job["id"], owner))
+            if guarded:stories.save(conn,owner,job,story_keys,now)
+            if job['kind']=='digest':
+                from .daily_telegram import save_shown
+                from .alert_feedback import keyboard
+                markup=keyboard(job,digest_items=record['detail']['shown'])
+                if markup:save_shown(conn,owner,job,record)
             conn.execute("UPDATE telegram_settings SET next_send_at=%s WHERE owner_id=%s", (now+timedelta(seconds=5), owner))
         # Intent is committed, while serial() still fences pause/disconnect and
         # other workers. No message body or destination is stored in the outbox.
         try:
-            result = transport.call(key, "sendMessage", dict(chat_id=cfg["chat_id"], text=message, parse_mode="HTML", link_preview_options=dict(is_disabled=True), protect_content=True, allow_paid_broadcast=False))
+            from .alert_feedback import keyboard
+            if job['kind']!='digest':markup=keyboard(job)
+            result = transport.call(key, "sendMessage", dict(chat_id=cfg["chat_id"], text=message, parse_mode="HTML", link_preview_options=dict(is_disabled=True), protect_content=True, allow_paid_broadcast=False,
+                **({'reply_markup':markup} if markup else {})))
             if not isinstance(result, dict) or type(result.get("message_id")) is not int or result.get("chat", {}).get("id") != cfg["chat_id"]:
                 raise transport.TelegramError("uncertain", "Telegram did not confirm delivery. Check your chat; no automatic retry.")
         except Exception as exc:

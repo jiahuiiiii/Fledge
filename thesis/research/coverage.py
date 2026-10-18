@@ -3,6 +3,7 @@
 import hashlib
 import re
 from datetime import datetime
+from urllib.parse import urlsplit
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -43,6 +44,18 @@ def change_for_review(link):
         and not link.get("repeat_suppression_allowed")
         and link.get("review_note") in {NUMERIC_CHANGE, STATUS_CHANGE}
     )
+
+
+def article_key(source):
+    """One delivery identity per Google News article URL.
+
+    Google News text is a rotating list of other outlets' headlines, so each
+    hourly check can save a new version of the same article. Its URL is stable.
+    """
+    url = source.get("url") or ""
+    if source.get("channel") == "news" and urlsplit(url).hostname == "news.google.com":
+        return "article:" + hashlib.sha256(url.encode()).hexdigest()
+    return None
 
 
 def text_key(source):
@@ -209,6 +222,8 @@ def keys(analysis, source):
         .startswith("sentiment-coverage-")
         else {text_key(source), "content:" + source["content_hash"]}
     )
+    if article_key(source):
+        result.add(article_key(source))
     current, visited = source["id"], set()
     while current not in visited:
         visited.add(current)
@@ -224,8 +239,10 @@ def keys(analysis, source):
 
 def observed_keys(analysis, source):
     if analysis["result"].get("summary_policy", "").startswith("sentiment-coverage-"):
-        return {"content:" + source["content_hash"]}
-    return {text_key(source), "content:" + source["content_hash"]}
+        result = {"content:" + source["content_hash"]}
+    else:
+        result = {text_key(source), "content:" + source["content_hash"]}
+    return result | ({article_key(source)} if article_key(source) else set())
 
 
 def group_keys(sources, links):

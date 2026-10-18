@@ -9,6 +9,7 @@ KEEP = {
     "source_request_clock", "market_request_clock", "price_history_clock",
     "hn_request_clock", "reddit_request_clock", "provider_clocks", "analyst_target_clock", "social_refresh_lock",
     "company_directory", "workspace_settings", "demo_state",
+    "reference_instruments",
 }
 
 

@@ -21,19 +21,28 @@ LABELS = {
     "not_applicable": "No clear company development",
 }
 
-def render(value, source, relevance):
+def render(value, source, relevance, *, repairs=None):
     if value is None:
         raise ValueError("News reporting evidence is missing.")
+    own = {p["id"]: p["quote"] for p in source["passages"]}
+    if len(set(value.passages)) != len(value.passages) or any(p not in own for p in value.passages):
+        raise ValueError("Reporting passages must belong to the original report.")
     eligible = value.kind in {"reported_event", "unconfirmed_event"}
+    if repairs is not None and (
+        bool(value.passages) != eligible
+        or (not eligible and value.impact != "not_stated")
+        or (eligible and relevance != "relevant")
+    ):
+        repairs.append("event_fields_inconsistent")
+        value = Evidence(kind="insufficient_detail" if relevance == "relevant" else "not_applicable",
+                         impact="not_stated", passages=[])
+        eligible = False
     if bool(value.passages) != eligible:
         raise ValueError("Only a specific reported or unconfirmed event has reporting passages.")
     if not eligible and value.impact != "not_stated":
         raise ValueError("Non-events cannot carry a reported event impact.")
     if eligible and relevance != "relevant":
         raise ValueError("Reporting evidence must concern the selected company.")
-    own = {p["id"]: p["quote"] for p in source["passages"]}
-    if len(set(value.passages)) != len(value.passages) or any(p not in own for p in value.passages):
-        raise ValueError("Reporting passages must belong to the original report.")
     return dict(policy=POLICY, kind=value.kind, impact=value.impact, eligible=eligible, label=LABELS[value.kind], citations=[dict(source_id=source["id"], passage_id=p, quote=own[p]) for p in value.passages])
 
 def eligible(item):

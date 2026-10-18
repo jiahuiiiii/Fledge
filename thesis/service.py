@@ -671,7 +671,7 @@ def state(owner, instrument_id=INSTRUMENT, *, include_financials=True):
         from .research.proposals import list_for as proposals_for
         from .research import sentiment, social, idea_alerts, sentiment_inputs
         from .research import question_library, source_hub
-        from .monitoring import news_watch, filing_watch, review_schedule
+        from .monitoring import news_watch, filing_watch, review_schedule, watch_lanes
 
         # The response is one explicit source scope; all downstream paths use this set.
         return dict(
@@ -685,11 +685,7 @@ def state(owner, instrument_id=INSTRUMENT, *, include_financials=True):
             ),
             social_status=social.status(conn, instrument_id),
             provider_status=source_hub.status(conn, instrument_id),
-            news_watch=one(
-                conn,
-                "SELECT enabled,interval_minutes,next_check_at,last_check_at,error,match_idea,event_version_id,include_context,idea_purpose FROM news_watches WHERE owner_id=%s AND instrument_id=%s",
-                (owner, instrument_id),
-            ),
+            news_watch=watch_lanes.present(conn, owner, instrument_id),
             research_alerts=news_watch.list_alerts(conn, owner),
             idea_alerts=idea_alerts.list_for(conn, owner),
             idea_watch_state=one(
@@ -1089,10 +1085,11 @@ def catalogue(conn, owner):
       EXISTS(SELECT 1 FROM watchlist_companies w WHERE w.owner_id=%s AND w.instrument_id=i.id) watchlisted,
       ((SELECT count(*) FROM change_events c JOIN thesis_versions cv ON cv.id=c.version_id LEFT JOIN review_events r ON r.evaluation_id=c.evaluation_id AND r.owner_id=c.owner_id WHERE c.owner_id=%s AND cv.thesis_id=t.id AND r.id IS NULL)
        + (SELECT count(*) FROM research_alerts a LEFT JOIN research_alert_reviews r ON r.alert_id=a.id AND r.owner_id=a.owner_id WHERE a.owner_id=%s AND a.instrument_id=i.id AND r.alert_id IS NULL)
-       + (SELECT count(*) FROM idea_alert_checks a JOIN idea_alert_publications p ON p.check_id=a.id AND p.owner_id=a.owner_id LEFT JOIN idea_alert_reviews r ON r.check_id=a.id AND r.owner_id=a.owner_id WHERE a.owner_id=%s AND a.instrument_id=i.id AND r.check_id IS NULL)) unread
+       + (SELECT count(*) FROM idea_alert_checks a JOIN idea_alert_publications p ON p.check_id=a.id AND p.owner_id=a.owner_id LEFT JOIN idea_alert_reviews r ON r.check_id=a.id AND r.owner_id=a.owner_id WHERE a.owner_id=%s AND a.instrument_id=i.id AND r.check_id IS NULL)
+       + (SELECT count(*) FROM move_event_members m LEFT JOIN move_event_reviews r ON r.event_id=m.event_id AND r.owner_id=m.owner_id WHERE m.owner_id=%s AND m.instrument_id=i.id AND r.event_id IS NULL)) unread
       FROM instruments i JOIN instrument_state s ON s.instrument_id=i.id LEFT JOIN theses t ON t.instrument_id=i.id AND t.owner_id=%s
       LEFT JOIN thesis_versions v ON v.thesis_id=t.id AND v.owner_id=t.owner_id AND v.revision=t.revision ORDER BY i.symbol""",
-        (owner, owner, owner, owner, owner),
+        (owner, owner, owner, owner, owner, owner),
     )
 
 

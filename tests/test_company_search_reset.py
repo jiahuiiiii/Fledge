@@ -73,9 +73,12 @@ def test_fresh_workspace_stays_empty_after_restart_and_keeps_ledger(directory_st
     with transaction(admin=True) as conn:
         conn.execute("INSERT INTO model_calls(id,request_key,request_hash,purpose,model,price_version,request_body,reserved_nano_usd,status,charged_nano_usd,owner_id) VALUES(gen_random_uuid(),'reset-accounting-test','test','test','test','test','{}',1000,'settled',750,%s)", (owner,))
         before = accounting_hash(conn)
+        references = rows(conn,'SELECT * FROM reference_instruments ORDER BY symbol')
         result = clear_research(conn)
         assert result["cleared"]["instruments"] > 0
         assert accounting_hash(conn) == before
+        assert rows(conn,'SELECT * FROM reference_instruments ORDER BY symbol') == references
+        assert len(references) == 3
     seed()
     assert service.state(owner)["empty"]
     assert service.state(owner, "4780d271-7c4a-5c18-80f8-74e164c21675")["empty"]

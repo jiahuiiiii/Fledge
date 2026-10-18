@@ -7,6 +7,7 @@ import { stamp } from "./MarketResearch";
 import ScheduledReviews from "./ScheduledReviews";
 import IdeaAlertChecks from "./IdeaAlertChecks";
 import { ResearchAlerts } from "./SentimentPanel";
+import MoveAlertCard from "./MoveAlertCard";
 const statusName = (value) =>
   ({ reviewed: "Reviewed", unresolved: "Left unresolved" })[value] ||
   "Awaiting review";
@@ -79,9 +80,11 @@ export default function ReviewDigest({
     setBusy(true);
     setError("");
     try {
-      await (kind === "idea"
-        ? api.reviewIdeaAlert(id, action)
-        : api.reviewAlert(id, action));
+      await (kind === "move"
+        ? api.reviewMoveAlert(id, action)
+        : kind === "idea"
+          ? api.reviewIdeaAlert(id, action)
+          : api.reviewAlert(id, action));
       refreshReview();
     } catch (e) {
       setError(e.message);
@@ -382,7 +385,9 @@ export default function ReviewDigest({
                         ? "Saved reasoning"
                         : record.kind === "company"
                           ? "News and sentiment"
-                          : "Condition assessment"}
+                          : record.kind === "move"
+                            ? "Price move"
+                            : "Condition assessment"}
                     </strong>
                     <time>{stamp(record.created_at)}</time>
                   </div>
@@ -422,9 +427,21 @@ export default function ReviewDigest({
                         Inspect this{" "}
                         {record.kind === "idea"
                           ? "reasoning check"
-                          : "company alert"}
+                          : record.kind === "move"
+                            ? "price move"
+                            : "company alert"}
                       </summary>
-                      {record.kind === "idea" ? (
+                      {record.kind === "move" ? (
+                        <MoveAlertCard
+                          alert={record.detail}
+                          busy={busy}
+                          readOnly={!!savedId}
+                          onOpen={onOpen}
+                          onReview={(id, action) =>
+                            acknowledge("move", id, action)
+                          }
+                        />
+                      ) : record.kind === "idea" ? (
                         <IdeaAlertChecks
                           readOnly={!!savedId}
                           checks={[record.detail]}

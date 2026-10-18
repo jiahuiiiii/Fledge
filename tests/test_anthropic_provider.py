@@ -113,7 +113,8 @@ def test_truncated_or_refused_answers_are_incomplete():
     assert refused["status"] == "incomplete" and refused["output"] == []
 
 
-def test_too_large_grammar_is_resent_once_with_instruction_json(monkeypatch):
+@pytest.mark.parametrize("reason", ["grammar is too large", "Schema is too complex for compilation."])
+def test_too_large_grammar_is_resent_once_with_instruction_json(monkeypatch, reason):
     import anthropic
     import httpx2
 
@@ -123,7 +124,7 @@ def test_too_large_grammar_is_resent_once_with_instruction_json(monkeypatch):
         request = httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
         response = httpx2.Response(400, request=request)
         return anthropic.BadRequestError(
-            "The compiled grammar is too large, which would cause performance issues.",
+            reason,
             response=response, body=None)
 
     class Messages:
@@ -164,3 +165,125 @@ def test_too_large_grammar_is_resent_once_with_instruction_json(monkeypatch):
     with pytest.raises(A.ProviderFailure, match="http_400"):
         A.send(body(name="other_format"), "call-3")
     assert len(sent) == 1
+
+
+def sentiment_case():
+    from test_sentiment_reliability import sample, answer
+    from thesis.research import sentiment
+    packet = sample()
+    request = sentiment.request_for(packet)
+    request["model"] = "claude-haiku-5-5"
+    raw = json.loads(sentiment.response_text(answer(packet)))
+    return packet, request, raw
+
+
+def wire_answer(raw, layout):
+    from copy import deepcopy
+    value = deepcopy(raw)
+    items = {}
+    for item in value["items"]:
+        key = item.pop("id")
+        for claim in item.get("price_claims", []):
+            if claim["direction_text"] is None:
+                claim["direction_text"] = ""
+        reporting = item.get("reporting")
+        if reporting and reporting["kind"] in A.NON_EVENT_KINDS and reporting["passages"] == []:
+            reporting.pop("passages")
+        items[key] = item
+    links = {k: None for k in layout["links"]}
+    for link in value["coverage_links"]:
+        links[link.pop("item_id")] = link
+    return dict(items=items, coverage_links=links)
+
+
+def test_fixed_source_slots_preserve_request_and_prevent_wrong_channel_fields():
+    from copy import deepcopy
+    packet, request, raw = sentiment_case()
+    before = deepcopy(request)
+    params, structured = A.to_messages(request)
+    assert request == before and structured
+    schema, layout = A.sentiment_schema(request)
+    assert layout["items"] == [s["label"] for s in packet["sources"]]
+    assert schema["properties"]["items"]["required"] == layout["items"]
+    for source in packet["sources"]:
+        slot = schema["properties"]["items"]["properties"][source["label"]]
+        slot = schema["$defs"][slot["$ref"].split("/")[-1]]
+        assert slot["additionalProperties"] is False and "id" not in slot["properties"]
+        if source["channel"] == "social":
+            assert "reporting" not in slot["properties"]
+        else:
+            event, non_event = slot["properties"]["reporting"]["anyOf"]
+            assert "passages" in event["required"]
+            assert "passages" not in non_event["properties"]
+            assert non_event["properties"]["impact"]["enum"] == ["not_stated"]
+    assert A.union_fields(params["output_config"]["format"]["schema"]) <= A.MAX_UNION_FIELDS
+    assert len(json.dumps(schema)) < len(json.dumps(request["text"]["format"]["schema"])) / 2
+
+
+def test_keyed_transport_round_trip_preserves_labels_links_prices_and_raw_provider_text():
+    from thesis.research import sentiment
+    packet, request, raw = sentiment_case()
+    social = next(i for i,s in zip(raw["items"],packet["sources"]) if s["channel"] == "social")
+    social["price_claims"] = [dict(passage_id="p1", amount_text="$42", kind="other", direction_text=None)]
+    news = next(i for i,s in zip(raw["items"],packet["sources"]) if s["channel"] == "news")
+    news["reporting"] = dict(kind="opinion_only", impact="not_stated", passages=[])
+    _, layout = A.sentiment_schema(request)
+    link_key = layout["links"][0]
+    raw["coverage_links"] = [dict(item_id=link_key, reference_id="item_1", relation="adds_detail",
+                                 explanation="Authored relation", item_passages=["p1"], reference_passages=["p1"])]
+    text = json.dumps(wire_answer(raw, layout))
+    translated = A.from_message(message(text,model="claude-haiku-5-5"), True, layout=layout)
+    assert json.loads(sentiment.response_text(dict(response_body=translated))) == raw
+    assert translated["wire_text"] == text and translated["wire_format"] == A.SENTIMENT_WIRE
+    assert translated["usage"]["output_tokens"] == 500  # Never recalculate usage from converted text.
+
+
+@pytest.mark.parametrize("fault", ["missing", "unknown", "id_inside", "link_unknown", "broken", "event_missing_passages"])
+def test_keyed_decoder_does_not_repair_structural_failures(fault):
+    from thesis.research import sentiment
+    packet, request, raw = sentiment_case()
+    _, layout = A.sentiment_schema(request)
+    wire = wire_answer(raw,layout)
+    first = layout["items"][0]
+    if fault == "missing": wire["items"].pop(first)
+    if fault == "unknown": wire["items"]["invented"] = wire["items"].pop(first)
+    if fault == "id_inside": wire["items"][first]["id"] = "invented"
+    if fault == "link_unknown": wire["coverage_links"]["invented"] = None
+    if fault == "event_missing_passages":
+        wire["items"][first]["reporting"] = dict(kind="reported_event",impact="adverse")
+    text = "{" if fault == "broken" else json.dumps(wire)
+    translated = A.from_message(message(text),True,layout=layout)
+    assert translated["status"] == "completed"  # A paid invalid response remains settled, not an uncertain charge.
+    with pytest.raises(ValueError): sentiment.render(dict(response_body=translated),packet)
+
+
+def test_keyed_decoder_keeps_fabricated_evidence_for_the_real_validator_to_reject():
+    from thesis.research import sentiment
+    packet, request, raw = sentiment_case()
+    raw["items"][0]["passages"] = ["invented"]
+    _, layout=A.sentiment_schema(request)
+    text=json.dumps(wire_answer(raw,layout))
+    translated=A.from_message(message(text),True,layout=layout)
+    with pytest.raises(ValueError,match="original source"):
+        sentiment.render(dict(response_body=translated),packet)
+
+
+def test_grammar_failure_cache_is_specific_to_model_and_schema(monkeypatch):
+    import hashlib
+    import anthropic
+    _, request, _ = sentiment_case()
+    schema,_=A.sentiment_schema(request)
+    digest=hashlib.sha256(json.dumps(anthropic.transform_schema(schema),sort_keys=True).encode()).hexdigest()
+    monkeypatch.setattr(A,"GRAMMAR_TOO_LARGE",{(request["model"],digest)})
+    assert not A.to_messages(request)[1]
+    assert A.to_messages(dict(request,model="claude-sonnet-5-5"))[1]
+    changed=json.loads(json.dumps(request))
+    changed["text"]["format"]["schema"]["properties"]["items"]["items"]["anyOf"][0]["properties"]["topic"]["enum"] = ["general"]
+    assert A.to_messages(changed)[1]
+
+
+def test_phase_one_rollback_keeps_the_legacy_anthropic_wire(monkeypatch):
+    _, request, _ = sentiment_case()
+    monkeypatch.setenv("THESIS_SENTIMENT_RELIABILITY","false")
+    schema,layout=A.sentiment_schema(request)
+    assert layout is None and schema == request["text"]["format"]["schema"]

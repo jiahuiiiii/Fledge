@@ -149,9 +149,12 @@ def replies(raw, post, now, days):
     return result,removed
 
 
-def refresh(iid, *, lookback_days=7, fetcher=None, now=None, collector=None):
+def refresh(iid, *, lookback_days=7, fetcher=None, now=None, collector=None, incremental=None):
     from thesis.providers.settings import settings
     from . import reddit_html, reddit_rss
+    if incremental is None:
+        from thesis.monitoring.watch_lanes import enabled
+        incremental = enabled()
     collector = collector or ('public' if fetcher else 'html' if settings().get('THESIS_REDDIT_HTML_ENABLED') == 'true' else 'rss')
     if collector not in ('public', 'html', 'rss'):
         raise ValueError('Choose the RSS, public feed or public HTML collector.')
@@ -189,7 +192,7 @@ def refresh(iid, *, lookback_days=7, fetcher=None, now=None, collector=None):
     rss_result=None
     try:
         if collector == 'rss':
-            rss_result=reddit_rss.collect(company,lookback_days,enabled,now,fetcher,cache_only=cache_only)
+            rss_result=reddit_rss.collect(company,lookback_days,enabled,now,fetcher,cache_only=cache_only,incremental=incremental)
             posts,comments,removed=[rss_result[k] for k in ('posts','comments','removed')]
             excluded,discovered,error=[rss_result[k] for k in ('excluded','discovered','error')]
         else:

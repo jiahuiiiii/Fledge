@@ -35,6 +35,11 @@ def session_token():
 
 @asynccontextmanager
 async def lifespan(app):
+    from .runtime_status import record_start
+    try:
+        record_start()
+    except OSError:
+        logging.getLogger('thesis').warning('Startup source record unavailable; running version is unverified.')
     stop = threading.Event()
 
     def loop():
@@ -48,21 +53,34 @@ async def lifespan(app):
     thread = threading.Thread(target=loop, daemon=True)
     thread.start()
 
-    def watch_loop():
+    def watch_loop(lane=None):
         from .monitoring.news_watch import run_once
 
         while not stop.wait(5):
             try:
                 for owner in auth.background_owners():
-                    run_once(owner)
+                    run_once(owner, lane=lane)
             except Exception:
                 logging.getLogger("thesis").exception("Local research watch failed")
 
     # Two workers: different companies' scheduled checks no longer queue behind
     # each other. Each claims a different watch through its lease.
     watch_threads = [threading.Thread(target=watch_loop, daemon=True) for _ in range(2)]
+    watch_threads += [threading.Thread(target=watch_loop, args=("fast",), daemon=True) for _ in range(2)]
     for watch_thread in watch_threads:
         watch_thread.start()
+
+    def move_loop():
+        from .monitoring.move_watch import run_once
+        while not stop.wait(5):
+            try:
+                for owner in auth.background_owners():
+                    run_once(owner)
+            except Exception:
+                logging.getLogger("thesis").warning("Price preview check failed")
+
+    move_thread = threading.Thread(target=move_loop, daemon=True)
+    move_thread.start()
 
     def filing_loop():
         from .monitoring.filing_watch import run_once
@@ -92,11 +110,17 @@ async def lifespan(app):
 
     def telegram_loop():
         from .monitoring.telegram import run_once
+        from .monitoring.telegram_updates import poll_feedback
+        from .monitoring.alert_routing import poll_preview as preview_routes
+        from .monitoring.daily_updates import poll as prepare_daily_updates
 
         while not stop.wait(5):
             try:
                 for owner in auth.background_owners():
+                    preview_routes(owner)
+                    prepare_daily_updates(owner)
                     run_once(owner)
+                poll_feedback()
             except Exception:
                 # Do not log external transport URLs, tokens or private messages.
                 logging.getLogger("thesis").warning("Telegram delivery check failed")
@@ -151,6 +175,7 @@ async def lifespan(app):
     thread.join(timeout=5)
     for watch_thread in watch_threads:
         watch_thread.join(timeout=5)
+    move_thread.join(timeout=5)
     filing_thread.join(timeout=5)
     review_thread.join(timeout=5)
     telegram_thread.join(timeout=5)
@@ -915,6 +940,54 @@ def review_research_alert(alert_id: UUID, payload: ReviewAction):
     return {"result": review(auth.current_owner(), str(alert_id), payload.action)}
 
 
+@app.post("/api/v1/move-alerts/{alert_id}/review")
+def review_move_alert(alert_id: UUID, payload: ReviewAction):
+    from .monitoring.move_alerts import review
+    return {"result": review(auth.current_owner(), str(alert_id), payload.action)}
+
+
+class AlertRating(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    value: Literal["useful", "not_useful"]
+
+
+@app.get('/api/v1/daily-updates')
+def daily_update_history():
+    from .monitoring.daily_updates import history
+    return {'result':history(auth.current_owner())}
+
+
+@app.get('/api/v1/daily-updates/{digest_id}')
+def daily_update_detail(digest_id:UUID,page:int=0):
+    from .monitoring.daily_updates import read
+    return {'result':read(auth.current_owner(),str(digest_id),page=page)}
+
+
+@app.post("/api/v1/alerts/{kind}/{alert_id}/rating")
+def rate_saved_alert(kind: str, alert_id: UUID, payload: AlertRating):
+    from .monitoring.alert_feedback import rate
+    return {"result": rate(auth.current_owner(),kind,str(alert_id),payload.value)}
+
+
+class SectorReferenceSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    symbol: str | None
+
+
+@app.get("/api/v1/companies/{instrument_id}/price-references")
+def price_references(instrument_id: UUID):
+    from .db import transaction
+    from .research.reference_prices import present
+    with transaction(auth.current_owner(), consistent=True) as conn:
+        return {"result": present(conn, auth.current_owner(), str(instrument_id))}
+
+
+@app.post("/api/v1/companies/{instrument_id}/price-references")
+def change_price_reference(instrument_id: UUID, payload: SectorReferenceSettings):
+    from .research.reference_prices import set_sector
+    return {"result": set_sector(auth.current_owner(), str(instrument_id), payload.symbol)}
+
+
 class EventWatchSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     version_id: UUID | None
@@ -1337,6 +1410,8 @@ class ResearchLoadSettings(BaseModel):
     initial: bool = False
     analyze: bool = False
     lookback_days: Literal[1, 7, 30] = 7
+    reread: bool = False
+    split_failed: bool = False
 
 
 @app.get("/api/v1/companies/{instrument_id}/loading")

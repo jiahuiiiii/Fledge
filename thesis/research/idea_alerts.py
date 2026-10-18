@@ -178,6 +178,7 @@ def start(conn, owner, iid, analysis, purpose="reasoning"):
 
 
 def active_watch(conn, owner, iid, token, purpose=None):
+    from thesis.monitoring.watch_lanes import active
     watch = one(
         conn,
         "SELECT * FROM news_watches WHERE owner_id=%s AND instrument_id=%s FOR UPDATE",
@@ -188,14 +189,7 @@ def active_watch(conn, owner, iid, token, purpose=None):
         and watch["enabled"]
         and watch["match_idea"]
         and (purpose is None or watch["idea_purpose"] == purpose)
-        and (token is None or watch["claim_token"] == token)
-        and (
-            token is None
-            or (
-                watch["lease_until"]
-                and watch["lease_until"] > datetime.now(timezone.utc)
-            )
-        )
+        and active(conn, owner, iid, token, datetime.now(timezone.utc), watch=watch)
     )
 
 

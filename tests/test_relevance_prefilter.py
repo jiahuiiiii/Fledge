@@ -155,7 +155,8 @@ def test_generate_saves_quick_check_and_reuses_earlier_full_reading(owner, monke
          patch.object(S, "present", side_effect=lambda c, r: r):
         transport, seen = quick({changed["label"]: "unrelated"})
         row = S.generate(iid, transport=transport)
-    assert row["request_key"].endswith(":" + R.POLICY)
+    from thesis.research.sentiment_reliability import POLICY as REPAIR_POLICY
+    assert row["request_key"].endswith(":" + R.POLICY + ":" + REPAIR_POLICY)
     assert row["result"]["prefilter"]["skipped"] == 1
     assert row["result"]["source_reuse"]["reused"] == len(p2["sources"]) - 1
     assert seen == dict(quick=1, full=0, full_labels=[])

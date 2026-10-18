@@ -7,6 +7,7 @@ import "./styles/app.css";
 import "./components/ContentFirstLayout.css";
 import "./components/ReadingFlow.css";
 import "./styles/mobile.css";
+import "./styles/header.css";
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     {["/terms", "/privacy"].includes(location.pathname) ? (

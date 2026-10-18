@@ -11,22 +11,26 @@ from uuid import UUID
 from .db import transaction, one, rows
 from . import service
 from .research import idea_alerts, sentiment, social
-from .monitoring import news_watch
+from .monitoring import news_watch, watch_lanes
 
 PAGE_SIZE = 20
 # Owner predicates supplement forced RLS. UNION ALL keeps distinct alert kinds.
 EVENTS = """WITH events AS (
- SELECT c.id,c.owner_id,t.instrument_id,c.version_id,c.created_at,'condition'::text kind,r.action review_action,r.created_at review_at
+ SELECT c.id,c.owner_id,t.instrument_id,c.version_id,c.created_at,'condition'::text kind,r.action review_action,r.created_at review_at,ARRAY[t.instrument_id] company_ids
  FROM change_events c JOIN thesis_versions v ON v.id=c.version_id AND v.owner_id=c.owner_id
  JOIN theses t ON t.id=v.thesis_id AND t.owner_id=v.owner_id
  LEFT JOIN review_events r ON r.owner_id=c.owner_id AND r.evaluation_id=c.evaluation_id WHERE c.owner_id=%(owner)s
  UNION ALL
- SELECT a.id,a.owner_id,a.instrument_id,a.version_id,a.created_at,'company',r.action,r.created_at
+ SELECT a.id,a.owner_id,a.instrument_id,a.version_id,a.created_at,'company',r.action,r.created_at,ARRAY[a.instrument_id]
  FROM research_alerts a LEFT JOIN research_alert_reviews r ON r.owner_id=a.owner_id AND r.alert_id=a.id WHERE a.owner_id=%(owner)s
  UNION ALL
- SELECT a.id,a.owner_id,a.instrument_id,a.version_id,p.created_at,'idea',r.action,r.created_at
+ SELECT a.id,a.owner_id,a.instrument_id,a.version_id,p.created_at,'idea',r.action,r.created_at,ARRAY[a.instrument_id]
  FROM idea_alert_checks a JOIN idea_alert_publications p ON p.owner_id=a.owner_id AND p.check_id=a.id
  LEFT JOIN idea_alert_reviews r ON r.owner_id=a.owner_id AND r.check_id=a.id WHERE a.owner_id=%(owner)s
+ UNION ALL
+ SELECT a.id,a.owner_id,a.instrument_id,NULL::uuid,a.created_at,'move',r.action,r.created_at,
+  ARRAY(SELECT m.instrument_id FROM move_event_members m WHERE m.owner_id=a.owner_id AND m.event_id=a.id ORDER BY m.instrument_id)
+ FROM move_events a LEFT JOIN move_event_reviews r ON r.owner_id=a.owner_id AND r.event_id=a.id WHERE a.owner_id=%(owner)s
 ) """
 
 
@@ -44,11 +48,7 @@ def clock(value):
 def coverage(conn, owner, company, now):
     """Current source health, never inferred from the absence of alerts."""
     iid = company["id"]
-    watch = one(
-        conn,
-        "SELECT enabled,interval_minutes,match_idea,idea_purpose,last_check_at,next_check_at,error FROM news_watches WHERE owner_id=%s AND instrument_id=%s",
-        (owner, iid),
-    )
+    watch = watch_lanes.present(conn, owner, iid)
     if company["mode"] == "recorded":
         return dict(
             mode="recorded",
@@ -166,6 +166,9 @@ def change_detail(conn, owner, event):
 
 
 def details(conn, owner, events):
+    from .monitoring import alert_feedback
+    from .monitoring import alert_routing
+    feedback_enabled=alert_feedback.enabled()
     result = []
     for event in events:
         if event["kind"] == "idea":
@@ -176,6 +179,10 @@ def details(conn, owner, events):
             )
             detail = idea_alerts.present(conn, owner, record)
             title = "Connections to saved reasoning"
+        elif event["kind"] == "move":
+            from .monitoring import move_alerts
+            detail = move_alerts.present(conn, owner, event["id"])
+            title = detail["title"]
         elif event["kind"] == "company":
             detail = news_watch.list_alerts(conn, owner, ids=[event["id"]])[0]
             title = detail["payload"].get("title", "Company source alert")
@@ -184,7 +191,10 @@ def details(conn, owner, events):
             title = detail["summary"]
         if detail.get("withheld"):
             title = "Source access changed — details withheld"
-        result.append(dict(event, title=title, detail=detail))
+        result.append(dict(event, title=title, detail=detail,
+            routing=alert_routing.latest(conn,owner,event['kind'],event['id']) if alert_routing.enabled() else None,
+            feedback_enabled=feedback_enabled,
+            feedback=alert_feedback.latest(conn,owner,event['kind'],event['id']) if feedback_enabled else None))
     return result
 
 
@@ -200,6 +210,7 @@ def prepare(
     exporting=False,
     window_start=None,
 ):
+    from .monitoring.daily_updates import enabled as daily_enabled
     now = clock(now or datetime.now(timezone.utc))
     end = clock(cutoff) if cutoff else now
     if type(days) is not int or days not in (0, 1, 7, 30):
@@ -247,12 +258,14 @@ def prepare(
         summary = rows(
             conn,
             EVENTS
-            + f"""SELECT instrument_id,
+            + f"""SELECT members.instrument_id,
             count(*) FILTER(WHERE created_at {lower} %(start)s) new_count,
             count(*) FILTER(WHERE review_action IS NULL) pending_count,
             count(*) FILTER(WHERE review_action='unresolved') unresolved_count,
             count(*) FILTER(WHERE created_at {older} %(start)s AND review_action IS NULL) older_pending_count,
-            max(created_at) latest_alert_at,max(review_at) latest_review_at FROM events WHERE created_at<=%(end)s GROUP BY instrument_id""",
+            max(created_at) latest_alert_at,max(review_at) latest_review_at FROM events
+            CROSS JOIN LATERAL unnest(company_ids) AS members(instrument_id)
+            WHERE created_at<=%(end)s GROUP BY members.instrument_id""",
             args,
         )
         by_id = {str(r["instrument_id"]): r for r in summary}
@@ -288,7 +301,7 @@ def prepare(
             company["coverage"] = coverage(conn, owner, company, now)
         # Displayed records are paginated independently of exact all-record counts.
         where = f""" WHERE created_at {lower} %(start)s AND created_at<=%(end)s
-            AND (%(iid)s::uuid IS NULL OR instrument_id=%(iid)s::uuid)
+            AND (%(iid)s::uuid IS NULL OR %(iid)s::uuid=ANY(company_ids))
             AND (%(review)s='all' OR (%(review)s='pending' AND review_action IS NULL) OR review_action=%(review)s)"""
         total = one(conn, EVENTS + "SELECT count(*) n FROM events" + where, args)["n"]
         if exporting and total > 1000:
@@ -305,6 +318,15 @@ def prepare(
         )
         records = details(conn, owner, page_rows)
         scoped = [c for c in companies if iid is None or str(c["id"]) == iid]
+        # One market event may be relevant to several companies. Company badges
+        # include it for each member; the full-list totals count the event once.
+        args['visible_ids'] = [str(c['id']) for c in scoped]
+        totals = one(conn, EVENTS + f"""SELECT
+            count(*) FILTER(WHERE created_at {lower} %(start)s) new_count,
+            count(*) FILTER(WHERE review_action IS NULL) pending_count,
+            count(*) FILTER(WHERE review_action='unresolved') unresolved_count,
+            count(*) FILTER(WHERE created_at {older} %(start)s AND review_action IS NULL) older_pending_count
+            FROM events WHERE created_at<=%(end)s AND company_ids && %(visible_ids)s::uuid[]""", args)
         return dict(
             generated_at=now,
             cutoff=end,
@@ -315,18 +337,10 @@ def prepare(
             page=page,
             page_size=PAGE_SIZE,
             total=total,
-            totals={
-                k: sum(c[k] for c in scoped)
-                for k in (
-                    "new_count",
-                    "pending_count",
-                    "unresolved_count",
-                    "older_pending_count",
-                    "quiet_checks",
-                )
-            },
+            totals=dict(totals, quiet_checks=sum(c['quiet_checks'] for c in scoped)),
             companies=companies,
             records=records,
+            daily_reports_enabled=daily_enabled(),
             limitation="This review uses saved records. It does not fetch sources or call AI. Record dates are when this app recorded an update, not when the underlying event happened. Review status and source coverage are read now; a quiet list does not establish that nothing important happened.",
         )
 
@@ -403,6 +417,26 @@ def render_report(report):
                 )
             items = d["items"]
             sources = {s["id"]: s for s in d["sources"]}
+        elif event["kind"] == "move":
+            from .monitoring.move_alerts import percent
+            parts.append('<p>Preview · not sent to Telegram.</p>' if d['preview'] else '<p>Price-move alert.</p>')
+            for member in d['members']:
+                context = ' · market context only; no individual threshold crossed' if member['context_only'] else ''
+                parts.append(f'<p>{text(member["symbol"])}: {text(percent(member["change_percent"]))} today{context}.</p>')
+                for symbol,ref in member['indexes'].items():
+                    parts.append(f'<p>{text(symbol)}: {text(percent(ref["change_percent"]))}; gap {text(ref["gap_points"])} percentage points.</p>')
+            explanation=d['explanation']
+            parts.append(f'<p>{text(explanation["text"] if explanation else "No verified explanation is saved.")}</p>')
+            sources={s['id']:s for s in d['sources']}
+            for sentence in (explanation or {}).get('sentences',[]):
+                for citation in sentence['citations']:
+                    source=sources[citation['source_id']]
+                    parts.append(f'<blockquote>{text(citation["quote"])}</blockquote><p>{text(source["title"])}</p>')
+                    from .monitoring.telegram_message import safe_url
+                    if safe_url(source['url']):
+                        parts.append(f'<a href="{text(source["url"])}" rel="noreferrer">Read cited source</a>')
+            parts.append(f'<p>{text(d["limitation"])}</p>')
+            items=[]
         elif event["kind"] == "company":
             parts.append(f'<p>{text(d["payload"]["reason"])}</p>')
             for label, limits in d.get("source_limits", {}).items():

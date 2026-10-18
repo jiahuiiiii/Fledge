@@ -14,7 +14,7 @@ def start(conn, owner, watch, token, started, lease):
         (owner, watch["instrument_id"]),
     )
     conn.execute(
-        "INSERT INTO watch_checks(id,owner_id,instrument_id,started_at,lease_until,interval_minutes,match_idea,baseline_id,version_id,event_version_id,include_context,idea_purpose) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        "INSERT INTO watch_checks(id,owner_id,instrument_id,started_at,lease_until,interval_minutes,match_idea,baseline_id,version_id,event_version_id,include_context,idea_purpose,lane) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (
             token,
             owner,
@@ -28,6 +28,7 @@ def start(conn, owner, watch, token, started, lease):
             watch.get("event_version_id"),
             watch.get("include_context", False),
             watch.get("idea_purpose", "reasoning"),
+            watch.get("lane", "combined"),
         ),
     )
 
@@ -139,21 +140,14 @@ def finish(
 
 
 def present(conn, owner, check, result, now):
-    w = one(
-        conn,
-        "SELECT enabled,claim_token,lease_until FROM news_watches WHERE owner_id=%s AND instrument_id=%s",
-        (owner, check["instrument_id"]),
-    )
+    from .watch_lanes import active
+    running = active(conn, owner, check["instrument_id"], check["id"], now, lock=False) if not result else False
     status = (
         result["status"]
         if result
         else (
             "unfinished"
-            if not w
-            or not w["enabled"]
-            or w["claim_token"] != check["id"]
-            or not w["lease_until"]
-            or now >= w["lease_until"]
+            if not running
             else "running"
         )
     )
@@ -224,6 +218,7 @@ def present(conn, owner, check, result, now):
             str(check["event_version_id"]) if check.get("event_version_id") else None
         ),
         interval_minutes=check["interval_minutes"],
+        lane=check.get("lane", "combined"),
         version_id=str(check["version_id"]) if check["version_id"] else None,
         withheld=withheld,
         reason=reason,

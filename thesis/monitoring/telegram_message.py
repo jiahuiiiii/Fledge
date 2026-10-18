@@ -33,18 +33,42 @@ def safe_url(value):
         return None
 
 
-def render(record):
+def render(record,*,shown=None):
     d = record["detail"]
     kind = record["kind"]
     if d.get("withheld"):
         raise ValueError("Source access changed; do not forward this alert.")
+    if d.get('preview'):
+        raise ValueError('Preview alerts must never be sent.')
+    if kind in {'digest','cost'}:
+        from .daily_telegram import render as daily_render
+        return daily_render(record)
     symbol = plain(d.get("symbol"), 18)
-    label = {"company": "Company update", "idea": "Saved idea", "condition": "Monitored condition"}[kind]
+    label = {"company": "Company update", "idea": "Saved idea", "condition": "Monitored condition", "move": "Price move"}[kind]
     parts = [f"<b>{escape(symbol)} · {label}</b>", f"<b>{escape(plain(record['title'], 180))}</b>"]
     if d.get("fictional"):
         parts.insert(0, "<b>Fictional demo · not actual company news</b>")
     source_ids = []
-    if kind == "company":
+    primary_parts = {}
+    if kind == "move":
+        if d.get('preview'):
+            raise ValueError('Preview price events must never be sent.')
+        from .move_alerts import percent, numbers as move_numbers
+        numbers=move_numbers(d['members'])
+        index=d['members'][0]['indexes'].get('QQQ')
+        numbers+=(f" · Nasdaq {percent(index['change_percent'])}" if index else ' · Nasdaq unavailable')
+        if visible_units(escape(numbers))>3000:
+            raise ValueError('The full market-event member list exceeds the message bound.')
+        parts=[f'<b>{escape(numbers)}</b>']
+        context=[m['symbol'] for m in d['members'] if m['context_only']]
+        if context:
+            parts.append('Market context only; no individual threshold crossed: '+escape(', '.join(context)))
+        explanation=d.get('explanation') or {}
+        cause={'market':'Possible market connection','sector':'Possible sector connection',
+               'company':'Possible company connection','no_clear':'No clear cause found'}.get(explanation.get('cause'),'No clear cause found')
+        parts.append('<b>'+cause+'</b>\n'+escape(plain(explanation.get('text') or 'No verified explanation is saved.',800)))
+        source_ids.extend(s['id'] for s in d.get('sources',[]))
+    elif kind == "company":
         payload = d["payload"]
         for shift in payload.get("shifts", [])[:3]:
             parts.append(escape(plain(shift.get("title"), 120)) + ": " + escape(plain(shift["before"]["tone"], 30)) + " → " + escape(plain(shift["after"]["tone"], 30)))
@@ -56,6 +80,7 @@ def render(record):
             if quotes:
                 prefix = "Unconfirmed report" if basis.get("kind") == "unconfirmed_event" else "Source excerpt"
                 parts.append(f"<b>{prefix}</b>\n“{escape(plain(quotes[0].get('quote'), 320))}”")
+                primary_parts[len(parts)-1]=item['source_id']
         if payload.get("cutoff"):
             parts.append("Sample cutoff: " + stamp(payload["cutoff"]))
     elif kind == "idea":
@@ -63,6 +88,7 @@ def render(record):
         for item in [i for i in d["items"] if i["relation"] in RELATIONS][:2]:
             source_ids.append(item["source_id"])
             parts.append("<b>" + RELATIONS[item["relation"]] + "</b>\n" + escape(plain(item.get("explanation"), 350)))
+            primary_parts[len(parts)-1]=item['source_id']
         parts.append("Source interpretation; it does not resolve your idea or verify a social claim.")
     else:
         source_ids.extend(s["id"] for s in d.get("sources", [])[:2])
@@ -95,10 +121,11 @@ def render(record):
     # with emoji. Drop whole optional sections, never split tags or entities.
     footer = parts[-2:]
     selected = []
-    for part in parts[:-2]:
+    for index,part in enumerate(parts[:-2]):
         candidate = "\n\n".join(selected + [part] + footer)
         if visible_units(candidate) <= 3800:
             selected.append(part)
+            if shown is not None and index in primary_parts:shown.append(primary_parts[index])
     return "\n\n".join(selected + footer)
 
 

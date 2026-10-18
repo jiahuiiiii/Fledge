@@ -1,0 +1,53 @@
+.daily-updates {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl);
+  margin-block: var(--space-4);
+  overflow: hidden;
+}
+.daily-updates > summary,
+.daily-updates > [role="alert"],
+.daily-updates > [role="status"] {
+  padding: var(--space-4);
+}
+.daily-updates-body {
+  display: grid;
+  gap: var(--space-5);
+  padding: 0 var(--space-4) var(--space-4);
+}
+.daily-updates h3 {
+  margin: 0 0 var(--space-3);
+}
+.daily-updates p {
+  overflow-wrap: anywhere;
+}
+.daily-spend-history,
+.daily-recap {
+  border-top: 1px solid var(--color-line);
+  padding-top: var(--space-3);
+  margin-top: var(--space-3);
+}
+.daily-recap-contents {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+.daily-recap-record {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  min-width: 0;
+}
+.daily-recap-record .row {
+  flex-wrap: wrap;
+}
+.daily-recap-record .research-alerts,
+.daily-recap-record .sentiment-alert {
+  padding-inline: 0;
+  margin: 0;
+  border: 0;
+}
+.daily-cost-notice {
+  padding: var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-md);
+}

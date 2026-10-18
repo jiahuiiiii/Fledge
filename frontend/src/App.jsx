@@ -2034,10 +2034,11 @@ function CompanyWorkspace({
                                 )
                               }
                               loadingRun={loadingRun}
-                              onAnalyze={(days) =>
+                              onAnalyze={(days, options = {}) =>
                                 startLoading({
                                   analyze: true,
                                   lookback_days: days,
+                                  ...options,
                                 })
                               }
                               onWatch={(

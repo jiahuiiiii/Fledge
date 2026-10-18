@@ -103,6 +103,8 @@ def fetch(symbol, start, end, *, transport=None):
                     includePrePost="false",
                 ),
             ) as response:
+                from .source_observations import record
+                record("yahoo_history", response.status_code)
                 if response.status_code != 200:
                     raise ValueError(
                         "Yahoo price-history access was denied or rate-limited."
@@ -140,7 +142,9 @@ def at(values, index):
     return values[index] if isinstance(values, list) and index < len(values) else None
 
 
-def normalize(payload, symbol, start, end, *, observed_at=None):
+def normalize(payload, symbol, start, end, *, observed_at=None, instrument_type="EQUITY"):
+    if instrument_type not in ("EQUITY", "ETF"):
+        raise ValueError("Unsupported daily price instrument type.")
     observed_at = observed_at or end
     try:
         chart = payload["chart"]
@@ -151,7 +155,7 @@ def normalize(payload, symbol, start, end, *, observed_at=None):
         if (
             meta["symbol"] != symbol
             or meta["currency"] != "USD"
-            or meta["instrumentType"] != "EQUITY"
+            or meta["instrumentType"] != instrument_type
             or meta["exchangeTimezoneName"] != "America/New_York"
             or meta["dataGranularity"] != "1d"
         ):

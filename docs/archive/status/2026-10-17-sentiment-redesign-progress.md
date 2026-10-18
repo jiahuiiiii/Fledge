@@ -1,0 +1,520 @@
+# Historical implementation checkpoints — archived 17 October 2026
+
+This is a historical snapshot, including superseded approvals, deployment states and budgets. It is not current operating authority. Read [AGENTS.md](../../../AGENTS.md) and the [current redesign plan](../../development/sentiment-alert-redesign-plan.md) first. Relative links were adjusted for this archive; original checkpoint wording is retained.
+
+---
+
+# Sentiment and alert redesign — implementation plan
+
+Proposed 17 October 2026. Direction: build option **(c) most cost-effective** first (a mid-tier model for bulk reading, a small model for the quick check), then add selected parts of option **(b) most effective** where they matter most: a price-move trigger, a top-tier "why is it moving" explainer, and market/sector context. The model names below use the Claude family; [Model choice by provider](#model-choice-by-provider) gives the OpenAI and DeepSeek equivalent for each role, with measured results and costs. The evidence behind every number here is in the [experiment record](../../development/../testing/sentiment-model-comparison.md).
+
+## 1. The issue right now
+
+1. **Big moves don't alert.** Alerts only fire on new article text. Price never enters a watch, and the prompt tells the model to ignore trading signals. During the 14–15 October sell-off (NVDA −3.2% then −1.8%, AMZN and GOOGL −1.7%) no timely alert went out; the first came about 1.5 days later, worded like every other alert.
+2. **Too many low-value alerts.** Opinion pieces, "X vs Y" listicles and price recaps pass as reported events. Of the 12 Telegram alerts the owner's account received on 13–17 October, about half were listicles, price recaps or Google News clusters (developer's count).
+3. **Duplicates.** Three accounts shared one Telegram chat, and Google News's rotating related-headlines list made the same article look new every hour. Both are fixed (section 4, phase 0); the plan must keep it at zero.
+4. **Slow.** A watch check takes a median of 202 s and up to 16 minutes. The AI step is only about 10 s; collection is about 4 minutes, mostly Reddit's 30 s gap between requests shared by all watches. Every source re-downloads the full 7-day window every hour.
+5. **Brittle.** 16% of checks failed at the AI step on 13–16 October. One inconsistent label in a batch of 8 rejects the whole batch, and a batch that fails twice stays stuck. Switching models discards every saved label, forcing a full re-read (US$13.46 on Sonnet, US$9.18 on GPT-5.4 in the 16–17 October trial), and the Sonnet trial failed most of its checks for this reason.
+6. **One prompt does six jobs.** About 16,000 characters of rules plus a 79,000-character schema per batch of 8: relevance, tone, evidence basis, event type and impact, dollar amounts and cross-article linking. Nothing in it asks "how important is this?" or "why is the stock moving?".
+
+## 2. Why change
+
+The product's selling point is "tell me when something important happens to a company I'm watching, and why". Today the system answers a narrower question, "is there a new negative article?", so it misses what matters (price moves with a market-wide cause), sends things that don't (listicles), and does it slowly and expensively. The model tests show model choice is a secondary issue: every model, including Opus, treated sell-off stories as not about the company. The rules and structure of the pipeline need to change; a cheaper, faster model then comes almost free.
+
+## 3. Target design
+
+```
+Fast lane (every 15 min in US market hours, hourly otherwise)
+  quote + price vs index/sector ─► move detector (code) ─┐
+  company headlines (Finnhub, RSS) ─► quick check (small model) ─► labels (mid-tier model, split prompts)
+                                                         │
+Slow lane (hourly)                                       ▼
+  Reddit + Hacker News (incremental) ─► labels ─► importance + severity ─► alert
+                                                         ▲
+  move trigger ─► "why is it moving" explainer (top-tier model, rare) ┘
+```
+
+| Part | From option | Model / method |
+| --- | --- | --- |
+| Bulk labelling of new sources | (c) | Sonnet 5.5 or GPT-5.4, smaller prompts |
+| Quick relevance check | (c) | Haiku 5.5 or GPT-5.4 mini |
+| Item-level repair, label carry-over | (c) | code |
+| Fast/slow collection lanes | (c) | code |
+| Price-move detector with index/sector comparison | (b) | code |
+| "Why is it moving" explainer | (b) | **Opus 5.5** or GPT-5.5: low volume (a few calls a day), where nuance matters most |
+| Importance and severity routing | (b) | part of the event-labelling task, code routing |
+
+### Model choice by provider
+
+Each role can be filled from any of the three providers the app supports. Measured on the same 16 fresh META batches ([experiment record](../../development/../testing/sentiment-model-comparison.md#4-experiment-3--sonnet-haiku-and-gpt-models-on-the-same-meta-batches)). "Pass" is batches passing the app's checks today, without item-level repair; "with repair" is the share of labels that would be dropped. Daily cost assumes the owner's current 5 watches, about 60 bulk batches a day once caught up.
+
+| Role | Anthropic | OpenAI | DeepSeek |
+| --- | --- | --- | --- |
+| **"Why is it moving" explainer** (a few calls a day; nuance matters most) | **Opus 5.5**: 15/16 pass, 7 s, 5/6 hard cases, about US$0.077 per call | **GPT-5.5**: 16/16, 11 s, 4/6, about US$0.077 per call | DeepSeek V4 Pro: priced in the app, **not tested** |
+| **Bulk labelling** (every new source) | **Sonnet 5.5**: 16/16, 5.5 s, 3/6, 81% tone agreement with Opus; about US$2.40/day | **GPT-5.4** (live today): 16/16, 18 s, 4/6, 80%; about US$2.70/day | DeepSeek V4.1 Flash via OpenRouter (DeepInfra fp8): 13/16 (3 labels dropped with repair), **95 s**, 4/6, 75%; about **US$0.32/day** (measured). On NUS's deployment: 9/16, 1/6 |
+| **Quick relevance check** (cheap filter before labelling) | **Haiku 5.5** | **GPT-5.4 mini** (live today) | DeepSeek V4.1 Flash, thinking off (not tested for this task) |
+| **Cheapest possible bulk labeller** (option d) | Haiku 5.5: 12/16, 15 s, 4/6; about US$0.20/day, about 8% of labels dropped with repair | GPT-5.4 nano: 5/16, 9 s, 4/6; about US$0.22/day, about 20% dropped. GPT-5.4 mini: 3/16, 2/6, about 30% dropped; not recommended | DeepSeek V4.1 Flash via OpenRouter, as above: more reliable than Haiku or nano, but about 6× slower |
+
+**What this means for the decision:**
+
+- **OpenAI path** (GPT-5.4 bulk, GPT-5.4 mini quick check, GPT-5.5 explainer): about the same reliability and daily cost as the Anthropic path, and it is already live with all its saved labels, so there is no switch cost. GPT-5.4 is about 3× slower per batch than Sonnet, but the AI step is not the bottleneck: collection is (section 1).
+- **Anthropic path** (Sonnet bulk, Haiku quick check, Opus explainer): fastest and slightly cheaper for bulk labelling, best explainer on the hard cases (Opus 5/6). A switch costs a one-off re-read unless phase 1's label carry-over is in place.
+- **DeepSeek path** (via OpenRouter, one pinned host): the cheapest model that passed most batches without repair (13/16, about US$0.32/day), with 4/6 hard cases. Its drawback is speed: about 95 s per batch, which would make the fast lane depend on the slow model. It fits a cheap bulk labeller in the slow lane, not the fast lane or the explainer. Results depend heavily on the host: the same model on NUS's deployment passed 9/16 and got 1/6. Always pin one host and re-test after any host change.
+- **Mixing providers is allowed**: for example GPT-5.4 bulk with an Opus explainer. Each role is configured separately in phases 2 and 4.
+
+## 4. Phases
+
+Each phase ships on its own, is tested offline first, and restarts the app only from the owner's Terminal panel (never from an agent sandbox; see the 16 October outage).
+
+### Phase 0 — done (16–17 October)
+
+- Google News items keep only their own headline; articles are de-duplicated by URL ([`source_hub.py`](../../development/../../thesis/research/source_hub.py), [`coverage.py`](../../development/../../thesis/research/coverage.py)).
+- Demo account watches stopped; Telegram on only for the owner's account.
+- Provider back on OpenAI (GPT-5.4) as the stable baseline while this plan is built.
+- GPT-5.5, GPT-5.4, GPT-5.4 mini, GPT-5.4 nano and DeepSeek V4.1 Flash via OpenRouter added to the 16-batch comparison (17 October).
+
+### Phase 1 — reliability foundation (no model change)
+
+**17 October 2026: implementation prepared; acceptance pending (not done).**
+Offline related suites: 488 passed / 3 optional skips; later affected suites:
+150 passed, final recovery suites 68 passed (overlapping). Frontend: 198 tests and 8 isolated component behavior
+groups pass; build passes. META replay: Opus/Sonnet/GPT-5.5/GPT-5.4 each 16/16;
+Haiku 14/16 with 9/119 repaired items (7.56%), above the 5% gate. AVGO Opus
+15/15; the other four required models have no saved AVGO responses. Three-day
+live measurement and installation remain pending. No model change, paid test
+or app restart. See [phase 1 verification](../../development/../testing/sentiment-reliability.md).
+
+1. **Item-level repair** in `sentiment.render` and `reporting_basis.render`. When a single item breaks a consistency rule, keep the batch and repair that item instead of rejecting everything:
+   - tone and basis disagree, or a non-relevant item has a direction → tone and basis become `unclear`;
+   - event fields inconsistent with the kind or relevance → event becomes `insufficient_detail` / `not_applicable` with no impact, so it can never trigger an alert;
+   - event fields on a social item, earlier-attitude passages outside a relevant social post, price claims on news → dropped.
+
+   Structural failures still reject the batch: missing or duplicate labels, passages not from the source, broken or unfinished output. A batch that needs more than a quarter of its items repaired (at least 1) is also rejected. Each repaired item records `repair: {policy, reasons, original}`, is counted in the reading, and shows "the AI's label and its evidence disagreed" in the app. Previously failed saved batches are re-checked under the new rules before anything is re-sent, so stuck companies recover without new spend. The summary policy name stays the same, so saved labels remain reusable.
+2. **Label carry-over across models.** When the main model changes, reuse saved labels for unchanged sources if the prompt and policies match, and record the original model on each item. Only new sources go to the new model. An explicit "re-read everything" action stays available.
+3. **Stuck batches.** If a batch still fails after its one retry, an explicit paid recovery action can re-send its sources once as two half-size batches before giving up. No automatic paid retry; child batches cannot retry or split again.
+
+**Owner decision, 17 October 2026:** use GPT: retain GPT-5.4 for bulk readings and GPT-5.4 mini for the quick relevance check. Haiku is excluded from the selected rollout; its benchmark failure is not a release blocker. Other unselected models remain comparison evidence, not required rollout gates. No provider switch or environment change is needed. This records the phase 2 model choice without starting the next implementation phase or choosing the phase 4 explainer.
+
+**Done when (selected GPT path):** replaying the 16 META and 15 AVGO batches passes 16/16 and 15/15 for GPT-5.4 with at most 5% of items repaired, and 3 days live on GPT-5.4 show at least 97% of checks completing. META passes16/16; the separately approved17October GPT-5.4 AVGO run passes15/15,64items,0repairs for US$0.5073675. The three-day observation remains pending (start12:38:12SGT17October). The earlier all-model gate is superseded by the owner's GPT selection; retain all comparison results.
+
+### Phase 2 — choose the bulk and quick-check models
+
+**17 October 2026: model choice approved; verification prepared, acceptance pending (not done).** Stay on GPT-5.4 + GPT-5.4 mini. Do not switch to Haiku or Sonnet. A read-only 48-hour report and related suites pass111tests. No switch (US$0 catch-up); 0/48 hours after confirmed installation and 0 complete daily cost windows. Phase1 still needs its matching frontend install and idle backend restart; the 11:56 SGT idle check deferred restart because4watches were due within90seconds. [Phase 2 verification](../../development/../testing/sentiment-model-rollout.md).
+
+**Follow-up, 17 October 2026:** owner requested fixing Haiku first, then continuing
+phase 2. The compact Anthropic format now passes **16/16 META batches, 119 items,
+0 repairs**, using six successful revised responses and ten separately approved
+remaining responses after an HTTP 400 stop. Hard-case interpretation is 3/6;
+GPT remains selected. Three approved runs cost US$0.053381665 plus an unresolved
+maximum hold of US$0.011598500. No automatic paid retry, model switch or app
+restart. This authorises phase 2 preparation while phase 1's GPT AVGO and
+three-day live gates remain unverified; phase 1 is not marked done.
+[Details](../../development/../testing/sentiment-reliability.md#haiku-transport-follow-up--17-october-2026-meta-format-gate-passed).
+
+Decide between the OpenAI path (stay on GPT-5.4 + GPT-5.4 mini) and the Anthropic path (Sonnet 5.5 + Haiku 5.5), using [Model choice by provider](#model-choice-by-provider). Re-run the 16-batch comparison with item-level repair on before deciding (the OpenRouter DeepSeek run is already included). The default is to **stay on GPT-5.4**: equal reliability in the tests, about the same cost, and no switch cost. Move to Sonnet if the fast lane (phase 3) needs faster AI responses. For the Anthropic path, set `THESIS_MODEL_PROVIDER=anthropic` and `ANTHROPIC_REASONING_MODEL=claude-sonnet-5-5` with an idle restart; label carry-over keeps the switch cost near zero.
+
+**Done when:** 48 hours at 97% or more check completion on the chosen models, any switch catch-up costs under US$1, and daily AI cost is within the section 6 target.
+
+### Phase 3 — faster collection
+
+**Installation follow-up, 17 October 2026:** approved056/057 applied (schema57)
+and matching tested frontend installed after a full archive backup; saved data
+and preferences were exact across preparation. Owner started the stopped app
+in Terminal. HTTP200/two combined checks verified12:38:12SGT, the conservative
+phase1/2 observation start. Lanes/metrics remain off, so phase3's live measurement
+has not started. No new Telegram delivery or environment change.
+
+At12:55:59SGT, backed up `.env` and enabled only the dynamically read passive
+source-status counter. The24-hour denial baseline starts then. No restart,
+model/schedule/account preference change; lanes and new alerts remain off.
+
+**17 October 2026: implementation prepared; live acceptance pending (not done).**
+Owner approved additive migrations and continuing the entire plan without
+phase-boundary confirmation. Migrations056/057 add independent fast runtime
+state, lane-labelled history, incremental-source checkpoints and scoped HTTP
+status observations; existing preferences/history are preserved. Features are
+off pending the required live choices. Full offline backend2194pass/93optional
+skips; related438pass (overlapping); frontend199pass,
+build and6isolated browser groups at1440/390/320pass. 0/72live hours; medians and
+provider-denial baseline unverified. [Contract/results](../../development/../features/watch-lanes.md).
+
+1. **Fast lane**, every 15 minutes during US market hours (plus 1 hour either side) and hourly otherwise: quote and price, Finnhub, publisher RSS, Alpha Vantage. No Reddit or Hacker News.
+2. **Slow lane**, hourly: Reddit and Hacker News.
+   - Re-download a Reddit thread's comments only when the thread is new, or its feed entry's updated time changed.
+   - Re-check old Hacker News comments for deletion once a day instead of every hour.
+3. Keep the shared provider pacing and cooldowns; fast-lane checks never wait on the Reddit clock.
+
+**Done when:** fast-lane checks have a median of 60 s or less and slow-lane checks 180 s or less over 3 days, with no increase in provider denials.
+
+Read-only coverage follow-up17October20:03SGT:43related offline tests pass for
+requiring HTTPresponses for every observed provider in both comparison periods.
+Missing traffic is unknown, not zero denials; a known increase elsewhere still
+fails. Passive baseline7.1219/24hours,1184responses/15providers/0denials so far;
+lanes remain off,0/72rollout hours. No timing/denial acceptance claim.
+
+Core rollout observation at20:01SGT is7.3938/48hours:29completed,0failed,
+0stopped,3unfinished; all29completed readings use the reliability policy.
+Recorded completion90.625%includes the still-unfinished checks, not a final
+failure. Normal AIchargesUS$1.893521,0unresolved,0closed daily cost windows;
+48-hour/three-day completion and daily-cost gates remain pending. No new paid
+experiment, configuration change or restart by these observations.
+
+### Phase 4 — price-move trigger and "why is it moving" (from option b)
+
+**17 October 2026: implementation prepared; acceptance pending (not done).**
+Migrations058–060 are tested only in disposable databases; live schema57.
+Price-only references, Decimal3/2/5rules, grouping, immutable private previews,
+a separately disabled explainer role and cited evidence together in the existing
+Updates/review design are prepared. No new Telegram delivery. Full offline suite
+2308pass/93optional skips; final citation/worker regressions125pass, trial-runner
+regressions101pass (overlapping); frontend202pass/build and8isolated browser
+groups1440/390/320pass. User CSS preserved. [Contract and limits](../../development/../features/price-move-alerts.md).
+
+The retrospective produces3events across4sessions; the14October market group
+includes NVDA/AMZN/GOOGL (AMZN/GOOGL context-only). No15October trigger: NVDA's
+two-session fall is4.94049%, below5%. Thresholds are unchanged; the literal
+14–15October acceptance wording remains unresolved with the owner. All10paid explainer answers now pass citation checks: five saved answers
+revalidated for free after a repeated-source validator fix, then five previously
+unattempted cases in a separately approved continuation. Phase4 tests cost
+US$0.116235 with0unresolved holds; no automatic paid retry. These checks do not
+establish semantic accuracy. Owner subsequently approved GPT-5.5,3/2/5rules,08:30–17:00NewYork fast hours
+(adjusted early closes), and5UStrading days of previews. Fast cadence waits for
+the24-hour baseline; no new Telegram delivery. Preview installed13:56:17SGT after a264,076,069-byte archive backup; schema60
+(058–060 immutable),30tested assets,10guarded saved-data fingerprints exact.
+Owner started the app in Terminal; HTTP200 verified. Fast cadence/new Telegram
+stay off. Phase4acceptance remains pending; no live timeliness/recall proof.
+
+Follow-up: `price-move-rules-2` fixes a two-session-only trigger being grouped
+with today's opposite-direction rebound. Trigger direction is separate from
+daily direction, durable deduplication uses it, and both timeframes are visible
+together. Related127tests/frontend202/build/8browser groups pass; no paid calls,
+saved-record edits or migration. Prepared for next installation, not yet live.
+A2.5%daily slide can evade all current thresholds despite losing7.31%over3days;
+track this limit in preview instead of lowering thresholds to fit one example.
+
+Owner follow-up17October: evaluate recent-high/low drawdown episodes and volatility
+scaling on saved history before choosing new thresholds. Offline8-company replay
+now compares fixed7and4×prior60-return candidates over189–192scored sessions,
+with explicit reset/follow-up rules and independent up/down episodes.107related
+offline tests pass; NVDA enters14October at7.49875%below its recent high, no new
+step15October. QQQ has only5probe closes, so the full-year3/2/5comparison is
+incomplete. No live defaults changed, no AI/provider call or restart. The10-session
+entry still misses sufficiently slow drift; counts do not establish usefulness.
+[Results and limitations](../../development/../testing/drawdown-rule-comparison.md). This adds
+candidate evidence, not approval to alter thresholds or phase4acceptance.
+
+1. **Move detector (code only).** For each watched stock, compare today's change with the Nasdaq-100 (QQQ), the S&P 500 (SPY) and a sector fund (SOXX for semiconductors, otherwise the closest sector fund). Trigger on:
+   - a move of ±3% or more in a session;
+   - a gap of 2 points or more against the index;
+   - ±5% or more over 2 sessions, to catch slides like 14–15 October.
+
+   When two or more watched stocks trigger in the same direction as the index, group them into one **market event**. Add the index and sector funds as price-only instruments using the existing Yahoo adapter and pacing.
+2. **Explainer (Opus 5.5, or GPT-5.5 on the OpenAI path).** One call per trigger or market event. It receives the move numbers, the last 24 hours of company headlines, and the World tab's market headlines ([`world_news.py`](../../development/../../thesis/research/world_news.py)). It returns a cause type (market-wide, sector, company-specific or no clear cause) and one or two sentences that cite exact headlines, with the existing citation validation. No price prediction or trade advice.
+3. **Alert**, for example: "NVDA −3.2% today (Nasdaq −2.1%) · market-wide · investors rotating out of AI on spending worries" with the cited sources. A market event lists every affected watched stock in one message.
+
+**Done when:** a replay over saved 13–17 October prices and headlines produces an alert for the 14–15 October NVDA, AMZN and GOOGL moves, unit tests cover the thresholds and grouping, and the explainer passes its citation checks on 10 authored and real cases.
+
+### Phase 5 — smaller prompts, importance and severity
+
+**17 October 2026: first task prepared; not done.** A private blind50-source
+review page and strict scorer are prepared from permitted saved META/AVGO news
+and discussion. No AI suggestions or prefilled labels. Read-only export and
+related suites41pass;7authored browser groups1440/390/320pass with0HTTPrequests.
+Owner annotations0/50received; no accuracy claim, new prompt or live route change.
+[Review workflow](../../development/../testing/owner-sentiment-quality.md). Smaller-task request/validator
+contracts are also prepared (instructions3924/3379/2497characters, related106tests
+pass), with no dispatch or live pipeline integration yet. Routing/ratings/digest
+and all quality/replay gates remain outstanding.
+
+**Further preparation, 17 October 2026:** the smaller-task contracts now have an
+opt-in runner with old tone carry-over, importance backfill, cached duplicate
+comparisons, ledger reuse and explicit retry/terminal-split recovery; related
+integration suites164pass. New061 prepares append-only private usefulness ratings
+and a shared Telegram connection/callback cursor, with controls beside Updates
+evidence. Full offline2398pass/93optional skips, final affected164pass after the
+last repair-provenance addition;202frontend/build and17browser groups pass.
+Both features default off;061is not applied live. No new-prompt paid
+evaluation, owner labels, saved-research change or restart. Severity routing,
+daily digest/cost alerts, the one-week replay and all quality/live gates remain
+outstanding. [Contract](../../development/../features/sentiment-tasks-and-alert-ratings.md).
+
+Routing follow-up:062prepares immutable private route proposals and company
+importance previews, including neutral/favourable news. Seen-story/backfill guards
+stay quiet; saved-idea preferences remain. All importance publications are
+previews and cannot enter/send from Telegram; ordinary delivery stays unchanged
+for shadow comparison. Related263pass/2optional skips, final dedup/delivery99pass,
+202frontend/build and10
+isolated inbox/browser groups pass. Route capture defaults off and needs an
+explicit start;061/062remain unapplied live. Daily digest/cost alerts, actual
+approved routing, one-week replay and owner-quality/live gates remain pending.
+
+Daily-update follow-up17October:063prepares private frozen medium-route recaps,
+owner-only aggregate spending and preview cost notices, with existing evidence
+and ratings together in Updates. Daily dispatch-date costs distinguish confirmed
+charges from unresolved maxima; late settlements survive failure/backoff without
+rewriting snapshots. No implicit approved cost level. Final155related/13integration/
+202frontend tests, build and22daily/inbox browser groups pass. Final stable full
+offline2468pass/93optional skips. Earlier broad run2464pass/93skips/1checksum
+failure overlapped unapplied migration edits; retained diagnostic, clean rerun.
+061–063remain unapplied and all new flags off/unset. Telegram digest/cost transport,
+actual approved routing, quality/noise replay and live gates remain pending;
+**phase5not done**. [Contract](../../development/../features/daily-updates.md).
+
+Transport follow-up17October:064prepares daily recap/cost outbox types, guarded
+actual-record membership and immutable per-attempt rating-button mappings.
+Rendering rechecks source/private-revision access, preserves complete evidence
+blocks and binds ratings only to actually sent buttons. Final166related offline/
+202frontend/build/scopedformat and6browser groups pass. Broad offline2495pass/
+93optional skips precedes the final button-presence guard; final166affectedpass
+after it. New-type switches remain off and require an explicit delivery start;
+normal daily records remain previews. No live test, setting change, source/AI
+call, migration or restart. Actual routing/record production, live-choice approval,
+owner quality/noise replay and live gates remain; **phase5not done**.
+[Contract](../../development/../features/daily-updates.md#telegram-transport-follow-up--17-october-2026).
+
+Actual-routing follow-up17October:065prepares **new** actual company/move
+publications and separate actual routing/daily policies behind a default-off
+switch and explicit start. Immediate Telegram selection/dispatch require an
+actual high route; medium enters the matching daily recap, low stays in Updates.
+Old previews are never promoted, preview calendars/backoff do not skip actual
+work, and rollback cannot send new importance records through the legacy path.
+13new/257related backend,202frontend/build/scopedformat and13isolated browser
+groups pass,0HTTPcalls. Full offline2509pass/93optional skips.065unapplied, no live activation/install/restart or paid
+call. Cross-publication24-hour story suppression, seven-day noise replay,
+owner labels0/50, new-prompt hard cases0/6 and live approval/shadow/outcome gates
+remain; **phase5not done**. [Contract](../../development/../features/daily-updates.md#actual-routing-connection--17-october-2026-prepared).
+
+Story-guard follow-up17October:066prepares immutable private story claims per
+actual send attempt, covering only displayed evidence and shared across immediate
+messages/recaps and watched companies in an account. Known rejections, changed
+retry members, uncertain sends, exact24-hour expiry and routing rollback are
+tested. Validated repeat keys/canonical article URLs retain evidenced updates;
+no semantic guarantee for all paraphrases or unverifiable pre-install messages.
+Full offline2547pass/93optional skips precedes the final non-article URL-key guard
+and3late test cases; subsequent152affected pass (41new) verifies final code.
+Earlier249related and202frontend/build pass.
+066unapplied live, US$0, no source/AIcall, configuration/install/restart change.
+Seven-day independent replay0/7, owner labels0/50, new-prompt hard cases0/6 and
+live/shadow/approval/outcome gates remain; **phase5not done**.
+[Contract](../../development/../features/telegram-story-suppression.md).
+
+Quality-runner follow-up17October:56frozen one-source requests preserve the exact
+50owner review projections plus6original proofread cases. Read-only current-access
+preflight passes56/56. The operator-only runner uses selected GPT-5.4, hashes
+ledger identities independently of folders, enforces a combined cap no greater
+thanUS$2and stops at the first failure without retry. Explicit continuation reuses
+settled answers for free and sends only unattempted cases; owner labels remain
+separate.99related andfull2571offline tests pass (93optional skips), no paid run. Saved-news inventory covers
+7dates/1218versions with partial early-company coverage; it is not a replay or
+noise score. Real paid measurements, owner labels0/50, real hard cases0/6, noise replay0/7
+and live/shadow/outcome gates remain; **phase5not done**.
+[Contract](../../development/../testing/sentiment-quality-campaign.md).
+
+Quality-run follow-up17October: first run stopped after3settled requests,
+US$0.02518confirmed and0unresolved holds;2answers validated, third rejected for
+parent context on a parentless source. No paid retry;53cases remain untouched,
+including all6hard cases. A stricter supplied-evidence schema and explicit
+revised-plan continuation pass174related offline tests. Proposed retest requires
+owner approval: reuse2valid answers free, retest1failed case once and send53new
+cases, expected additionalUS$0.40–1.20within the combinedUS$2cap including prior
+charges. It has not executed. Review evidence/answers remain blind and unchanged;
+owner labels0/50, hard cases0/6, noise replay0/7and live gates remain;
+**phase5not done**. No install/restart/live-setting or saved-research change.
+
+Approved quality follow-up17October: owner approved the revised paid test.
+56/56answers validate,0repairs, fixed hard cases4/6pass. Two old answers reused
+free;54new requests include the one explicitly approved retest plus53untouched
+cases. AdditionalUS$0.420225, combinedUS$0.445405,0unresolved holds/automatic
+retries. Owner will label later; review page remains blind,0/50answers received.
+New read-only replay-readiness checker passes23new/128related offline tests;
+145saved readings yield1055exact tone candidates for1066news opportunities,
+all saved after their source-availability frame (no historical-timeliness claim).
+Importance/duplicate evaluation and independent noise replay0/7remain. No
+live setting, migration, installation, restart or research/preference change;
+**phase5not done**. [Replay inventory](../../development/../testing/news-noise-replay.md).
+
+Replay-engine follow-up17October: complete baseline/frame validator, production
+company publications/routing, bounded immediate/daily formatting, displayed-only
+24-hour story claims and separate fingerprint-bound noise auditing are prepared.
+New operator freezes exact inherited tones, source/model/file contracts and
+ledger-backed sequential tasks, with combined cap and no automatic retry.
+266related offline tests pass. Real frozen corpus1489versions has1434reusable
+tone candidates;162new-news event requests before new quick skips, plus bounded
+duplicate comparisons. ExpectedUS$2–5, cumulative test capUS$6; cost disclosed
+before dispatch. No paid news-noise run yet; independent replay/noise gate0/7,
+owner labels0/50and live gates remain. No live schema/settings/research change.
+[Scope and limits](../../development/../testing/news-noise-replay.md#complete-sample-replay-and-bounded-evaluator--17-october-2026).
+
+Paid replay follow-up17October: first run stopped at13paid requests/12validated
+answers/5of172frames, US$0.119564confirmed,0unresolved holds or automatic retries.
+The failed event answer supplied headline text as a passage ID. New schema3binds
+both event evidence fields to each source's permitted IDs, sharing variants for
+identical sets; instructions/tone bodies and strict runtime checks stay exact.
+311affected offline tests pass. Saved-only recheck validates12/12good answers
+free,0new calls; the56-case tone plan/fingerprint remains exact (hard cases4/6).
+Revised plan reuses12good answers, explicitly retests1failed request and sends
+untouched work only; expected additionalUS$2–5, combined capUS$6including prior
+cost. Not executed; paid retest needs owner approval. Independent noise gate0/7,
+owner labels0/50, live approval/shadow/outcome gates remain; **phase5not done**.
+No live setting, migration, install/restart, research/preference or delivery
+change. [Record](../../development/../testing/news-noise-replay.md#first-paid-stop-and-source-bound-schemas--17-october-2026).
+
+Completed approved replay17October:172/172frames,7/7input dates,23hypothetical
+messages (16immediate/7recaps),278new paid requests,12distinct valid prior
+answers reused. AdditionalUS$2.31882475, combinedUS$2.43838875,0unresolved holds
+or automatic retries. Separate assistant excerpt review flags15/23messages
+(65.22%;11/16immediate,4/7recaps), so≤10%noise acceptance **fails**. Clear
+recommendation/valuation/comparison cases alone flag6/23(26.09%). This is a
+company-news counterfactual, not owner ground truth or an all-alert/live claim.
+
+Prepared guards fix mixed recaps and explicit editorial wrappers without
+rewriting saved readings; a free same-history diagnostic still fails11/20(55%).
+New purpose-specific importance instructions/version are prepared for a separate
+test, with unchanged56-tone bodies/hard cases4/6and owner labels0/50pending.
+Final229affected offline tests pass; real saved-only preflight checks4cached
+answers,0new calls, retains all prior cost and stops at uncached work.
+Expected additionalUS$1.50–3, combined capUS$6includingUS$2.43838875; not
+executed, owner approval required. New prompt/routing/delivery remain off;
+**phase5not done**. [Results and limits](../../development/../testing/news-noise-replay.md#completed-approved-revision-and-failed-noise-gate--17-october-2026).
+
+Further offline correction17October: guard4preserves factual buyback/dividend/
+product announcements that happened to contain valuation adjectives or a price
+reaction, including decimal amounts/company abbreviations; explicit investment
+advice and editorial-first headlines still stay low. Final241affected tests
+pass, no paid calls. The pending new-purpose
+plan is refreshed without changing its history/models/prompt/budget; saved-only
+preflight checks4cached answers,0new calls. Old failed gate/guard2diagnostic are
+retained, no new noise or owner-quality pass claimed. Paid approval still pending.
+
+Approved purpose-test result17October:172/172frames/7input dates complete with
+162new paid event requests and128distinct cached quick/tone/duplicate answers;
+290distinct answers/293evaluations pass,0repairs/failures/automatic retries.
+AdditionalUS$1.87638250, combinedUS$4.31477125withinUS$6cap,0unresolved holds.
+54publications/18hypothetical messages(11immediate/7daily). Separate assistant
+review retains33exact prior judgments and reads7new excerpts:38substantive,
+1opinion,1unclear. **2/18messages(11.11%)still fail≤10%**, split0/11immediate
+and2/7recaps. Original15/23failure retained; no label changed to pass.27of30
+earlier substantive excerpts remain displayed and11others appear;3drop out,
+including management commentary demoted to opinion, so usefulness/recall is not
+proven. Same-history company-news scope, not owner truth or all-alert/live proof.
+241affected offline tests remain passing; no production change during/after the
+run, owner answers0/50received. New prompt/routing/delivery off; no source,
+research/preference/settings/migration/install/restart/Telegram change.
+**Phase5not done.** [Complete result](../../development/../testing/news-noise-replay.md#approved-purpose-test-result--17-october-2026).
+
+1. **Split the prompt into smaller tasks:**
+   1. relevance (the existing quick check);
+   2. tone and evidence basis;
+   3. news only: event type, impact and **importance**;
+   4. duplicate-story linking, run only when code finds headline candidates with similar wording.
+
+   Target: each task's instructions are 6,000 characters or less.
+2. **Importance:** high, medium or low, with a category: earnings or guidance, legal or regulatory, deal, management, product, analyst opinion, or market commentary. Opinion pieces, comparisons and price recaps are low by rule.
+3. **Severity routing:**
+   - high (price-move triggers, high-importance events): Telegram straight away;
+   - medium: daily digest;
+   - low: in the app only.
+4. **Rate this alert:** a useful / not useful button in Updates and Telegram, stored per alert, to measure the outcome in section 6.
+
+**Done when:** a 1-week replay puts 10% or fewer of Telegram-bound alerts in the low-value categories, and the label-quality check in section 6 still passes.
+
+### Phase 6 — optional: Reddit counted by discussion
+
+Weight Reddit tone by thread and cap per author, so one busy thread can't swing the tally. Choose comment order deliberately (newest, or Reddit's ranking) instead of the feed default.
+
+## 5. Rollout and safety
+
+- **Shadow week before Telegram.** Phases 4 and 5 first run in shadow mode for 5 US trading days: alerts are saved and shown in a "preview" list, not sent. They're compared with what the current pipeline sent.
+- **Restarts** only from the owner's Terminal panel, after an idle check; back up `.env` before every provider change.
+- **Cost guard:** a daily summary of AI spend, and an alert to the owner if a day exceeds US$5.
+- **Rollback:** each phase is behind a setting so it can be turned off without a code revert.
+
+## 6. Outcome and how success is measured
+
+**Aim:** when something important happens to a watched company — especially a big price move — the owner gets one clear alert within about 20 minutes that says what moved, by how much against the market, and the most likely cited cause. Low-value articles stop interrupting, and the system runs reliably at about the cost of today's GPT-5.4 setup or less.
+
+Measured over 10 US trading days after phase 4 is live. Baselines are from 13–17 October 2026.
+
+Measurement preparation17October: new unapplied067retains private append-only
+price assessments before publication, including non-triggers and unavailable
+inputs. Logging failure continues detection with an explicit coverage gap.
+The read-only outcome operator separates preview/actual deployment, first ten
+whole US sessions, full24-hour cost buckets, confirmed sends, grouped triggering
+members, repeated observations, unresolved costs and latest ratings. Missing
+evidence and separate owner-quality/independent-noise reviews remain pending.
+Broad2656offline tests pass/93optional skips; final57outcome/readiness checks
+cover late report guards, with earlier105price-related pass (overlapping);
+worker/migration remain uninstalled. No real ten-session outcome is claimed.
+Read-only19:30SGTdeployment verification finds schema64(all applied checksums
+exact), app started15:54:29SGT, new task/live-routing/daily-report flags unset,
+lanes/new move delivery false. Earlier schema60statements describe the previously
+recorded checkpoint;065–067are currently pending. No restart by this work.
+[Measurement contract](../../development/../testing/redesign-outcomes.md).
+
+| Metric | Baseline | Target (success) | How it is measured |
+| --- | --- | --- | --- |
+| Big moves alerted (rules in phase 4) | 0 timely alerts for the 14–15 Oct moves | 90% or more of qualifying moves | Move detector log against alerts sent |
+| Time from move to alert | about 1.5 days (14–16 Oct) | median 20 min or less in market hours | Trigger time against Telegram sent time |
+| Duplicate deliveries (same story, same account, 24 h) | 3 in one account on 16 Oct | 0 | Telegram delivery log, matched by article |
+| Low-value share of Telegram alerts | about half of 12 (13–17 Oct) | 10% or less | Importance category on sent alerts |
+| Alerts rated useful | not measured | 70% or more | "Rate this alert" button |
+| Watch checks completing | 84% (13–16 Oct) | 97% or more | Watch history |
+| Companies stuck more than 2 h | several during the Sonnet trial | 0 | Watch history |
+| Labels lost to item repair | not applicable | 5% or less | Repair records per reading |
+| Check duration | median 202 s, worst 974 s | fast lane median 60 s or less; slow lane 180 s or less | Watch history |
+| AI cost per day (5 watches) | about US$2.70 (GPT-5.4, estimated) | US$3 or less, including Opus explainers | Spending ledger |
+| Cost of a model switch | US$9–13 | under US$1 | Ledger, 24 h after a switch |
+| Label quality | GPT-5.4 80% and Sonnet 81% tone agreement with Opus; 4/6 and 3/6 proofread cases | 80% or more against an owner-labelled 50-source set; 4/6 or more on the hard cases | Fixed labelled set, re-run after each prompt change |
+
+**The change has failed, and the previous phase's setup is restored, if any of these happen:** check completion below 90% on any day, AI cost above US$6 a day for 2 days, fewer than 70% of qualifying moves alerted, or more alerts rated not useful than useful over a week.
+
+The owner-labelled 50-source set doesn't exist yet. Building it is the first task of phase 5, and the [AnnoABSA](../../development/../testing/sentiment-research-basis.md) annotation tool, with its AI suggestions off, is one option for it.
+
+## 7. Notes for whoever implements this
+
+Read this before starting a phase. Read [AGENTS.md](../../development/../../AGENTS.md) too: it has the project's working rules.
+
+### Working in this repo
+
+- **Tests:** run with a locale set, or the throwaway test database refuses to start ("postmaster became multithreaded during startup"):
+  `LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 .venv/bin/python -m pytest -q tests/<file>.py`.
+  Tests create their own database under `/private/tmp` and make no network calls; they never touch the owner's data.
+- **Never start or restart the app from an agent's sandbox.** On 16 October an app restarted that way couldn't read the system's TLS certificates; every outside request failed, and the app died when the agent's session ended (about 8 hours without monitoring). Ask the owner, or use the desktop app's Terminal panel, and run `.venv/bin/python run.py --port 8841` from the repository folder.
+- **Restart only when idle:** no watch lease active, no AI call running, no data update running, and no watch due within about 90 seconds. Checking the same tables as the `idle()` function in `.local/live-tests/sonnet-switch-20261016/restart.py` (not in Git) is enough. Back up `.env` before any provider change; a running app refuses AI calls as soon as `.env` changes, until it restarts.
+- **Paid AI calls** go through the spending ledger (`thesis/providers/ledger.py`), which only allows the configured models at known prices. Experiment scripts in [`experiments/soclaas_replay/`](../../development/../../experiments/soclaas_replay/) show how to price another model inside one test process without changing the app. OpenRouter is not in the ledger: cap spend in the script and record OpenRouter's reported cost.
+- **Replay inputs** for the 16 META and 15 AVGO batches are in `.local/live-tests/fair-meta-20261016/run/` and `.local/live-tests/soclaas-avgo-20261016/run15/`, on the owner's Mac only. Use them for phase 1 and phase 2 checks; fetch fresh batches with `fair_compare.py` if they're missing.
+- **Phase 0 is committed** on the branch that adds this plan. Start from that branch or after it's merged.
+
+### Phase 3: watch intervals
+
+The database only allows 60- or 240-minute watches: `CHECK (interval_minutes IN (60,240))` on `news_watches` ([migration 012](../../development/../../migrations/012_sentiment_alerts.sql)) and `watch_checks` ([migration 018](../../development/../../migrations/018_watch_check_history.sql)), and `news_watch.configure` enforces the same values. A 15-minute fast lane needs a new numbered migration that adds 15 to both checks, plus code changes. Prefer a separate lane setting over reusing `interval_minutes`, so the existing slow-lane schedule and its watch history keep their meaning. Never edit an already-applied migration.
+
+### Phase 4: index and sector prices
+
+- **Live price source.** Watches don't refresh price history today; `price_history.refresh` only runs when the chart is open. Use the Finnhub quote that `market.refresh` already fetches each check: `normalize_quote` gives current price, previous close and `change_percent`. Finnhub has a 5-minute per-company cooldown; a recent check is reused, not re-fetched. Use the saved Yahoo daily bars (`price_history`) for the two-session rule.
+- **Index and sector funds are not companies.** The `instruments` table (id, symbol, name) is filled from the SEC company directory (`thesis/research/sec/service.py` `add_company`), and much of the app assumes every instrument is a company with filings. Don't add QQQ, SPY or SOXX there. Add a small reference table (symbol, role such as `index` or `sector`, sector mapping) with its own quote snapshots, fetched with the same Finnhub client and pacing. Check that the Finnhub key returns ETF quotes before building on it.
+- **Sector mapping** (which fund is each company's sector) is a small owner-editable table, defaulting to SOXX for semiconductors and none otherwise.
+
+### Phase 4: explainer storage and Telegram
+
+- Store each trigger and explanation in a new table: trigger time, the move numbers used, cause type, the explanation text, cited source versions and the AI call ID. Make it append-only like other research records.
+- Alerts appear in three places that only know three alert kinds today: `research_alerts` (company alerts), the shared events query in `thesis/review_digest.py` (condition, company, idea), and `thesis/monitoring/telegram_message.py` `render`. Add a fourth kind (for example `move`) to all three, and to the Updates inbox in the frontend, rather than stuffing moves into company alerts.
+- A Telegram move message should start with the numbers ("NVDA −3.2% today · Nasdaq −2.1%"), then the cause type, the explanation, and at most two cited source links. Keep the existing safeguards: escaped text, length limit, no resend after an uncertain delivery.
+
+### Phase 5: prompt changes and re-reads
+
+Saved labels are reused only when the prompt version, model, summary policy and related policies all match (`compatible` in [`sentiment_reuse.py`](../../development/../../thesis/research/sentiment_reuse.py)). Splitting the prompt creates new prompt versions, so every company would re-read its whole 7-day pool once, US$4–13 based on the 16–17 October switches. Either extend phase 1's label carry-over to cover prompt changes for tasks whose output didn't change, or schedule the switch at a quiet time and accept the one-off cost. Tone-flip alerts also need the old and new readings to use the same prompt version, model and summary policy (`changes` in `thesis/monitoring/news_watch.py`), so expect no tone-flip alerts on the first check after the switch.
+
+### Decisions that need the owner's OK
+
+Defaults are given in the phases; confirm each with the owner before going live:
+
+| Decision | Default in this plan |
+| --- | --- |
+| Main and quick-check models (phase 2) | Stay on GPT-5.4 + GPT-5.4 mini |
+| Explainer model (phase 4) | Opus 5.5 (or GPT-5.5 on the OpenAI path) |
+| Move thresholds | ±3% in a session, 2 points against the index, ±5% over 2 sessions |
+| Fast-lane hours | US market hours (09:30–16:00 New York time) plus 1 hour either side |
+| Severity routing | High to Telegram now, medium to a daily digest, low in the app only |
+| Daily cost alert | US$5 |
+| Shadow period before Telegram | 5 US trading days |

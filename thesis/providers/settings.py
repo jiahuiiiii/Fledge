@@ -6,6 +6,8 @@ from thesis.config import ROOT, DATA
 
 OPENAI_MODEL = "gpt-5.4-mini-2026-03-17"
 OPENAI_REASONING_MODEL = "gpt-5.4-2026-03-05"
+OPENAI_EXPLAINER_MODEL = "gpt-5.5-2026-04-23"
+EXPLAINER_MODELS = (OPENAI_EXPLAINER_MODEL, "claude-opus-5-5")
 # Prices in nano-USD per token: input, cache read, cache write, output.
 # Anthropic: 5-minute cache write. Checked 2026-10-13.
 ANTHROPIC_PRICES = {
@@ -37,7 +39,7 @@ API_KEYS = {
     "anthropic": "ANTHROPIC_API_KEY",
     "deepseek": "DEEPSEEK_API_KEY",
 }
-SELECTION_KEYS = ("THESIS_MODEL_PROVIDER",) + tuple(
+SELECTION_KEYS = ("THESIS_MODEL_PROVIDER", "THESIS_MOVE_EXPLAINER_MODEL") + tuple(
     f"{provider.upper()}_{role}"
     for provider in TWIN_PRICES
     for role in ("MODEL", "REASONING_MODEL")
@@ -111,6 +113,17 @@ def _models():
 PROVIDER, MODEL, REASONING_MODEL = _models()
 
 
+def explainer_choice(values):
+    model = values.get("THESIS_MOVE_EXPLAINER_MODEL") or None
+    if model is not None and model not in EXPLAINER_MODELS:
+        raise ProviderConfigError("Choose a priced move explainer model or leave it disabled")
+    return model
+
+
+# Independent role, disabled until the owner approves a live choice.
+EXPLAINER_MODEL = explainer_choice(_configured())
+
+
 def provider_for(model):
     for provider, prices in TWIN_PRICES.items():
         if model in prices:
@@ -123,7 +136,7 @@ def live_key(model=MODEL):
         raise ProviderConfigError(
             "Live requests require the original persistent Fledge database"
         )
-    if model not in (MODEL, REASONING_MODEL):
+    if model not in (MODEL, REASONING_MODEL) and (EXPLAINER_MODEL is None or model != EXPLAINER_MODEL):
         raise ProviderConfigError("The requested model has not been priced for this allowance")
     values = settings()
     if values.get("THESIS_LIVE_MODELS_ENABLED") != "true":
@@ -133,8 +146,11 @@ def live_key(model=MODEL):
         raise ProviderConfigError(
             "The AI provider settings in .env changed; restart the app to use them"
         )
-    name = API_KEYS[PROVIDER]
+    if explainer_choice(values) != EXPLAINER_MODEL:
+        raise ProviderConfigError("The explainer setting in .env changed; restart the app to use it")
+    provider = provider_for(model)
+    name = API_KEYS[provider]
     key = values.get(name, "")
     if not key:
-        raise ProviderConfigError(f"Add the {PROVIDER} key ({name}) to the private .env file")
+        raise ProviderConfigError(f"Add the {provider} key ({name}) to the private .env file")
     return key

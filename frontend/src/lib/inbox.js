@@ -1,4 +1,5 @@
 import { sourceHeadline } from "./sourceHeadline.js";
+import { moveSummary } from "./moveAlerts.js";
 
 const relations = {
   supports: "May support your reasoning",
@@ -43,6 +44,7 @@ export function inboxSummary(record) {
   }
   if (record.kind === "condition")
     return { title: record.title, text: d.question };
+  if (record.kind === "move") return moveSummary(d);
   const noteworthy = d.items.filter((i) => relations[i.relation]);
   const kinds = [...new Set(noteworthy.map((i) => i.relation))];
   return {

@@ -6,6 +6,10 @@ import { api } from "../api/client";
 import { stamp } from "./MarketResearch";
 import IdeaAlertChecks from "./IdeaAlertChecks";
 import { ResearchAlerts } from "./SentimentPanel";
+import MoveAlertCard from "./MoveAlertCard";
+import AlertRating from "./AlertRating";
+import AlertRoutingPreview from "./AlertRoutingPreview";
+import DailyUpdates from "./DailyUpdates";
 import { ConditionChange } from "./IdeasAndChanges";
 import { inboxSummary, recordKey } from "../lib/inbox";
 import "./UpdateInbox.css";
@@ -14,6 +18,7 @@ const kindName = {
   idea: "Your saved idea",
   company: "Company news",
   condition: "Monitored condition",
+  move: "Price move",
 };
 const reviewName = (action) =>
   ({ reviewed: "Reviewed", unresolved: "Left unresolved" })[action] ||
@@ -124,9 +129,11 @@ export default function UpdateInbox({
     setError("");
     setNotice("");
     try {
-      await (kind === "idea"
-        ? api.reviewIdeaAlert(id, action)
-        : api.reviewAlert(id, action));
+      await (kind === "move"
+        ? api.reviewMoveAlert(id, action)
+        : kind === "idea"
+          ? api.reviewIdeaAlert(id, action)
+          : api.reviewAlert(id, action));
       setNotice(
         action === "reviewed"
           ? "Review recorded. Your idea is unchanged."
@@ -154,7 +161,7 @@ export default function UpdateInbox({
         <div>
           <h2>Updates</h2>
           <p className="inbox-intro">
-            Changes to your ideas, company reporting and monitored conditions.
+            Price moves, company reporting and changes to your saved research.
           </p>
         </div>
         <div className="inbox-heading-actions">
@@ -168,6 +175,9 @@ export default function UpdateInbox({
           </button>
         </div>
       </div>
+      {!company && data?.daily_reports_enabled && (
+        <DailyUpdates refresh={refresh} onOpen={onOpen} onSource={onSource} />
+      )}
       <details className="inbox-filter-disclosure">
         <summary>
           Filter updates{" "}
@@ -278,6 +288,8 @@ export default function UpdateInbox({
                   >
                     <div className="inbox-kind">{kindName[record.kind]}</div>
                     <ConditionChange change={d} onOpen={onOpen} />
+                    <AlertRoutingPreview record={record} />
+                    <AlertRating record={record} />
                   </article>
                 );
               return (
@@ -297,6 +309,9 @@ export default function UpdateInbox({
                     </div>
                     <h3>{summary.title}</h3>
                     <p className="inbox-preview">{summary.text}</p>
+                    {record.kind === "company" && d.preview && (
+                      <p className="fine">Preview · not sent to Telegram</p>
+                    )}
                     {summary.source && (
                       <p className="inbox-source-caption">
                         {summary.source}
@@ -310,7 +325,9 @@ export default function UpdateInbox({
                     )}
                     {summary.alert && (
                       <p className="inbox-alert-caption">
-                        Flagged for review: {summary.alert}
+                        {record.kind === "move"
+                          ? summary.alert
+                          : `Flagged for review: ${summary.alert}`}
                       </p>
                     )}
                     {summary.question && (
@@ -346,7 +363,16 @@ export default function UpdateInbox({
                     </div>
                   </summary>
                   <div className="inbox-detail">
-                    {record.kind === "idea" ? (
+                    {record.kind === "move" ? (
+                      <MoveAlertCard
+                        alert={d}
+                        busy={busy}
+                        onOpen={onOpen}
+                        onReview={(id, action) =>
+                          acknowledge("move", id, action)
+                        }
+                      />
+                    ) : record.kind === "idea" ? (
                       <IdeaAlertChecks
                         checks={[d]}
                         embedded
@@ -369,6 +395,8 @@ export default function UpdateInbox({
                         }
                       />
                     )}
+                    <AlertRoutingPreview record={record} />
+                    <AlertRating record={record} />
                   </div>
                 </details>
               );

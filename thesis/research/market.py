@@ -68,6 +68,8 @@ def fetch(endpoint, params, *, transport=None):
             with client.stream(
                 "GET", "https://finnhub.io/api/v1/" + endpoint, params=params
             ) as response:
+                from .source_observations import record
+                record("finnhub", response.status_code)
                 if response.status_code != 200:
                     raise ValueError(
                         "Finnhub access was denied or rate-limited."

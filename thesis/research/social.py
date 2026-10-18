@@ -92,6 +92,12 @@ def parse_feed(content, feed, now, lookback_days=7):
             ):
                 raise ValueError("Unsupported post URL")
             author = entry.findtext(ATOM + "author/" + ATOM + "name")
+            try:
+                updated = datetime.fromisoformat((entry.findtext(ATOM + "updated") or "").replace("Z", "+00:00"))
+                if updated.tzinfo is None or not posted <= updated <= now:
+                    updated = None
+            except ValueError:
+                updated = None
             result.append(
                 dict(
                     post_key=key,
@@ -99,6 +105,7 @@ def parse_feed(content, feed, now, lookback_days=7):
                     body=body,
                     url=url,
                     published_at=posted,
+                    updated_at=updated,
                     feed=feed,
                     author_hash=(
                         hashlib.sha256(author.encode()).hexdigest() if author else None

@@ -441,14 +441,15 @@ def test_failed_check_retries_soon_then_returns_to_the_normal_schedule(owner):
     assert item["details"]["failure_reason"] == "Sentiment analysis is already running for this company."
 
 
-def test_scheduled_watch_allows_one_retry_of_a_failed_batch(owner, monkeypatch):
+def test_scheduled_watch_only_rechecks_saved_answers_without_paid_retry(owner, monkeypatch):
     iid, _ = begin(owner)
     seen = {}
+    original_generate = sentiment.generate
 
     def generate(i, **kw):
         seen.update(kw)
-        return sentiment.generate(i, transport=provider("negative"))
+        return original_generate(i, transport=provider("negative"))
 
     monkeypatch.setattr(news_watch.sentiment, "generate", generate)
     assert news_watch.run_once(owner, market_refresh=lambda _: None, social_refresh=lambda: None)
-    assert seen.get("retry_failed") is True
+    assert seen.get("retry_failed") is False

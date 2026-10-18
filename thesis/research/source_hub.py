@@ -1,6 +1,7 @@
 """Bounded Deus-style news fan-in with independent, visible provider outcomes."""
 from thesis.display_time import stamp as display_stamp
 import json
+import contextvars
 import re
 from threading import Lock
 from urllib.parse import urljoin, urlsplit
@@ -35,6 +36,8 @@ FEEDS = {
  'korea_business': ('Korea Times · Business', 'https://feed.koreatimes.co.kr/k/business.xml', 25),
 }
 FEED_LOCKS = {provider: Lock() for provider in FEEDS}
+# Feeds whose item description is not the article's own text.
+AGGREGATOR_FEEDS = {'google_business'}
 LABELS = {key: val[0] for key,val in FEEDS.items()} | {'alpha_vantage':'Alpha Vantage', 'x':'X / Twitter'}
 RECENT_CHECK = 'This source was checked recently; saved data is retained.'
 
@@ -86,6 +89,8 @@ def get(provider, url, *, params=None, headers=None, transport=None):
             endpoint = url
             for redirect in range(3):
                 with client.stream('GET',endpoint,params=params) as response:
+                    from .source_observations import record
+                    record(provider, response.status_code)
                     if provider in FEEDS and response.status_code in (301,302,307,308):
                         target=urljoin(endpoint,response.headers.get('Location',''))
                         destination=urlsplit(target)
@@ -160,7 +165,10 @@ def parse_feed(provider, body, company, now):
         try:
             prefix=atom if root.tag!= 'rss' else ''
             title=provider_text(plain_summary(entry.findtext(prefix+'title') or ''),600)
-            summary=provider_text(plain_summary(entry.findtext(prefix+'description') or entry.findtext(prefix+'summary') or entry.findtext(prefix+'content') or ''),6000,allow_empty=True)
+            # Google News descriptions are a rotating list of other outlets'
+            # headlines from the same story cluster, not this article's text:
+            # keep only its own headline (which ends with the outlet).
+            summary='' if provider in AGGREGATOR_FEEDS else provider_text(plain_summary(entry.findtext(prefix+'description') or entry.findtext(prefix+'summary') or entry.findtext(prefix+'content') or ''),6000,allow_empty=True)
             link=entry.findtext('link') if not prefix else next((l.get('href') for l in entry.findall(atom+'link') if l.get('rel','alternate')=='alternate'),'')
             url=safe_url(link)
             date=entry.findtext('pubDate') if not prefix else entry.findtext(atom+'published') or entry.findtext(atom+'updated')
@@ -298,7 +306,8 @@ def refresh_rss(iid,*,fetcher=None):
         try:return refresh(iid,provider,fetcher=fetcher)
         except Conflict as exc:return dict(status='cached',message=str(exc))
     with ThreadPoolExecutor(max_workers=3) as pool:
-        results=list(pool.map(run,FEEDS))
+        futures=[pool.submit(contextvars.copy_context().run,run,provider) for provider in FEEDS]
+        results=[future.result() for future in futures]
     matched=sum(r.get('matched',0) for r in results)
     failed=sum(r['status']=='failed' for r in results)
     waiting=sum(r['status']=='cached' for r in results)

@@ -262,6 +262,21 @@ export const api = {
       method: "POST",
       body: { action },
     }),
+  reviewMoveAlert: (id, action) =>
+    request(`/move-alerts/${id}/review`, { method: "POST", body: { action } }),
+  rateAlert: (kind, id, value) =>
+    request(`/alerts/${kind}/${id}/rating`, {
+      method: "POST",
+      body: { value },
+    }),
+  dailyUpdates: () => request("/daily-updates"),
+  dailyDigest: (id, page = 0) => request(`/daily-updates/${id}?page=${page}`),
+  priceReferences: (id) => request(`/companies/${id}/price-references`),
+  setPriceReference: (id, symbol) =>
+    request(`/companies/${id}/price-references`, {
+      method: "POST",
+      body: { symbol },
+    }),
   suggest: (body) => request("/proposals/generate", { method: "POST", body }),
   approveSuggestions: (proposal_ids, definition) =>
     request("/proposals/approve", {

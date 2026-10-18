@@ -11,6 +11,8 @@ from .settings import (
     OPENAI_REASONING_MODEL as REASONING_MODEL,
     TWIN_PRICES,
     provider_for,
+    OPENAI_EXPLAINER_MODEL,
+    EXPLAINER_MODELS,
 )
 
 NANO = 1_000_000_000
@@ -32,6 +34,7 @@ IDEA_EVIDENCE_MAX_OUTPUT = 9000
 IDEA_EVIDENCE_PRICE_VERSION = "openai-gpt-5.4-idea-evidence-9000-20261003"
 REASONING_PRICE_VERSION = "openai-gpt-5.4-standard-20261002"
 MAX_REQUEST_BYTES = 64000
+MOVE_EXPLAINER_PRICE_VERSION = "move-explainer-low-2000-20261017"
 
 
 @dataclass(frozen=True)
@@ -153,6 +156,16 @@ PROFILES = OPENAI_PROFILES + tuple(
     for base in OPENAI_PROFILES
 )
 
+# Separate role/family: these profiles do not change any historical allowance.
+# GPT-5.5 standard $5/$0.50/$30 per 1M, checked 2026-10-17:
+# https://developers.openai.com/api/docs/models/gpt-5.5
+PROFILES += (
+    PriceProfile(OPENAI_EXPLAINER_MODEL, MOVE_EXPLAINER_PRICE_VERSION,
+                 5000, 500, 30000, MAX_OUTPUT, "low"),
+    PriceProfile("claude-opus-5-5", twin_version("anthropic", "claude-opus-5-5", MOVE_EXPLAINER_PRICE_VERSION),
+                 4000, 200, 20000, MAX_OUTPUT, "low", 5000),
+)
+
 
 def price_profile(model, version=None):
     for profile in PROFILES:
@@ -167,6 +180,8 @@ def _family(body):
     fmt = text.get("format") if isinstance(text, dict) else None
     name = fmt.get("name") if isinstance(fmt, dict) else None
     limit, effort = body.get("max_output_tokens"), body.get("reasoning")
+    if limit == MAX_OUTPUT and effort == {"effort": "low"} and name == "price_move_explainer":
+        return MOVE_EXPLAINER_PRICE_VERSION
     if limit == SENTIMENT_LOW_MAX_OUTPUT and effort == {"effort": "low"} and name == "source_sentiment":
         return SENTIMENT_LOW_PRICE_VERSION
     if limit == SENTIMENT_DEPTH_MAX_OUTPUT and effort == {"effort": "high"} and name == "source_sentiment_reasoning_eval":
@@ -185,6 +200,12 @@ def request_profile(body):
     model = body.get("model")
     family = _family(body)
     provider = provider_for(model)
+    if family == MOVE_EXPLAINER_PRICE_VERSION:
+        if model not in EXPLAINER_MODELS:
+            raise ValueError("Only a priced move-explainer model can use this request family")
+        return price_profile(model, family if provider == "openai" else twin_version(provider, model, family))
+    if model == OPENAI_EXPLAINER_MODEL:
+        raise ValueError("This model is priced only for the bounded move explainer")
     if provider != "openai":
         if family is None:
             # Quick-check and other bounded routes keep their own allowance.

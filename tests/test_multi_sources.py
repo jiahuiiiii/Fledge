@@ -44,6 +44,20 @@ def test_rss_and_atom_preserve_dates_and_source_text():
     assert hub.parse_feed('cnbc',raw,COMPANY,NOW)[0][0]['url'].endswith('/atom')
 
 
+def test_google_news_keeps_only_the_articles_own_headline():
+    # The description is a rotating list of other outlets' headlines in the cluster.
+    cluster='&lt;ol&gt;&lt;li&gt;Microsoft slides as AI rout deepens CNA&lt;/li&gt;&lt;li&gt;Tech sell-off deepens The Guardian&lt;/li&gt;&lt;/ol&gt;'
+    own=rss(title='Microsoft shares fall on AI spending doubts - The Straits Times',summary=cluster,url='https://news.google.com/rss/articles/abc')
+    items,_,_=hub.parse_feed('google_business',own,COMPANY,NOW)
+    assert len(items)==1 and items[0]['body']==''
+    assert items[0]['headline']=='Microsoft shares fall on AI spending doubts - The Straits Times'
+    # A company named only by a related headline is not this article's subject.
+    other=rss(title='Tech stocks tumble - The Straits Times',summary=cluster,url='https://news.google.com/rss/articles/def')
+    assert hub.parse_feed('google_business',other,COMPANY,NOW)[0]==[]
+    # Other publishers keep their own description text.
+    assert hub.parse_feed('cnbc',other,COMPANY,NOW)[0][0]['body']!=''
+
+
 @pytest.mark.parametrize('date',['','undated','Sun, 01 Jan 2000 10:00:00 GMT',format_datetime(NOW+timedelta(days=1))])
 def test_bad_or_missing_dates_do_not_become_fresh_news(date):
     items,total,rejected=hub.parse_feed('cnbc',rss(date=date),COMPANY,NOW)

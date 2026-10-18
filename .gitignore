@@ -8,6 +8,9 @@ __pycache__/
 .env
 .DS_Store
 
+# Private human-review exports.
+fledge-owner-labels-*.json
+
 .env.*
 !.env.example
 output/Fledge - Group 6 - CP1001 Week 9.pptx

@@ -11,6 +11,7 @@ import json
 import os
 
 from thesis.providers import ledger
+from thesis.db import transaction
 from thesis.providers.settings import MODEL
 from . import reddit_thread_context
 
@@ -137,7 +138,13 @@ def run(packet, *, transport=None):
     by_label = {s["label"]: s["id"] for s in packet["sources"]}
 
     def send(body):
-        call = ledger.execute(request_key(body), "sentiment:" + POLICY, body, transport=transport)
+        from .sentiment_batching import has_attempt
+        key = request_key(body)
+        with transaction() as conn:
+            saved = ledger.find(conn, key)
+        if saved is None and has_attempt(key):
+            raise ledger.BudgetBlocked("An earlier quick relevance check has no settled response. No automatic retry; its charge needs review.")
+        call = saved or ledger.execute(key, "sentiment:" + POLICY, body, transport=transport)
         if call["status"] != "settled":
             raise ledger.BudgetBlocked(
                 "An earlier quick relevance check may already have been sent. No automatic retry; its charge needs review.")
@@ -173,12 +180,15 @@ def skipped_item(source):
 def merge(packet, result, record):
     """Add skipped sources back as unrelated quick-check items and recount once."""
     from .sentiment import summarize
+    from . import sentiment_reliability
     present = {i["source_id"] for i in result["items"]}
     order = {s["id"]: n for n, s in enumerate(packet["sources"])}
-    extra = [skipped_item(s) for s in packet["sources"] if s["id"] not in present]
+    extra = [dict(skipped_item(s), model=record["model"], call_ids=record["call_ids"])
+             for s in packet["sources"] if s["id"] not in present]
     items = sorted(result["items"] + extra, key=lambda i: order[i["source_id"]])
     if len(items) != len(packet["sources"]):
         raise ValueError("Every source must be read or skipped exactly once.")
     return dict(result, items=items, prefilter=record,
                 summary=summarize(items, packet["sources"], result["coverage_links"],
-                                  packet.get("comparison_sources", [])))
+                                  packet.get("comparison_sources", [])),
+                **(dict(repairs=sentiment_reliability.counts(items)) if sentiment_reliability.enabled() else {}))

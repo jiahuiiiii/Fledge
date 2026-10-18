@@ -10,14 +10,14 @@ from copy import deepcopy
 from collections import Counter
 from datetime import datetime, timezone, timedelta
 from typing import Literal
-from uuid import uuid4
+from uuid import UUID, uuid4
 from pydantic import BaseModel, ConfigDict, Field
 from psycopg.types.json import Jsonb
 from thesis.db import transaction, one, rows
 from thesis.providers import ledger
 from thesis.providers.settings import REASONING_MODEL
 from . import market_brief, social, coverage
-from . import sentiment_context, reporting_basis, reddit_thread_context
+from . import sentiment_context, reporting_basis, reddit_thread_context, sentiment_reliability
 from .citations import source_passages, model_source, FINDING_GROUNDING
 from .sec.checkpoint import current_documents, active_document
 from . import sentiment_guards
@@ -470,7 +470,7 @@ def response_text(call):
     return texts[0]
 
 
-def render(call, packet):
+def render(call, packet, *, enforce_repair_limit=True):
     raw = json.loads(response_text(call))
     result = Classification.model_validate(raw)
     if packet.get("guard_policy") == sentiment_guards.POLICY and any(
@@ -483,6 +483,9 @@ def render(call, packet):
             "The sentiment response did not classify every source exactly once."
         )
     items = []
+    repairing = sentiment_reliability.enabled()
+    origin_model = (call.get("model") or call.get("response_body", {}).get("model")
+                    or (call.get("request_body") or {}).get("model") or REASONING_MODEL)
     for item in result.items:
         source = sources[item.id]
         passages = {p["id"]: p["quote"] for p in source["passages"]}
@@ -490,7 +493,7 @@ def render(call, packet):
             p not in passages for p in item.passages
         ):
             raise ValueError("Sentiment evidence does not match its original source.")
-        if item.relevance != "relevant" and item.sentiment != "unclear":
+        if item.relevance != "relevant" and item.sentiment != "unclear" and not repairing:
             raise ValueError(
                 "Unrelated or ambiguous sources cannot carry a directional label."
             )
@@ -500,6 +503,13 @@ def render(call, packet):
             raise ValueError(
                 "Earlier-attitude evidence does not match its original source."
             )
+        # Validate even fields which will be dropped; never repair fabricated evidence.
+        if repairing and item.reporting is not None:
+            if len(set(item.reporting.passages)) != len(item.reporting.passages) or any(p not in passages for p in item.reporting.passages):
+                raise ValueError("Reporting passages must belong to the original report.")
+        if repairing and any(c.passage_id not in passages for c in item.price_claims):
+            raise ValueError("Price evidence does not match its original source.")
+        original, reasons = sentiment_reliability.repair(item, source) if repairing else (None, [])
         if item.previous_passages and (
             source["channel"] != "social" or item.relevance != "relevant"
         ):
@@ -525,7 +535,8 @@ def render(call, packet):
         if source["channel"] == "news" and item.price_claims:
             raise ValueError("Structured share-price claims are only accepted for social sources.")
         if packet.get("reporting_policy") == reporting_basis.POLICY and source["channel"] == "news":
-            reporting = reporting_basis.render(item.reporting, source, item.relevance)
+            reporting = reporting_basis.render(item.reporting, source, item.relevance,
+                                               repairs=reasons if repairing else None)
         elif item.reporting is not None:
             raise ValueError("Reporting evidence is only accepted for news in the current contract.")
         items.append(
@@ -546,10 +557,17 @@ def render(call, packet):
                 ],
                 **({"conversation": context} if context else {}),
                 **({"thread_context": thread} if thread else {}),
+                **(dict(model=origin_model,
+                         call_id=str(call["id"]) if call.get("id") else None)
+                   if repairing else {}),
+                **(dict(repair=dict(policy=sentiment_reliability.POLICY, reasons=reasons,
+                                   original=original)) if reasons else {}),
             )
             | (sentiment_guards.apply(item, source, packet["company"])
                if packet.get("guard_policy") == sentiment_guards.POLICY else {})
         )
+    if repairing and enforce_repair_limit and sum(bool(i.get("repair")) for i in items) > max(1, len(items) // 4):
+        raise ValueError("Too many sentiment items need repair in this batch.")
     ignored = []
     links = coverage.render(result.coverage_links, packet, items, ignored)
     return dict(
@@ -563,6 +581,7 @@ def render(call, packet):
         model=REASONING_MODEL,
         prompt_version=PROMPT,
         guard_policy=packet.get("guard_policy"),
+        **(dict(repairs=sentiment_reliability.counts(items)) if repairing else {}),
     )
 
 
@@ -603,6 +622,8 @@ def present(conn, record):
             sources=[],
             summary={},
         )
+    from . import sentiment_task_runner, sentiment_tasks
+    current_prompt=sentiment_tasks.PROMPT if sentiment_task_runner.enabled() else PROMPT
     return dict(
         record["result"],
         id=str(record["id"]),
@@ -615,7 +636,7 @@ def present(conn, record):
         earlier_method=any(
             record["result"].get(key) != value
             for key, value in (
-                ("prompt_version", PROMPT),
+                ("prompt_version", current_prompt),
                 ("model", REASONING_MODEL),
                 ("summary_policy", POLICY),
             )
@@ -679,33 +700,48 @@ def present(conn, record):
     )
 
 
-def generate(iid, *, transport=None, now=None, lookback_days=7, progress=None, retry_failed=False):
+def generate(iid, *, transport=None, now=None, lookback_days=7, progress=None, retry_failed=False,
+             reread_token=None, split_failed=False):
     from . import sentiment_batching
     # A session lock spans external calls without holding a DB transaction.
     # It also serializes explicit recovery with scheduled/company requests.
     with sentiment_batching.company_lock(iid):
         return _generate(iid, transport=transport, now=now, lookback_days=lookback_days,
-                         progress=progress, retry_failed=retry_failed)
+                         progress=progress, retry_failed=retry_failed,
+                         reread_token=reread_token, split_failed=split_failed)
 
 
-def _generate(iid, *, transport, now, lookback_days, progress, retry_failed):
+def _generate(iid, *, transport, now, lookback_days, progress, retry_failed, reread_token=None, split_failed=False):
     from . import relevance_prefilter, sentiment_batching
     with transaction() as c:
         packet = prepare(c, iid, now, lookback_days=lookback_days)
-        # Unchanged inputs reuse an earlier full reading instead of paying again.
+        suffix = ":" + relevance_prefilter.POLICY
+        if sentiment_reliability.enabled():
+            suffix += ":" + sentiment_reliability.POLICY
         legacy = identity(packet)
-        key = legacy + ":" + relevance_prefilter.POLICY
-        old = one(c, "SELECT * FROM sentiment_analyses WHERE request_key IN (%s,%s) ORDER BY request_key=%s DESC LIMIT 1",
-                  (key, legacy, key))
+        normal_key = legacy + suffix
+        if reread_token is not None:
+            # A durable explicit run identity, never a nonce invented by a watch.
+            packet["reread_token"] = str(UUID(str(reread_token)))
+            packet["replaces_request_key"] = normal_key
+            legacy = identity(packet)
+        # Unchanged inputs reuse an earlier full reading instead of paying again.
+        key = legacy + suffix
+        old = one(c, "SELECT * FROM sentiment_analyses WHERE instrument_id=%s AND "
+                  "(request_key IN (%s,%s) OR packet->>'replaces_request_key'=%s) "
+                  "ORDER BY created_at DESC,request_key=%s DESC,id DESC LIMIT 1",
+                  (iid, key, legacy, key, key))
     if old:
         with transaction() as c:
             return present(c, old)
     from . import sentiment_reuse
     with transaction() as c:
-        reused = sentiment_reuse.find(c, packet)
+        reused = {} if reread_token else sentiment_reuse.find(c, packet)
     result, calls = sentiment_batching.run_reusing(packet, reused, transport=transport,
-                                                   progress=progress, retry_failed=retry_failed)
-    packet["batching"] = dict(policy=sentiment_batching.POLICY,
+                                                   progress=progress, retry_failed=retry_failed,
+                                                   prefilter=False if reread_token else None,
+                                                   split_failed=split_failed)
+    packet["batching"] = dict(policy=result.get('batching',{}).get('policy',sentiment_batching.POLICY),
                              call_ids=[str(call["id"]) for call in calls])
     if result.get("source_reuse"):
         packet["source_reuse"] = result["source_reuse"]

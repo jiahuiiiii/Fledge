@@ -3,6 +3,7 @@
 from copy import deepcopy
 import pytest
 from thesis.monitoring import news_watch
+from thesis.research import coverage
 from test_news_coverage import source, analyse, relation
 from datetime import timedelta
 from uuid import uuid4
@@ -186,3 +187,33 @@ def test_opinion_only_repeat_guard_does_not_create_changed_reporting():
         )
     ]
     assert news_watch.changes(before, after) == []
+
+
+def google_news(label, body, minute):
+    item = source(label, body, minute)
+    item["url"] = "https://news.google.com/rss/articles/CBMi-same-article"
+    return item
+
+
+def test_new_version_of_a_seen_google_news_article_is_not_delivered_again():
+    # Same article, saved again because Google's related-headline text rotated.
+    first = google_news("item_1", "Microsoft sinks in tech rout. The Guardian", 0)
+    again = google_news("item_2", "Microsoft sinks in tech rout. Yahoo Finance", 1)
+    assert news_watch.changes(analyse([first], []), analyse([again], [])) == []
+    # The stable article key is also remembered, so later baselines keep it.
+    key = coverage.article_key(first)
+    assert key and key == coverage.article_key(again)
+    assert key in coverage.observed_keys(analyse([first], []), first)
+    unrelated = source("item_0", "Microsoft opens an office.", 0)
+    assert news_watch.changes(analyse([unrelated], []), analyse([again], []), {("news", key)}) == []
+    # Without that remembered key the same new version would alert.
+    assert len(news_watch.changes(analyse([unrelated], []), analyse([again], []))) == 1
+
+
+def test_other_publishers_still_treat_a_changed_version_as_new_reporting():
+    first = source("item_1", "Microsoft sinks in tech rout.", 0)
+    again = source("item_2", "Microsoft sinks in tech rout after a downgrade.", 1)
+    again["url"] = first["url"]
+    assert coverage.article_key(again) is None
+    alerts = news_watch.changes(analyse([first], []), analyse([again], []))
+    assert len(alerts) == 1 and alerts[0]["kind"] == "new_reporting"

@@ -208,9 +208,12 @@ def explain_saved_failure(conn, run):
     return run
 
 
-def start(owner, iid, *, initial=False, analyze=False, lookback_days=7):
+def start(owner, iid, *, initial=False, analyze=False, lookback_days=7,
+          reread=False, split_failed=False):
     if type(lookback_days) is not int or lookback_days not in (1,7,30):
         raise ValueError('Choose a discussion window of 1, 7 or 30 days.')
+    if (reread or split_failed) and (not analyze or initial or (reread and split_failed)):
+        raise ValueError('Choose one explicit analysis action.')
     with transaction(owner) as conn:
         conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s,0))", ('research-load:'+str(owner)+str(iid),))
         if not one(conn, 'SELECT 1 FROM sec_companies WHERE instrument_id=%s', (iid,)):
@@ -222,9 +225,16 @@ def start(owner, iid, *, initial=False, analyze=False, lookback_days=7):
         if old and not analyze and (datetime.now(timezone.utc)-old['created_at']).total_seconds()<15:
             raise Conflict('The last refresh just finished. Its results are shown below.')
         keys = [k for k in LABELS if k != 'analysis'] if not analyze else ['market','rss','alpha_vantage','reddit','hackernews','x','analysis']
+        if reread or split_failed:
+            keys = ['analysis']
         steps = [dict(key=k,label=LABELS[k],status='queued',message='Waiting for a worker') for k in keys]
+        run_id = uuid4()
+        if reread:
+            steps[-1]['reread_token'] = str(run_id)
+        if split_failed:
+            steps[-1]['split_failed'] = True
         return one(conn, 'INSERT INTO research_loads(id,owner_id,instrument_id,lookback_days,steps) VALUES(%s,%s,%s,%s,%s) RETURNING *',
-                   (uuid4(),owner,iid,lookback_days,Jsonb(steps)))
+                   (run_id,owner,iid,lookback_days,Jsonb(steps)))
 
 
 def _write(conn, run, index, **fields):
@@ -294,6 +304,7 @@ def execute(run, key):
     from . import source_hub,x_source
     iid = str(run['instrument_id'])
     days = run['lookback_days']
+    analysis_options = next((s for s in run['steps'] if s['key'] == 'analysis'), {})
     actions = dict(market=lambda: market.refresh(iid), filings=lambda: sec.refresh(iid),
                    disclosures=lambda: disclosures.refresh(iid),
                    rss=lambda: source_hub.refresh_rss(iid),alpha_vantage=lambda: source_hub.refresh(iid,'alpha_vantage'),
@@ -302,7 +313,9 @@ def execute(run, key):
                    hackernews=lambda: hackernews.refresh(iid,lookback_days=days,include_threads=True),
                    targets=lambda: analyst_targets.refresh(iid), multiples=lambda: multiples.refresh(iid),
                    analysis=lambda: sentiment.generate(iid,lookback_days=days,
-                       progress=lambda value: analysis_progress(run, value), retry_failed=True))
+                       progress=lambda value: analysis_progress(run, value), retry_failed=True,
+                       reread_token=analysis_options.get('reread_token'),
+                       split_failed=analysis_options.get('split_failed', False)))
     result = actions[key]()
     if key=='filings':
         from thesis import service
