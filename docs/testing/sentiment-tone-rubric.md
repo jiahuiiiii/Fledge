@@ -134,3 +134,17 @@ One approved run of version 4 with full saved thread context completed 56/56 req
 The 19 cases that gained thread messages (11–22 supplied each) now match the owner only 3 times. The model marked 11 of them as unclear relevance, against 5 before, including four replies it previously matched. Reddit RSS does not say which message a reply answers. Given many unordered siblings, the model follows its rule not to infer reply structure from order and abstains. With only the topic, it assumed the reply answered the topic.
 
 **Conclusion:** extra discussion messages without the reply chain make short replies harder to place, not easier. This result does not support sending more unordered thread context. Options are a real reply chain (Reddit's official API, which needs owner setup) or an owner rule that replies in a thread about the company count as about the company unless they clearly discuss something else. Version 4 stays off; no further paid attempt is authorised by this run. Raw requests, responses and the ledger record are in `.local/live-tests/redesign-phase-5-20261018/thread-context-run1/`.
+
+### Agreed-rules reference rescore — 18 October 2026
+
+After re-reading six short replies with their full saved threads, the owner agreed five more reference changes: cases 17, 20, 21, 34 and 38. Case 06 keeps its original label because the thread makes it genuinely ambiguous. The private agreed-rules reference now differs from the original owner labels in 14 of 50 cases. The original labels and their official 24/50 score are unchanged.
+
+Free rescoring of saved predictions (no new AI calls) against that reference:
+
+| Run | Exact agreement |
+| --- | --- |
+| Original quality prompt, topic-only context | 38/50 |
+| Rubric version 2, topic-only context | 37/50 |
+| Version 4, full thread context | 32/50 |
+
+Topic-only context is better than unordered full threads. These are same-set development results: the reference was revised after seeing model answers, so it cannot act as independent validation. A release claim still needs a fresh labelled set under these rules. The remaining open rules (large bullish trades, a CEO criticising others, case 08) cover several of the remaining differences.
