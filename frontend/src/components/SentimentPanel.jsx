@@ -28,6 +28,8 @@ import { useEffect, useId, useState } from "react";
 import Modal from "./Modal";
 import EvidenceButton from "./EvidenceButton";
 import { stamp } from "./MarketResearch";
+import { api } from "../api/client";
+import { loadPreviousSample, savedPreviousSample } from "../lib/previousSample";
 export default function SentimentPanel({
   data,
   busy,
@@ -1152,6 +1154,59 @@ function AlertEvidence({ item, sources, onSource, comparison }) {
   );
 }
 
+// Loads the alert's earlier sample once, when the section is first opened.
+function PreviousSample({ alert, onSource }) {
+  const [sample, setSample] = useState(() => savedPreviousSample(alert));
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    setSample(savedPreviousSample(alert));
+    setError(null);
+  }, [alert.id]);
+  async function load() {
+    if (sample || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      setSample(await loadPreviousSample(api, alert.id));
+    } catch (failure) {
+      setError(failure.message || "The earlier sample could not be loaded.");
+    } finally {
+      setLoading(false);
+    }
+  }
+  return (
+    <details onToggle={(event) => event.currentTarget.open && load()}>
+      <summary>Previous sample · {stamp(alert.payload.previous_cutoff)}</summary>
+      {sample?.withheld ? (
+        <p className="warning">
+          Evidence is currently unavailable; this earlier sample is withheld.
+        </p>
+      ) : sample ? (
+        sample.items.map((i) => (
+          <AlertEvidence
+            key={i.source_id}
+            item={i}
+            sources={sample.sources}
+            onSource={onSource}
+          />
+        ))
+      ) : error ? (
+        <p className="warning" role="alert">
+          {error}{" "}
+          <button type="button" onClick={load}>
+            Try again
+          </button>
+        </p>
+      ) : (
+        <p className="muted" aria-live="polite">
+          Loading the earlier sample…
+        </p>
+      )}
+    </details>
+  );
+}
+
 export function ResearchAlerts({
   alerts,
   busy,
@@ -1266,19 +1321,7 @@ export function ResearchAlerts({
                   ))}
                 </details>
               )}
-              <details>
-                <summary>
-                  Previous sample · {stamp(a.payload.previous_cutoff)}
-                </summary>
-                {a.previous_items?.map((i) => (
-                  <AlertEvidence
-                    key={i.source_id}
-                    item={i}
-                    sources={a.previous_sources}
-                    onSource={onSource}
-                  />
-                ))}
-              </details>
+              <PreviousSample alert={a} onSource={onSource} />
               {a.payload.saved_idea && (
                 <details>
                   <summary>

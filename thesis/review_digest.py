@@ -184,7 +184,7 @@ def details(conn, owner, events):
             detail = move_alerts.present(conn, owner, event["id"])
             title = detail["title"]
         elif event["kind"] == "company":
-            detail = news_watch.list_alerts(conn, owner, ids=[event["id"]])[0]
+            detail = news_watch.list_alerts(conn, owner, ids=[event["id"]], previous=False)[0]
             title = detail["payload"].get("title", "Company source alert")
         else:
             detail = change_detail(conn, owner, event)

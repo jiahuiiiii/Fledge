@@ -878,6 +878,13 @@ def watch_checks(instrument_id: UUID, before: UUID | None = None):
     return {"result": history(auth.current_owner(), str(instrument_id), before)}
 
 
+@app.get("/api/v1/research-alerts/{alert_id}/previous-sample")
+def alert_previous_sample(alert_id: UUID):
+    from .monitoring.news_watch import previous_sample
+
+    return {"result": previous_sample(auth.current_owner(), str(alert_id))}
+
+
 @app.get("/api/v1/social-sources/{post_id}/conversation")
 def saved_conversation(post_id: UUID):
     from .research.conversation import read

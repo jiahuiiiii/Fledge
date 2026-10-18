@@ -411,7 +411,7 @@ def cited(sources, items, links=()):
     return [s for s in sources if s["id"] in wanted]
 
 
-def list_alerts(conn, owner, ids=None):
+def list_alerts(conn, owner, ids=None, *, previous=True):
     data = rows(
         conn,
         "SELECT a.*,i.symbol,i.name,r.action review_action FROM research_alerts a JOIN instruments i ON i.id=a.instrument_id LEFT JOIN research_alert_reviews r ON r.owner_id=a.owner_id AND r.alert_id=a.id WHERE a.owner_id=%s AND (%s::uuid[] IS NULL OR a.id=ANY(%s::uuid[])) ORDER BY a.created_at DESC,a.id DESC LIMIT 100",
@@ -453,11 +453,24 @@ def list_alerts(conn, owner, ids=None):
                         "previous": prior.get("coverage", {}).get("input_limits"),
                     }
                 ),
-                previous_items=[] if withheld else prior["items"],
-                previous_sources=[] if withheld else cited(prior["sources"], prior["items"]),
+                # Lists omit the large earlier sample; previous_sample() returns it
+                # on request through these same access and withdrawal checks.
+                previous_items=None if not previous else [] if withheld else prior["items"],
+                previous_sources=None if not previous else [] if withheld else cited(prior["sources"], prior["items"]),
             )
         )
     return result
+
+
+def previous_sample(owner, alert_id):
+    from thesis.service import Missing
+    with transaction(owner, consistent=True) as conn:
+        found = list_alerts(conn, owner, ids=[str(alert_id)])
+    if not found:
+        raise Missing("This alert is unavailable.")
+    alert = found[0]
+    return dict(id=alert["id"], withheld=alert["withheld"],
+                previous_items=alert["previous_items"], previous_sources=alert["previous_sources"])
 
 
 def review(owner, alert_id, action):

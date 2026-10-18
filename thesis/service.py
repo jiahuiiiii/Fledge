@@ -686,7 +686,7 @@ def state(owner, instrument_id=INSTRUMENT, *, include_financials=True):
             social_status=social.status(conn, instrument_id),
             provider_status=source_hub.status(conn, instrument_id),
             news_watch=watch_lanes.present(conn, owner, instrument_id),
-            research_alerts=news_watch.list_alerts(conn, owner),
+            research_alerts=news_watch.list_alerts(conn, owner, previous=False),
             idea_alerts=idea_alerts.list_for(conn, owner),
             idea_watch_state=one(
                 conn,
