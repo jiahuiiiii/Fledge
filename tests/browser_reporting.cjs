@@ -20,7 +20,7 @@ let browser;
  assert.match(text,/does not establish which claim is true/);
  await update.getByRole('button',{name:'Inspect earlier report ↗',exact:true}).click();
  await page.getByRole('dialog').waitFor();assert.match(await page.getByRole('dialog').innerText(),/unconfirmed report/);await page.keyboard.press('Escape');
- await update.getByRole('button',{name:'Inspect alert source ↗',exact:true}).click();
+ await update.getByRole('button',{name:'Inspect source ↗',exact:true}).click();
  await page.getByRole('dialog').waitFor();assert.match(await page.getByRole('dialog').innerText(),/denies that the service will close/);await page.keyboard.press('Escape');
  for(const width of [320,390,1440]){
   await page.setViewportSize({width,height:1050});

@@ -103,7 +103,7 @@ let browser;
  assert.notEqual(coverageChevron,'none','coverage keeps its separate disclosure chevron');
  const companyRow=inbox.locator('.inbox-record[data-kind="company"]').first();
  await companyRow.locator(':scope > summary').click();
- await companyRow.getByRole('button',{name:'Inspect alert source ↗',exact:true}).first().click();await page.getByRole('dialog').waitFor();await page.keyboard.press('Escape');
+ await companyRow.getByRole('button',{name:'Inspect source ↗',exact:true}).first().click();await page.getByRole('dialog').waitFor();await page.keyboard.press('Escape');
  await companyRow.getByRole('button',{name:'Leave unresolved',exact:true}).click();await inbox.getByText('Page 1 of 2',{exact:true}).waitFor();
  await chooseFilter('Show updates','unresolved');await page.waitForFunction(()=>document.querySelectorAll('.inbox-record').length===1);
  await inbox.locator('.inbox-record > summary').click();assert.match(await inbox.innerText(),/Left unresolved/);
