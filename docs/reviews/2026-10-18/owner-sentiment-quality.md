@@ -89,6 +89,49 @@ rubric and review ambiguous examples before changing the prompt. If these labels
 inform development, the same cases cannot later be presented as an untouched
 holdout; any retest is explicitly a same-set development result.
 
+## Focused ambiguity review — 18 October 2026
+
+A free assistant review covers the eight disagreements entirely within
+mixed/neutral/unclear and the three positive-versus-negative disagreements.
+These are 11 selected cases, not a representative new test. The assessments
+below are provisional hypotheses under the existing written contract, not
+adjudicated replacement labels or a revised score.
+
+| Review focus | Cases | Finding |
+| --- | --- | --- |
+| Priority model investigations | 15, 40 | An explicit company-product question was treated as unclear relevance; a two-company comparison received target-specific tone despite unnamed clause attribution. Check over-abstention and unsupported attribution. |
+| Insufficient meaning or evidence | 01, 17, 28, 38 | Target remarks are absent from a news excerpt; an image-only reply has no supplied image; slang and a short joke leave meaning uncertain. Readable surrounding text alone does not establish the target's tone. |
+| Speaker and timeframe | 06, 20, 48 | A reply's own conclusion can differ from a quotation/topic. Conditional future buying and present price caution can support different readings. Preserve the expressed speaker and timeframe before assigning direction. |
+| Rubric boundaries | 44, 49 | Useful macro context need not be company-specific sentiment. Uncertainty about a statement's truth is different from uncertainty about the tone of an intelligible description. |
+
+Two cases are priorities for investigating model behavior; this is not a count
+of proven model errors. The other nine are not declared correct model answers.
+In particular, the conditional-entry example needs a clearer policy before
+either positive or negative becomes an authoritative reference.
+
+The practical distinction remains: **neutral** is intelligible relevant text
+without expressed direction; **unclear** means the supplied evidence cannot
+support a reliable interpretation; **mixed** needs supported opposing current
+framing about the target. A topic may resolve a reply's reference but cannot
+supply the reply author's attitude. Broad-market context can be useful without
+becoming every company's sentiment. These summarize the current contract;
+no prompt, scoring convention or production behavior changes in this review.
+
+Next development should clarify these boundaries and add authored offline
+examples for explicit product questions, multi-company attribution and
+conditional entry-price comments. Original owner answers remain intact; no
+repeat of all 50 labels is needed now. A later same-set retest must be labelled
+development evidence. Release confidence still needs a fresh held-out review
+under a stable rubric; this audit does not authorize another paid campaign.
+
+Private `triage-11.json` retains each original pair and a provisional rationale.
+Checks confirm 11 unique reviewed cases, with original export, predictions,
+blind-review page and protected CSS hashes unchanged. Original exact agreement
+remains **24/50 (48%)**, and phase 5 remains unfinished. Incremental cost is
+**US$0**, with no new model/source request, live change or restart. The earlier
+60 passing tests still describe the evaluation machinery; they are not a new
+test of these semantic judgments.
+
 ## Artifacts and limits
 
 Private evidence is in
