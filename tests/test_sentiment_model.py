@@ -63,3 +63,12 @@ def test_luna_call_settles_at_luna_rates_including_cache_writes(monkeypatch):
         return dict(provider(request), id="resp_other", model="gpt-6-luna-2026-11-01")
     with pytest.raises(Exception):
         ledger.execute("luna-unpriced", "test", body, transport=other)
+
+
+def test_luna_sentiment_requests_get_the_main_model_time_limit(monkeypatch):
+    from thesis.providers.openai import request_timeout
+    monkeypatch.setattr(T, "SENTIMENT_MODEL", LUNA)
+    luna = request_timeout(T.request_for("tone", threaded_packet()))
+    monkeypatch.setattr(T, "SENTIMENT_MODEL", settings.OPENAI_REASONING_MODEL)
+    main = request_timeout(T.request_for("tone", threaded_packet()))
+    assert luna.read == main.read == 180
