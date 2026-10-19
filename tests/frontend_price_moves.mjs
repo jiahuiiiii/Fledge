@@ -157,7 +157,7 @@ try{
  const company=page.locator('[data-kind="company"]');
  await company.getByText('Preview · not sent to Telegram',{exact:true}).waitFor();
  await company.locator(':scope > summary').click();
- await company.getByText(/Importance assessment: high · deal/).waitFor();
+ await company.getByText(/high importance \(deal/).waitFor();
  await company.getByLabel('Delivery preview').getByText(/Routing preview · Telegram immediately/).waitFor();
  assert.equal(await company.locator('blockquote').count(),1);
  assert.equal(await company.locator('blockquote').innerText(),'Nvidia announced a new supply agreement.');

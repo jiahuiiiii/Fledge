@@ -18,8 +18,14 @@ export function sentimentSummaryParts(sample) {
       : sample.tone === "negative leaning"
         ? counts.negative
         : null;
-  const amount =
-    majority == null
+  // The displayed lean compares positive with negative; neutral is listed apart.
+  const split = ["positive", "negative", "neutral", "mixed"]
+    .filter((key) => key === "positive" || key === "negative" || counts[key])
+    .map((key) => `${counts[key] || 0} ${key}`)
+    .join(" · ");
+  const amount = sample.lean_policy
+    ? split
+    : majority == null
       ? `${usable} clear readings`
       : `${majority} of ${usable} clear readings`;
   const label =

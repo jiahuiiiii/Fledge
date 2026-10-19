@@ -65,10 +65,12 @@ let browser;
  assert.equal(await alerts.locator('.sentiment-alert').count(),2);
  assert.match(await alerts.innerText(),/positive leaning → negative leaning/);
  await alerts.getByText(/^Previous sample ·/).first().click();
+ // The earlier sample loads on open; wait for it rather than racing the request.
+ await alerts.getByText(/Synthetic Microsoft positive opinion/).first().waitFor();
  assert.match(await alerts.innerText(),/Synthetic Microsoft positive opinion/);
  await alerts.getByText('Your reasoning when this alert was created · revision 1',{exact:true}).first().click();
  assert.match(await alerts.innerText(),/I want durable margins before relying on growth/);
- await alerts.getByRole('button',{name:'Inspect alert source ↗',exact:true}).first().click();await modal.waitFor();await page.keyboard.press('Escape');
+ await alerts.getByRole('button',{name:'Inspect source ↗',exact:true}).first().click();await modal.waitFor();await page.keyboard.press('Escape');
  await alerts.getByRole('button',{name:'Mark reviewed',exact:true}).first().click();await page.waitForFunction(()=>document.querySelectorAll('.sentiment-alert').length===1);
  await expand();await alerts.getByRole('button',{name:'Leave unresolved',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('.sentiment-alert').length===0);
  await alerts.getByLabel('Show updates').selectOption('all');await alerts.locator('.inbox-record').first().waitFor();await expand();assert.equal(await alerts.locator('.sentiment-alert').count(),2);

@@ -1,7 +1,7 @@
 """Direct Responses API with no retries, redirects, tools or credential logging."""
 
 import httpx
-from .settings import live_key, OPENAI_REASONING_MODEL as REASONING_MODEL
+from .settings import live_key, OPENAI_REASONING_MODEL as REASONING_MODEL, OPENAI_SENTIMENT_MODEL
 
 
 class ProviderFailure(Exception):
@@ -15,7 +15,8 @@ def request_timeout(body):
 
     # The isolated high-reasoning trial can take longer. App routes retain their
     # original limits; connect/write/pool waits stay bounded independently.
-    standard = 180 if body.get("model") == REASONING_MODEL else 60
+    # A sentiment-only model reads the same batches as the main model.
+    standard = 180 if body.get("model") in (REASONING_MODEL, OPENAI_SENTIMENT_MODEL) else 60
     read = (
         420
         if body.get("model") == REASONING_MODEL

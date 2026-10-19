@@ -1,10 +1,17 @@
 import SentimentPriceContext from "./SentimentPriceContext";
 
-export default function SentimentBasis({ item }) {
-  if (!item.evidence_policy) return <p>{item.explanation}</p>;
+// compact: alert cards show the quote alone; the reason and the shared
+// AI-interpretation note are rendered once by the card instead.
+export default function SentimentBasis({ item, compact = false }) {
+  if (!item.evidence_policy)
+    return compact ? null : <p>{item.explanation}</p>;
+  // Alert cards lead with the quote; the full view keeps its original order.
+  const quotes = item.citations.map((c, i) => (
+    <blockquote key={i}>{c.quote}</blockquote>
+  ));
   return (
     <div className="sentiment-basis">
-      <p className="fine">{item.explanation}</p>
+      {!compact && <p className="fine">{item.explanation}</p>}
       {item.repair && (
         <p className="fine">
           The AI's label and its evidence disagreed. Inconsistent fields were
@@ -21,6 +28,7 @@ export default function SentimentBasis({ item }) {
         values={item.price_comparisons}
         quotedText={item.citations.map((c) => c.quote)}
       />
+      {compact && quotes}
       {item.reporting_basis && (
         <details className="reporting-evidence">
           <summary>{item.reporting_basis.label}</summary>
@@ -43,14 +51,14 @@ export default function SentimentBasis({ item }) {
           </p>
         </details>
       )}
-      <strong>
-        {item.previous_citations?.length
-          ? "View used for this label"
-          : "Wording used for this label"}
-      </strong>
-      {item.citations.map((c, i) => (
-        <blockquote key={i}>{c.quote}</blockquote>
-      ))}
+      {!compact && (
+        <strong>
+          {item.previous_citations?.length
+            ? "View used for this label"
+            : "Wording used for this label"}
+        </strong>
+      )}
+      {!compact && quotes}
       {!!item.previous_citations?.length && (
         <details>
           <summary>Earlier view in the same post</summary>
@@ -59,10 +67,12 @@ export default function SentimentBasis({ item }) {
           ))}
         </details>
       )}
-      <p className="fine">
-        Original excerpts selected by AI. The label and any earlier/current
-        distinction are interpretations.
-      </p>
+      {!compact && (
+        <p className="fine">
+          Original excerpts selected by AI. The label and any earlier/current
+          distinction are interpretations.
+        </p>
+      )}
     </div>
   );
 }

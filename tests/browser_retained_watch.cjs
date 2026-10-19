@@ -14,7 +14,7 @@ let browser;
  assert.equal(await inbox.locator('.inbox-record').count(),1);
  await inbox.locator('.inbox-record > summary').click();
  const pending=inbox.locator('.sentiment-alert');assert.match(await pending.innerText(),/\$3.2/);
- await pending.getByRole('button',{name:'Inspect alert source ↗',exact:true}).first().click();
+ await pending.getByRole('button',{name:'Inspect source ↗',exact:true}).first().click();
  const dialog=page.getByRole('dialog');await dialog.waitFor();assert.match(await dialog.innerText(),/cleared the way for digital publishers/);assert.match(await dialog.innerText(),/after alleging/);await page.keyboard.press('Escape');
  for(const width of [320,390,1440]){await page.setViewportSize({width,height:1050});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await inbox.screenshot({path:`/private/tmp/thesis-retained-watch-${width}.png`});}
  const response=await page.request.get(base+'/api/v1/research-review/export?days=0&review=all');assert.equal(response.status(),200);const html=await response.text();assert.match(html,/-1.7%/);assert.match(html,/\$3.2/);assert.doesNotMatch(html,/<script/);

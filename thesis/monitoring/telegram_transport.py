@@ -26,7 +26,7 @@ class NoRedirect(HTTPRedirectHandler):
 
 
 def call(key, method, payload):
-    if method not in {"getMe", "getWebhookInfo", "getUpdates", "sendMessage", "answerCallbackQuery"}:
+    if method not in {"getMe", "getWebhookInfo", "getUpdates", "sendMessage", "answerCallbackQuery", "editMessageReplyMarkup"}:
         raise ValueError("Unsupported Telegram operation.")
     sending = method == "sendMessage"
     fallback = "uncertain" if sending else "unavailable"

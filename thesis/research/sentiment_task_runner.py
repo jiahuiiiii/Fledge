@@ -16,6 +16,15 @@ from . import sentiment, sentiment_tasks as T, sentiment_reuse, reporting_basis
 from . import relevance_prefilter, sentiment_reliability, coverage, reddit_thread_context
 
 
+def auto_split_enabled():
+    """One automatic half-split retry for a batch that fails its evidence check (owner choice, 18 Oct 2026)."""
+    value = os.environ.get('THESIS_SENTIMENT_AUTO_SPLIT')
+    if value is None and os.environ.get('THESIS_TEST_OFFLINE') != 'true':
+        from thesis.providers.settings import settings
+        value = settings().get('THESIS_SENTIMENT_AUTO_SPLIT')
+    return str(value or 'true').lower() in {'true', '1', 'on'}
+
+
 def enabled():
     value = os.environ.get('THESIS_SENTIMENT_TASKS')
     if value is None and os.environ.get('THESIS_TEST_OFFLINE') != 'true':
@@ -25,7 +34,7 @@ def enabled():
 
 
 def identity(packet):
-    value = dict(policy=T.POLICY, schema_policy=T.SCHEMA_POLICY,headline_policy=T.HEADLINE_POLICY,instructions=T.INSTRUCTIONS, model=T.REASONING_MODEL,
+    value = dict(policy=T.POLICY, schema_policy=T.SCHEMA_POLICY,headline_policy=T.HEADLINE_POLICY,instructions=T.INSTRUCTIONS, model=T.SENTIMENT_MODEL,
                  company=packet['company'], sources=[sentiment_reuse.content_key(s) for s in packet['sources']],
                  comparisons=[sentiment_reuse.content_key(s) for s in packet.get('comparison_sources',[])],
                  policies={key:packet.get(key) for key in ('reporting_policy','context_policy','reddit_thread_policy','guard_policy')},
@@ -76,7 +85,7 @@ def response(items, links=()):
 
 
 def run(packet, reused=None, *, transport=None, progress=None, prefilter=None, saved_only=False,
-        retry_failed=False, split_failed=False):
+        retry_failed=False, split_failed=False, auto_split=None):
     from . import sentiment_batching as B, parallel
     reused=deepcopy(reused or {})
     supplied=packet['sources']+packet.get('comparison_sources',[])
@@ -85,6 +94,7 @@ def run(packet, reused=None, *, transport=None, progress=None, prefilter=None, s
         raise ValueError('Sentiment tasks need distinct source IDs and labels.')
     calls=[]; checked={}; tones={}; origins={}; events={}; links=[]; trace=[]
     recovery=[];parse_lock=threading.RLock()
+    if auto_split is None:auto_split=auto_split_enabled()
     skipped={sid:dict(saved['item'],id=next(s['label'] for s in packet['sources'] if s['id']==sid))
              for sid,saved in reused.items() if saved['item'].get('prefilter')}
     quick_record=None
@@ -116,6 +126,19 @@ def run(packet, reused=None, *, transport=None, progress=None, prefilter=None, s
                 details['split_available']=True
             report('A saved '+task+' task needs attention. No automatic paid retry.',details)
             raise ValueError('A saved '+task+' task did not pass its evidence checks. No automatic paid retry.') from None
+        def splittable(part):
+            return not part.get('_terminal') and len(part.get('_candidate_pairs',part['sources']))>1
+        def halves(part,base):
+            """Two terminal children with stable keys, shared with explicit recovery."""
+            children=[];selected=part.get('_candidate_pairs',part['sources']);middle=(len(selected)+1)//2
+            for index,values in enumerate((selected[:middle],selected[middle:])):
+                child=pair_part(values) if task=='duplicate' else part_for(packet,values)
+                if task=='duplicate':child['_candidate_pairs']=values
+                child['_terminal']=True
+                child_body=body_for(child)
+                child['_task_key']=key_for(task,child_body,packet)+':split:'+hashlib.sha256(base.encode()).hexdigest()+':'+str(index)
+                children.append(child)
+            return children
         def resolve(part):
             body=body_for(part);base=part.get('_task_key') or key_for(task,body,packet)
             previous=None;bad=None
@@ -135,27 +158,27 @@ def run(packet, reused=None, *, transport=None, progress=None, prefilter=None, s
                     child=dict(part,_task_key=base+':retry:1')
                     jobs.append((child,body));return
                 length=len(part.get('_candidate_pairs',part['sources']))
+                if auto_split and attempt==0 and not retry_failed and splittable(part):
+                    # The one automatic retry: two halves, each sent at most once.
+                    children=halves(part,base)
+                    for child in children:child['_automatic']=True
+                    recovery.append(dict(task=task,parent_key=base,child_keys=[c['_task_key'] for c in children],automatic=True))
+                    for child in children:resolve(child)
+                    return
                 if not part.get('_terminal') and attempt==1 and length>1:
-                    children=[];middle=(length+1)//2
-                    selected=part.get('_candidate_pairs',part['sources'])
-                    for index,values in enumerate((selected[:middle],selected[middle:])):
-                        child=pair_part(values) if task=='duplicate' else part_for(packet,values)
-                        if task=='duplicate':child['_candidate_pairs']=values
-                        child['_terminal']=True
-                        child_body=body_for(child)
-                        child['_task_key']=key_for(task,child_body,packet)+':split:'+hashlib.sha256(base.encode()).hexdigest()+':'+str(index)
-                        children.append(child)
+                    children=halves(part,base)
                     if split_failed or any(B.has_attempt(c['_task_key']) for c in children):
                         recovery.append(dict(task=task,parent_key=base,child_keys=[c['_task_key'] for c in children]))
                         for child in children:resolve(child)
                         return
                 invalid(part,call,bad,attempt)
-            if part.get('_terminal') and not split_failed:
+            if part.get('_terminal') and not split_failed and not part.get('_automatic'):
                 raise ledger.BudgetBlocked('Smaller-task recovery is unfinished. Continue it explicitly; no automatic paid call.')
             if split_failed and not part.get('_terminal') and not recovery:
                 raise ValueError('No saved failed task is ready for smaller-batch recovery. No new task was sent.')
             jobs.append((part,body))
         # Revalidate saved results before dispatching any new task in this stage.
+        start=len(calls)
         for part in parts:
             resolve(part)
         def work(part,body):
@@ -163,7 +186,17 @@ def run(packet, reused=None, *, transport=None, progress=None, prefilter=None, s
             try:result=parse_result(call,part)
             except ValueError as error:raise B.BatchFailed(0,call,error) from None
             return call,result
-        results,errors=parallel.run_all([lambda part=p,body=b:work(part,body) for p,b in jobs])
+        def dispatch():
+            batch=list(jobs);jobs.clear()
+            return batch,*parallel.run_all([lambda part=p,body=b:work(part,body) for p,b in batch])
+        batch,results,errors=dispatch()
+        if errors and auto_split and all(isinstance(e,B.BatchFailed) and splittable(batch[i][0]) for i,e in errors.items()):
+            # Re-resolve the stage: answered batches are reused from the ledger, each
+            # failed batch is sent once as two halves, and unsent batches go normally.
+            del calls[start:]
+            for part in parts:
+                resolve(part)
+            batch,results,errors=dispatch()
         if errors:
             error=errors[min(errors)]
             if not isinstance(error,B.BatchFailed):raise error
@@ -305,7 +338,7 @@ def run(packet, reused=None, *, transport=None, progress=None, prefilter=None, s
     if [item['source_id'] for item in items]!=[s['id'] for s in packet['sources']]:
         raise ValueError('Every source must be read or reused exactly once.')
     result=dict(items=items,coverage_links=links,summary=sentiment.summarize(items,packet['sources'],links,packet.get('comparison_sources',[])),
-                summary_policy=sentiment.POLICY,prompt_version=T.PROMPT,model=T.REASONING_MODEL,
+                summary_policy=sentiment.POLICY,prompt_version=T.PROMPT,model=T.SENTIMENT_MODEL,
                 guard_policy=packet.get('guard_policy'),tasks=dict(policy=T.POLICY,stages=trace,duplicate_batches=len(pair_parts),recovery=recovery),
                 batching=dict(policy=T.POLICY,completed=len(calls),total=len(calls),source_counts=[],comparison_limit=T.MAX_PAIRS,
                               comparison_context_bounded=bool(pairs)),

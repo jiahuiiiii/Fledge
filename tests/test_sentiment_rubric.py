@@ -97,9 +97,31 @@ def test_prompt_revision_changes_tone_request_identity_but_not_event_or_source_i
 
 
 def test_development_examples_are_separate_from_teaching_snippets_and_cover_all_tones():
-    assert len({c['id'] for c in CASES}) == len(CASES) == 23
+    assert len({c['id'] for c in CASES}) == len(CASES) == 25
     assert {c['expected']['sentiment'] for c in CASES} == {'positive', 'negative', 'mixed', 'neutral', 'unclear'}
     assert 'Not owner labels' in DATA['provenance']
     for text, label in T.TONE_TEACHING_EXAMPLES:
         assert text in T.INSTRUCTIONS['tone'] and label in T.INSTRUCTIONS['tone']
         assert all(text != c['text'] for c in CASES)
+
+
+def test_short_reply_rule_is_symmetric_and_bare_laughs_stay_unclear():
+    tone=T.INSTRUCTIONS['tone']
+    assert "favourable or adverse wording then sets its attitude" in tone
+    assert 'Explicit agreement adopts the stance agreed with; a bare laugh does not.' in tone
+    assert ('Topic: Holding Aster for years. Reply: Same here.', 'relevant / positive / expressed_evaluation') in T.TONE_TEACHING_EXAMPLES
+    assert T.PROMPT=='thesis-source-sentiment-tasks-5' and 'thesis-source-sentiment-tasks-3' in T.REUSABLE_PROMPTS
+    assert len(tone)<=6000
+
+
+def test_direction_follows_the_target_in_a_dispute_with_another_company():
+    tone=T.INSTRUCTIONS['tone']
+    assert "When an article's subject is another company, judge only the target's stated outcome" in tone
+    assert "the other company's loss in a dispute with the target is not adverse to the target" in tone
+    # No legal teaching snippet: it primed sarcastic legal remarks about the target as positive.
+    assert not any('licence' in text for text, _ in T.TONE_TEACHING_EXAMPLES)
+    mirrored = {c['id']: c['expected']['sentiment'] for c in CASES if c['id'].startswith('rival-')}
+    assert mirrored == {'rival-loses-dispute': 'positive', 'rival-wins-dispute': 'negative'}
+    # A changed prompt is a new request identity; old tasks-4 answers are not reused.
+    assert 'thesis-source-sentiment-tasks-4' not in T.REUSABLE_PROMPTS
+    assert len(tone) <= 6000

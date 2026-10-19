@@ -324,3 +324,123 @@ def test_revised_plan_cannot_pay_again_for_a_previously_valid_case(tmp_path,acce
     with pytest.raises(ValueError,match='explicitly named failed'):
         execute(m,revised,tmp_path/'invalid-retry',normal,revised_after=tmp_path/'old')
     assert len(seen)==2 and not (tmp_path/'invalid-retry').exists()
+
+
+def threaded_packet():
+    """An authored Reddit reply inside a saved four-message discussion."""
+    p=controls();p['company']=dict(symbol='EXA',name='EXA Example')
+    def message(key,role,text,minute):
+        passages,_=source_passages('Reddit comment' if role=='comment' else 'Authored EXA topic',text)
+        return dict(source_id='src-'+key,message_key=key,role=role,parent_key=None,author_key='author-'+key,
+            passages=passages,published_at=f'2026-10-07T12:{minute:02}:00+00:00',
+            available_at=f'2026-10-07T12:{minute:02}:00+00:00',url='https://example.invalid/'+key)
+    topic=message('t3_abc','topic','EXA results are out. Holding for years.',0)
+    earlier=message('t1_one','comment','EXA guidance looked strong to me.',1)
+    sibling=message('t1_two','comment','Same view, holding too.',2)
+    target=message('t1_tgt','comment','Same here.',3)
+    source=dict(id='src-t1_tgt',label='item_1',channel='social',platform='reddit',social_kind='comment',
+        thread_key='t3_abc',post_key='t1_tgt',title='Reddit comment',text='Same here.',passages=target['passages'],
+        published_at=target['published_at'],available_at=target['available_at'],url=target['url'],
+        content_hash=hashlib.sha256(b'tgt').hexdigest(),author_hash='author-t1_tgt')
+    p['sources']=[source];p['reddit_thread_context']=[dict(thread_key='t3_abc',messages=[topic,earlier,sibling,target])]
+    return p
+
+
+def supplied_messages(packet):
+    payload=json.loads(V.T.request_for('tone',packet)['input'][1]['content'])
+    return [m['message_key'] for m in payload['reddit_threads'][0]['messages']]
+
+
+def test_thread_context_sends_saved_discussion_but_keeps_review_page_evidence():
+    base=threaded_packet()
+    review=V.selected(base,'src-t1_tgt')
+    thread=V.selected(base,'src-t1_tgt',thread_extras=True)
+    assert supplied_messages(review)==['t3_abc','t1_tgt']
+    assert supplied_messages(thread)==['t3_abc','t1_one','t1_two','t1_tgt']
+    # The blind review projection is the same in both modes, so owner labels stay comparable.
+    assert Q.case_evidence(review,review['sources'][0])==Q.case_evidence(thread,thread['sources'][0])
+    # Permission checks cover every message actually sent.
+    keys=lambda p:[m['message_key'] for m in V.consumed(p)['reddit_thread_context'][0]['messages']]
+    assert keys(review)==['t3_abc','t1_tgt'] and keys(thread)==['t3_abc','t1_one','t1_two','t1_tgt']
+
+
+def test_thread_plan_is_a_separate_frozen_plan_and_review_plans_keep_their_identity():
+    m,p=fixtures()
+    assert 'thread_context' not in p
+    variant=V.thread_plan(p,m)
+    assert variant['thread_context']=='thread' and variant['fingerprint']!=p['fingerprint']
+    assert V.validate(variant,m) and V.estimate(variant,m)['requests']==56
+    assert all(c['packet']['thread_extras'] is (c['scope']=='owner50') for c in variant['requests'])
+    tampered=deepcopy(variant);tampered['thread_context']='review'
+    with pytest.raises(ValueError):V.validate(tampered,m)
+    with pytest.raises(ValueError):V.make_plan(m,{},[],thread_context='everything')
+
+
+def parent_check(source_id='src-t1_tgt', **change):
+    check=dict(source_id=source_id,outcome='available',fetched_at='2026-10-07 12:10:00+00:00',
+        parent=dict(parent_key='t1_one',parent_type='comment',title='Parent comment',body='EXA guidance looked strong to me.',
+                    url='https://example.invalid/t1_one',published_at='2026-10-07 12:01:00+00:00'))
+    return dict(check,**change)
+
+
+def test_parent_variant_sends_the_verified_parent_but_not_siblings():
+    reviewed=V.selected(threaded_packet(),'src-t1_tgt')
+    before=deepcopy(reviewed)
+    packet=V.with_parent(reviewed,parent_check())
+    assert reviewed==before  # The reviewed packet itself is never modified.
+    assert supplied_messages(packet)==['t3_abc','t1_one','t1_tgt']
+    payload=json.loads(V.T.request_for('tone',packet)['input'][1]['content'])
+    source=payload['sources'][0]
+    assert source['conversation']['parent_key']=='t1_one' and source['conversation']['parent_type']=='comment'
+    assert source['conversation']['published_at']=='2026-10-07T12:01:00+00:00'
+    assert next(m for m in payload['reddit_threads'][0]['messages'] if m['message_key']=='t1_tgt')['parent_key']=='t1_one'
+    # A parent comment's generic title is not a citable passage, as in the live app.
+    assert [p['id'] for p in packet['sources'][0]['conversation']['passages']]==['p1']
+    # Permission checks skip the private parent row; its withdrawal is checked separately.
+    assert 'conversation' not in V.consumed(packet)['sources'][0]
+    # An answer citing the parent renders with its evidence, like a live parent.
+    item=dict(id='item_1',relevance='relevant',sentiment='positive',statement='opinion',topic='general',passages=['p1'],
+              previous_passages=[],context_passages=['p1'],basis='expressed_evaluation',price_claims=[])
+    call=dict(response_body=dict(status='completed',output=[dict(type='message',content=[dict(type='output_text',text=json.dumps(dict(items=[item])))])]))
+    assert V.parse(call,packet)[0]==dict(relevance='relevant',sentiment='positive')
+
+
+@pytest.mark.parametrize('change',[dict(outcome='unavailable'),dict(source_id='src-other')])
+def test_parent_variant_rejects_checks_for_other_replies_or_unavailable_parents(change):
+    with pytest.raises(ValueError):
+        V.with_parent(V.selected(threaded_packet(),'src-t1_tgt'),parent_check(**change))
+
+
+def test_parent_plan_keeps_reviewed_packets_and_is_frozen_separately():
+    m,p=fixtures()
+    case=next(c for c in m['cases'] if c['platform']=='reddit')
+    check=parent_check(case['source_id'],parent=dict(parent_check()['parent'],parent_key='t3_abc',parent_type='story',
+                       title='Authored EXA topic',body='EXA results are out.'))
+    variant=V.parents_plan(p,m,{case['id']:check,'case-unused':dict(outcome='unavailable')})
+    assert variant['thread_context']=='parents' and set(variant['parents'])=={case['id']}
+    assert V.validate(variant,m) and V.estimate(variant,m)['requests']==56
+    changed=[c for c in variant['requests'] if c.get('reviewed_packet') and c['packet']!=c['reviewed_packet']]
+    assert [c['id'] for c in changed]==[case['id']]
+    assert changed[0]['packet']['sources'][0]['conversation']['parent_type']=='story'
+    original=next(c for c in p['requests'] if c['id']==case['id'])
+    assert changed[0]['reviewed_packet']==original['packet']
+    tampered=deepcopy(variant);tampered['parents'][case['id']]['parent']['body']='Different words.'
+    with pytest.raises(ValueError):V.validate(tampered,m)
+    with pytest.raises(ValueError):V.make_plan(m,{},[],thread_context='parents')
+
+
+def test_reuse_settled_reads_identical_answers_free_and_sends_nothing(tmp_path,access):
+    m,p=fixtures();seen=[]
+    execute(m,p,tmp_path/'first',provider(seen))
+    before=ledger.snapshot()['calls']
+    again=execute(m,p,tmp_path/'reused',provider(seen),reuse_settled=True)
+    assert again['completed'] and again['attempted']==0 and len(seen)==56
+    assert all(r['reused'] for r in again['results']) and ledger.snapshot()['calls']==before
+
+
+@pytest.mark.parametrize('failure',['timeout','invalid'])
+def test_reuse_settled_never_resends_a_failed_request(tmp_path,access,failure):
+    m,p=fixtures();seen=[]
+    execute(m,p,tmp_path/'first',provider(seen,failure=failure))
+    result=execute(m,p,tmp_path/'reused',provider(seen),reuse_settled=True)
+    assert len(seen)==1 and result['attempted']==0 and not result['completed']

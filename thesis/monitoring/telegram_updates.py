@@ -5,6 +5,8 @@ are not retained here. Rating rows remain private to their alert's account.
 No source or AI calls; feedback polling is off until explicitly enabled.
 """
 from datetime import timedelta
+# Taps are checked often so a rating is confirmed within a couple of seconds.
+POLL_SECONDS = 1.5
 import re
 from uuid import UUID
 from thesis.db import transaction,one,rows
@@ -35,7 +37,8 @@ def connect_message(conn,message,fingerprint,now):
         (sender['id'],label,cfg['owner_id'],cfg['link_hash'],now))
 
 
-def rating_callback(conn,callback,fingerprint,update_id):
+def rating_callback(conn,callback,fingerprint,update_id,edits=None):
+    """edits receives (chat, message, buttons) showing the saved choice, sent after commit."""
     if not isinstance(callback,dict):return 'unavailable'
     if not alert_feedback.enabled():return 'paused'
     data=callback.get('data');message=callback.get('message') or {};sender=callback.get('from') or {}
@@ -69,7 +72,23 @@ def rating_callback(conn,callback,fingerprint,update_id):
             'useful' if choice=='u' else 'not_useful',source='telegram',
             request_key='telegram:'+fingerprint+':'+str(update_id))
     except service.Missing:return 'unavailable'
+    if edits is not None:
+        edits.append((sender['id'],message['message_id'],buttons(conn,delivery)))
     return 'saved'
+
+
+def buttons(conn,delivery):
+    """The message's buttons with each item's latest saved rating ticked."""
+    owner=delivery['owner_id']
+    if delivery['kind']!='digest':
+        latest=alert_feedback.latest(conn,owner,delivery['kind'],str(delivery['event_id']))
+        return alert_feedback.keyboard(delivery,chosen=(latest or {}).get('value'))
+    items=rows(conn,'SELECT i.position,m.kind,m.event_id FROM telegram_digest_items i JOIN daily_digest_members m '
+        'ON m.owner_id=i.owner_id AND m.digest_id=%s AND m.position=i.member_position '
+        'WHERE i.owner_id=%s AND i.delivery_id=%s AND i.attempt=%s ORDER BY i.position',
+        (delivery['event_id'],owner,delivery['id'],delivery['attempts']))
+    chosen={i['position']:(alert_feedback.latest(conn,owner,i['kind'],str(i['event_id'])) or {}).get('value') for i in items}
+    return alert_feedback.keyboard(delivery,digest_items=items,chosen=chosen)
 
 
 def receive(*,force=False):
@@ -77,7 +96,7 @@ def receive(*,force=False):
     from . import telegram as T
     key=transport.token()
     if not key:return False
-    fingerprint=T.fingerprint(key);now=T.clock();acknowledgements=[]
+    fingerprint=T.fingerprint(key);now=T.clock();acknowledgements=[];edits=[]
     with transaction(admin=True) as conn:
         if not one(conn,'SELECT pg_try_advisory_xact_lock(hashtextextended(%s,0)) locked',
                    ('telegram-updates:'+fingerprint,))['locked']:return False
@@ -104,19 +123,24 @@ def receive(*,force=False):
             connect_message(conn,update.get('message'),fingerprint,now)
             callback=update.get('callback_query')
             if callback:
-                result=rating_callback(conn,callback,fingerprint,update['update_id'])
+                result=rating_callback(conn,callback,fingerprint,update['update_id'],edits)
                 if result=='pending':break  # Wait for the original send acknowledgement.
                 query_id=callback.get('id') if isinstance(callback,dict) else None
                 if isinstance(query_id,str) and 1<=len(query_id)<=256:
                     acknowledgements.append((query_id,{'saved':'Rating saved.','paused':'Alert ratings are paused.'}.get(result,'This alert is unavailable.')))
             new_offset=update['update_id']+1
         conn.execute('UPDATE telegram_poll_state SET update_offset=%s,next_poll_at=%s,last_update_at=%s WHERE bot_fingerprint=%s',
-            (new_offset,now+timedelta(seconds=5),now if new_offset!=offset else state['last_update_at'],fingerprint))
+            (new_offset,now+timedelta(seconds=POLL_SECONDS),now if new_offset!=offset else state['last_update_at'],fingerprint))
         conn.execute('UPDATE telegram_settings SET update_offset=greatest(update_offset,%s) WHERE bot_fingerprint=%s',
                      (new_offset,fingerprint))
     # A failed callback acknowledgement does not undo or repeat a saved vote.
     for query_id,text in acknowledgements:
         try:transport.call(key,'answerCallbackQuery',dict(callback_query_id=query_id,text=text,cache_time=0))
+        except Exception:pass
+    # Showing the choice is cosmetic: an unchanged or failed edit keeps the saved vote.
+    for chat,message,markup in edits:
+        if markup is None:continue
+        try:transport.call(key,'editMessageReplyMarkup',dict(chat_id=chat,message_id=message,reply_markup=markup))
         except Exception:pass
     return bool(valid)
 

@@ -1,6 +1,7 @@
-"""Bounded, dated parent context for new HN classifications; never extra votes."""
+"""Bounded, dated parent context for new HN/Reddit classifications; never extra votes."""
 
 import hashlib
+import re
 from datetime import datetime, timedelta
 from thesis.db import one
 from thesis.providers.ledger import canonical
@@ -10,6 +11,10 @@ POLICY = "saved-parent-context-1"
 MAX_BYTES = 8000
 MAX_PARENT_BYTES = 3000
 MAX_PARENTS = 4
+MAX_AGE = timedelta(hours=24)
+# A Reddit parent is checked once, from the reply's own context feed, near
+# collection. It stays usable for the reply's seven-day discussion window.
+MAX_REDDIT_AGE = timedelta(days=7)
 
 
 def attach(conn, sources, cutoff, *, batch_limits=True):
@@ -36,7 +41,8 @@ def attach(conn, sources, cutoff, *, batch_limits=True):
         ):
             source["context_status"] = "withdrawn"
             continue
-        if cutoff - row["checked_at"] > timedelta(hours=24):
+        reddit = source.get("platform") == "reddit" and re.fullmatch(r"t[13]_[a-z0-9]+", row["parent_key"] or "")
+        if cutoff - row["checked_at"] > (MAX_REDDIT_AGE if reddit else MAX_AGE):
             source["context_status"] = "old_check"
             continue
         passages, omitted = source_passages(row["title"], row["body"])
@@ -72,6 +78,9 @@ def attach(conn, sources, cutoff, *, batch_limits=True):
         ).hexdigest()
         source["conversation"] = context
         source["context_status"] = "included"
+        if reddit and source.get("timestamp_basis") == "feed_updated":
+            from .social import FEED_NOTE_WITH_PARENT
+            source["source_note"] = FEED_NOTE_WITH_PARENT
         count += 1
         used_bytes += size
 

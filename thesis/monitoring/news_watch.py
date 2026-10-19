@@ -400,22 +400,46 @@ def publish(owner, iid, analysis_id, *, claim_token=None, now=None):
         return len(alerts)+len(proposals)
 
 
-def list_alerts(conn, owner, ids=None):
+def cited(sources, items, links=()):
+    """Only the sources an alert can display: its items, their citations and links.
+
+    Alert cards, the inbox and exports look sources up by these ids alone.
+    """
+    wanted = {i.get("source_id") for i in items}
+    wanted |= {c.get("source_id") for i in items for c in i.get("citations") or []}
+    wanted |= {l.get(k) for l in links for k in ("source_id", "reference_source_id")}
+    return [s for s in sources if s["id"] in wanted]
+
+
+def list_alerts(conn, owner, ids=None, *, previous=True, detail_instrument=None):
     data = rows(
         conn,
         "SELECT a.*,i.symbol,i.name,r.action review_action FROM research_alerts a JOIN instruments i ON i.id=a.instrument_id LEFT JOIN research_alert_reviews r ON r.owner_id=a.owner_id AND r.alert_id=a.id WHERE a.owner_id=%s AND (%s::uuid[] IS NULL OR a.id=ANY(%s::uuid[])) ORDER BY a.created_at DESC,a.id DESC LIMIT 100",
         (owner, ids, ids),
     )
     result = []
+    # A company page details only its own alerts. Others need only their
+    # review status for the updates badge; no evidence is sent for them.
+    detailed = [a for a in data if detail_instrument is None or str(a["instrument_id"]) == str(detail_instrument)]
+    # Consecutive alerts share readings; build each one once for this request.
+    wanted = list({str(a[k]) for a in detailed for k in ("current_id", "previous_id")})
+    records = {str(r["id"]): r for r in rows(conn, "SELECT * FROM sentiment_analyses WHERE id=ANY(%s::uuid[])", (wanted,))} if wanted else {}
+    presented = {}
+
+    def shown(identity):
+        identity = str(identity)
+        if identity not in presented:
+            presented[identity] = sentiment.present(conn, records.get(identity))
+        return presented[identity]
+
     for a in data:
-        current = one(
-            conn, "SELECT * FROM sentiment_analyses WHERE id=%s", (a["current_id"],)
-        )
-        previous = one(
-            conn, "SELECT * FROM sentiment_analyses WHERE id=%s", (a["previous_id"],)
-        )
-        visible = sentiment.present(conn, current)
-        prior = sentiment.present(conn, previous)
+        if detail_instrument is not None and str(a["instrument_id"]) != str(detail_instrument):
+            result.append(dict(id=str(a["id"]), instrument_id=str(a["instrument_id"]), symbol=a["symbol"], name=a["name"],
+                               created_at=a["created_at"].isoformat(), review_action=a["review_action"],
+                               preview=a.get("preview", False), status_only=True))
+            continue
+        visible = shown(a["current_id"])
+        prior = shown(a["previous_id"])
         withheld = visible["withheld"] or prior["withheld"]
         result.append(
             dict(
@@ -428,7 +452,7 @@ def list_alerts(conn, owner, ids=None):
                 withheld=withheld,
                 preview=a.get('preview',False),
                 payload={} if withheld else a["payload"],
-                sources=[] if withheld else visible["sources"],
+                sources=[] if withheld else cited(visible["sources"], a["payload"].get("items", []), a["payload"].get("coverage_links", [])),
                 source_limits=(
                     {}
                     if withheld
@@ -437,11 +461,24 @@ def list_alerts(conn, owner, ids=None):
                         "previous": prior.get("coverage", {}).get("input_limits"),
                     }
                 ),
-                previous_items=[] if withheld else prior["items"],
-                previous_sources=[] if withheld else prior["sources"],
+                # Lists omit the large earlier sample; previous_sample() returns it
+                # on request through these same access and withdrawal checks.
+                previous_items=None if not previous else [] if withheld else prior["items"],
+                previous_sources=None if not previous else [] if withheld else cited(prior["sources"], prior["items"]),
             )
         )
     return result
+
+
+def previous_sample(owner, alert_id):
+    from thesis.service import Missing
+    with transaction(owner, consistent=True) as conn:
+        found = list_alerts(conn, owner, ids=[str(alert_id)])
+    if not found:
+        raise Missing("This alert is unavailable.")
+    alert = found[0]
+    return dict(id=alert["id"], withheld=alert["withheld"],
+                previous_items=alert["previous_items"], previous_sources=alert["previous_sources"])
 
 
 def review(owner, alert_id, action):

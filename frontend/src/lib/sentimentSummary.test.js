@@ -21,6 +21,25 @@ test("leaning shows its usable denominator and the separate unclear count", () =
     "Too little clear evidence for an overall tone · 4 clear readings · 1 unclear",
   );
 });
+test("a displayed lean lists positive, negative and neutral separately", () => {
+  assert.equal(
+    sentimentSummaryLabel({
+      tone: "positive leaning",
+      majority_tone: "mixed / balanced",
+      lean_policy: "sentiment-lean-1",
+      counts: { positive: 26, negative: 9, neutral: 34, mixed: 18, unclear: 3 },
+    }),
+    "positive leaning · 26 positive · 9 negative · 34 neutral · 18 mixed · 3 unclear",
+  );
+  assert.equal(
+    sentimentSummaryLabel({
+      tone: "mostly neutral",
+      lean_policy: "sentiment-lean-1",
+      counts: { positive: 2, negative: 0, neutral: 20 },
+    }),
+    "mostly neutral · 2 positive · 0 negative · 20 neutral",
+  );
+});
 test("price display formats the server result without calculating a new return", () => {
   assert.equal(
     priceComparisonText({

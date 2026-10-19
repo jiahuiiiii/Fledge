@@ -67,7 +67,7 @@ from each of at most three company threads. Within that bound it now retains
 short replies without their own company mention. Such a reply requires the exact
 permitted topic in the selected date window before analysis. An absent topic
 excludes it as required context unavailable. RSS timestamps remain feed update
-times, and immediate-parent relationships are unavailable. The app explicitly
+times, and immediate-parent relationships are unavailable (superseded 18 October; see below). The app explicitly
 calls these partial saved discussions; this change does not retrieve every
 Reddit comment or enable blocked JSON/HTML routes.
 
@@ -84,3 +84,7 @@ analysis or source refresh is required to install this change.
 This is the sentiment/quick-check input contract. Optional discussion-theme and
 question research retain their separate source-selection contracts. Model
 interpretation accuracy has not been established by the packaging tests.
+
+## Verified Reddit reply parents — 18 October 2026
+
+Saved Reddit RSS replies can now carry a verified immediate parent, read from each reply's own context feed. See [Reddit RSS collection](reddit-rss-collection.md#verified-reply-parents--18-october-2026). It uses the same saved-parent records, limits, citation rules and withdrawal checks as Hacker News, and its parent key is also the reply's `parent_key` in the thread context. Unchecked replies keep a null parent. Grandparents are not supplied. A Reddit parent stays usable for seven days from its check, as the reply's discussion window, while Hacker News keeps 24 hours.

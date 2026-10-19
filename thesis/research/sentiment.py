@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from psycopg.types.json import Jsonb
 from thesis.db import transaction, one, rows
 from thesis.providers import ledger
-from thesis.providers.settings import REASONING_MODEL
+from thesis.providers.settings import SENTIMENT_MODEL
 from . import market_brief, social, coverage
 from . import sentiment_context, reporting_basis, reddit_thread_context, sentiment_reliability
 from .citations import source_passages, model_source, FINDING_GROUNDING
@@ -25,6 +25,11 @@ from . import sentiment_guards
 PROMPT = "thesis-source-sentiment-24"
 EVIDENCE_POLICY = "sentiment-source-extracts-1"
 POLICY = "sentiment-coverage-9"
+# Displayed lean, derived from each reading's saved counts when it is shown.
+# Saved summaries, reuse and opinion-change alerts keep POLICY's stored tone.
+LEAN_POLICY = "sentiment-lean-1"
+LEAN_RATIO = 2
+LEAN_MINIMUM = 5
 SELECTION_POLICY = "sentiment-all-eligible-1"
 
 
@@ -304,7 +309,7 @@ def request_for(packet):
     else:
         schema["properties"]["coverage_links"]["maxItems"] = 0
     return dict(
-        model=REASONING_MODEL,
+        model=SENTIMENT_MODEL,
         store=False,
         service_tier="default",
         max_output_tokens=ledger.SENTIMENT_LOW_MAX_OUTPUT,
@@ -445,6 +450,39 @@ def summarize(
     return result
 
 
+def lean(sample):
+    """Positive vs negative only; neutral and mixed are shown separately.
+
+    A side leads when it has at least LEAN_RATIO times the other, with at least
+    LEAN_MINIMUM directional groups. Fewer directional groups read as mostly
+    neutral when neutral is the largest group.
+    """
+    counts = sample.get("counts")
+    if sample.get("tone") in ("thin sample", "separate platform samples") or not isinstance(counts, dict):
+        return sample.get("tone")
+    positive, negative = counts.get("positive", 0), counts.get("negative", 0)
+    if positive + negative < LEAN_MINIMUM:
+        others = max(positive, negative, counts.get("mixed", 0))
+        return "mostly neutral" if counts.get("neutral", 0) > others else "mixed / balanced"
+    if positive >= LEAN_RATIO * negative:
+        return "positive leaning"
+    if negative >= LEAN_RATIO * positive:
+        return "negative leaning"
+    return "mixed / balanced"
+
+
+def displayed(summary):
+    """A display copy with the lean; the saved majority tone stays beside it."""
+    shown = deepcopy(summary or {})
+    samples = [shown.get(c) for c in ("news", "social")] + list((shown.get("social_platforms") or {}).values())
+    for sample in samples:
+        if isinstance(sample, dict) and "tone" in sample:
+            counts = sample.get("counts") or {}
+            sample.update(majority_tone=sample["tone"], tone=lean(sample), lean_policy=LEAN_POLICY,
+                          directional_groups=counts.get("positive", 0) + counts.get("negative", 0))
+    return shown
+
+
 class IncompleteResponse(ValueError):
     """A settled response can be paid for without containing a usable result."""
 
@@ -485,7 +523,7 @@ def render(call, packet, *, enforce_repair_limit=True):
     items = []
     repairing = sentiment_reliability.enabled()
     origin_model = (call.get("model") or call.get("response_body", {}).get("model")
-                    or (call.get("request_body") or {}).get("model") or REASONING_MODEL)
+                    or (call.get("request_body") or {}).get("model") or SENTIMENT_MODEL)
     for item in result.items:
         source = sources[item.id]
         passages = {p["id"]: p["quote"] for p in source["passages"]}
@@ -578,7 +616,7 @@ def render(call, packet, *, enforce_repair_limit=True):
             items, packet["sources"], links, packet.get("comparison_sources", [])
         ),
         summary_policy=POLICY,
-        model=REASONING_MODEL,
+        model=SENTIMENT_MODEL,
         prompt_version=PROMPT,
         guard_policy=packet.get("guard_policy"),
         **(dict(repairs=sentiment_reliability.counts(items)) if repairing else {}),
@@ -626,6 +664,7 @@ def present(conn, record):
     current_prompt=sentiment_tasks.PROMPT if sentiment_task_runner.enabled() else PROMPT
     return dict(
         record["result"],
+        summary=displayed(record["result"].get("summary")),
         id=str(record["id"]),
         cutoff=p["cutoff"],
         social_lookback_days=p.get("social_lookback_days", 7),
@@ -637,7 +676,7 @@ def present(conn, record):
             record["result"].get(key) != value
             for key, value in (
                 ("prompt_version", current_prompt),
-                ("model", REASONING_MODEL),
+                ("model", SENTIMENT_MODEL),
                 ("summary_policy", POLICY),
             )
         ) or p.get('selection', {}).get('policy') != SELECTION_POLICY,

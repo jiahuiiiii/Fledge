@@ -42,3 +42,11 @@ Initial offline integration: 290 backend tests with the saved actual SEC corpus,
 ## Later reporting clarifications — phase 25
 
 Company watches also retain new cited details/contradictions linked to exact earlier reporting they saw, regardless of adverse tone. Alerts and weekly exports show both reports. [Rules and limits](reporting-updates.md). Earlier descriptions restricting reporting alerts to adverse/mixed items describe the initial rule. No old alerts are backfilled.
+
+## Displayed lean — 18 October 2026
+
+The owner found that almost every reading showed "mixed / balanced": the saved rule needs a strict majority of all counted groups, and neutral factual news is usually the largest group. On 18 October META news had 26 positive and 9 negative groups among 87 and still showed mixed.
+
+Readings now display a lean (`sentiment-lean-1`) computed from the saved counts when they are shown. A side leads when it has at least twice the other side's groups, with at least five positive plus negative groups. With fewer, the reading shows "mostly neutral" if neutral is the largest group, otherwise mixed. Neutral and mixed counts are listed separately. Thin samples and separate platform samples are unchanged. The same 18 October counts give META positive leaning, while GOOGL (21/13), AVGO (21/13) and NVDA (22/19) stay mixed.
+
+The saved summary, its `sentiment-coverage-9` policy, answer reuse and opinion-change alerts are unchanged; the stored majority tone is shown beside the lean as `majority_tone`. Changing the policy would have forced paid re-reads of every saved reading. Older readings get the displayed lean too, from their own counts.

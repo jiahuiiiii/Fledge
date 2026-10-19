@@ -311,7 +311,7 @@ def run(plan,output,cap,*,approved_plan,transport=None,remaining_after=None,revi
             links=[deepcopy(l) for l in link_state.values() if l['source_id'] in visible and l['reference_source_id'] in visible]
             items=[deepcopy(state[s['id']]) for s in sources]
             result=dict(items=items,coverage_links=links,summary=S.summarize(items,sources,links,[]),
-                prompt_version=T.PROMPT,summary_policy=S.POLICY,guard_policy=packet['guard_policy'],model=T.REASONING_MODEL,
+                prompt_version=T.PROMPT,summary_policy=S.POLICY,guard_policy=packet['guard_policy'],model=T.SENTIMENT_MODEL,
                 batching=dict(policy=T.POLICY),prefilter=dict(policy=P.POLICY),repairs=S.sentiment_reliability.counts(items))
             return dict(packet=packet,result=result)
 

@@ -28,6 +28,9 @@ import { useEffect, useId, useState } from "react";
 import Modal from "./Modal";
 import EvidenceButton from "./EvidenceButton";
 import { stamp } from "./MarketResearch";
+import "./AlertEvidence.css";
+import { api } from "../api/client";
+import { loadPreviousSample, savedPreviousSample } from "../lib/previousSample";
 export default function SentimentPanel({
   data,
   busy,
@@ -1079,31 +1082,52 @@ function AlertEvidence({ item, sources, onSource, comparison }) {
   const source = sources.find((s) => s.id === item.source_id);
   const reference =
     comparison && sources.find((s) => s.id === comparison.reference_source_id);
+  const importanceQuotes = (item.importance?.citations || []).filter(
+    (c) =>
+      c.source_id === item.source_id &&
+      !(item.citations || []).some((old) => old.quote === c.quote),
+  );
+  const tone = item.sentiment || "unclear";
   return (
-    <div className="alert-evidence">
-      <strong>{source?.title || "Source unavailable"}</strong>
-      <p className="fine">
-        {item.sentiment} · {item.statement.replaceAll("_", " ")} ·{" "}
-        {source?.source}
+    <div className="alert-evidence alert-evidence-compact">
+      <div className="alert-evidence-head">
+        <span className={`alert-tone tone-${tone}`}>
+          {tone.charAt(0).toUpperCase() + tone.slice(1)}
+        </span>
+        <strong>{source?.title || "Source unavailable"}</strong>
+      </div>
+      <p className="alert-evidence-meta">
+        {[
+          item.statement?.replaceAll("_", " "),
+          source?.source,
+          item.importance &&
+            `${item.importance.level} importance${item.importance.category ? ` (${item.importance.category.replaceAll("_", " ")})` : ""}`,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+        <button className="source-link" onClick={() => onSource(source)}>
+          Inspect source ↗
+        </button>
       </p>
-      <SentimentBasis item={item} />
-      {item.importance && (
-        <div className="importance-evidence">
-          <p className="fine">
-            Importance assessment: {item.importance.level} ·{" "}
-            {item.importance.category?.replaceAll("_", " ")}. An interpretation
-            of the source, separate from tone.
-          </p>
-          {(item.importance.citations || [])
-            .filter(
-              (c) =>
-                c.source_id === item.source_id &&
-                !(item.citations || []).some((old) => old.quote === c.quote),
-            )
-            .map((c, i) => (
-              <blockquote key={i}>{c.quote}</blockquote>
-            ))}
-        </div>
+      <SentimentBasis item={item} compact />
+      {(item.explanation || importanceQuotes.length > 0) && (
+        <details className="alert-why">
+          <summary>Why this label</summary>
+          {item.explanation && <p>{item.explanation}</p>}
+          {item.importance && (
+            <p>
+              Importance is assessed separately from tone:{" "}
+              {item.importance.level}
+              {item.importance.category
+                ? ` · ${item.importance.category.replaceAll("_", " ")}`
+                : ""}
+              .
+            </p>
+          )}
+          {importanceQuotes.map((c, i) => (
+            <blockquote key={i}>{c.quote}</blockquote>
+          ))}
+        </details>
       )}
       <SentimentContext value={item.conversation} />
       <RedditThreadContext value={item.thread_context} />
@@ -1145,10 +1169,60 @@ function AlertEvidence({ item, sources, onSource, comparison }) {
           </button>
         </details>
       )}
-      <button className="source-link" onClick={() => onSource(source)}>
-        Inspect alert source ↗
-      </button>
     </div>
+  );
+}
+
+// Loads the alert's earlier sample once, when the section is first opened.
+function PreviousSample({ alert, onSource }) {
+  const [sample, setSample] = useState(() => savedPreviousSample(alert));
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    setSample(savedPreviousSample(alert));
+    setError(null);
+  }, [alert.id]);
+  async function load() {
+    if (sample || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      setSample(await loadPreviousSample(api, alert.id));
+    } catch (failure) {
+      setError(failure.message || "The earlier sample could not be loaded.");
+    } finally {
+      setLoading(false);
+    }
+  }
+  return (
+    <details onToggle={(event) => event.currentTarget.open && load()}>
+      <summary>Previous sample · {stamp(alert.payload.previous_cutoff)}</summary>
+      {sample?.withheld ? (
+        <p className="warning">
+          Evidence is currently unavailable; this earlier sample is withheld.
+        </p>
+      ) : sample ? (
+        sample.items.map((i) => (
+          <AlertEvidence
+            key={i.source_id}
+            item={i}
+            sources={sample.sources}
+            onSource={onSource}
+          />
+        ))
+      ) : error ? (
+        <p className="warning" role="alert">
+          {error}{" "}
+          <button type="button" onClick={load}>
+            Try again
+          </button>
+        </p>
+      ) : (
+        <p className="muted" aria-live="polite">
+          Loading the earlier sample…
+        </p>
+      )}
+    </details>
   );
 }
 
@@ -1266,19 +1340,11 @@ export function ResearchAlerts({
                   ))}
                 </details>
               )}
-              <details>
-                <summary>
-                  Previous sample · {stamp(a.payload.previous_cutoff)}
-                </summary>
-                {a.previous_items?.map((i) => (
-                  <AlertEvidence
-                    key={i.source_id}
-                    item={i}
-                    sources={a.previous_sources}
-                    onSource={onSource}
-                  />
-                ))}
-              </details>
+              <PreviousSample alert={a} onSource={onSource} />
+              <p className="fine alert-ai-note">
+                Tone, importance and quoted excerpts are AI interpretations of
+                each source. Open a source to check it.
+              </p>
               {a.payload.saved_idea && (
                 <details>
                   <summary>

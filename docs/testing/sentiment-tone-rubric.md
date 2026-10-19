@@ -110,3 +110,55 @@ owner clarification and has not received a paid evaluation; the candidate remain
 This uses the distinction between prompt examples and evaluations described in
 OpenAI's [prompt engineering](https://developers.openai.com/api/docs/guides/prompt-engineering)
 and [evaluation guidance](https://developers.openai.com/api/docs/guides/evaluation-best-practices).
+
+## Owner decisions and version 4 — 18 October 2026
+
+A full review of all 26 disagreements against this rubric found that most came from labelling conventions rather than model mistakes. Missing conversation context also played a large part. The owner then agreed these rules:
+
+1. **Market-wide news is not company tone.** A market or sector story that doesn't name the company or a concrete relationship is unrelated, even when it is useful background. Price-move explanations (phase 4) are where market context belongs.
+2. **Mixed needs both sides stated** about the company now. Only one side stated means positive or negative, not mixed.
+3. **Small cases:** a former-employer career mention is unrelated; a description without direction is neutral; an intelligible claim is neutral, not unclear, even when its truth is unverified.
+
+The owner did **not** accept that short Reddit replies should be judged without their conversation. Those replies are answers inside longer discussions. The 50-case test and the blind review page had sent only the topic and the reply (`extras=False`), although threads had 13–30 saved messages. The live app already sends other saved messages from the same discussion, up to 12 KB.
+
+**Version 4** (`thesis-source-sentiment-tasks-4`, still off) changes one rule. A short reply's own favourable **or** adverse wording sets its attitude once context makes the question clear. Explicit agreement adopts the stance it agrees with; a bare laugh does not. One invented teaching example is added. The instruction stays under 6,000 characters (5,973).
+
+The quality runner gains a separate **thread context** plan (`--thread-variant`) that sends the same saved discussion messages as the live app. The review-page evidence shown to the owner is unchanged, and earlier review-context plans keep their exact identity. Hard cases keep their fixed benchmark context.
+
+Still undecided: whether a large bullish trade such as a "yolo" position counts as positive; whether a company CEO criticising others is negative for the company or a neutral report; and what case 08 should be (mixed is not supported). Original owner labels remain unchanged. A separate private reference applies only the agreed rules to the nine cases they cover. Scores against it are same-set development results, not independent validation.
+
+### Thread-context result — 18 October 2026
+
+One approved run of version 4 with full saved thread context completed 56/56 requests for **US$0.5958425**, with no failures, repairs, retries or unresolved cost. Hard cases stayed at **4/6**. Agreement **fell to 22/50** against the original owner labels (from 24/50). Against the agreed-rules reference it is 31/50.
+
+The 19 cases that gained thread messages (11–22 supplied each) now match the owner only 3 times. The model marked 11 of them as unclear relevance, against 5 before, including four replies it previously matched. Reddit RSS does not say which message a reply answers. Given many unordered siblings, the model follows its rule not to infer reply structure from order and abstains. With only the topic, it assumed the reply answered the topic.
+
+**Conclusion:** extra discussion messages without the reply chain make short replies harder to place, not easier. This result does not support sending more unordered thread context. Options are a real reply chain (Reddit's official API, which needs owner setup) or an owner rule that replies in a thread about the company count as about the company unless they clearly discuss something else. Version 4 stays off; no further paid attempt is authorised by this run. Raw requests, responses and the ledger record are in `.local/live-tests/redesign-phase-5-20261018/thread-context-run1/`.
+
+### Agreed-rules reference rescore — 18 October 2026
+
+After re-reading six short replies with their full saved threads, the owner agreed five more reference changes: cases 17, 20, 21, 34 and 38. Case 06 keeps its original label because the thread makes it genuinely ambiguous. The private agreed-rules reference now differs from the original owner labels in 14 of 50 cases. The original labels and their official 24/50 score are unchanged.
+
+Free rescoring of saved predictions (no new AI calls) against that reference:
+
+| Run | Exact agreement |
+| --- | --- |
+| Original quality prompt, topic-only context | 38/50 |
+| Rubric version 2, topic-only context | 37/50 |
+| Version 4, full thread context | 32/50 |
+
+Topic-only context is better than unordered full threads. These are same-set development results: the reference was revised after seeing model answers, so it cannot act as independent validation. A release claim still needs a fresh labelled set under these rules. The remaining open rules (large bullish trades, a CEO criticising others, case 08) cover several of the remaining differences.
+
+## Version 5: direction follows the watched company — 18 October 2026
+
+Live failure: a QCOM alert ("New adverse or mixed company reporting") rested on two Arm articles about a jury finding that Arm breached its licence with Qualcomm and disrupted Qualcomm's business. GPT-6 Luna with version 4 labelled both negative for QCOM, judging the article's subject rather than the watched company.
+
+Version 5 adds: "When an article's subject is another company, judge only the target's stated outcome: the other company's loss in a dispute with the target is not adverse to the target." Several phrases were shortened to stay within 6,000 characters (5,941). Two fictional mirrored development cases were added (`rival-loses-dispute` positive, `rival-wins-dispute` negative). A draft teaching snippet ("Jury finds Birch breached its licence with Aster → positive") was dropped after testing.
+
+| Check (GPT-6 Luna) | Result |
+| --- | --- |
+| The five live QCOM verdict articles | Arm-loses articles positive, Qualcomm-wins articles positive, hung jury neutral, in all three trial wordings (was negative) |
+| 50 owner cases, old instructions, two runs | 36/50 and 34/50; the runs disagree on 9 cases |
+| 50 owner cases, version 5 drafts | 33/50, 33/50, 32/50; final scoped wording 33/50, hard cases 4/6 |
+
+Repeated Luna runs vary by about two points, so the general cost of the rule is between none and about two points; the rival-dispute failure is fixed consistently. Hard case 01 (sarcastic praise of Meta's legal tactics) is wrong in some old-instruction runs and in GPT-5.4's, so its flips are not attributed to the rule. Spend: US$0.028 OpenAI through the ledger, US$0.079 OpenRouter, no unresolved amounts. Same-set development results, not an unseen holdout.

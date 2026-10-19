@@ -156,6 +156,7 @@ export const api = {
     request(`/scheduled-reviews/${id}?page=${page}`),
   seeReview: (id) =>
     request(`/scheduled-reviews/${id}/seen`, { method: "POST" }),
+  alertPreviousSample: (id) => request(`/research-alerts/${id}/previous-sample`),
   conversation: (id, collect = false) =>
     request(`/social-sources/${id}/conversation`, {
       method: collect ? "POST" : "GET",

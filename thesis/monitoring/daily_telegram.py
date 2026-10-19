@@ -208,10 +208,12 @@ def save_shown(conn,owner,delivery,record):
             (owner,delivery['id'],delivery['attempts']+1,item['position'],item['member_position']))
 
 
-def keyboard(delivery,items):
+def keyboard(delivery,items,chosen=None):
+    """chosen maps a position to its latest rating; that button shows a tick."""
     if not items:return None
-    token=UUID(str(delivery['id'])).hex
+    token=UUID(str(delivery['id'])).hex;chosen=chosen or {}
+    mark=lambda i,value:'✓ ' if chosen.get(i['position'])==value else ''
     return dict(inline_keyboard=[[
-        dict(text=f"{i['position']+1} · Useful",callback_data=f"d:{token}:{i['position']}:u"),
-        dict(text=f"{i['position']+1} · Not useful",callback_data=f"d:{token}:{i['position']}:n"),
+        dict(text=f"{i['position']+1} · {mark(i,'useful')}Useful",callback_data=f"d:{token}:{i['position']}:u"),
+        dict(text=f"{i['position']+1} · {mark(i,'not_useful')}Not useful",callback_data=f"d:{token}:{i['position']}:n"),
     ] for i in items])
