@@ -14,6 +14,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from . import service
 from . import auth
+from . import wake
 from .config import ROOT, DATA, OWNER
 from .models import (
     SaveIdea,
@@ -57,6 +58,9 @@ async def lifespan(app):
         from .monitoring.news_watch import run_once
 
         while not stop.wait(5):
+            # A few seconds of Power Nap is too short for a check; wait until awake.
+            if not wake.settled():
+                continue
             try:
                 for owner in auth.background_owners():
                     run_once(owner, lane=lane)
@@ -73,6 +77,8 @@ async def lifespan(app):
     def move_loop():
         from .monitoring.move_watch import run_once
         while not stop.wait(5):
+            if not wake.settled():
+                continue
             try:
                 for owner in auth.background_owners():
                     run_once(owner)
@@ -86,6 +92,8 @@ async def lifespan(app):
         from .monitoring.filing_watch import run_once
 
         while not stop.wait(5):
+            if not wake.settled():
+                continue
             try:
                 for owner in auth.background_owners():
                     run_once(owner)
@@ -113,15 +121,20 @@ async def lifespan(app):
         from .monitoring.alert_routing import poll_preview as preview_routes
         from .monitoring.daily_updates import poll as prepare_daily_updates
 
-        while not stop.wait(5):
+        backoff = wake.Backoff(5, name="Telegram delivery check", ceiling=120)
+        while not stop.wait(backoff.delay()):
+            if not wake.settled():
+                continue
             try:
                 for owner in auth.background_owners():
                     preview_routes(owner)
                     prepare_daily_updates(owner)
                     run_once(owner)
-            except Exception:
+            except Exception as exc:
                 # Do not log external transport URLs, tokens or private messages.
-                logging.getLogger("thesis").warning("Telegram delivery check failed")
+                backoff.failed(exc)
+            else:
+                backoff.succeeded()
 
     telegram_thread = threading.Thread(target=telegram_loop, daemon=True)
 
@@ -129,11 +142,17 @@ async def lifespan(app):
     def feedback_loop():
         from .monitoring.telegram_updates import poll_feedback, POLL_SECONDS
 
-        while not stop.wait(POLL_SECONDS):
+        # Telegram keeps taps for 24 hours, so pausing during an outage loses none.
+        backoff = wake.Backoff(POLL_SECONDS, name="Telegram rating check")
+        while not stop.wait(backoff.delay()):
+            if not wake.settled():
+                continue
             try:
                 poll_feedback()
-            except Exception:
-                logging.getLogger("thesis").warning("Telegram rating check failed")
+            except Exception as exc:
+                backoff.failed(exc)
+            else:
+                backoff.succeeded()
 
     feedback_thread = threading.Thread(target=feedback_loop, daemon=True)
     feedback_thread.start()

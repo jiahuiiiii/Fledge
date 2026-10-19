@@ -324,6 +324,10 @@ def publish(owner, iid, analysis_id, *, claim_token=None, now=None):
             raise ValueError("Sentiment analysis does not match this company.")
         if current["packet"].get("social_lookback_days", 7) != 7:
             return 0
+        # Alerts compare whole samples. A reading that left sources unread would
+        # count as a sample shift, so it neither alerts nor becomes the baseline.
+        if current["packet"].get("held_sources"):
+            return 0
         previous = (
             one(
                 c,
@@ -572,6 +576,7 @@ def run_once(
     source_observations.CHECK.set(token)
     message = None
     status = "completed"
+    skipped = None
     stage = "company news"
     analysis_id = idea_check_id = None
     details = {
@@ -653,6 +658,8 @@ def run_once(
             )
             analysis_id = record["id"]
             details["analysis"] = "completed"
+            if record.get("held_sources"):
+                details["held_sources"] = record["held_sources"]["count"]
             stage = "company alert publication"
             watch_context.require_active(owner, iid, token, supplied_clock)
             details["company_alerts"] = publish(
@@ -674,13 +681,24 @@ def run_once(
     except WatchStopped:
         status = "stopped"
     except Exception as exc:
+        from thesis.providers.ledger import BudgetBlocked, WakePaused
         status = "failed"
         busy = isinstance(exc, Conflict) and "already running" in str(exc)
+        # Neither is a failure: the other lane is reading this company, or the
+        # computer has just woken and nothing was sent. Both try again shortly.
+        skipped = "other_lane_busy" if busy else "computer_woke" if isinstance(exc, WakePaused) else None
         details["failed_stage"] = stage
         # Keep the actual reason: a generic message hid a two-day AI block
         # (12-13 Oct 2026) behind hourly "did not complete" results.
         details["failure_reason"] = failure_reason(exc)
-        logger.exception("Scheduled watch check failed at %s", stage)
+        if skipped:
+            status = "stopped"
+            details["skip_reason"] = skipped
+        if skipped or isinstance(exc, BudgetBlocked):
+            # An app-authored reason says it all; a traceback per check only hides it.
+            logger.warning("Scheduled %s check stopped at %s: %s", lane, stage, details["failure_reason"])
+        else:
+            logger.exception("Scheduled watch check failed at %s", stage)
         message = (
             f"The scheduled update stopped at {stage}: {details['failure_reason']} "
             "Saved research is still available. No automatic paid retry was made."
@@ -694,15 +712,16 @@ def run_once(
         )
         finished = supplied_clock or datetime.now(timezone.utc)
         retry_at = None
-        if status == "failed" and active:
+        if (status == "failed" or skipped) and active:
             recent = rows(
                 c,
-                "SELECT r.status FROM watch_check_results r JOIN watch_checks w ON w.id=r.check_id WHERE w.owner_id=%s AND w.instrument_id=%s AND w.lane=%s ORDER BY w.started_at DESC LIMIT %s",
+                "SELECT r.status,r.details->>'skip_reason' skip FROM watch_check_results r JOIN watch_checks w ON w.id=r.check_id WHERE w.owner_id=%s AND w.instrument_id=%s AND w.lane=%s ORDER BY w.started_at DESC LIMIT %s",
                 (owner, iid, lane, QUICK_RETRIES + 1),
             )
-            failures = next((n for n, r in enumerate(recent) if r["status"] != "failed"), len(recent))
+            # Skips count too: each retry fetches sources again, which have daily limits.
+            failures = next((n for n, r in enumerate(recent) if r["status"] != "failed" and not r["skip"]), len(recent))
             if failures <= QUICK_RETRIES:
-                retry_at = finished + timedelta(minutes=BUSY_RETRY_MINUTES if busy else RETRY_MINUTES)
+                retry_at = finished + timedelta(minutes=BUSY_RETRY_MINUTES if skipped else RETRY_MINUTES)
                 message = message.replace(
                     "No automatic paid retry was made.",
                     f"Trying again automatically at {retry_at.astimezone(SGT):%H:%M} SGT "

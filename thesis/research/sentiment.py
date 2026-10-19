@@ -770,16 +770,40 @@ def _generate(iid, *, transport, now, lookback_days, progress, retry_failed, rer
                   "(request_key IN (%s,%s) OR packet->>'replaces_request_key'=%s) "
                   "ORDER BY created_at DESC,request_key=%s DESC,id DESC LIMIT 1",
                   (iid, key, legacy, key, key))
-    if old:
-        with transaction() as c:
-            return present(c, old)
     from . import sentiment_reuse
-    with transaction() as c:
-        reused = {} if reread_token else sentiment_reuse.find(c, packet)
-    result, calls = sentiment_batching.run_reusing(packet, reused, transport=transport,
-                                                   progress=progress, retry_failed=retry_failed,
-                                                   prefilter=False if reread_token else None,
-                                                   split_failed=split_failed)
+    # A scheduled reading leaves out only sources whose earlier request may have
+    # been charged (never resent) and reads the rest. Explicit re-reads and
+    # recovery still stop, so the owner sees and decides on the unsettled request.
+    scheduled = reread_token is None and not retry_failed and not split_failed
+    held = []
+    while True:
+        if old:
+            with transaction() as c:
+                return present(c, old)
+        with transaction() as c:
+            reused = {} if reread_token else sentiment_reuse.find(c, packet)
+        try:
+            result, calls = sentiment_batching.run_reusing(packet, reused, transport=transport,
+                                                           progress=progress, retry_failed=retry_failed,
+                                                           prefilter=False if reread_token else None,
+                                                           split_failed=split_failed)
+            break
+        except sentiment_batching.HeldSources as exc:
+            remaining = [s for s in packet["sources"] if s["id"] not in exc.source_ids]
+            if not scheduled or not remaining or len(remaining) == len(packet["sources"]):
+                raise
+            # Ids and channel only: a held source is not shown, so its text never
+            # outlives a later withdrawal through this record.
+            held += [dict(id=s["id"], channel=s["channel"], reason=str(exc))
+                     for s in packet["sources"] if s["id"] in exc.source_ids]
+            packet = dict(packet, sources=remaining, held_sources=held)
+            key = identity(packet) + suffix + ":held:" + hashlib.sha256(
+                ledger.canonical(sorted(h["id"] for h in held)).encode()).hexdigest()
+            with transaction() as c:
+                old = one(c, "SELECT * FROM sentiment_analyses WHERE instrument_id=%s AND request_key=%s",
+                          (iid, key))
+    if held:
+        result["held_sources"] = dict(count=len(held), reason=held[0]["reason"])
     packet["batching"] = dict(policy=result.get('batching',{}).get('policy',sentiment_batching.POLICY),
                              call_ids=[str(call["id"]) for call in calls])
     if result.get("source_reuse"):
