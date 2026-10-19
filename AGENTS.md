@@ -18,7 +18,7 @@ Earlier checkpoints are preserved in [implementation history](docs/archive/statu
 - Never edit an applied migration. Add a new numbered file when a schema change is required. Startup **automatically applies all pending migrations**; schema approval and feature activation are separate.
 - The owner has approved additive migrations for the redesign. This covers 065–067. They are approved for the next deliberate restart, not blocked by an approval guard. No further schema changes are introduced by the operations cleanup.
 - Keep work on `feat/sentiment-analysis-redesign` (renamed from `codex/redesign-phase-5` on 18 October at the owner's request). Do not check out or restart from `main` while it lacks the applied schema files. Do not merge, push or open a PR without the owner's request. Preserve unrelated work.
-- Leave `frontend/src/styles/app.css` alone, including staging. It contains someone else's uncommitted edits. Leave `.claude/` alone.
+- `frontend/src/styles/app.css` is editable again: its leftover uncommitted banner fix was committed on 20 October at the owner's request. Leave `.claude/` alone.
 - The owner authorized continuing the full redesign without phase-boundary stops. Still obtain the explicit live choices below; do not mark incomplete acceptance gates done.
 
 ## Current deployment checkpoint

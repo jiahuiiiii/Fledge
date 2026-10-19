@@ -777,6 +777,16 @@ input[type="checkbox"] {
   display: block;
   margin-top: 10px;
 }
+/* The workspace banner reuses .error for its colour only; keep its own
+   padding and keep the action on the message's centre line. */
+.global-message.error {
+  padding: 9px 25px;
+  border-radius: 0;
+}
+.global-message.error button {
+  margin-top: 0;
+  font-size: var(--text-xs);
+}
 .focus-page,
 .history-page {
   padding: 25px;
@@ -1247,7 +1257,8 @@ input[type="checkbox"] {
   .idea-panel .full {
     max-width: 370px;
   }
-  .global-message {
+  .global-message,
+  .global-message.error {
     padding: 10px 18px;
   }
   .focus-page,
