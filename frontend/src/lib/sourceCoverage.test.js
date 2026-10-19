@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { sourceCoverage } from "./sourceCoverage.js";
+import {
+  sampleWithheld,
+  sourceCoverage,
+  withheldAlertNote,
+  withheldSourcesNote,
+} from "./sourceCoverage.js";
 
 test("old limited readings disclose unanalysed candidates without declaring them unrelated", () => {
   const coverage = sourceCoverage({
@@ -65,4 +70,38 @@ test("counts sources skipped by the quick relevance check", () => {
   assert.equal(news.quickSkipped, 1);
   assert.equal(news.unrelated, 2);
   assert.equal(coverage.quickSkipped, 1);
+});
+
+test("withheld tone totals are labelled, not shown as complete or unanalysed", () => {
+  const analysis = {
+    summary: { news: { selected: 3, relevant: 3 }, social_platforms: {} },
+    withheld_sources: 2,
+    withheld_summaries: { reddit: 2, social: 2 },
+    items: [
+      { source_id: "r1", channel: "social", relevance: "relevant" },
+      { source_id: "n1", channel: "news", relevance: "relevant" },
+    ],
+    sources: [
+      { id: "r1", platform: "reddit" },
+      { id: "n1", kind: "news" },
+    ],
+    coverage: {
+      available_news: 3,
+      social_platforms: { reddit: 3, hackernews: 0, x: 0 },
+    },
+  };
+  const reddit = sourceCoverage(analysis).scopes.find((s) => s.scope === "reddit");
+  assert.equal(reddit.withheld, 2);
+  assert.equal(reddit.analysed, 1);
+  assert.equal(reddit.relevant, 1);
+  assert.equal(reddit.unanalysed, 0);
+  assert.equal(sampleWithheld(analysis, "reddit"), true);
+  assert.equal(sampleWithheld(analysis, "news"), false);
+  assert.match(withheldSourcesNote(analysis), /^2 saved sources are no longer available/);
+  assert.equal(withheldSourcesNote({ withheld_sources: 0 }), null);
+  assert.match(
+    withheldAlertNote({ payload: { withheld_items: 1 } }),
+    /^1 cited source is no longer available/,
+  );
+  assert.equal(withheldAlertNote({ payload: {} }), null);
 });

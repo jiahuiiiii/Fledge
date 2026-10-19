@@ -10,6 +10,7 @@ from thesis.research import hackernews as hn, social, sentiment
 from thesis.monitoring import news_watch
 from test_market import prepare
 from test_sentiment import provider, add_social, feed
+from test_partial_withdrawal import strict_and_partial
 
 
 def item(
@@ -132,7 +133,7 @@ def test_persisted_cooldown_exact_source_and_disabled_access(owner):
         c.execute("UPDATE social_feeds SET enabled=false WHERE feed='hackernews'")
     try:
         with transaction() as c:
-            assert sentiment.latest(c, iid)["withheld"]
+            strict_and_partial(c, iid)
     finally:
         with transaction(admin=True) as c:
             c.execute("UPDATE social_feeds SET enabled=true WHERE feed='hackernews'")
@@ -153,8 +154,7 @@ def test_rechecks_missing_search_items_and_withholds_deleted_history(owner):
     assert seen == [("search", "MSFT"), ("item", "123")]
     with transaction() as c:
         assert not social.documents(c, iid, datetime.now(timezone.utc))
-        assert sentiment.latest(c, iid)["id"] == original["id"]
-        assert sentiment.latest(c, iid)["withheld"]
+        assert strict_and_partial(c, iid)["id"] == original["id"]
         assert one(c, "SELECT count(*) n FROM social_posts")["n"] == 1
 
 

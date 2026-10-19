@@ -1,7 +1,12 @@
 import NewsStatus from "./NewsStatus";
 import { countedTone } from "../lib/newsPresentation";
 import { modelAvailability } from "../lib/modelAvailability";
-import { sourceCoverage } from "../lib/sourceCoverage";
+import {
+  sampleWithheld,
+  sourceCoverage,
+  withheldAlertNote,
+  withheldSourcesNote,
+} from "../lib/sourceCoverage";
 import Checkbox from "./Checkbox";
 import Select from "./Select";
 import SentimentLimits from "./SentimentLimits";
@@ -314,6 +319,9 @@ export default function SentimentPanel({
             <p className="fine">
               Some sources were omitted. Open Evidence to inspect the limits.
             </p>
+          )}
+          {withheldSourcesNote(a) && (
+            <p className="fine">{withheldSourcesNote(a)}</p>
           )}
           {tab === "all" ? (
             <>
@@ -669,9 +677,11 @@ export default function SentimentPanel({
       ) : (
         <>
           <p className="muted">
-            {disabledReason
-              ? "Tone analysis is not available yet. You can read the collected sources below."
-              : "No tone analysis saved for this source yet. Read the collected sources below, or choose Refresh & analyse."}
+            {a && sampleWithheld(a, platform || channel)
+              ? "This source's saved tone totals are withheld because they counted a source that is no longer available. Its remaining items are listed under All sources; choose Refresh & analyse for a new reading."
+              : disabledReason
+                ? "Tone analysis is not available yet. You can read the collected sources below."
+                : "No tone analysis saved for this source yet. Read the collected sources below, or choose Refresh & analyse."}
           </p>
           <CurrentSentimentSources
             data={data.sentiment_inputs}
@@ -692,7 +702,9 @@ export default function SentimentPanel({
               ? "Analyse a source sample first, then summarise its discussions."
               : a.withheld
                 ? "Source access changed. A new summary cannot be created from this sample."
-                : busy
+                : a.withheld_sources > 0
+                  ? "Some saved sources in this sample are no longer available. Choose Refresh & analyse before creating a new summary."
+                  : busy
                   ? "Wait for the current workspace action to finish. Saved readings remain available."
                   : availability.state === "running"
                     ? "Another AI request is running. Wait for it to finish before starting a discussion summary. Saved readings remain available."
@@ -969,6 +981,7 @@ export default function SentimentPanel({
                           : activeReasoning) ||
                         !a ||
                         a.withheld ||
+                        a.withheld_sources > 0 ||
                         !modelStatus?.comparison_enabled
                       }
                       onClick={() => onCheckIdea(checkPurpose)}
@@ -982,6 +995,13 @@ export default function SentimentPanel({
                       : "Looks for support, challenges, specific risks and answers linked to your saved reasoning."}{" "}
                     Explicit private AI check · works with a saved draft.
                   </p>
+                  {a?.withheld_sources > 0 && (
+                    <p className="fine">
+                      Some saved sources in this sample are no longer
+                      available. Choose Refresh & analyse before checking it
+                      against your idea.
+                    </p>
+                  )}
                   {checkPurpose === "question" && activeQuestion && (
                     <blockquote>
                       <span className="section-label">SAVED QUESTION</span>
@@ -1288,6 +1308,9 @@ export function ResearchAlerts({
               )}
               <h3>{a.payload.title}</h3>
               <p>{a.payload.reason}</p>
+              {withheldAlertNote(a) && (
+                <p className="fine">{withheldAlertNote(a)}</p>
+              )}
               <SentimentLimits
                 value={a.source_limits?.current}
                 label="Current sample"

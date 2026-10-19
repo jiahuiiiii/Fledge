@@ -415,6 +415,46 @@ def cited(sources, items, links=()):
     return [s for s in sources if s["id"] in wanted]
 
 
+def _shown_sample(reading, channel, platform):
+    return (platform or channel) not in reading.get("withheld_summaries", [])
+
+
+def visible_payload(payload, current, previous):
+    """The alert parts both readings still show, or None to withhold the alert.
+
+    An item stays only while the current reading still shows its own
+    interpretation; a tone shift also needs both of its saved totals.
+    """
+    if current["withheld"] or previous["withheld"]:
+        return None
+    shown = {i["source_id"] for i in current["items"]}
+    links = {(l["source_id"], l["reference_source_id"], l["relation"]) for l in current.get("coverage_links", [])}
+    items = payload.get("items", [])
+    if any((l["source_id"], l["reference_source_id"], l["relation"]) not in links
+           for l in payload.get("coverage_links", [])):
+        # A linked report change is one claim; it is not shown half-evidenced.
+        return None
+    if payload.get("kind") == "sentiment":
+        shifts = [
+            shift for shift in payload.get("shifts", [])
+            if _shown_sample(current, shift["channel"], shift.get("platform"))
+            and _shown_sample(previous, shift["channel"], shift.get("platform"))
+            and all(i["source_id"] in shown for i in shift["items"])
+        ]
+        if len(shifts) == len(payload.get("shifts", [])) and all(i["source_id"] in shown for i in items):
+            return payload
+        kept = [i for shift in shifts for i in shift["items"]]
+        if not shifts or not kept:
+            return None
+        return dict(payload, shifts=shifts, items=kept, withheld_items=len(items) - len(kept))
+    kept = [i for i in items if i["source_id"] in shown]
+    if len(kept) == len(items):
+        return payload
+    if not kept:
+        return None
+    return dict(payload, items=kept, withheld_items=len(items) - len(kept))
+
+
 def list_alerts(conn, owner, ids=None, *, previous=True, detail_instrument=None):
     data = rows(
         conn,
@@ -433,7 +473,7 @@ def list_alerts(conn, owner, ids=None, *, previous=True, detail_instrument=None)
     def shown(identity):
         identity = str(identity)
         if identity not in presented:
-            presented[identity] = sentiment.present(conn, records.get(identity))
+            presented[identity] = sentiment.present(conn, records.get(identity), partial=True)
         return presented[identity]
 
     for a in data:
@@ -444,7 +484,8 @@ def list_alerts(conn, owner, ids=None, *, previous=True, detail_instrument=None)
             continue
         visible = shown(a["current_id"])
         prior = shown(a["previous_id"])
-        withheld = visible["withheld"] or prior["withheld"]
+        payload = visible_payload(a["payload"], visible, prior) if visible and prior else None
+        withheld = payload is None
         result.append(
             dict(
                 id=str(a["id"]),
@@ -455,8 +496,8 @@ def list_alerts(conn, owner, ids=None, *, previous=True, detail_instrument=None)
                 review_action=a["review_action"],
                 withheld=withheld,
                 preview=a.get('preview',False),
-                payload={} if withheld else a["payload"],
-                sources=[] if withheld else cited(visible["sources"], a["payload"].get("items", []), a["payload"].get("coverage_links", [])),
+                payload={} if withheld else payload,
+                sources=[] if withheld else cited(visible["sources"], payload.get("items", []), payload.get("coverage_links", [])),
                 source_limits=(
                     {}
                     if withheld

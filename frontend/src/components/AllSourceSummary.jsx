@@ -13,10 +13,14 @@ export function SourceToneSummary({ analysis }) {
         <div key={sample.scope}>
           <SourceLabel scope={sample.scope} />
           <strong>
-            {sentimentSummaryParts(sample.sentimentSummary).label}
+            {sample.withheld != null
+              ? "Tone totals withheld"
+              : sentimentSummaryParts(sample.sentimentSummary).label}
           </strong>
           <small className="tone-detail">
-            {sentimentSummaryParts(sample.sentimentSummary).detail}
+            {sample.withheld != null
+              ? "They counted a source that is no longer available."
+              : sentimentSummaryParts(sample.sentimentSummary).detail}
           </small>
         </div>
       ))}
@@ -72,13 +76,15 @@ export default function AllSourceSummary({
             <div key={sample.scope}>
               <SourceLabel scope={sample.scope} />
               <strong>
-                {sample.analysed
-                  ? sentimentSummaryParts(sample.sentimentSummary).label
-                  : connection?.status === "disabled"
-                    ? "Connection off"
-                    : "No analysed texts"}
+                {sample.withheld != null
+                  ? "Tone totals withheld"
+                  : sample.analysed
+                    ? sentimentSummaryParts(sample.sentimentSummary).label
+                    : connection?.status === "disabled"
+                      ? "Connection off"
+                      : "No analysed texts"}
               </strong>
-              {sample.analysed > 0 && (
+              {sample.analysed > 0 && sample.withheld == null && (
                 <small className="tone-detail">
                   {sentimentSummaryParts(sample.sentimentSummary).detail}
                 </small>
@@ -106,6 +112,11 @@ export default function AllSourceSummary({
               {sample.excludedCount > 0 && (
                 <span className="fine">
                   {sample.excludedCount} excluded before analysis
+                </span>
+              )}
+              {sample.withheld > 0 && (
+                <span className="fine">
+                  {sample.withheld} no longer available; not shown
                 </span>
               )}
               {sample.unanalysed > 0 && (

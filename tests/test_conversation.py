@@ -14,6 +14,7 @@ from thesis.providers import ledger
 from test_hackernews import item, transport, hn
 from test_market import prepare
 from test_sentiment import provider
+from test_partial_withdrawal import strict_and_partial
 
 
 def setup(owner):
@@ -165,7 +166,7 @@ def test_removed_child_withholds_its_saved_analysis(owner):
     with pytest.raises(service.Missing):
         cv.read(p["id"])
     with transaction() as c:
-        assert sentiment.latest(c, iid)["withheld"]
+        strict_and_partial(c, iid)
 
 
 def test_parent_denial_recorded_once_hides_old_parent(owner):

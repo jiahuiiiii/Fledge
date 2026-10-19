@@ -36,7 +36,7 @@ def safe_url(value):
 def render(record,*,shown=None):
     d = record["detail"]
     kind = record["kind"]
-    if d.get("withheld"):
+    if d.get("withheld") or (d.get("payload") or {}).get("withheld_items"):
         raise ValueError("Source access changed; do not forward this alert.")
     if d.get('preview'):
         raise ValueError('Preview alerts must never be sent.')

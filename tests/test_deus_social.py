@@ -74,7 +74,12 @@ def test_removed_parent_withholds_reply_and_saved_reading(owner):
         c.execute("INSERT INTO social_withdrawals VALUES('t3_abc123',%s)",(now,))
     with transaction() as c:
         assert social.documents(c,iid,now)==[]
-        assert sentiment.latest(c,iid)['withheld']
+        record=one(c,'SELECT * FROM sentiment_analyses WHERE instrument_id=%s',(iid,))
+        assert sentiment.present(c,record)['withheld']
+        # The company reading drops the thread's posts and replies and their totals.
+        current=sentiment.latest(c,iid)
+        assert current['withheld_sources'] and not any(i['channel']=='social' for i in current['items'])
+        assert not any(s['kind']=='social' for s in current['sources']) and 'social' not in current['summary']
 
 
 def test_thread_only_reply_without_parent_is_not_sent_to_model(owner):
