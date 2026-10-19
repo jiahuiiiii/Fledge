@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { revisionPayload } from "./kestrelDiff.js";
+import { DEFAULT_EVIDENCE } from "./eventWindows.js";
 test("editing preserves identity, expected revision and explicit numeric scope", () => {
   const body = revisionPayload(
     {
@@ -109,11 +110,19 @@ test("event-only revision preserves definitions and rejects incomplete windows",
     { deadline: "" },
     { window_start: "2026-11-01" },
     { description: "  " },
-    { evidence_requirement: "" },
+    { evidence_requirement: "abc" },
   ])
     assert.throws(() =>
       revisionPayload({ ...form, events: [{ ...event, ...change }] }, "draft"),
     );
+  // A blank requirement takes the default wording the editor shows.
+  assert.equal(
+    revisionPayload(
+      { ...form, events: [{ ...event, evidence_requirement: "  " }] },
+      "draft",
+    ).events[0].evidence_requirement,
+    DEFAULT_EVIDENCE,
+  );
 });
 
 test("numerical purpose preserves thresholds and defaults old definitions to required", () => {

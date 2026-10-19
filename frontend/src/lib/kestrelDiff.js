@@ -1,6 +1,6 @@
 // Adapted from Kestrel thesisDiff.js: preserve condition identities through edits.
 // Replaces its multi-request mutation plan with one atomic revision document.
-import { eventWindows } from "./eventWindows.js";
+import { eventWindows, DEFAULT_EVIDENCE } from "./eventWindows.js";
 import { reportExpectationPayload } from "./reportExpectation.js";
 
 export const validConditions = (rows) =>
@@ -29,7 +29,11 @@ export function revisionPayload(form, status) {
         "Use a whole number from 1 to 3650 days, or leave the age limit blank.",
       );
   }
-  const events = form.events || [];
+  // A blank evidence requirement takes the plain default shown in the editor.
+  const events = (form.events || []).map((e) => ({
+    ...e,
+    evidence_requirement: e.evidence_requirement.trim() || DEFAULT_EVIDENCE,
+  }));
   for (const e of events) {
     if (
       e.description.trim().length < 5 ||

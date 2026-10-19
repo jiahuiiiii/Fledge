@@ -1,3 +1,7 @@
+# Simpler event editor — 20 October 2026
+
+A new event shows two fields: **What to watch for** and **Type** (Required event or Risk to watch), plus one line stating which dates count. Everything else sits under **More options**. A new event defaults to news published from seven days ago through 90 days ahead (UTC), because the source sample covers the latest seven days. A blank proof field saves the wording shown in it: "A report clearly stating that this has happened. Plans, rumours or a beta don't count." Date meaning, dates and repeat keep their earlier behaviour and are opened automatically when an event already uses an occurrence window or repeats. Saved definitions are unchanged; the defaults apply only to new events.
+
 # Current event schedules — phase 56
 
 Choose **Repeat this window** when an event needs fresh evidence every month, three months or year. Choose 2–12 windows and inspect **Preview all windows** before approving. Month-end dates stay at month end; other day anchors clamp only in shorter months. The finite schedule cannot overlap or exceed 3,650 days. One-window definitions keep their existing behavior.
