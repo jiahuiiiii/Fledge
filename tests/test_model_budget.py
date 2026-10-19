@@ -331,11 +331,9 @@ def test_copied_installation_cannot_start_another_live_allowance(monkeypatch, tm
     module = importlib.import_module("thesis.providers.settings")
     monkeypatch.setattr(module, "ROOT", tmp_path)
     monkeypatch.setattr(module, "DATA", tmp_path / ".local")
-    monkeypatch.setattr(
-        module,
-        "settings",
-        lambda: pytest.fail("Alternate installation must be rejected before keys"),
-    )
+    # A copy may only read its own .env to see whether it opted in as a capped
+    # test copy (THESIS_TEST_COPY); without that it is still rejected.
+    monkeypatch.setattr(module, "settings", lambda: {"OPENAI_API_KEY": "must-not-be-used"})
     with pytest.raises(ValueError, match="original persistent"):
         module.live_key()
 
@@ -634,9 +632,7 @@ def test_copied_installation_blocks_both_profiles_before_reading_secrets(
     module = importlib.import_module("thesis.providers.settings")
     monkeypatch.setattr(module, "ROOT", tmp_path)
     monkeypatch.setattr(module, "DATA", tmp_path / ".local")
-    monkeypatch.setattr(
-        module, "settings", lambda: pytest.fail("Copied installation read secrets")
-    )
+    monkeypatch.setattr(module, "settings", lambda: {"OPENAI_API_KEY": "must-not-be-used"})
     with pytest.raises(ValueError, match="original persistent"):
         module.live_key(model)
 

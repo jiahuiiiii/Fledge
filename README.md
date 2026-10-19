@@ -142,6 +142,8 @@ For frontend development, run the API above and `npm run dev` inside `frontend/`
 
 ## Paid AI installation restriction
 
+**Separate test copies** (another laptop or a cloud server) can opt in with their own key, their own database and cost record, and a total spending cap of at most US$20: `THESIS_TEST_COPY=true` and `THESIS_TEST_COPY_CAP_USD` in that copy's `.env`. A test copy cannot run from or point its data at the original folder, and its results are separate from the original installation's evidence. [Test copy setup](docs/development/test-copy.md).
+
 Paid AI is configured for the owner's original installation, not a portable multi-user setup. Before dispatch, [`live_key()`](thesis/providers/settings.py) checks the resolved paths:
 
 | Setting | Required original location |
