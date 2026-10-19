@@ -69,7 +69,16 @@ export function EventEditor({ events = [], onChange }) {
       </p>
       {events.map((e, i) => (
         <fieldset className="event-definition" key={e.condition_id}>
-          <legend>Event {i + 1}</legend>
+          <legend>
+            <span>Event {i + 1}</span>
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => onChange(events.filter((_, j) => i !== j))}
+            >
+              Remove event {i + 1}
+            </button>
+          </legend>
           <label>
             What to watch for
             <input
@@ -93,7 +102,7 @@ export function EventEditor({ events = [], onChange }) {
           </label>
           <p className="fine">{windowSummary(e)}</p>
           <details
-            className="explanation"
+            className="event-more"
             open={
               e.date_basis === "event_occurrence" || !!e.repeat_months
                 ? true
@@ -101,117 +110,112 @@ export function EventEditor({ events = [], onChange }) {
             }
           >
             <summary>More options</summary>
-            <label>
-              What counts as proof
-              <textarea
-                aria-label={`Event evidence required ${i + 1}`}
-                value={e.evidence_requirement}
-                maxLength={600}
-                onChange={(x) =>
-                  edit(i, "evidence_requirement", x.target.value)
-                }
-                placeholder={DEFAULT_EVIDENCE}
-              />
-            </label>
-            <p className="fine">Leave blank to use the wording shown.</p>
-            <label>
-              What the dates mean
-              <Select
-                aria-label={`Event date meaning ${i + 1}`}
-                value={e.date_basis || "report_publication"}
-                onChange={(x) => edit(i, "date_basis", x.target.value)}
-              >
-                <option value="report_publication">
-                  When the news was published
-                </option>
-                <option value="event_occurrence">
-                  When the event happened
-                </option>
-              </Select>
-            </label>
-            <p className="fine">
-              {e.date_basis === "event_occurrence"
-                ? "A later report can confirm an earlier event, but it must state the event’s full day, month and year. Missing or unclear dates stay unconfirmed."
-                : "Only news published between these dates counts (UTC). It doesn't limit when the event itself happened."}
-            </p>
-            <div className="event-dates">
+            <div className="event-more-body">
               <label>
-                From
-                <input
-                  aria-label={`${e.date_basis === "event_occurrence" ? "Event" : "Report"} window start ${i + 1}`}
-                  type="date"
-                  value={e.window_start}
-                  onChange={(x) => edit(i, "window_start", x.target.value)}
-                />
-              </label>
-              <label>
-                Until (inclusive)
-                <input
-                  aria-label={`${e.date_basis === "event_occurrence" ? "Event" : "Report"} deadline ${i + 1}`}
-                  type="date"
-                  min={e.window_start || undefined}
-                  value={e.deadline}
-                  onChange={(x) => edit(i, "deadline", x.target.value)}
-                />
-              </label>
-            </div>
-            <label>
-              Repeat
-              <Select
-                aria-label={`Event repeat interval ${i + 1}`}
-                value={e.repeat_months || 0}
-                onChange={(x) =>
-                  onChange(
-                    events.map((item, j) =>
-                      j === i
-                        ? {
-                            ...item,
-                            repeat_months: Number(x.target.value),
-                            repeat_count: Number(x.target.value)
-                              ? item.repeat_count > 1
-                                ? item.repeat_count
-                                : 4
-                              : 1,
-                          }
-                        : item,
-                    ),
-                  )
-                }
-              >
-                <option value={0}>Once</option>
-                <option value={1}>Every month</option>
-                <option value={3}>Every 3 months</option>
-                <option value={12}>Every year</option>
-              </Select>
-            </label>
-            {!!e.repeat_months && (
-              <label>
-                Number of windows, including the first
-                <input
-                  aria-label={`Event window count ${i + 1}`}
-                  type="number"
-                  min="2"
-                  max="12"
-                  value={e.repeat_count ?? 4}
+                What counts as proof
+                <textarea
+                  aria-label={`Event evidence required ${i + 1}`}
+                  value={e.evidence_requirement}
+                  maxLength={600}
                   onChange={(x) =>
-                    edit(
-                      i,
-                      "repeat_count",
-                      x.target.value === "" ? "" : Number(x.target.value),
+                    edit(i, "evidence_requirement", x.target.value)
+                  }
+                  placeholder={DEFAULT_EVIDENCE}
+                />
+              </label>
+              <p className="fine">Leave blank to use the wording shown.</p>
+              <label>
+                What the dates mean
+                <Select
+                  aria-label={`Event date meaning ${i + 1}`}
+                  value={e.date_basis || "report_publication"}
+                  onChange={(x) => edit(i, "date_basis", x.target.value)}
+                >
+                  <option value="report_publication">
+                    When the news was published
+                  </option>
+                  <option value="event_occurrence">
+                    When the event happened
+                  </option>
+                </Select>
+              </label>
+              <p className="fine">
+                {e.date_basis === "event_occurrence"
+                  ? "A later report can confirm an earlier event, but it must state the event’s full day, month and year. Missing or unclear dates stay unconfirmed."
+                  : "Only news published between these dates counts (UTC). It doesn't limit when the event itself happened."}
+              </p>
+              <div className="event-dates">
+                <label>
+                  From
+                  <input
+                    aria-label={`${e.date_basis === "event_occurrence" ? "Event" : "Report"} window start ${i + 1}`}
+                    type="date"
+                    value={e.window_start}
+                    onChange={(x) => edit(i, "window_start", x.target.value)}
+                  />
+                </label>
+                <label>
+                  Until (inclusive)
+                  <input
+                    aria-label={`${e.date_basis === "event_occurrence" ? "Event" : "Report"} deadline ${i + 1}`}
+                    type="date"
+                    min={e.window_start || undefined}
+                    value={e.deadline}
+                    onChange={(x) => edit(i, "deadline", x.target.value)}
+                  />
+                </label>
+              </div>
+              <label>
+                Repeat
+                <Select
+                  aria-label={`Event repeat interval ${i + 1}`}
+                  value={e.repeat_months || 0}
+                  onChange={(x) =>
+                    onChange(
+                      events.map((item, j) =>
+                        j === i
+                          ? {
+                              ...item,
+                              repeat_months: Number(x.target.value),
+                              repeat_count: Number(x.target.value)
+                                ? item.repeat_count > 1
+                                  ? item.repeat_count
+                                  : 4
+                                : 1,
+                            }
+                          : item,
+                      ),
                     )
                   }
-                />
+                >
+                  <option value={0}>Once</option>
+                  <option value={1}>Every month</option>
+                  <option value={3}>Every 3 months</option>
+                  <option value={12}>Every year</option>
+                </Select>
               </label>
-            )}
-            <EventSchedule event={e} />
+              {!!e.repeat_months && (
+                <label>
+                  Number of windows, including the first
+                  <input
+                    aria-label={`Event window count ${i + 1}`}
+                    type="number"
+                    min="2"
+                    max="12"
+                    value={e.repeat_count ?? 4}
+                    onChange={(x) =>
+                      edit(
+                        i,
+                        "repeat_count",
+                        x.target.value === "" ? "" : Number(x.target.value),
+                      )
+                    }
+                  />
+                </label>
+              )}
+              <EventSchedule event={e} />
+            </div>
           </details>
-          <button
-            type="button"
-            className="text-button"
-            onClick={() => onChange(events.filter((_, j) => i !== j))}
-          >
-            Remove event {i + 1}
-          </button>
         </fieldset>
       ))}
       {events.length < 3 && (
