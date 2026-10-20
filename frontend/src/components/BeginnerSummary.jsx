@@ -190,7 +190,7 @@ export default function BeginnerSummary({
       <section className="bs-card" id="bs-news" tabIndex={-1} aria-labelledby="bs-news-title">
         <h4 id="bs-news-title">News: what happened</h4>
         <p className="bs-meaning">{newsMeaning(newsGroups)}</p>
-        {onRate && (newsGroups.unrated.length > 0 || postGroups.unrated.length > 0) && (
+        {onRate && !reading && (newsGroups.unrated.length > 0 || postGroups.unrated.length > 0) && (
           <div className="bs-rate">
             <button type="button" className="primary" onClick={onRate} disabled={rating}>
               {rating ? "Rating… this takes a minute or two" : "Rate with AI"}
@@ -210,7 +210,7 @@ export default function BeginnerSummary({
             <ul className="bs-headlines">{newsGroups.neutral.slice(0, 5).map(headline)}</ul>
           </details>
         )}
-        {group("Not rated yet", "none", newsGroups.unrated, 5)}
+        {!reading && group("Not rated yet", "none", newsGroups.unrated, 5)}
         {!news.length && onUpdate && (
           <button type="button" className="bs-link inline" onClick={onUpdate}>
             Get the latest news
@@ -234,7 +234,7 @@ export default function BeginnerSummary({
         {group("Upbeat posts (opinions)", "none", postGroups.good)}
         {group("Worried posts (opinions)", "none", postGroups.bad)}
         {group("Mixed posts: good and bad", "none", postGroups.mixed)}
-        {group("Not rated yet", "none", postGroups.unrated)}
+        {!reading && group("Not rated yet", "none", postGroups.unrated)}
       </section>
 
       <section className="bs-card" id="bs-world" tabIndex={-1} aria-labelledby="bs-world-title">
