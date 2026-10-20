@@ -33,6 +33,46 @@ def safe_url(value):
         return None
 
 
+TONES = {"favourable": "Good news", "adverse": "Bad news", "mixed": "Mixed news"}
+SENTIMENTS = {"positive": "Good news", "negative": "Bad news", "mixed": "Mixed news", "neutral": "Neutral news"}
+LEANINGS = {"positive leaning": "Good news", "negative leaning": "Bad news"}
+CATEGORIES = {"earnings_guidance": "earnings or guidance", "legal_regulatory": "legal or regulatory",
+              "deal": "deal", "management": "management", "product": "product",
+              "analyst_opinion": "analyst", "market_commentary": "market commentary"}
+
+
+def item_tone(item):
+    """The saved reading's label; an effect stated in the report outranks tone."""
+    impact = (item.get("reporting_basis") or {}).get("impact")
+    return TONES.get(impact) or SENTIMENTS.get(item.get("sentiment"), "Unclear news")
+
+
+def news_tone(payload, items):
+    shifts = payload.get("shifts") or []
+    if shifts:
+        after = {LEANINGS.get(s["after"]["tone"], "Mixed news") for s in shifts}
+        return after.pop() if len(after) == 1 else "Mixed news"
+    tones = {item_tone(i) for i in items}
+    return tones.pop() if len(tones) == 1 else "Mixed news"
+
+
+def why_notified(payload, items):
+    """One plain sentence from saved labels only; no new interpretation."""
+    shifts = payload.get("shifts") or []
+    if shifts:
+        s = shifts[0]
+        return f"Why: news tone changed from {plain(s['before']['tone'], 30)} to {plain(s['after']['tone'], 30)}."
+    if payload.get("kind") == "new_reporting":
+        if payload.get("coverage_links"):
+            return "Why: a new report changes details of a story seen earlier."
+        return "Why: a new report describes a development with a bad or mixed effect for the company."
+    importance = (items[0].get("importance") or {}) if items else {}
+    if importance.get("level"):
+        kind = CATEGORIES.get(importance.get("category"), "company")
+        return f"Why: new {kind} news, rated {plain(importance['level'], 10)} importance."
+    return "Why: " + plain(payload.get("title") or "new company news", 160) + "."
+
+
 def render(record,*,shown=None):
     d = record["detail"]
     kind = record["kind"]
@@ -69,20 +109,26 @@ def render(record,*,shown=None):
         parts.append('<b>'+cause+'</b>\n'+escape(plain(explanation.get('text') or 'No verified explanation is saved.',800)))
         source_ids.extend(s['id'] for s in d.get('sources',[]))
     elif kind == "company":
+        # Owner feedback 20 Oct 2026: say good, bad or neutral up front, one short
+        # line on why, then the excerpt. The rule's explanation stays in the app.
         payload = d["payload"]
-        for shift in payload.get("shifts", [])[:3]:
-            parts.append(escape(plain(shift.get("title"), 120)) + ": " + escape(plain(shift["before"]["tone"], 30)) + " → " + escape(plain(shift["after"]["tone"], 30)))
-        parts.append(escape(plain(payload.get("reason"), 450)))
-        for item in payload.get("items", [])[:2]:
+        items = payload.get("items", [])[:2]
+        titles = {str(s["id"]): s.get("title") for s in d.get("sources", [])}
+        parts = [f"<b>{escape(symbol)} · {escape(news_tone(payload, items))}</b>",
+                 f"<b>{escape(plain(titles.get(str(items[0]['source_id'])) if items else None, 180) or plain(record['title'], 180))}</b>"]
+        if d.get("fictional"):
+            parts.insert(0, "<b>Fictional demo · not actual company news</b>")
+        parts.append(escape(why_notified(payload, items)))
+        for index, item in enumerate(items):
             source_ids.append(item["source_id"])
             basis = item.get("reporting_basis") or {}
             quotes = basis.get("citations") or item.get("citations") or []
             if quotes:
                 prefix = "Unconfirmed report" if basis.get("kind") == "unconfirmed_event" else "Source excerpt"
-                parts.append(f"<b>{prefix}</b>\n“{escape(plain(quotes[0].get('quote'), 320))}”")
+                also = titles.get(str(item["source_id"])) if index else None
+                head = f"<b>Also: {escape(plain(also, 150))}</b>\n" if also else ""
+                parts.append(f"{head}<b>{prefix}</b>\n“{escape(plain(quotes[0].get('quote'), 320))}”")
                 primary_parts[len(parts)-1]=item['source_id']
-        if payload.get("cutoff"):
-            parts.append("Sample cutoff: " + stamp(payload["cutoff"]))
     elif kind == "idea":
         parts.append("<b>Your question</b>\n" + escape(plain(d.get("question"), 240)))
         for item in [i for i in d["items"] if i["relation"] in RELATIONS][:2]:

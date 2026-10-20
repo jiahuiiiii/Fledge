@@ -397,3 +397,42 @@ def test_transport_validates_ack_and_sanitizes_errors(monkeypatch, data, code):
     with pytest.raises(HTTP.TelegramError) as exc:
         HTTP.call(KEY,"sendMessage",dict(chat_id=999,text="test"))
     assert exc.value.code == code and KEY not in str(exc.value) and "SECRET" not in str(exc.value)
+
+
+def test_company_message_leads_with_tone_headline_and_why():
+    item = dict(source_id="s1", sentiment="neutral",
+                importance=dict(level="high", category="deal"),
+                reporting_basis=dict(kind="reported_event", impact="not_stated",
+                                     citations=[dict(quote="Broadcom to advance NTT DOCOMO's private cloud")]))
+    detail = dict(symbol="AVGO", payload=dict(kind="important_reporting", items=[item],
+                  reason="Newly analysed news states a company development with saved importance evidence."),
+                  sources=[dict(id="s1", url="https://example.com/a", title="Broadcom to Advance NTT DOCOMO's Private Cloud")])
+    message = render(dict(kind="company", title="New company developments to review",
+                          created_at="2026-10-20T03:01:00Z", detail=detail))
+    lines = message.split("\n\n")
+    assert lines[0] == "<b>AVGO · Neutral news</b>"
+    assert lines[1] == "<b>Broadcom to Advance NTT DOCOMO&#x27;s Private Cloud</b>"
+    assert lines[2] == "Why: new deal news, rated high importance."
+    assert "Source excerpt" in message and "Newly analysed" not in message and "Sample cutoff" not in message
+
+
+@pytest.mark.parametrize("basis,sentiment,expected", [
+    (dict(impact="adverse"), "neutral", "Bad news"),
+    (dict(impact="favourable"), "negative", "Good news"),
+    (dict(impact="not_stated"), "positive", "Good news"),
+    (dict(impact="not_stated"), "unclear", "Unclear news"),
+])
+def test_tone_prefers_a_stated_effect_over_tone(basis, sentiment, expected):
+    from thesis.monitoring.telegram_message import item_tone
+    assert item_tone(dict(reporting_basis=basis, sentiment=sentiment)) == expected
+
+
+def test_adverse_reporting_and_mixed_items_explain_why():
+    from thesis.monitoring.telegram_message import news_tone, why_notified
+    bad = dict(reporting_basis=dict(impact="adverse"))
+    good = dict(reporting_basis=dict(impact="favourable"))
+    assert news_tone(dict(), [bad, good]) == "Mixed news"
+    assert why_notified(dict(kind="new_reporting"), [bad]) == \
+        "Why: a new report describes a development with a bad or mixed effect for the company."
+    assert why_notified(dict(kind="new_reporting", coverage_links=[{}]), [bad]) == \
+        "Why: a new report changes details of a story seen earlier."
