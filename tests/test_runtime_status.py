@@ -169,3 +169,23 @@ def test_old_ledger_records_are_not_mistaken_for_active_calls(db):
         # Observation neither settles old calls nor redispatches them.
         assert conn.execute("SELECT count(*) n FROM model_calls WHERE id=ANY(%s::uuid[]) AND status='dispatched'",
                             ([old,recent['id']],)).fetchone()['n']==2
+
+
+def test_routine_daily_timer_and_waiting_review_do_not_block_idle(owner):
+    # 20 Oct 2026: idle_at_observation was never true because of these two.
+    from datetime import datetime, timedelta, timezone
+    from thesis.db import transaction
+    from thesis.monitoring import review_schedule
+    now = datetime.now(timezone.utc)
+    review_schedule.configure(owner, True, now.weekday(), 0, "UTC", now=now - timedelta(days=8))
+    mode = dict(features=dict(fast_lanes=False, price_detection=False, daily_records=True))
+    with transaction(owner) as conn:
+        conn.execute("UPDATE review_schedules SET next_due_at=now()-interval '1 hour',retry_after=now()+interval '40 minutes',error='generation_failed' WHERE owner_id=%s", (owner,))
+    with readonly() as conn:
+        blockers = R.restart_blockers(conn, mode=mode)
+        assert blockers['reviews_due_90s'] == 0 and 'daily_due_90s' not in blockers
+        assert 'daily_due_90s' in R.routine_timers(conn, mode=mode)
+    with transaction(owner) as conn:
+        conn.execute("UPDATE review_schedules SET retry_after=now()+interval '30 seconds' WHERE owner_id=%s", (owner,))
+    with readonly() as conn:
+        assert R.restart_blockers(conn, mode=mode)['reviews_due_90s'] == 1

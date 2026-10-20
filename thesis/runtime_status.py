@@ -122,12 +122,17 @@ def restart_blockers(conn, *, mode):
         sends="SELECT count(*) n FROM telegram_deliveries WHERE status='sending'",
         news_due_90s="SELECT count(*) n FROM news_watches WHERE enabled AND next_check_at<=now()+interval '90 seconds'",
         filings_due_90s="SELECT count(*) n FROM filing_watches WHERE enabled AND next_check_at<=now()+interval '90 seconds'",
-        reviews_due_90s="SELECT count(*) n FROM review_schedules WHERE enabled AND next_due_at<=now()+interval '90 seconds'",
+        # A review waiting out its hour after a failure is not about to run.
+        reviews_due_90s="""SELECT count(*) n FROM review_schedules WHERE enabled AND next_due_at<=now()+interval '90 seconds'
+          AND (retry_after IS NULL OR retry_after<=now()+interval '90 seconds')""",
         active_actions="""SELECT count(*) n FROM pg_locks l JOIN pg_stat_activity a ON a.pid=l.pid
           WHERE l.locktype='advisory' AND l.granted AND l.pid<>pg_backend_pid()
           AND NOT (l.classid::bigint=((hashtextextended('research-loading-worker-process',0)>>32)&4294967295)
           AND l.objid::bigint=(hashtextextended('research-loading-worker-process',0)&4294967295)
-          AND l.objsubid=1 AND a.state='idle')""")
+          AND l.objsubid=1 AND a.state='idle')
+          -- Millisecond transaction locks (the 1.5-second Telegram rating poll)
+          -- are not an action; real work holds its lock far longer.
+          AND NOT (a.xact_start IS NOT NULL AND now()-a.xact_start<interval '5 seconds')""")
     if mode['features']['fast_lanes']:
         queries['fast_due_90s'] = """SELECT count(*) n FROM news_watches w LEFT JOIN fast_watch_state f
           USING(owner_id,instrument_id) WHERE w.enabled AND (f.next_check_at IS NULL
@@ -139,10 +144,17 @@ def restart_blockers(conn, *, mode):
         queries['moves_due_90s'] = """SELECT count(DISTINCT w.owner_id) n FROM news_watches w
           LEFT JOIN move_watch_state s USING(owner_id) WHERE w.enabled
           AND (s.next_check_at IS NULL OR s.next_check_at<=now()+interval '90 seconds')"""
-    if mode['features']['daily_records']:
-        queries['daily_due_90s'] = """SELECT count(*) n FROM daily_updates_state
-          WHERE next_check_at<=now()+interval '90 seconds'"""
     return {name: conn.execute(query).fetchone()['n'] for name, query in queries.items()}
+
+
+def routine_timers(conn, *, mode):
+    """Shown but never blocking: daily records re-check about every minute, so one
+    is always due. Their local transactions roll back cleanly; sends are counted
+    separately as restart blockers."""
+    if not mode['features']['daily_records']:
+        return {}
+    return dict(daily_due_90s=conn.execute("""SELECT count(*) n FROM daily_updates_state
+          WHERE next_check_at<=now()+interval '90 seconds'""").fetchone()['n'])
 
 
 def report(*, root=ROOT, data=DATA, port=8841):
@@ -157,11 +169,12 @@ def report(*, root=ROOT, data=DATA, port=8841):
         conn.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
         schema = schema_status(conn, root=root)
         blockers = restart_blockers(conn, mode=mode)
+        routine = routine_timers(conn, mode=mode)
         attention = conn.execute('SELECT needs_attention FROM model_activity()').fetchone()['needs_attention']
     return dict(as_of=datetime.now(timezone.utc).isoformat(), app_pid=pid,
                 app_process_start=process_start(pid) if pid else None,
                 deployment=deployment(root=root, data=data, pid=pid), configured_mode=mode,
-                schema=schema, restart_blockers=blockers,
+                schema=schema, restart_blockers=blockers, routine_timers=routine,
                 historical_ai_records_needing_attention=attention,
                 idle_at_observation=bool(pid) and not any(blockers.values()) and not schema['mismatched_or_missing'],
                 restart_note='Read-only observation, not a reservation. Recheck immediately before a Terminal restart.',
