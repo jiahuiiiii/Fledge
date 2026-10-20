@@ -183,3 +183,11 @@ def test_portfolio_api(owner, listed):
     assert page['move']['down'] == 5 and len(page['companies']) == 5
     no_ai = client.post('/api/v1/portfolio/explain', headers=HEADERS)
     assert no_ai.status_code == 422
+
+
+def test_unrated_news_is_not_called_no_news():
+    listed = [dict(id='x', symbol='MSFT', name='Microsoft', sector='Software',
+                   quote=dict(change_percent=-0.2), news=dict(counts={}, items=[], rated=False))]
+    content, _ = portfolio.packet(listed, [], [])
+    assert content['companies'][0]['news_rated'] is False
+    assert 'news_rated is false' in portfolio.INSTRUCTIONS

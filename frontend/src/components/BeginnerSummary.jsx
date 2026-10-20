@@ -40,6 +40,8 @@ export default function BeginnerSummary({
   onSource,
   onWorld,
   onUpdate,
+  onRate,
+  rating = false,
   practice = false,
 }) {
   const [world, setWorld] = useState(null);
@@ -136,7 +138,6 @@ export default function BeginnerSummary({
       <section className="bs-price-row" aria-label="Share price">
         {price ? (
           <>
-            <strong>{price.price}</strong>
             {price.move && (
               <span className={`mood-${price.mood}`}>
                 <span aria-hidden="true">
@@ -189,6 +190,14 @@ export default function BeginnerSummary({
       <section className="bs-card" id="bs-news" tabIndex={-1} aria-labelledby="bs-news-title">
         <h4 id="bs-news-title">News: what happened</h4>
         <p className="bs-meaning">{newsMeaning(newsGroups)}</p>
+        {onRate && (newsGroups.unrated.length > 0 || postGroups.unrated.length > 0) && (
+          <div className="bs-rate">
+            <button type="button" className="primary" onClick={onRate} disabled={rating}>
+              {rating ? "Rating… this takes a minute or two" : "Rate with AI"}
+            </button>
+            <small>Fledge reads the news and posts and marks each good, bad or mixed.</small>
+          </div>
+        )}
         {group("Good news", "good", newsGroups.good)}
         {group("Bad news", "bad", newsGroups.bad)}
         {group("Mixed: good and bad in one story", "mixed", newsGroups.mixed)}
