@@ -3838,6 +3838,16 @@ function CompanyWorkspace({
               </section>
             )}
             <footer className="form-actions">
+              {current && (
+                <button
+                  type="button"
+                  className="archive-button"
+                  disabled={busy || !!conflict}
+                  onClick={() => save("archived")}
+                >
+                  Archive idea and stop monitoring
+                </button>
+              )}
               <button
                 type="submit"
                 className={approved ? "secondary" : "primary"}
@@ -3875,16 +3885,6 @@ function CompanyWorkspace({
                 </button>
               )}
             </footer>
-            {current && (
-              <button
-                type="button"
-                className="archive-button"
-                disabled={busy || !!conflict}
-                onClick={() => save("archived")}
-              >
-                Archive idea and stop monitoring
-              </button>
-            )}
           </form>
         )}
       </Modal>
