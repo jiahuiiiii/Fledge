@@ -430,7 +430,7 @@ export function AllHistory({
                 appear here, so you can see how your thinking changed.
               </p>
               <button onClick={() => onOpen("", "ideas")}>
-                Go to My ideas
+                Go to My views
               </button>
             </div>
           )}

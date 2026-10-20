@@ -78,6 +78,15 @@ export default function TelegramSettings() {
     };
   }, [open]);
 
+  // Without a bot on the server there is nothing a user can set up here.
+  const [configured, setConfigured] = useState(null);
+  useEffect(() => {
+    api
+      .telegram()
+      .then((value) => setConfigured(!!value?.configured))
+      .catch(() => setConfigured(false));
+  }, []);
+
   async function act(name, action, message) {
     const previous = data;
     acting.current = true;
@@ -108,6 +117,7 @@ export default function TelegramSettings() {
     }
   }
 
+  if (!configured) return null;
   return (
     <>
       <button

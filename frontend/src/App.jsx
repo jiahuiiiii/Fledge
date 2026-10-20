@@ -553,6 +553,7 @@ function CompanyWorkspace({
   }, [exploration]);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [updatesOpen, setUpdatesOpen] = useState(false);
+  const [updatePressed, setUpdatePressed] = useState(false);
   const [priceChartOpen, setPriceChartOpen] = useState(false);
   useEffect(() => {
     mainPane.current?.scrollTo(0, 0);
@@ -902,8 +903,8 @@ function CompanyWorkspace({
                   ["ideas", "My views"],
                 ]
               : [
-                  ["workspace", "Workspace"],
-                  ["ideas", "My ideas"],
+                  ["workspace", "Home"],
+                  ["ideas", "My views"],
                   ["updates", "Updates"],
                   ["world", "World"],
                 ]
@@ -1111,7 +1112,7 @@ function CompanyWorkspace({
             : beginner
               ? isRecorded
                 ? "Your view is saved."
-                : "Your view is saved. News alerts are off; to get them, turn on Watch in News & discussion."
+                : "Your view is saved."
               : "Draft saved. Monitoring is off.",
       );
       // Show the confirmation instead of leaving it above the scrolled view.
@@ -1638,8 +1639,8 @@ function CompanyWorkspace({
                 ...(updatesWaiting ? [["updates", "Updates"]] : []),
               ]
             : [
-                ["workspace", "Workspace"],
-                ["ideas", "My ideas"],
+                ["workspace", "Home"],
+                ["ideas", "My views"],
                 ["updates", "Updates"],
                 ["world", "World"],
               ]
@@ -1808,13 +1809,13 @@ function CompanyWorkspace({
                   className="primary"
                   disabled={companyLoading}
                   onClick={() => setResearchOpen(true)}
-                  aria-label="Ask a question"
-                  title="Ask a question"
+                  aria-label="Research questions"
+                  title="Research questions"
                 >
                   <span className="company-action-icon">
                     <Icon name="idea" />
                   </span>
-                  <span className="company-action-label">Ask a question</span>
+                  <span className="company-action-label">Research questions</span>
                 </button>
               )}
               <button
@@ -2483,15 +2484,9 @@ function CompanyWorkspace({
                     {view === "ideas" && (
                       <IdeasAndChanges
                         mode="ideas"
-                        catalogue={data.catalogue.filter(
-                          (c) =>
-                            !selectedCompanyId || c.id === selectedCompanyId,
-                        )}
+                        catalogue={data.catalogue}
                         changes={data.changes}
                         onOpen={onChoose}
-                        selectedCompany={data.catalogue.find(
-                          (c) => c.id === selectedCompanyId,
-                        )}
                         onCreate={selectedCompanyId ? openEditor : undefined}
                       />
                     )}
@@ -3004,7 +2999,10 @@ function CompanyWorkspace({
         </Modal>
         <Modal
           open={updatesOpen && !companyLoading}
-          onClose={() => setUpdatesOpen(false)}
+          onClose={() => {
+            setUpdatesOpen(false);
+            setUpdatePressed(false);
+          }}
           title={
             isRecorded
               ? "Research updates"
@@ -3020,17 +3018,16 @@ function CompanyWorkspace({
             ) : (
               <>
                 <p>
-                  Checks news, discussions, filings, prices, analyst targets and
-                  forecasts for {data.instrument.symbol} in one go. It usually
-                  takes a minute or two and uses no AI credit. Sources checked
-                  recently are skipped until they are due again.
+                  {beginner
+                    ? `Gets the latest news, posts and price for ${data.instrument.symbol}. Takes a minute or two.`
+                    : `Checks news, discussions, filings, prices, analyst targets and forecasts for ${data.instrument.symbol} in one go. It usually takes a minute or two and uses no AI credit. Sources checked recently are skipped until they are due again.`}
                 </p>
-                {lastSourceCheck(data) && (
+                {!beginner && lastSourceCheck(data) && (
                   <p className="fine">
                     Sources last checked {dateTime(lastSourceCheck(data))}.
                   </p>
                 )}
-                {data.source_checks
+                {!beginner && data.source_checks
                   .filter((c) => ["failed", "denied"].includes(c.state))
                   .map((c) => (
                     <p className="fine" key={c.source_id}>
@@ -3043,11 +3040,14 @@ function CompanyWorkspace({
               <button
                 className="primary"
                 disabled={!!loadingRun?.active}
-                onClick={() => startLoading()}
+                onClick={() => {
+                  setUpdatePressed(true);
+                  startLoading();
+                }}
               >
                 {loadingRun?.active ? "Updating…" : "Update now"}
               </button>
-              {layout.progressHidden && (
+              {!beginner && layout.progressHidden && (
                 <ResearchProgressToggle
                   run={loadingRun}
                   error={loadingError}
@@ -3055,19 +3055,29 @@ function CompanyWorkspace({
                 />
               )}
             </div>
-            <ResearchLoading
-              run={loadingRun}
-              error={loadingError}
-              onCollapse={toggleProgress}
-              hidden={!!layout.progressHidden}
-            />
-            {!isRecorded && (
+            {beginner ? (
+              loadingRun && (updatePressed || loadingRun.active) && (
+                <p className="fine" role="status">
+                  {loadingRun.active
+                    ? "Updating… you can close this, it keeps going."
+                    : "Done. Anything new is on the Summary."}
+                </p>
+              )
+            ) : (
+              <ResearchLoading
+                run={loadingRun}
+                error={loadingError}
+                onCollapse={toggleProgress}
+                hidden={!!layout.progressHidden}
+              />
+            )}
+            {!isRecorded && !beginner && (
               <p className="fine">
                 The AI tone reading is separate: use Refresh &amp; analyse in
                 News &amp; discussion when you want a new one.
               </p>
             )}
-            {modelAvailability(modelStatus).blocked && (
+            {!beginner && modelAvailability(modelStatus).blocked && (
               <details className="research-ai-status">
                 <summary>
                   {modelAvailability(modelStatus).state === "running"
@@ -3176,11 +3186,12 @@ function CompanyWorkspace({
       </div>
       <Modal
         open={!companyLoading && !!source}
-        title="Source evidence"
+        title={beginner ? (source?.kind === "social" ? "Post" : "Article") : "Source evidence"}
         onClose={() => setSource(null)}
       >
         {source && (
           <div className="source-modal">
+            {!beginner && (
             <span className="demo-tag">
               {source.kind === "recorded"
                 ? "AUTHORED FICTIONAL SOURCE"
@@ -3190,6 +3201,7 @@ function CompanyWorkspace({
                     ? "SOCIAL · PUBLIC DISCUSSION"
                     : "CALCULATED FROM SEC FACTS"}
             </span>
+            )}
             <h3>{source.title}</h3>
             <p className="muted">
               {source.source} ·{" "}
@@ -3197,8 +3209,12 @@ function CompanyWorkspace({
                 ? "feed updated"
                 : "published"}{" "}
               {dateTime(source.published_at)}
-              <br />
-              First available here {dateTime(source.available_at)}
+              {!beginner && (
+                <>
+                  <br />
+                  First available here {dateTime(source.available_at)}
+                </>
+              )}
             </p>
             {source.timestamp_basis === "feed_updated" && (
               <p className="fine">
@@ -3208,9 +3224,11 @@ function CompanyWorkspace({
             )}
             {source.kind !== "sec-calculation" ? (
               <>
-                <blockquote>
-                  {source.body || "Only a headline was supplied."}
-                </blockquote>
+                {!(beginner && (!source.body || source.body.trim() === source.title?.trim())) && (
+                  <blockquote>
+                    {source.body || "Only a headline was supplied."}
+                  </blockquote>
+                )}
                 {["news", "social"].includes(source.kind) && (
                   <a
                     className="source-link"
@@ -3248,9 +3266,13 @@ function CompanyWorkspace({
               {source.kind === "recorded"
                 ? "This is the exact stored source version. Interpretations shown in the workspace are authored for the demo; quotation matching alone does not verify a conclusion."
                 : source.kind === "news"
-                  ? "This is the stored provider headline and snippet, not the full article. AI interpretation can omit context; read the original reporting."
+                  ? beginner
+                    ? "A short preview. Read the original for the full story."
+                    : "This is the stored provider headline and snippet, not the full article. AI interpretation can omit context; read the original reporting."
                   : source.kind === "social"
-                    ? "This is a selected public discussion text, not a verified event or a representative investor sample. Each sentiment reading identifies any saved parent context it used. Inspecting a parent here does not change an earlier label. Collection includes bounded posts and replies when accessible, not complete threads."
+                    ? beginner
+                      ? "One person’s public post. Opinions, not facts."
+                      : "This is a selected public discussion text, not a verified event or a representative investor sample. Each sentiment reading identifies any saved parent context it used. Inspecting a parent here does not change an earlier label. Collection includes bounded posts and replies when accessible, not complete threads."
                     : "This is the stored calculation and its original filing inputs. It is not a verbatim filing excerpt. Later filings cannot rewrite this version."}
             </p>
           </div>
@@ -3315,9 +3337,10 @@ function CompanyWorkspace({
             <section className="idea-writing">
               <p className="idea-intro">
                 {beginner
-                  ? "Say in your own words what you think of this company and why, whether you like it or not. Alerts are optional."
+                  ? "Say in your own words what you think of this company and why, whether you like it or not."
                   : "Start with your question and your point of view. Add monitoring rules when you’re ready."}
               </p>
+              {(!beginner || !editor.question.trim()) && (
               <label className="field">
                 {beginner ? "Your question" : "Research question"}
                 <input
@@ -3330,9 +3353,10 @@ function CompanyWorkspace({
                   }}
                 />
               </label>
+              )}
               <div className="field">
                 <label htmlFor="idea-reasoning">
-                  {beginner ? "Your answer" : "My reasoning"}
+                  {beginner ? "Your view" : "My reasoning"}
                 </label>
                 <textarea
                   id="idea-reasoning"

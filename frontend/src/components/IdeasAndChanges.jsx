@@ -40,7 +40,7 @@ export default function IdeasAndChanges({
       {mode !== "ideas" && <span className="section-label">YOUR RESEARCH</span>}
       <div className="ideas-heading">
         <div>
-          <h2>{mode === "ideas" ? (beginner ? "My views" : "My ideas") : "What changed"}</h2>
+          <h2>{mode === "ideas" ? "My views" : "What changed"}</h2>
           <p className="muted">
             {mode === "ideas"
               ? "The views you chose to save, in your own words."
@@ -70,12 +70,15 @@ export default function IdeasAndChanges({
                     <strong title={c.name}>{companyName(c)}</strong>
                     <span>{c.symbol}</span>
                   </div>
-                  <span className="status saved-idea-status">{c.status}</span>
+                  {!beginner && (
+                    <span className="status saved-idea-status">{c.status}</span>
+                  )}
                 </div>
                 <h3>{c.question || "Your saved idea"}</h3>
                 <p className="saved-idea-reasoning">
                   {c.reasoning || "Draft with no reasoning yet."}
                 </p>
+                {!beginner && (
                 <div className="saved-idea-meta">
                   <span
                     className={
@@ -92,8 +95,9 @@ export default function IdeasAndChanges({
                     Evidence cutoff {date(c.cutoff)} · Revision {c.revision}
                   </span>
                 </div>
+                )}
                 <div className="saved-idea-footer">
-                  <span>Open idea</span>
+                  <span>Open view</span>
                   <IdeaArrow />
                 </div>
               </button>
