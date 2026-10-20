@@ -16,7 +16,7 @@ Earlier checkpoints are preserved in [implementation history](docs/archive/statu
 - Paid calls use the existing spending ledger. No automatic paid retries. Retain failures, raw responses, charges and unresolved reservations. Disclose expected cost before any paid test over US$2; a completed paid attempt does not authorize another attempt.
 - Tests are offline and make no network calls. Use `LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 .venv/bin/python -m pytest -q tests/<file>.py`. Test databases are disposable; never point them at the live workspace.
 - Never edit an applied migration. Add a new numbered file when a schema change is required. Startup **automatically applies all pending migrations**; schema approval and feature activation are separate.
-- The owner has approved additive migrations for the redesign. This covers 065–067. They are approved for the next deliberate restart, not blocked by an approval guard. No further schema changes are introduced by the operations cleanup.
+- The owner has approved additive migrations for the redesign: 065–067 (applied), and on 20 October 068, which lets saved weekly reviews include price moves. They apply at the next deliberate restart, not blocked by an approval guard. Any further schema change needs a new owner approval.
 - Keep work on `feat/sentiment-analysis-redesign` (renamed from `codex/redesign-phase-5` on 18 October at the owner's request). Do not check out or restart from `main` while it lacks the applied schema files. Do not merge, push or open a PR without the owner's request. Preserve unrelated work.
 - `frontend/src/styles/app.css` is editable again: its leftover uncommitted banner fix was committed on 20 October at the owner's request. Leave `.claude/` alone.
 - The owner authorized continuing the full redesign without phase-boundary stops. Still obtain the explicit live choices below; do not mark incomplete acceptance gates done.
@@ -30,12 +30,12 @@ Read-only observation, 17 October at 23:25 SGT. Recheck before operating; this t
 | Branch | `feat/sentiment-analysis-redesign`, unmerged |
 | App | Running since 15:54:29 SGT; exact startup source fingerprint was not recorded |
 | Database | Schema 064; all applied file checksums match |
-| Next startup | Automatically applies approved 065–067 |
+| Next startup | Automatically applies approved 068 (065–067 already applied) |
 | Operating mode | Price previews: existing combined news/social watches plus price detection |
 | Fast/slow lanes | Off; passive provider metrics on |
 | Smaller sentiment tasks | Off |
-| Severity routing and daily records | Off |
-| New move/digest/cost Telegram delivery | Off; existing account Telegram preferences unchanged |
+| Severity routing and daily records | On from 20 October 07:16:59 SGT (owner approval; see below) |
+| New move/digest/cost Telegram delivery | On from 20 October 07:16:59 SGT; account Telegram preferences unchanged |
 | Restart | Not performed; recheck active work and due times immediately beforehand |
 
 `price-move-rules-2` was saved at 14:03 and committed at 14:05, before the 15:54 restart. Do not claim that particular fix is definitely absent from the running app. Later phase 5 changes were made after startup. Without a matching startup manifest, report the exact running version as unknown.
@@ -50,10 +50,10 @@ The prepared [runtime status tool](thesis/runtime_status.py) is read-only: `.ven
 | Explainer | GPT-5.5, preview only |
 | Move rules | ±3% session, 2 percentage points against QQQ, ±5% over two sessions |
 | Fast hours | 08:30–17:00 New York, adjusted for early closes |
-| Preview period | Five US trading days, no new Telegram delivery |
+| Preview period | Ended early by the owner on 20 October at 07:16:59 SGT |
 | Additive migrations | Approved; application remains automatic at startup |
-| Actual severity/new Telegram routing | Not approved |
-| Daily cost alert level and delivery | Not approved; US$5 remains a proposal |
+| Actual severity/new Telegram routing | **Approved 20 October** by the owner; live from 07:16:59 SGT (`THESIS_ALERT_ROUTING_LIVE`). Urgent alerts and price moves go to Telegram; others go to the daily summary |
+| Daily cost alert level and delivery | **Approved 20 October**: US$5 a day, sent by Telegram; daily summary also sent by Telegram from 07:16:59 SGT |
 
 Fast cadence waits for the 24-hour passive baseline, started 17 October at 12:55:59 SGT. It cannot finish before 18 October at 12:55:59 SGT. Three-day lane timing/denial comparisons, five trading days of previews and ten trading days of outcomes remain unverified.
 
