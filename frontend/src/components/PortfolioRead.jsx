@@ -54,8 +54,13 @@ export default function PortfolioRead({ onOpenCompany }) {
         .catch(() => active && setPage(null));
     load();
     addEventListener("fledge:home-changed", load);
+    // Prices on the cards refresh every minute; keep this summary in step.
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, 60_000);
     return () => {
       active = false;
+      clearInterval(timer);
       removeEventListener("fledge:home-changed", load);
     };
   }, []);
