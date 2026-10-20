@@ -23,6 +23,29 @@ export function latestPriceQuote(market, history) {
     : null;
 }
 
+// Plain labels for prices outside 09:30-16:00 New York time.
+export function sessionLabel(session) {
+  return session === "pre-market"
+    ? "Pre-market"
+    : session === "after-hours"
+      ? "After hours"
+      : null;
+}
+
+// The regular-session price shown next to a pre-market/after-hours one.
+export function closeBeside(history) {
+  const series = history?.snapshot?.series,
+    latest = series?.latest_quote,
+    regular = series?.regular_quote;
+  if (!sessionLabel(latest?.session) || !regular) return null;
+  const price = Number(regular.price);
+  if (!(price > 0)) return null;
+  return {
+    label: latest.session === "pre-market" ? "Previous close" : "At close",
+    price,
+  };
+}
+
 const finite = (value) =>
   value == null ||
   value === "" ||

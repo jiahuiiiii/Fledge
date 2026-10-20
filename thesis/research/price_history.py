@@ -66,10 +66,8 @@ def latest_quote(meta, end):
     return max(quotes, key=lambda q: q["quoted_at"]) if quotes else None
 
 
-def fetch(symbol, start, end, *, transport=None):
-    from .directory import valid_symbol
-    if not valid_symbol(symbol) or not configured():
-        raise ValueError("Daily price history is not connected for this company.")
+def _wait_for_slot():
+    """Shared Yahoo pacing: one request every two seconds across companies."""
     with transaction(source=True) as conn:
         row = one(
             conn, "SELECT next_at FROM price_history_clock WHERE singleton FOR UPDATE"
@@ -85,6 +83,32 @@ def fetch(symbol, start, end, *, transport=None):
         )
     if delay > 0:
         time.sleep(delay)
+
+
+def fetch(symbol, start, end, *, transport=None):
+    from .directory import valid_symbol
+    if not valid_symbol(symbol) or not configured():
+        raise ValueError("Daily price history is not connected for this company.")
+    return _chart(symbol, dict(
+        period1=int(start.timestamp()),
+        period2=int(end.timestamp()),
+        interval="1d",
+        events="div,splits",
+        includePrePost="false",
+    ), transport)
+
+
+def fetch_extended(symbol, *, transport=None):
+    """Today's 5-minute prices including pre-market and after-hours trading.
+    Used only for the latest displayed quote, never for daily bars or alerts."""
+    from .directory import valid_symbol
+    if not valid_symbol(symbol) or not configured():
+        raise ValueError("Extended-hours prices are not connected for this company.")
+    return _chart(symbol, dict(range="1d", interval="5m", includePrePost="true"), transport)
+
+
+def _chart(symbol, params, transport):
+    _wait_for_slot()
     try:
         with httpx.Client(
             headers={"User-Agent": "Thesis-local-pitch/0.1"},
@@ -95,13 +119,7 @@ def fetch(symbol, start, end, *, transport=None):
             with client.stream(
                 "GET",
                 f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
-                params=dict(
-                    period1=int(start.timestamp()),
-                    period2=int(end.timestamp()),
-                    interval="1d",
-                    events="div,splits",
-                    includePrePost="false",
-                ),
+                params=params,
             ) as response:
                 from .source_observations import record
                 record("yahoo_history", response.status_code)
@@ -123,6 +141,53 @@ def fetch(symbol, start, end, *, transport=None):
         raise ValueError(
             "Daily price history could not be read. Earlier prices are retained."
         ) from None
+
+
+def extended_quote(payload, symbol, observed_at):
+    """Latest pre-market or after-hours price from a 5-minute chart, labelled
+    by the provider's own trading periods. Regular-session prices are left to
+    the daily chart; anything unexpected gives None (no extended quote)."""
+    try:
+        result = payload["chart"]["result"]
+        if payload["chart"].get("error") or len(result) != 1:
+            return None
+        result = result[0]
+        meta = result["meta"]
+        if (
+            meta.get("symbol") != symbol
+            or meta.get("currency") != "USD"
+            or meta.get("exchangeTimezoneName") != "America/New_York"
+            or meta.get("dataGranularity") != "5m"
+        ):
+            return None
+        periods = meta["currentTradingPeriod"]
+        spans = {}
+        for key, label in (("pre", "pre-market"), ("post", "after-hours")):
+            period = periods[key]
+            begin, finish = period["start"], period["end"]
+            if type(begin) is not int or type(finish) is not int or not 0 < begin < finish:
+                return None
+            spans[label] = (begin, finish)
+        stamps = result["timestamp"]
+        closes = result["indicators"]["quote"][0]["close"]
+        if not isinstance(stamps, list) or not isinstance(closes, list) or len(stamps) > 400:
+            return None
+        limit = int(observed_at.timestamp())
+        for stamp, close in sorted(zip(stamps, closes), reverse=True):
+            if type(stamp) is not int or not 0 < stamp <= limit or close is None:
+                continue
+            if stamp < limit - 7 * 86400:
+                return None
+            session = next((label for label, (begin, finish) in spans.items()
+                            if begin <= stamp < finish), None)
+            if not session:
+                return None  # The newest price is regular-session (or unlabelled).
+            price = decimal(close)
+            return dict(price=str(price), quoted_at=datetime.fromtimestamp(stamp, timezone.utc).isoformat(),
+                        session=session, interval="5m")
+        return None
+    except (KeyError, TypeError, IndexError, ValueError, OverflowError, OSError, AttributeError):
+        return None
 
 
 def decimal(value, *, zero=False):
@@ -263,7 +328,7 @@ def normalize(payload, symbol, start, end, *, observed_at=None, instrument_type=
         ) from None
 
 
-def refresh(iid, *, fetcher=None):
+def refresh(iid, *, fetcher=None, extended_fetcher=None):
     attempt = uuid4()
     with transaction(source=True) as conn:
         collection_lock(conn)
@@ -307,6 +372,8 @@ def refresh(iid, *, fetcher=None):
             payload, company["symbol"], start, end,
             observed_at=datetime.now(timezone.utc),
         )
+        if extended_fetcher or (fetcher is None and not regular_hours(datetime.now(timezone.utc))):
+            series = with_extended_quote(series, company["symbol"], extended_fetcher)
         with transaction(source=True) as conn:
             collection_lock(conn)
             now = datetime.now(timezone.utc)
@@ -367,6 +434,35 @@ def refresh(iid, *, fetcher=None):
         raise ValueError(
             "Daily-history refresh failed; earlier prices are retained. No automatic retry."
         ) from None
+
+
+def regular_hours(now):
+    """Weekday 09:30-16:00 New York: the daily chart's own quote is current,
+    so no extra extended-hours request is made. Holidays still ask; the
+    provider's trading periods then decide the label."""
+    local = now.astimezone(NY)
+    minutes = local.hour * 60 + local.minute
+    return local.weekday() < 5 and 9 * 60 + 30 <= minutes < 16 * 60
+
+
+def with_extended_quote(series, symbol, fetcher=None):
+    """Prefer a newer pre-market/after-hours price for display. Optional: a
+    failed or unlabelled extended read keeps the daily chart's quote."""
+    if fetcher is None and not configured():
+        return series
+    try:
+        raw = (fetcher or fetch_extended)(symbol)
+        quote = extended_quote(raw, symbol, datetime.now(timezone.utc))
+    except Exception:
+        return series
+    if not quote:
+        return series
+    current = series.get("latest_quote")
+    if current and current["quoted_at"] >= quote["quoted_at"]:
+        return series
+    text = json.dumps(raw, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    quote["raw_sha256"] = hashlib.sha256(text.encode()).hexdigest()
+    return {**series, "latest_quote": quote, "regular_quote": current}
 
 
 def present(iid):
