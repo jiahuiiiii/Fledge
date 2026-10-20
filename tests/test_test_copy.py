@@ -41,7 +41,8 @@ def test_copy_must_opt_in_with_a_sensible_cap(copy_install, monkeypatch):
     with pytest.raises(ValueError, match="THESIS_TEST_COPY=true"):
         settings.test_copy_cap({})
     assert settings.test_copy_cap({"THESIS_TEST_COPY": "true", "THESIS_TEST_COPY_CAP_USD": "2.50"}) == Decimal("2.50")
-    for cap in ("", "0", "-1", "25", "abc", "NaN", "inf"):
+    assert settings.test_copy_cap({"THESIS_TEST_COPY": "true", "THESIS_TEST_COPY_CAP_USD": "100"}) == Decimal("100")
+    for cap in ("", "0", "-1", "101", "abc", "NaN", "inf"):
         with pytest.raises(ValueError, match="THESIS_TEST_COPY_CAP_USD"):
             settings.test_copy_cap({"THESIS_TEST_COPY": "true", "THESIS_TEST_COPY_CAP_USD": cap})
 

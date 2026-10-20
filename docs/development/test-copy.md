@@ -12,7 +12,7 @@ its `.local` database. Any other copy was refused. Now another copy can opt in:
 | --- | --- | --- |
 | Where | Original folder and database only | Any folder except the original, with its own database |
 | Opt-in | Not needed | `THESIS_TEST_COPY=true` |
-| Spending | No cap (owner decision 13 Oct) | Total cap from `THESIS_TEST_COPY_CAP_USD`, above 0 and at most US$20 |
+| Spending | No cap (owner decision 13 Oct) | Total cap from `THESIS_TEST_COPY_CAP_USD`, above 0 and at most US$100 |
 | Cost record | Its own ledger | Its own ledger, in its own database |
 | Other checks | Unchanged | Same: live switch, priced models, restart after provider change, key present |
 

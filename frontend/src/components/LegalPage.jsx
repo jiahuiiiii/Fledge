@@ -1,14 +1,34 @@
+import { useEffect, useState } from "react";
+import { api } from "../api/client";
 import { PRIVACY_CONTACT, TERMS_DATE } from "../lib/terms";
 import "./AccountGate.css";
 import "./LegalPage.css";
 
 // Terms of Use and Privacy Notice (Singapore PDPA), readable before signing up.
 // Plain words on purpose: people should understand what they agree to.
-const contact = PRIVACY_CONTACT ? (
-  <a href={`mailto:${PRIVACY_CONTACT}`}>{PRIVACY_CONTACT}</a>
-) : (
-  "the Fledge team (contact details coming soon)"
-);
+// The contact is set per installation (THESIS_PRIVACY_CONTACT on the
+// server); the built-in value is only a fallback.
+function Contact() {
+  const [email, setEmail] = useState(PRIVACY_CONTACT);
+  useEffect(() => {
+    let active = true;
+    api
+      .legal()
+      .then((result) => {
+        if (active && result?.privacy_contact) setEmail(result.privacy_contact);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+  return email ? (
+    <a href={`mailto:${email}`}>{email}</a>
+  ) : (
+    "the Fledge team (contact details coming soon)"
+  );
+}
+const contact = <Contact />;
 
 function Terms() {
   return (
@@ -56,8 +76,9 @@ function Terms() {
       <ul>
         <li>One account per person. Keep your password private.</li>
         <li>
-          There is no password reset yet, so store your password somewhere
-          safe.
+          When you sign up you get a one-time recovery code. Keep it safe: it
+          is the only way to reset a forgotten password yourself, and anyone
+          with your username and code can change your password.
         </li>
         <li>
           If you are under 18, use Fledge only with a parent or guardian’s
@@ -107,7 +128,8 @@ function Privacy() {
         <li>
           <strong>Account:</strong> your username (or your email address, on
           versions of Fledge that use email sign-in). Your password is stored
-          only as a scrambled hash; we cannot read it.
+          only as a scrambled hash; we cannot read it. Your password recovery
+          code is stored the same way.
         </li>
         <li>
           <strong>Your answers:</strong> where you are with investing and what

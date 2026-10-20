@@ -52,7 +52,7 @@ SELECTION_KEYS = ("THESIS_MODEL_PROVIDER", "THESIS_MOVE_EXPLAINER_MODEL", "THESI
 APPROVED_ROOT = Path("/Users/jiahuiwong/Documents/GitHub/Thesis")
 # A separate test copy (another laptop or a cloud server) may opt in with its own
 # key, its own database and cost record, and a total spending cap it must set.
-TEST_COPY_MAX_CAP_USD = Decimal("20")
+TEST_COPY_MAX_CAP_USD = Decimal("100")
 
 
 class ProviderConfigError(ValueError):
@@ -162,7 +162,7 @@ def test_copy_cap(values=None):
 
     A test copy never shares the original's database or cost record: it must not
     run from, or point its data at, the original folder. Its own .env says
-    THESIS_TEST_COPY=true and THESIS_TEST_COPY_CAP_USD (above 0, at most 20).
+    THESIS_TEST_COPY=true and THESIS_TEST_COPY_CAP_USD (above 0, at most 100).
     """
     if original_installation():
         return None
