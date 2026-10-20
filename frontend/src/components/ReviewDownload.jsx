@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 export default function ReviewDownload({
+  inline = false,
   version,
   evaluation,
   comparison,
@@ -50,6 +51,25 @@ export default function ReviewDownload({
       setBusy(false);
     }
   }
+  if (inline)
+    return (
+      <>
+        <button
+          className="text-button"
+          disabled={busy}
+          onClick={download}
+          aria-label="Download research record"
+          title="Your idea, reasoning and source references as a printable page. Includes private notes; review before sharing."
+        >
+          {busy ? "Preparing…" : "Download"}
+        </button>
+        {error && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
+      </>
+    );
   return (
     <div className="review-download">
       <button className="secondary" disabled={busy} onClick={download}>

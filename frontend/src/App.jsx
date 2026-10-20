@@ -93,6 +93,7 @@ import EventAssessment, {
   EventDefinitions,
 } from "./components/EventConditions";
 import ProposalPanel from "./components/ProposalPanel";
+import { statusLine, watchItems } from "./lib/ideaWatch";
 import { combineSuggestions } from "./lib/proposals";
 import ReviewDownload from "./components/ReviewDownload";
 import ReportingAge, { ageLabel } from "./components/ReportingAge";
@@ -101,7 +102,12 @@ import Onboarding from "./components/Onboarding";
 import PortfolioRead from "./components/PortfolioRead";
 import PersonalHome from "./components/PersonalHome";
 import { SettingsMenu } from "./components/DetailModeToggle";
-import { ProfileContext, readLocalMode, writeLocalMode, useProfile } from "./lib/profile";
+import {
+  ProfileContext,
+  readLocalMode,
+  writeLocalMode,
+  useProfile,
+} from "./lib/profile";
 import ReportExpectationEditor, {
   ReportExpectationText,
 } from "./components/ReportExpectation";
@@ -1074,7 +1080,12 @@ function CompanyWorkspace({
       setFormError("Resolve the saved-versus-draft comparison before saving.");
       return;
     }
-    if (beginner && status === "draft" && !proposalIds.length && !editor.reasoning?.trim()) {
+    if (
+      beginner &&
+      status === "draft" &&
+      !proposalIds.length &&
+      !editor.reasoning?.trim()
+    ) {
       setFormError("Write a sentence or two in “Your answer” first.");
       return;
     }
@@ -1193,7 +1204,13 @@ function CompanyWorkspace({
       />
     );
   }
-  function resultsPanel(e, v, history = false, compact = false) {
+  function resultsPanel(
+    e,
+    v,
+    history = false,
+    compact = false,
+    evidence = true,
+  ) {
     const linkedChange = data.changes.find((c) => c.evaluation_id === e.id);
     const previous = linkedChange
       ? v.evaluations.find(
@@ -1204,33 +1221,36 @@ function CompanyWorkspace({
         ];
     return (
       <>
-        <IdeaEvidenceReview
-          evaluation={e}
-          previous={previous}
-          version={v}
-          documents={data.documents}
-          change={linkedChange}
-          onSource={openSource}
-          review={v.evidence_reviews?.find((r) => r.evaluation_id === e.id)}
-          onCompare={
-            !e.manifest.snapshot_id
-              ? undefined
-              : () =>
-                  act(
-                    () =>
-                      api.compareEvidence(v.id, e.manifest.snapshot_id, e.id),
-                    "Evidence comparison saved for this revision.",
-                  )
-          }
-          busy={busy}
-          error={error}
-          unavailableReason={
-            modelAvailability(modelStatus, "comparison_enabled").message || null
-          }
-          compact={compact}
-          showReasoning={!history}
-          onOpen={() => onChoose(instrumentId, "history", e.id)}
-        />
+        {evidence && (
+          <IdeaEvidenceReview
+            evaluation={e}
+            previous={previous}
+            version={v}
+            documents={data.documents}
+            change={linkedChange}
+            onSource={openSource}
+            review={v.evidence_reviews?.find((r) => r.evaluation_id === e.id)}
+            onCompare={
+              !e.manifest.snapshot_id
+                ? undefined
+                : () =>
+                    act(
+                      () =>
+                        api.compareEvidence(v.id, e.manifest.snapshot_id, e.id),
+                      "Evidence comparison saved for this revision.",
+                    )
+            }
+            busy={busy}
+            error={error}
+            unavailableReason={
+              modelAvailability(modelStatus, "comparison_enabled").message ||
+              null
+            }
+            compact={compact}
+            showReasoning={!history}
+            onOpen={() => onChoose(instrumentId, "history", e.id)}
+          />
+        )}
         {!compact && eventPanel(v, e, null, history)}
         <p className="numeric-scope-note">
           {v.events?.length ? (
@@ -1914,7 +1934,10 @@ function CompanyWorkspace({
                             openEditor();
                             if (!current) {
                               const plain = `What do I think about ${data.instrument.name}, and why?`;
-                              setEditor({ ...formFor(null, plain), question: plain });
+                              setEditor({
+                                ...formFor(null, plain),
+                                question: plain,
+                              });
                             }
                           }}
                           onView={(next) => {
@@ -1922,7 +1945,9 @@ function CompanyWorkspace({
                             requestAnimationFrame(() => {
                               window.scrollTo(0, 0);
                               document
-                                .querySelectorAll(".main-workspace, .workspace-grid")
+                                .querySelectorAll(
+                                  ".main-workspace, .workspace-grid",
+                                )
                                 .forEach((el) => el.scrollTo?.(0, 0));
                             });
                           }}
@@ -1944,7 +1969,9 @@ function CompanyWorkspace({
                                 requestAnimationFrame(() => {
                                   window.scrollTo(0, 0);
                                   document
-                                    .querySelectorAll(".main-workspace, .workspace-grid")
+                                    .querySelectorAll(
+                                      ".main-workspace, .workspace-grid",
+                                    )
                                     .forEach((el) => el.scrollTo?.(0, 0));
                                 });
                               }}
@@ -2550,8 +2577,9 @@ function CompanyWorkspace({
                       onAddCompany={() => setAddingCompany(true)}
                       onOpenCompany={(id) => onChoose(id)}
                       practice={
-                        visibleCompanies.find((c) => c.id === INSTRUMENT_DEMO) ||
-                        visibleCompanies.find((c) => c.mode === "recorded")
+                        visibleCompanies.find(
+                          (c) => c.id === INSTRUMENT_DEMO,
+                        ) || visibleCompanies.find((c) => c.mode === "recorded")
                       }
                     />
                     <PortfolioRead onOpenCompany={(id) => onChoose(id)} />
@@ -2576,154 +2604,260 @@ function CompanyWorkspace({
                       onCompanyChange={chooseCompany}
                     />
                   </Suspense>
-                ) : ["ideas", "updates", "world"].includes(view) ? null : view ===
-                  "idea" ? (
-                  <section className="focus-page reasoning-page">
-                    <span className="section-label">YOUR REASONING</span>
-                    <h2>
-                      {current?.question ||
-                        "Give your research somewhere to live."}
-                    </h2>
-                    {!current && (
-                      <p className="reasoning large">
-                        Save what you think, what you are unsure about, and what
-                        could change your mind. A draft needs no monitoring
-                        rules.
-                      </p>
-                    )}
-                    <button className="primary" onClick={openEditor}>
-                      {current ? "Edit my idea" : "Save an idea"}{" "}
-                      <Icon name="arrow" />
-                    </button>
-                    <ProposalPanel
-                      proposals={data.proposals}
-                      current={current}
-                      busy={busy}
-                      unavailableReason={
-                        modelAvailability(modelStatus, "comparison_enabled")
-                          .message || null
-                      }
-                      onGenerate={() =>
-                        act(async () => {
-                          const result = await api.suggest({
-                            instrument_id: instrumentId,
-                            snapshot_id: data.snapshot_id,
-                            base_version_id: current?.id || null,
-                            question,
-                          });
-                          if (activeScope.current === scope)
-                            setNotice(result.explanation);
-                        })
-                      }
-                      onReview={(chosen) => {
-                        try {
-                          const candidate = combineSuggestions(chosen);
-                          setEditor(
-                            formFor(
-                              {
-                                ...candidate,
-                                revision: candidate.expected_revision,
-                              },
-                              candidate.question,
-                            ),
-                          );
-                          setProposalIds(chosen.map((p) => p.id));
-                          setProposalStale(false);
-                          setApproved(false);
-                          setFormError("");
-                          setConflict(null);
-                        } catch (e) {
-                          setError(e.message);
+                ) : ["ideas", "updates", "world"].includes(
+                    view,
+                  ) ? null : view === "idea" ? (
+                  <section className="focus-page reasoning-page idea-page">
+                    <header className="idea-head">
+                      <span className="section-label">
+                        {data.instrument.symbol} ·{" "}
+                        {beginner ? "MY VIEW" : "MY IDEA"}
+                      </span>
+                      <h2>
+                        {current?.question ||
+                          "What do you want to watch for this company?"}
+                      </h2>
+                      <p
+                        className={
+                          current?.reasoning?.trim()
+                            ? "idea-reasoning"
+                            : "idea-reasoning empty"
                         }
-                      }}
-                      onReject={(id) =>
-                        act(
-                          () => api.rejectSuggestion(id),
-                          "Suggestion rejected. Your saved idea is unchanged.",
-                        )
-                      }
-                      onSource={openSource}
-                      onOpen={(id) =>
-                        onChoose(instrumentId, "history", `revision:${id}`)
-                      }
-                    />
-                    {current && (
-                      <>
-                        <div className="divider" />
-                        <span className="section-label">
-                          REVISION {current.revision} ·{" "}
-                          {current.status.toUpperCase()}
-                        </span>
-                        <ReviewDownload
-                          version={current}
-                          evaluation={evaluation}
-                          comparison={current.evidence_reviews?.find((r) =>
-                            evaluation
-                              ? r.evaluation_id === evaluation.id
-                              : r.evaluation_id == null &&
-                                r.snapshot_id === data.snapshot_id,
-                          )}
-                        />
-                        {evaluation ? (
-                          resultsPanel(evaluation, current)
-                        ) : (
+                      >
+                        {current?.reasoning?.trim() ||
+                          (current
+                            ? "No reasoning written yet."
+                            : "Write what you think and what would change your mind, then choose what to watch.")}
+                      </p>
+                      <p
+                        className={`idea-status ${current?.status === "monitoring" ? "on" : "off"}`}
+                      >
+                        {checkingCurrent
+                          ? "Checking recorded evidence…"
+                          : statusLine(current, evaluation)}
+                      </p>
+                      <div className="idea-actions">
+                        <button
+                          className="primary"
+                          onClick={openEditor}
+                          aria-label={current ? "Edit my idea" : "Save an idea"}
+                        >
+                          {current ? "Edit" : "Start an idea"}
+                        </button>
+                        {current && (
                           <>
-                            <p className="muted">
-                              {checkingCurrent
-                                ? "Checking recorded evidence…"
-                                : "No active assessment. Save and explicitly approve monitoring when you are ready."}
-                            </p>
-                            {eventPanel(current)}
-                            <IdeaEvidenceReview
-                              evaluation={{
-                                id: null,
-                                manifest: {
-                                  snapshot_id: data.snapshot_id,
-                                  document_ids: data.documents.map((d) => d.id),
-                                  active_document_id: data.active_document_id,
-                                  cutoff: data.demo.as_of,
-                                },
-                              }}
+                            <ReviewDownload
+                              inline
                               version={current}
-                              documents={data.documents}
-                              onSource={openSource}
-                              draft
-                              onCompare={() =>
-                                act(
-                                  () =>
-                                    api.compareEvidence(
-                                      current.id,
-                                      data.snapshot_id,
-                                    ),
-                                  "Evidence comparison saved for this revision.",
-                                )
-                              }
-                              busy={busy}
-                              error={error}
-                              unavailableReason={
-                                modelAvailability(
-                                  modelStatus,
-                                  "comparison_enabled",
-                                ).message || null
-                              }
-                              review={current.evidence_reviews?.find(
-                                (r) =>
-                                  r.evaluation_id == null &&
-                                  r.snapshot_id === data.snapshot_id,
+                              evaluation={evaluation}
+                              comparison={current.evidence_reviews?.find((r) =>
+                                evaluation
+                                  ? r.evaluation_id === evaluation.id
+                                  : r.evaluation_id == null &&
+                                    r.snapshot_id === data.snapshot_id,
                               )}
                             />
+                            <button
+                              className="text-button"
+                              onClick={() => onChoose(instrumentId, "history")}
+                            >
+                              History
+                            </button>
                           </>
                         )}
-                      </>
+                      </div>
+                    </header>
+                    <section className="idea-section">
+                      <h3>What I'm watching</h3>
+                      {current && watchItems(current, evaluation).length ? (
+                        <ul className="idea-watch-list">
+                          {watchItems(current, evaluation).map((item) => (
+                            <li key={item.key}>
+                              <span className="idea-watch-type">
+                                {item.type}
+                              </span>
+                              <span className="idea-watch-label">
+                                {item.label}
+                              </span>
+                              <span className="idea-watch-state">
+                                {item.state}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="idea-empty">
+                          Nothing yet. Add an event or a number in Edit, and you
+                          get an alert when it happens.
+                        </p>
+                      )}
+                      <div className="idea-tools">
+                        <ProposalPanel
+                          embedded
+                          proposals={data.proposals}
+                          current={current}
+                          busy={busy}
+                          unavailableReason={
+                            modelAvailability(modelStatus, "comparison_enabled")
+                              .message || null
+                          }
+                          onGenerate={() =>
+                            act(async () => {
+                              const result = await api.suggest({
+                                instrument_id: instrumentId,
+                                snapshot_id: data.snapshot_id,
+                                base_version_id: current?.id || null,
+                                question,
+                              });
+                              if (activeScope.current === scope)
+                                setNotice(result.explanation);
+                            })
+                          }
+                          onReview={(chosen) => {
+                            try {
+                              const candidate = combineSuggestions(chosen);
+                              setEditor(
+                                formFor(
+                                  {
+                                    ...candidate,
+                                    revision: candidate.expected_revision,
+                                  },
+                                  candidate.question,
+                                ),
+                              );
+                              setProposalIds(chosen.map((p) => p.id));
+                              setProposalStale(false);
+                              setApproved(false);
+                              setFormError("");
+                              setConflict(null);
+                            } catch (e) {
+                              setError(e.message);
+                            }
+                          }}
+                          onReject={(id) =>
+                            act(
+                              () => api.rejectSuggestion(id),
+                              "Suggestion rejected. Your saved idea is unchanged.",
+                            )
+                          }
+                          onSource={openSource}
+                          onOpen={(id) =>
+                            onChoose(instrumentId, "history", `revision:${id}`)
+                          }
+                        />
+                        {current &&
+                          !evaluation &&
+                          current.events?.length > 0 && (
+                            <button
+                              className="text-button"
+                              disabled={busy}
+                              onClick={() =>
+                                act(
+                                  () =>
+                                    api.checkEvents(
+                                      current.id,
+                                      data.snapshot_id,
+                                      {},
+                                    ),
+                                  "Event check saved.",
+                                )
+                              }
+                            >
+                              Check events now (AI)
+                            </button>
+                          )}
+                      </div>
+                    </section>
+                    {current && evaluation && (
+                      <section className="idea-section">
+                        <h3>Latest check</h3>
+                        {resultsPanel(evaluation, current, false, false, false)}
+                      </section>
                     )}
-                    <details
-                      className="idea-history"
-                      open={!!initialEvaluation}
-                      key={initialEvaluation || "idea-history"}
-                    >
-                      <summary>History · versions and evidence checks</summary>
-                      {renderIdeaHistory()}
-                    </details>
+                    {current &&
+                      (() => {
+                        const review = current.evidence_reviews?.find((r) =>
+                          evaluation
+                            ? r.evaluation_id === evaluation.id
+                            : r.evaluation_id == null &&
+                              r.snapshot_id === data.snapshot_id,
+                        );
+                        const compare = () =>
+                          act(
+                            () =>
+                              evaluation
+                                ? api.compareEvidence(
+                                    current.id,
+                                    evaluation.manifest.snapshot_id,
+                                    evaluation.id,
+                                  )
+                                : api.compareEvidence(
+                                    current.id,
+                                    data.snapshot_id,
+                                  ),
+                            "Comparison saved for this revision.",
+                          );
+                        const unavailable =
+                          modelAvailability(modelStatus, "comparison_enabled")
+                            .message || null;
+                        return (
+                          <section className="idea-section">
+                            <h3>Check my reasoning</h3>
+                            {review ? (
+                              <IdeaEvidenceReview
+                                evaluation={
+                                  evaluation || {
+                                    id: null,
+                                    manifest: {
+                                      snapshot_id: data.snapshot_id,
+                                      document_ids: data.documents.map(
+                                        (d) => d.id,
+                                      ),
+                                      active_document_id:
+                                        data.active_document_id,
+                                      cutoff: data.demo.as_of,
+                                    },
+                                  }
+                                }
+                                version={current}
+                                documents={data.documents}
+                                onSource={openSource}
+                                draft={!evaluation}
+                                onCompare={compare}
+                                busy={busy}
+                                error={error}
+                                unavailableReason={unavailable}
+                                review={review}
+                                showReasoning={false}
+                              />
+                            ) : (
+                              <>
+                                <p className="idea-empty">
+                                  {current.reasoning?.trim()
+                                    ? "Compare what you wrote with this company's recent news. Uses AI."
+                                    : "Write your reasoning in Edit first, then compare it with recent news."}
+                                </p>
+                                <div className="idea-tools">
+                                  <button
+                                    className="text-button"
+                                    disabled={
+                                      busy ||
+                                      !!unavailable ||
+                                      !current.reasoning?.trim()
+                                    }
+                                    onClick={compare}
+                                  >
+                                    Compare with recent news (AI)
+                                  </button>
+                                </div>
+                                {unavailable && (
+                                  <p className="fine">{unavailable}</p>
+                                )}
+                              </>
+                            )}
+                          </section>
+                        );
+                      })()}
                   </section>
                 ) : (
                   renderIdeaHistory()
@@ -3362,7 +3496,9 @@ function CompanyWorkspace({
               <summary>
                 <span>
                   <strong>
-                    {beginner ? "Get alerts (optional)" : "Add monitoring rules"}
+                    {beginner
+                      ? "Get alerts (optional)"
+                      : "Add monitoring rules"}
                   </strong>
                   <small>
                     {beginner
