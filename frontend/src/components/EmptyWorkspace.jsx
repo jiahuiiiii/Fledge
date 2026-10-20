@@ -47,8 +47,8 @@ export default function EmptyWorkspace({ view, onChoose }) {
         </a>
         <nav aria-label="Workspace navigation">
           {[
-            ["workspace", "Workspace"],
-            ["ideas", "My ideas"],
+            ["workspace", "Home"],
+            ["ideas", "My views"],
             ["updates", "Updates"],
           ].map(([id, label]) => (
             <button

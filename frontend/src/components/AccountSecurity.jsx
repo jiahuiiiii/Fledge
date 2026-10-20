@@ -129,7 +129,7 @@ export function ForgotPasswordForm({ onDone, onBack }) {
           value={code}
           onChange={(event) => setCode(event.target.value)}
         />
-        <small>You saw it once, when you created your account.</small>
+        <small>Your most recent recovery code.</small>
       </div>
       <div className="account-field">
         <label htmlFor="reset-password">New password</label>
@@ -152,7 +152,7 @@ export function ForgotPasswordForm({ onDone, onBack }) {
         {busy ? "Please wait…" : "Set new password"}
       </button>
       <p className="account-alt">
-        Lost your code too? Ask whoever runs this Fledge to reset it for you.
+        Lost your code too? Contact the Fledge team to reset it.
       </p>
       <p className="account-alt">
         <button type="button" onClick={onBack}>
@@ -254,7 +254,7 @@ export function AccountSecurityDialog({ open, onClose, hasRecoveryCode, onCodeCh
             {!hasRecoveryCode && (
               <p className="security-nudge">
                 You don’t have a recovery code yet. Without one, a forgotten
-                password can only be reset by whoever runs this Fledge.
+                password can only be reset by the Fledge team.
               </p>
             )}
             <div className="account-field">

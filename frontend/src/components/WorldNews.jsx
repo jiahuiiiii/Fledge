@@ -122,9 +122,8 @@ export default function WorldNews({ active, onOpenCompany }) {
         </div>
       </header>
       <p className="world-news-status fine">
-        {page?.checked_at
-          ? `Market news from Finnhub, last 3 days. Last updated ${formatTimestamp(page.checked_at)}.`
-          : "No world headlines saved yet."}
+        {page?.checked_at &&
+          `Market news from Finnhub, last 3 days. Last updated ${formatTimestamp(page.checked_at)}.`}
         {beginner && page && !page.configured && page.articles.length > 0 && (
           <span> These are the latest saved headlines.</span>
         )}
@@ -141,11 +140,9 @@ export default function WorldNews({ active, onOpenCompany }) {
           </span>
         )}
       </p>
-      {page && !page.configured && !(beginner && page.articles.length) && (
+      {page && !page.configured && !beginner && page.articles.length > 0 && (
         <p className="warning" role="status">
-          {page.articles.length
-            ? "New headlines can’t load right now, so these are the last saved ones."
-            : "World headlines aren’t connected yet."}
+          New headlines can’t load right now, so these are the last saved ones.
         </p>
       )}
       {page?.error && (
@@ -159,7 +156,7 @@ export default function WorldNews({ active, onOpenCompany }) {
         </p>
       )}
 
-      {page && (
+      {page?.articles.length > 0 && (
         <div
           className="world-news-filters"
           role="group"
@@ -188,7 +185,9 @@ export default function WorldNews({ active, onOpenCompany }) {
       ) : articles.length === 0 ? (
         <p className="world-news-empty">
           {filter === "all"
-            ? "No headlines from the last three days yet."
+            ? page.configured
+              ? "No headlines from the last three days yet."
+              : "World headlines aren’t connected yet."
             : filter === "mine"
               ? "No recent headline names your companies. Run the watchlist check to look for indirect effects, like rates or tariffs."
               : "No recent headlines on this theme."}

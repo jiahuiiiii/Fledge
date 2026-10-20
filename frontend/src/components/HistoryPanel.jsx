@@ -94,7 +94,7 @@ export default function HistoryPanel({
               Save an idea first. Its revisions and completed checks will appear
               here, so you can see how your thinking changed.
             </p>
-            {onIdeas && <button onClick={onIdeas}>Go to My ideas</button>}
+            {onIdeas && <button onClick={onIdeas}>Go to My views</button>}
           </div>
         )}
       </section>

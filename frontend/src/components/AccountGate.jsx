@@ -137,7 +137,23 @@ export default function AccountGate({ children }) {
   });
   const [fieldError, setFieldError] = useState({});
   // A just-made recovery code, shown once before the app opens.
-  const [recovery, setRecovery] = useState(null);
+  // Kept in this tab until confirmed, so a reload can't lose the code.
+  const [recovery, setRecoveryState] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem("fledge:recovery") || "null");
+    } catch {
+      return null;
+    }
+  });
+  const setRecovery = (value) => {
+    setRecoveryState(value);
+    try {
+      if (value) sessionStorage.setItem("fledge:recovery", JSON.stringify(value));
+      else sessionStorage.removeItem("fledge:recovery");
+    } catch {
+      /* Storage can be unavailable; the screen still shows once. */
+    }
+  };
   const [forgot, setForgot] = useState(false);
   const [securityOpen, setSecurityOpen] = useState(false);
   const [agree, setAgree] = useState(false);

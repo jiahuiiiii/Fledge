@@ -147,9 +147,7 @@ export default function BeginnerSummary({
               </span>
             )}
           </>
-        ) : (
-          <span className="bs-muted">No share price saved yet</span>
-        )}
+        ) : null}
         {price?.move && (
           <p className="bs-price-note">
             Prices move for many reasons. The news below may not explain
@@ -180,9 +178,8 @@ export default function BeginnerSummary({
           ))}
         </ul>
         <p className="bs-key">
-          {rated && "Sorted by AI from saved headlines and posts; tap any item to check it. "}
-          ▲ mostly good · ▼ mostly bad · ◆ mixed. This shows the tone of what’s
-          being said, not whether to buy or sell.
+          {rated && "▲ mostly good · ▼ mostly bad · ◆ mixed. "}
+          This shows what’s being said, not whether to buy or sell.
         </p>
         {pointer && <p className="bs-pointer">{pointer}</p>}
       </section>
