@@ -54,14 +54,12 @@ export default function PortfolioRead({ onOpenCompany }) {
         .catch(() => active && setPage(null));
     load();
     addEventListener("fledge:home-changed", load);
-    // Prices on the cards refresh every minute; keep this summary in step.
-    const timer = setInterval(() => {
-      if (document.visibilityState === "visible") load();
-    }, 60_000);
+    // Re-read right after the cards fetch newer prices, so both agree.
+    addEventListener("fledge:prices-updated", load);
     return () => {
       active = false;
-      clearInterval(timer);
       removeEventListener("fledge:home-changed", load);
+      removeEventListener("fledge:prices-updated", load);
     };
   }, []);
   // A "list" needs at least two companies; one company has its own Summary.
