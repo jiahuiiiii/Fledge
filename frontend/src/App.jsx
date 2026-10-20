@@ -3433,19 +3433,20 @@ function CompanyWorkspace({
           >
             {proposalIds.length > 0 && (
               <div className="warning">
-                Review the complete resulting idea below. Fill every missing
-                threshold and date, and edit any wording before saving. Nothing
-                has changed yet.{" "}
+                Suggestions are filled in below. Check them and edit anything
+                before saving. Nothing is saved yet.{" "}
                 {proposalStale &&
                   "The idea or evidence changed while reviewing. Close this draft and request fresh suggestions; it cannot be silently applied to the new revision."}
               </div>
             )}
             <section className="idea-writing">
-              <p className="idea-intro">
-                {beginner
-                  ? "Say in your own words what you think of this company and why, whether you like it or not. Alerts are optional."
-                  : "Start with your question and your point of view. Add monitoring rules when you’re ready."}
-              </p>
+              {!proposalIds.length && (
+                <p className="idea-intro">
+                  {beginner
+                    ? "Say in your own words what you think of this company and why, whether you like it or not. Alerts are optional."
+                    : "Start with your question and your point of view. Add monitoring rules when you’re ready."}
+                </p>
+              )}
               <label className="field">
                 {beginner ? "Your question" : "Research question"}
                 <input

@@ -6251,6 +6251,34 @@ input[type="checkbox"] {
 .idea-dialog .conflict-comparison {
   margin: 20px 30px;
 }
+/* Writing section on the same scale as the monitoring rules (20 Oct 2026):
+   13px labels and notes, 15px typed text; the hint never inherits bold. */
+.idea-dialog .idea-writing .field {
+  gap: 8px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-2);
+}
+.idea-dialog .idea-writing :is(input, textarea) {
+  font-size: var(--text-base);
+  line-height: 1.6;
+  padding: 11px 14px;
+  color: var(--color-text);
+}
+.idea-dialog .idea-writing textarea {
+  min-height: 120px;
+}
+.idea-dialog .idea-writing :is(.idea-intro, .reasoning-prompt) {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--color-muted);
+}
+.idea-dialog .idea-form > .warning {
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
 @keyframes research-spin {
   to {
     transform: rotate(360deg);
