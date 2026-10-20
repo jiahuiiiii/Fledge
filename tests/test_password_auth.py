@@ -19,7 +19,7 @@ def password_mode(owner, monkeypatch):
 
 
 def test_register_login_and_sessions(password_mode):
-    cookie, lifetime = password_auth.register('Mei_88', 'correct horse')
+    cookie, lifetime, code = password_auth.register('Mei_88', 'correct horse')
     account = password_auth.authenticate(cookie)
     assert account and account != OWNER and lifetime == 7 * 86400
     with transaction(admin=True) as conn:
@@ -71,7 +71,7 @@ def test_concurrent_wrong_passwords_respect_the_limit(password_mode):
 
 def test_sign_up_never_claims_the_owner_account(password_mode):
     # Even a username someone might configure for the owner gets a new account.
-    cookie, _ = password_auth.register('Ten', 'owner password')
+    cookie, *_ = password_auth.register('Ten', 'owner password')
     assert password_auth.authenticate(cookie) != OWNER
     with pytest.raises(password_auth.PasswordFailure, match='taken'):
         password_auth.provision_owner('ten', 'owner password')
@@ -116,7 +116,7 @@ def test_api_sign_up_answers_and_sign_out(password_mode):
 
 
 def test_existing_accounts_accept_terms_once(password_mode):
-    cookie, _ = password_auth.register('olduser', 'pass word 1')  # signed up before consent existed
+    cookie, *_ = password_auth.register('olduser', 'pass word 1')  # signed up before consent existed
     account = password_auth.authenticate(cookie)
     assert terms.status(account)['accepted'] is False
     client = TestClient(app)
@@ -128,5 +128,5 @@ def test_existing_accounts_accept_terms_once(password_mode):
     assert accepted.status_code == 200 and accepted.json()['result']['accepted']
     assert client.post('/api/v1/terms/accept', json={'terms_version': terms.VERSION}, headers=HEADERS).status_code == 200
     assert client.get('/api/v1/session').json()['result']['terms']['accepted'] is True
-    other, _ = password_auth.register('someone_else', 'pass word 1')
+    other, *_ = password_auth.register('someone_else', 'pass word 1')
     assert terms.status(password_auth.authenticate(other))['accepted'] is False  # consent is per account

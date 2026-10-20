@@ -347,6 +347,16 @@ def find(conn, request_key):
     )
 
 
+def _test_copy_cap():
+    """None on the original installation (no cap, by owner decision) and in
+    offline tests; a test copy's own total cap otherwise."""
+    import os
+    from .settings import original_installation, test_copy_cap
+    if os.environ.get("THESIS_TEST_OFFLINE") == "true" or original_installation():
+        return None
+    return test_copy_cap()
+
+
 def reserve(request_key, purpose, body, *, owner=None):
     # Owner decision 13 Oct 2026: no spending cap and no charge-review block.
     # Every call is still recorded; a failed request can simply be sent again.
@@ -386,6 +396,16 @@ def reserve(request_key, purpose, body, *, owner=None):
                 (request_key + REDISPATCH,),
             )["n"]
             key = f"{request_key}{REDISPATCH}{count + 1}"
+        cap = _test_copy_cap()
+        if cap is not None:
+            # A test copy stops before its total (spent + still held + this call's
+            # maximum) could pass the cap it set for itself.
+            totals = one(conn, "SELECT * FROM model_global_totals()")
+            if totals["spent"] + totals["held"] + maximum > int(cap * NANO):
+                raise BudgetBlocked(
+                    f"This test copy reached its US${cap} AI spending cap. Raise "
+                    "THESIS_TEST_COPY_CAP_USD in .env and restart to continue."
+                )
         call = one(
             conn,
             """INSERT INTO model_calls(id,request_key,request_hash,purpose,model,price_version,

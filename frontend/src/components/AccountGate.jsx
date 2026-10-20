@@ -4,6 +4,11 @@ import { api } from "../api/client";
 import { useProfile } from "../lib/profile";
 import { typeName } from "../lib/investorTypes";
 import { TERMS_VERSION } from "../lib/terms";
+import {
+  AccountSecurityDialog,
+  ForgotPasswordForm,
+  RecoveryCodeScreen,
+} from "./AccountSecurity";
 import "./AccountGate.css";
 
 function InvestorTypeLine() {
@@ -131,6 +136,10 @@ export default function AccountGate({ children }) {
     }
   });
   const [fieldError, setFieldError] = useState({});
+  // A just-made recovery code, shown once before the app opens.
+  const [recovery, setRecovery] = useState(null);
+  const [forgot, setForgot] = useState(false);
+  const [securityOpen, setSecurityOpen] = useState(false);
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -268,8 +277,11 @@ export default function AccountGate({ children }) {
     setError("");
     setMessage("");
     try {
-      if (creating) await api.register(name, password, TERMS_VERSION);
-      else await api.passwordLogin(name, password);
+      if (creating) {
+        const result = await api.register(name, password, TERMS_VERSION);
+        if (result?.recovery_code)
+          setRecovery({ code: result.recovery_code, reason: "new" });
+      } else await api.passwordLogin(name, password);
       try {
         localStorage.setItem("fledge:has-account", "1");
       } catch {
@@ -303,6 +315,21 @@ export default function AccountGate({ children }) {
       setBusy(false);
     }
   }
+  async function refreshSession() {
+    try {
+      setSession(await api.session());
+    } catch (failure) {
+      setError(failure.message);
+    }
+  }
+  if (session?.authenticated && recovery)
+    return (
+      <RecoveryCodeScreen
+        code={recovery.code}
+        reason={recovery.reason}
+        onDone={() => setRecovery(null)}
+      />
+    );
   if (session?.authenticated && session.terms && !session.terms.accepted)
     return (
       <TermsGate
@@ -338,6 +365,30 @@ export default function AccountGate({ children }) {
             </p>
             <InvestorTypeLine />
             <ProModeSwitch />
+            {session.mode === "password" && session.username && (
+              <div className="account-security">
+                {session.has_recovery_code === false && (
+                  <p className="security-nudge">
+                    Add a recovery code so you can reset a forgotten password.
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.currentTarget.closest("details")?.removeAttribute("open");
+                    setSecurityOpen(true);
+                  }}
+                >
+                  Password and recovery code
+                </button>
+                <AccountSecurityDialog
+                  open={securityOpen}
+                  onClose={() => setSecurityOpen(false)}
+                  hasRecoveryCode={!!session.has_recovery_code}
+                  onCodeChanged={refreshSession}
+                />
+              </div>
+            )}
             <p>
               News and company data are the same for everyone. Your answers,
               notes and settings are private to you.
@@ -364,17 +415,39 @@ export default function AccountGate({ children }) {
           fledge<span aria-hidden="true">↗</span>
         </a>
         <h1 className="account-pitch">
-          {session?.mode === "password" && !creating
-            ? "Welcome back"
-            : "Understand the news behind your stocks"}
+          {forgot
+            ? "Reset your password"
+            : session?.mode === "password" && !creating
+              ? "Welcome back"
+              : "Understand the news behind your stocks"}
         </h1>
         <p className="account-lede">
-          {session?.mode === "password" && !creating
-            ? "Sign in to pick up where you left off."
-            : "Plain-English news and what people are saying, for US stocks."}
+          {forgot
+            ? "Use the recovery code you saved when you signed up."
+            : session?.mode === "password" && !creating
+              ? "Sign in to pick up where you left off."
+              : "Plain-English news and what people are saying, for US stocks."}
         </p>
         {!session && !error ? (
           <p role="status">Checking your session…</p>
+        ) : session?.mode === "password" && forgot ? (
+          <ForgotPasswordForm
+            onBack={() => {
+              setForgot(false);
+              setError("");
+            }}
+            onDone={async (code) => {
+              try {
+                localStorage.setItem("fledge:has-account", "1");
+              } catch {
+                /* Storage can be unavailable. */
+              }
+              if (code) setRecovery({ code, reason: "reset" });
+              setForgot(false);
+              setMessage("");
+              await refreshSession();
+            }}
+          />
         ) : session?.mode === "password" ? (
           <form onSubmit={sendPassword} noValidate className="account-form">
             <div className="account-field">
@@ -413,6 +486,19 @@ export default function AccountGate({ children }) {
                 <small id="password-error" className="field-error">
                   {fieldError.password}
                 </small>
+              )}
+              {!creating && (
+                <button
+                  type="button"
+                  className="account-forgot"
+                  onClick={() => {
+                    setForgot(true);
+                    setError("");
+                    setFieldError({});
+                  }}
+                >
+                  Forgot password?
+                </button>
               )}
             </div>
             {creating && (

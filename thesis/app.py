@@ -5,6 +5,7 @@ import secrets
 import threading
 import logging
 import os
+import re
 from uuid import UUID
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, RedirectResponse
@@ -218,9 +219,29 @@ async def lifespan(app):
 app = FastAPI(
     title="Fledge local prototype", lifespan=lifespan, docs_url=None, redoc_url=None
 )
-app.add_middleware(
-    TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"]
-)
+
+
+def public_origin():
+    """THESIS_PUBLIC_ORIGIN (e.g. https://fledge.example.com) when Fledge is
+    served on the internet behind an HTTPS front door; empty on a laptop."""
+    from .providers.settings import settings
+    if os.environ.get("THESIS_TEST_OFFLINE") == "true":
+        return os.environ.get("THESIS_PUBLIC_ORIGIN", "").rstrip("/")
+    return (settings().get("THESIS_PUBLIC_ORIGIN") or "").strip().rstrip("/")
+
+
+def allowed_hosts():
+    hosts = ["127.0.0.1", "localhost", "testserver"]
+    origin = public_origin()
+    if origin:
+        from urllib.parse import urlsplit
+        host = urlsplit(origin).hostname
+        if host:
+            hosts.append(host)
+    return hosts
+
+
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts())
 
 
 def error(status, message):
@@ -234,16 +255,25 @@ def error(status, message):
     )
 
 
+def cookie_options(max_age):
+    # Over HTTPS the browser must never send the session over plain HTTP.
+    return dict(httponly=True, samesite="strict", max_age=max_age,
+                secure=public_origin().startswith("https://"))
+
+
 @app.middleware("http")
 async def local_session(request: Request, call_next):
     owner = None
     if request.url.path.startswith("/api/"):
         origin = request.headers.get("origin")
-        if origin and origin not in {f"http://{request.headers.get('host')}"}:
+        allowed = {f"http://{request.headers.get('host')}"}
+        if public_origin():
+            allowed.add(public_origin())
+        if origin and origin not in allowed:
             return error(403, "Use this app from its local window.")
         if request.headers.get("sec-fetch-site") in {"cross-site", "same-site"}:
             return error(403, "Cross-origin requests are not accepted.")
-        public = request.url.path in {"/api/v1/session", "/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/auth/register", "/api/v1/auth/password-login"}
+        public = request.url.path in {"/api/v1/session", "/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/auth/register", "/api/v1/auth/password-login", "/api/v1/auth/password-reset", "/api/v1/legal"}
         try:
             managed = auth.configuration()
             if managed:
@@ -338,9 +368,11 @@ def bootstrap():
         )
     email=None
     username=None
+    has_recovery=None
     if password_mode:
         from . import password_auth
         username=password_auth.username(owner)
+        has_recovery=password_auth.has_recovery(owner) if username else None
     elif managed:
         with transaction(admin=True,consistent=True) as conn:
             identity=one(conn,'SELECT verified_email FROM auth_identities WHERE account_id=%s AND project_url=%s',(owner,managed['url']))
@@ -350,6 +382,7 @@ def bootstrap():
             "result": {
                 "mode": "password" if password_mode else "managed" if managed else "local-pitch",
                 "username": username,
+                "has_recovery_code": has_recovery,
                 "authenticated": True,
                 "account": "Research account" if managed else "Local demo",
                 "account_id": owner,
@@ -363,7 +396,7 @@ def bootstrap():
         }
     )
     if not managed:
-        response.set_cookie(auth.COOKIE,session_token(),httponly=True,samesite="strict",max_age=86400)
+        response.set_cookie(auth.COOKIE, session_token(), **cookie_options(86400))
     return response
 
 
@@ -404,13 +437,17 @@ def password_session(action, payload):
     config = auth.configuration()
     if not config or config.get("mode") != "password":
         return error(409, "Username sign-in is not enabled for this installation.")
+    code = None
     try:
         if action == "register":
             from . import terms
             if not payload.accept_terms or payload.terms_version != terms.VERSION:
                 return error(422, "Read and accept the Terms of Use and Privacy Notice to create an account.")
-            cookie, lifetime = password_auth.register(payload.username, payload.password,
-                                                      terms_version=terms.VERSION)
+            cookie, lifetime, code = password_auth.register(payload.username, payload.password,
+                                                            terms_version=terms.VERSION)
+        elif action == "reset":
+            cookie, lifetime, code = password_auth.reset_with_code(
+                payload.username, payload.recovery_code, payload.password)
         else:
             cookie, lifetime = password_auth.login(payload.username, payload.password)
     except password_auth.PasswordFailure as failure:
@@ -418,9 +455,70 @@ def password_session(action, payload):
         if failure.retry_after:
             response.headers["Retry-After"] = str(failure.retry_after)
         return response
-    response = JSONResponse({"result": {"signed_in": True}})
-    response.set_cookie(auth.COOKIE, cookie, httponly=True, samesite="strict", max_age=lifetime)
+    # The recovery code is returned once, only to the browser that just proved
+    # it may have it, and is never stored in readable form.
+    response = JSONResponse({"result": {"signed_in": True, "recovery_code": code}})
+    response.set_cookie(auth.COOKIE, cookie, **cookie_options(lifetime))
     return response
+
+
+class ResetRequest(PasswordRequest):
+    recovery_code: str = Field(min_length=1, max_length=40)
+
+
+class PasswordChange(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    current_password: str = Field(min_length=1, max_length=256)
+    new_password: str = Field(default="", max_length=256)
+
+
+@app.post("/api/v1/auth/password-reset")
+def password_reset(payload: ResetRequest):
+    return password_session("reset", payload)
+
+
+def account_security(action, payload):
+    from . import password_auth
+    config = auth.configuration()
+    if not config or config.get("mode") != "password":
+        return error(409, "Username sign-in is not enabled for this installation.")
+    owner = auth.current_owner()
+    try:
+        if action == "password":
+            cookie, lifetime = password_auth.change_password(owner, payload.current_password, payload.new_password)
+            response = JSONResponse({"result": {"changed": True}})
+            response.set_cookie(auth.COOKIE, cookie, **cookie_options(lifetime))
+            return response
+        code = password_auth.replace_recovery_code(owner, payload.current_password)
+        return {"result": {"recovery_code": code}}
+    except password_auth.PasswordFailure as failure:
+        response = error(failure.status, str(failure))
+        if failure.retry_after:
+            response.headers["Retry-After"] = str(failure.retry_after)
+        return response
+
+
+@app.post("/api/v1/account/password")
+def change_password(payload: PasswordChange):
+    return account_security("password", payload)
+
+
+@app.post("/api/v1/account/recovery-code")
+def new_recovery_code(payload: PasswordChange):
+    return account_security("recovery", payload)
+
+
+@app.get("/api/v1/legal")
+def legal_contact():
+    """Who people write to about their personal data (PDPA). Set per
+    installation with THESIS_PRIVACY_CONTACT; readable before sign-in."""
+    from .providers.settings import settings
+    if os.environ.get("THESIS_TEST_OFFLINE") == "true":
+        value = os.environ.get("THESIS_PRIVACY_CONTACT", "")
+    else:
+        value = settings().get("THESIS_PRIVACY_CONTACT") or ""
+    value = value.strip()
+    return {"result": {"privacy_contact": value if re.fullmatch(r"[^@\s]{1,64}@[^@\s]{1,190}\.[^@\s]{2,}", value) else ""}}
 
 
 @app.post("/api/v1/auth/register")
@@ -447,7 +545,7 @@ def login_callback(request: Request, code: str | None = None):
     try:
         token, lifetime = auth.complete(code, request.cookies.get(auth.FLOW_COOKIE))
         response = RedirectResponse("/", status_code=303)
-        response.set_cookie(auth.COOKIE, token, httponly=True, samesite="strict", max_age=lifetime)
+        response.set_cookie(auth.COOKIE, token, **cookie_options(lifetime))
     except auth.AuthFailure:
         response = RedirectResponse("/?auth_error=link", status_code=303)
     response.delete_cookie(auth.FLOW_COOKIE, path="/auth/callback")
