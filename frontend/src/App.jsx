@@ -1931,6 +1931,12 @@ function CompanyWorkspace({
                           onUpdate={
                             isRecorded ? undefined : () => setUpdatesOpen(true)
                           }
+                          onRate={
+                            isRecorded
+                              ? undefined
+                              : () => startLoading({ analyze: true, lookback_days: 7 })
+                          }
+                          rating={!!loadingRun?.active}
                         />
                       </RetainedView>
                       <RetainedView active={tab === "evidence"}>
