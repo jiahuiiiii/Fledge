@@ -152,6 +152,7 @@
 
 /* Pre-market / after-hours label and the regular close beside it. */
 .market-quote .quote-session {
+  font: inherit;
   color: var(--color-text);
   font-weight: 600;
 }

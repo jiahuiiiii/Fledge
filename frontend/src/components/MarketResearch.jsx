@@ -51,9 +51,9 @@ export function MarketQuote({ market, history, compact = false }) {
             </div>
             <small>
               {sessionLabel(latest.session) && (
-                <strong className="quote-session">
+                <span className="quote-session">
                   {sessionLabel(latest.session)} ·{" "}
-                </strong>
+                </span>
               )}
               Yahoo Finance
               {!sessionLabel(latest.session) && ` · ${latest.session}`} ·{" "}
