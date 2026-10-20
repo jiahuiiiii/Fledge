@@ -13,7 +13,11 @@ import {
   trailing,
   newsTone,
 } from "../lib/companySnapshot";
-import { latestPriceQuote, quoteMovement } from "../lib/priceRefresh";
+import {
+  latestPriceQuote,
+  quoteMovement,
+  sessionLabel,
+} from "../lib/priceRefresh";
 import "./CompanyOverview.css";
 const stamp = (value) =>
   formatTimestamp(value, { fallback: "Date unavailable" });
@@ -205,7 +209,7 @@ export default function CompanyOverview({
                     )}
                     <span className="company-overview-date">
                       {quote
-                        ? `${yahoo ? "Yahoo Finance" : "Finnhub"} · ${stamp(quote.quoted_at)}`
+                        ? `${yahoo && sessionLabel(quote.session) ? `${sessionLabel(quote.session)} · ` : ""}${yahoo ? "Yahoo Finance" : "Finnhub"} · ${stamp(quote.quoted_at)}`
                         : "No saved quote"}
                       {reading.priceError && " · Latest-price read unavailable"}
                     </span>

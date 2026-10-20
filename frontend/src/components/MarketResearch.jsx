@@ -4,7 +4,12 @@ import { currentCompanyHeadlines } from "../lib/companyHeadlines";
 import { newsSourceStatus } from "../lib/newsPresentation";
 import Select from "./Select";
 import { useId, useState } from "react";
-import { latestPriceQuote, quoteMovement } from "../lib/priceRefresh";
+import {
+  closeBeside,
+  latestPriceQuote,
+  quoteMovement,
+  sessionLabel,
+} from "../lib/priceRefresh";
 import PriceChange from "./PriceChange";
 export const stamp = formatTimestamp;
 const money = (value) =>
@@ -21,6 +26,7 @@ export function MarketQuote({ market, history, compact = false }) {
     status = market?.status;
   const latest = latestPriceQuote(market, history);
   const movement = quoteMovement(market, history);
+  const close = closeBeside(history);
   const interrupted =
     status?.lease_until && new Date(status.lease_until) < new Date();
   return (
@@ -44,8 +50,20 @@ export function MarketQuote({ market, history, compact = false }) {
               )}
             </div>
             <small>
-              Yahoo Finance · {latest.session} · {stamp(latest.quoted_at)}
+              {sessionLabel(latest.session) && (
+                <span className="quote-session">
+                  {sessionLabel(latest.session)} ·{" "}
+                </span>
+              )}
+              Yahoo Finance
+              {!sessionLabel(latest.session) && ` · ${latest.session}`} ·{" "}
+              {stamp(latest.quoted_at)}
             </small>
+            {close && (
+              <small className="quote-close">
+                {close.label} {money(close.price)}
+              </small>
+            )}
           </>
         ) : q ? (
           <>

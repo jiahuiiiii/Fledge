@@ -170,3 +170,24 @@ test("header uses the newer separately attributed quote and withholds withdrawn 
     null,
   );
 });
+
+test("extended sessions get plain labels and the regular close beside them", async () => {
+  const { sessionLabel, closeBeside } = await import("./priceRefresh.js");
+  assert.equal(sessionLabel("pre-market"), "Pre-market");
+  assert.equal(sessionLabel("after-hours"), "After hours");
+  assert.equal(sessionLabel("regular session"), null);
+  const history = (session, regular) => ({
+    snapshot: { series: { latest_quote: { session }, regular_quote: regular } },
+  });
+  assert.deepEqual(closeBeside(history("pre-market", { price: "100.5" })), {
+    label: "Previous close",
+    price: 100.5,
+  });
+  assert.deepEqual(closeBeside(history("after-hours", { price: "101" })), {
+    label: "At close",
+    price: 101,
+  });
+  assert.equal(closeBeside(history("regular session", { price: "101" })), null);
+  assert.equal(closeBeside(history("after-hours", null)), null);
+  assert.equal(closeBeside(history("after-hours", { price: "x" })), null);
+});
