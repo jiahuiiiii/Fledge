@@ -123,6 +123,7 @@ export default function CompanyOverview({
           /* Keep the saved price on screen. */
         }
       }
+      if (!stopped) dispatchEvent(new Event("fledge:prices-updated"));
     };
     const timer = setInterval(tick, LIVE_PRICE_MS);
     return () => {
