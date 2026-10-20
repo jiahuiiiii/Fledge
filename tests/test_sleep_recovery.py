@@ -147,7 +147,7 @@ def held_generation(owner, held_count=1):
                                 held_ids)
         return real(pkt, reused, **dict(kw, transport=provider("neutral")))
     patches = (patch.object(S, "prepare", side_effect=lambda *a, **k: deepcopy(p)), patch.object(B, "check_access"),
-               patch.object(S, "present", side_effect=lambda c, r: r), patch.object(B, "run_reusing", run_reusing))
+               patch.object(S, "present", side_effect=lambda c, r, **_: r), patch.object(B, "run_reusing", run_reusing))
     return iid, p, held_ids, attempts, patches
 
 

@@ -139,7 +139,8 @@ def digest_record(conn,owner,identity,now,*,delivery_id=None):
         if len(shown)>=MAX_ITEMS:
             remaining+=1;continue
         record=T.event(conn,owner,member['kind'],member['event_id'])
-        if not record or record['detail'].get('withheld') or record['detail'].get('preview'):
+        if (not record or record['detail'].get('withheld') or record['detail'].get('preview')
+                or (record['detail'].get('payload') or {}).get('withheld_items')):
             unavailable+=1;continue
         if guarded:
             try:record=G.prepare(conn,owner,record,delivery_id,now,local=story_keys,legacy=legacy,force=True)

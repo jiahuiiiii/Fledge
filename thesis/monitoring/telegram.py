@@ -256,6 +256,8 @@ def run_once(owner):
                         why = "The saved idea changed or the original alert is unavailable."
                     elif record["detail"].get("withheld"):
                         why = "Source access changed; alert details were not forwarded."
+                    elif (record["detail"].get("payload") or {}).get("withheld_items"):
+                        why = "Some alert evidence is no longer available; review the remaining evidence in Updates."
                     elif record['detail'].get('preview'):
                         why = 'Preview alerts are kept in Updates and are never forwarded.'
                     else:

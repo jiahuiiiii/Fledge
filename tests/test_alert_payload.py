@@ -28,7 +28,8 @@ def test_each_reading_is_presented_once_and_unused_sources_are_dropped(monkeypat
         return alerts if 'research_alerts' in sql else [readings[r] for r in params[0]]
     calls = []
 
-    def present(conn, record):
+    def present(conn, record, partial=False):
+        assert partial
         calls.append(record['id'])
         n = record['id'][1]
         return dict(withheld=False, coverage={}, sources=[source('s' + n), source('unused' + n)],
@@ -91,8 +92,11 @@ def test_earlier_sample_keeps_account_and_withdrawal_checks(owner):
     with transaction(admin=True) as c:
         c.execute("UPDATE social_feeds SET enabled=false")
     try:
-        hidden = N.previous_sample(owner, alert["id"])
-        assert hidden["withheld"] and hidden["previous_items"] == [] and hidden["previous_sources"] == []
+        # Only the unavailable social sources leave the earlier sample.
+        sample = N.previous_sample(owner, alert["id"])
+        assert not sample["withheld"] and sample["previous_items"]
+        assert {i["channel"] for i in sample["previous_items"]} == {"news"}
+        assert {s["kind"] for s in sample["previous_sources"]} == {"news"}
     finally:
         with transaction(admin=True) as c:
             c.execute("UPDATE social_feeds SET enabled=true")
