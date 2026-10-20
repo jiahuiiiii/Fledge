@@ -13,6 +13,8 @@ let browser;
  await modal.getByLabel('My reasoning').fill('A launch may support this idea, but a plan is not completion.');
  await modal.getByRole('button',{name:'+ Add event condition',exact:true}).click();
  await modal.getByLabel('Event description 1',{exact:true}).fill('Northstar product launch');
+ // Proof, dates and repeat sit behind More options since 20 Oct 2026.
+ const more=modal.getByText('More options',{exact:true}).first();if(!(await more.evaluate(s=>s.parentElement.open)))await more.click();
  await modal.getByLabel('Event evidence required 1',{exact:true}).fill('A report explicitly confirms general availability, not plans.');
  await modal.getByLabel('Report window start 1',{exact:true}).fill('2025-01-01');
  await modal.getByLabel('Report deadline 1',{exact:true}).fill('2026-12-31');

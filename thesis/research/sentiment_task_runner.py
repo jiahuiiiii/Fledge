@@ -111,7 +111,8 @@ def run(packet, reused=None, *, transport=None, progress=None, prefilter=None, s
             attempted=one(conn,'SELECT id FROM model_calls WHERE request_key=%s OR starts_with(request_key,%s) LIMIT 1',
                           (key,key+ledger.REDISPATCH))
         if saved:return saved
-        if attempted:raise ledger.BudgetBlocked('An earlier sentiment task has no settled response. No automatic paid retry.')
+        if attempted:raise B.HeldSources('An earlier sentiment task has no settled response. No automatic paid retry.',
+                                         [s['id'] for s in part['sources']])
         if saved_only:raise ValueError('This reading has an unsent task.')
         return ledger.execute(key,T.PROMPT+':'+task,body,transport=transport)
     def stage(task, parts, parse):
@@ -151,7 +152,8 @@ def run(packet, reused=None, *, transport=None, progress=None, prefilter=None, s
                         if previous is None:previous=(saved,attempt);bad=error
                     else:calls.append(saved);return
                 elif B.has_attempt(key):
-                    raise ledger.BudgetBlocked('An earlier sentiment task may have been sent. No automatic paid retry; review its charge.')
+                    raise B.HeldSources('An earlier sentiment task may have been sent. No automatic paid retry; review its charge.',
+                                        [s['id'] for s in part['sources']])
             if previous:
                 call,attempt=previous
                 if not part.get('_terminal') and attempt==0 and retry_failed:
@@ -177,10 +179,16 @@ def run(packet, reused=None, *, transport=None, progress=None, prefilter=None, s
             if split_failed and not part.get('_terminal') and not recovery:
                 raise ValueError('No saved failed task is ready for smaller-batch recovery. No new task was sent.')
             jobs.append((part,body))
+        def resolve_all():
+            # Collect every held batch before sending anything, so one pass names them all.
+            held=[]
+            for part in parts:
+                try:resolve(part)
+                except B.HeldSources as error:held.append(error)
+            if held:raise B.held_together(held)
         # Revalidate saved results before dispatching any new task in this stage.
         start=len(calls)
-        for part in parts:
-            resolve(part)
+        resolve_all()
         def work(part,body):
             call=load(task,part,body)
             try:result=parse_result(call,part)
@@ -194,10 +202,11 @@ def run(packet, reused=None, *, transport=None, progress=None, prefilter=None, s
             # Re-resolve the stage: answered batches are reused from the ledger, each
             # failed batch is sent once as two halves, and unsent batches go normally.
             del calls[start:]
-            for part in parts:
-                resolve(part)
+            resolve_all()
             batch,results,errors=dispatch()
         if errors:
+            held=B.held_together(errors.values())
+            if held:raise held
             error=errors[min(errors)]
             if not isinstance(error,B.BatchFailed):raise error
             report('The '+task+' task stopped. Its paid response is saved; no automatic retry.',B.failure_details(error.call,error.error))

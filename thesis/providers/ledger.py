@@ -236,6 +236,10 @@ class BudgetBlocked(ValueError):
     pass
 
 
+class WakePaused(BudgetBlocked):
+    """Nothing was reserved or sent: the computer woke from sleep moments ago."""
+
+
 def canonical(value):
     return json.dumps(
         value,
@@ -493,6 +497,11 @@ def execute(request_key, purpose, body, *, transport=None, owner=None):
             from .openai import send
 
         live_key(body.get("model"))  # Configuration failures never reserve a call.
+        from thesis import wake
+        # A request sent before the connection returns is cut off and can never be resent.
+        if not wake.settled():
+            raise WakePaused("The computer woke from sleep moments ago. Nothing was sent; "
+                             "this check runs again once the connection is back.")
     call, dispatch = reserve(request_key, purpose, body, owner=owner)
     if not dispatch:
         return call

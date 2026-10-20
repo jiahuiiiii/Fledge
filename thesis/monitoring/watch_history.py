@@ -175,6 +175,10 @@ def present(conn, owner, check, result, now):
             + details.get("failed_stage", "scheduled")
             + " step did not complete. Earlier completed steps are shown; no automatic paid retry was made."
         )
+    elif status == "stopped" and details.get("skip_reason") == "other_lane_busy":
+        reason = "Another check of this company was already reading its sentiment, so this one stepped aside and tries again shortly."
+    elif status == "stopped" and details.get("skip_reason") == "computer_woke":
+        reason = "The computer had just woken from sleep, so no AI request was sent. The check tries again once the connection is back."
     elif status == "stopped":
         reason = "The watch was stopped or changed while this check was running. Inspect any earlier published updates separately."
     elif status == "completed":
@@ -196,6 +200,11 @@ def present(conn, owner, check, result, now):
             reason = "No alert rule triggered within the selected source sample. This does not establish that nothing material happened."
     if status == "completed" and details.get("events") in ("checked", "reused"):
         reason += " An approved-event check also completed; condition reassessment and its updates are recorded separately."
+    if status == "completed" and details.get("held_sources"):
+        held = details["held_sources"]
+        reason += (f" {held} source{'s were' if held != 1 else ' was'} left unread: an earlier AI request for "
+                   + ("them" if held != 1 else "it") + " has no settled response and is never resent automatically. "
+                   "Alerts wait for the next complete reading.")
     if status == "completed" and details.get("coverage_gap"):
         reason = "Some sources could not be refreshed; this check used the available sample. " + reason
     if withheld:

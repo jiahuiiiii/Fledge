@@ -136,7 +136,7 @@ def test_generate_saves_quick_check_and_reuses_earlier_full_reading(owner, monke
     p = packet()
     p["instrument_id"] = iid
     with patch.object(S, "prepare", return_value=p), patch.object(B, "check_access"), \
-         patch.object(S, "present", side_effect=lambda c, r: r):
+         patch.object(S, "present", side_effect=lambda c, r, **_: r):
         # A reading saved before this method exists: unchanged inputs reuse it.
         monkeypatch.setenv("THESIS_RELEVANCE_PREFILTER", "false")
         before = S.generate(iid, transport=provider("neutral"))
@@ -152,7 +152,7 @@ def test_generate_saves_quick_check_and_reuses_earlier_full_reading(owner, monke
     changed["text"] += " A later update says more."
     changed["passages"], _ = source_passages(changed["title"], changed["text"])
     with patch.object(S, "prepare", return_value=p2), patch.object(B, "check_access"), \
-         patch.object(S, "present", side_effect=lambda c, r: r):
+         patch.object(S, "present", side_effect=lambda c, r, **_: r):
         transport, seen = quick({changed["label"]: "unrelated"})
         row = S.generate(iid, transport=transport)
     from thesis.research.sentiment_reliability import POLICY as REPAIR_POLICY

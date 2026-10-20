@@ -643,15 +643,47 @@ def permitted_ids(conn, record):
     }
 
 
-def present(conn, record):
+def unavailable(conn, record):
+    """Saved source and thread-message ids the current access no longer permits."""
+    p = record["packet"]
+    allowed = permitted_ids(conn, record)
+    hidden = {
+        s["id"]
+        for s in p["sources"] + p.get("comparison_sources", [])
+        if s["id"] not in allowed or not sentiment_context.allowed(conn, s)
+    }
+    return hidden | {
+        m["source_id"]
+        for c in p.get("reddit_thread_context", [])
+        for m in c["messages"]
+        if m["source_id"] not in allowed
+    }
+
+
+def cited_ids(value):
+    """Every source whose saved text an item or coverage link shows or relied on."""
+    ids = {value.get("source_id"), value.get("reference_source_id")}
+    for key in ("citations", "previous_citations", "reference_citations"):
+        ids |= {c.get("source_id") for c in value.get(key) or []}
+    ids |= {c.get("source_id") for c in (value.get("reporting_basis") or {}).get("citations") or []}
+    ids |= {m.get("source_id") for m in (value.get("thread_context") or {}).get("messages") or []}
+    ids.discard(None)
+    return ids
+
+
+def present(conn, record, *, partial=False):
+    """A saved reading under the current source access.
+
+    By default any unavailable source withholds the whole reading. With
+    partial=True only the unavailable sources, the items, citations and links
+    that depend on them, and the tone totals that counted them are left out;
+    the stored record is unchanged.
+    """
     if not record:
         return None
     p = record["packet"]
-    allowed = permitted_ids(conn, record)
-    if not sentiment_guards.allowed(conn, p) or not reddit_thread_context.access_allowed(p, allowed) or any(
-        s["id"] not in allowed or not sentiment_context.allowed(conn, s)
-        for s in p["sources"] + p.get("comparison_sources", [])
-    ):
+    hidden = unavailable(conn, record) if sentiment_guards.allowed(conn, p) else None
+    if hidden is None or (hidden and not partial):
         return dict(
             id=str(record["id"]),
             withheld=True,
@@ -660,11 +692,57 @@ def present(conn, record):
             sources=[],
             summary={},
         )
+    saved = record["result"]
+    # A Reddit comment was read with its thread; a withdrawn message in that
+    # thread withholds every interpretation that could have relied on it.
+    tainted = {
+        c["thread_key"]
+        for c in p.get("reddit_thread_context", [])
+        if any(m["source_id"] in hidden for m in c["messages"])
+    }
+    by_id = {s["id"]: s for s in p["sources"] + p.get("comparison_sources", [])}
+    items = [
+        i
+        for i in saved["items"]
+        if not cited_ids(i) & hidden
+        and reddit_thread_context.key(by_id.get(i["source_id"], {})) not in tainted
+    ]
+    shown_items = {i["source_id"] for i in items}
+    hidden = hidden | ({i["source_id"] for i in saved["items"]} - shown_items)
+    links = [
+        link
+        for link in saved.get("coverage_links", [])
+        if not cited_ids(link) & hidden and link["source_id"] in shown_items
+    ]
+    selected = [s for s in p["sources"] if s["id"] not in hidden]
+    comparison = [s for s in p.get("comparison_sources", []) if s["id"] not in hidden]
+    # Saved totals that counted a withheld source are not shown as complete.
+    affected = Counter()
+    for s in p["sources"]:
+        if s["id"] in hidden:
+            affected.update(
+                ["news"] if s["channel"] == "news" else ["social", s.get("platform") or "reddit"]
+            )
+    if len(links) != len(saved.get("coverage_links", [])):
+        # News totals grouped reports through the withheld link.
+        affected.setdefault("news", 0)
+    summary = displayed(saved.get("summary"))
+    for scope in affected:
+        summary.pop(scope, None)
+        (summary.get("social_platforms") or {}).pop(scope, None)
+    withheld_sources = sum(
+        s["id"] in hidden for s in p["sources"] + p.get("comparison_sources", [])
+    )
     from . import sentiment_task_runner, sentiment_tasks
     current_prompt=sentiment_tasks.PROMPT if sentiment_task_runner.enabled() else PROMPT
     return dict(
-        record["result"],
-        summary=displayed(record["result"].get("summary")),
+        saved,
+        items=items,
+        coverage_links=links,
+        summary=summary,
+        withheld_sources=withheld_sources,
+        # Selected sources withheld per sample whose saved totals are not shown.
+        withheld_summaries=dict(sorted(affected.items())),
         id=str(record["id"]),
         cutoff=p["cutoff"],
         social_lookback_days=p.get("social_lookback_days", 7),
@@ -683,7 +761,7 @@ def present(conn, record):
         sources=[
             dict(
                 id=s["id"],
-                comparison_only=s in p.get("comparison_sources", []),
+                comparison_only=s in comparison,
                 title=s["title"],
                 body=s["text"],
                 source=s["publisher"],
@@ -695,21 +773,23 @@ def present(conn, record):
                 available_at=s["available_at"],
                 url=s["url"],
             )
-            for s in p["sources"] + p.get("comparison_sources", [])
+            for s in selected + comparison
         ],
         coverage=dict(
             selection=p.get('selection'),
             input_limits=p.get("input_limits"),
-            parent_contexts=sum(bool(s.get("conversation")) for s in p["sources"]),
-            reddit_threads=len(p.get("reddit_thread_context", [])),
+            parent_contexts=sum(bool(s.get("conversation")) for s in selected),
+            reddit_threads=len(
+                [c for c in p.get("reddit_thread_context", []) if c["thread_key"] not in tainted]
+            ),
             context_statuses=dict(
                 Counter(
                     s.get("context_status", "not_saved")
-                    for s in p["sources"]
+                    for s in selected
                     if s.get("platform") == "hackernews"
                 )
             ),
-            comparison_news=len(p.get("comparison_sources", [])),
+            comparison_news=len(comparison),
             available_news=p["available_news_count"],
             available_social=p["available_social_count"],
             social_platforms=p.get(
@@ -719,7 +799,7 @@ def present(conn, record):
                 platform: len(
                     {
                         s["author_hash"]
-                        for s in p["sources"]
+                        for s in selected
                         if s["channel"] == "social"
                         and s.get("platform", "reddit") == platform
                         and s.get("author_hash")
@@ -731,7 +811,7 @@ def present(conn, record):
             selected_social_authors=len(
                 {
                     s["author_hash"]
-                    for s in p["sources"]
+                    for s in selected
                     if s["channel"] == "social" and s.get("author_hash")
                 }
             ),
@@ -770,16 +850,40 @@ def _generate(iid, *, transport, now, lookback_days, progress, retry_failed, rer
                   "(request_key IN (%s,%s) OR packet->>'replaces_request_key'=%s) "
                   "ORDER BY created_at DESC,request_key=%s DESC,id DESC LIMIT 1",
                   (iid, key, legacy, key, key))
-    if old:
-        with transaction() as c:
-            return present(c, old)
     from . import sentiment_reuse
-    with transaction() as c:
-        reused = {} if reread_token else sentiment_reuse.find(c, packet)
-    result, calls = sentiment_batching.run_reusing(packet, reused, transport=transport,
-                                                   progress=progress, retry_failed=retry_failed,
-                                                   prefilter=False if reread_token else None,
-                                                   split_failed=split_failed)
+    # A scheduled reading leaves out only sources whose earlier request may have
+    # been charged (never resent) and reads the rest. Explicit re-reads and
+    # recovery still stop, so the owner sees and decides on the unsettled request.
+    scheduled = reread_token is None and not retry_failed and not split_failed
+    held = []
+    while True:
+        if old:
+            with transaction() as c:
+                return present(c, old, partial=True)
+        with transaction() as c:
+            reused = {} if reread_token else sentiment_reuse.find(c, packet)
+        try:
+            result, calls = sentiment_batching.run_reusing(packet, reused, transport=transport,
+                                                           progress=progress, retry_failed=retry_failed,
+                                                           prefilter=False if reread_token else None,
+                                                           split_failed=split_failed)
+            break
+        except sentiment_batching.HeldSources as exc:
+            remaining = [s for s in packet["sources"] if s["id"] not in exc.source_ids]
+            if not scheduled or not remaining or len(remaining) == len(packet["sources"]):
+                raise
+            # Ids and channel only: a held source is not shown, so its text never
+            # outlives a later withdrawal through this record.
+            held += [dict(id=s["id"], channel=s["channel"], reason=str(exc))
+                     for s in packet["sources"] if s["id"] in exc.source_ids]
+            packet = dict(packet, sources=remaining, held_sources=held)
+            key = identity(packet) + suffix + ":held:" + hashlib.sha256(
+                ledger.canonical(sorted(h["id"] for h in held)).encode()).hexdigest()
+            with transaction() as c:
+                old = one(c, "SELECT * FROM sentiment_analyses WHERE instrument_id=%s AND request_key=%s",
+                          (iid, key))
+    if held:
+        result["held_sources"] = dict(count=len(held), reason=held[0]["reason"])
     packet["batching"] = dict(policy=result.get('batching',{}).get('policy',sentiment_batching.POLICY),
                              call_ids=[str(call["id"]) for call in calls])
     if result.get("source_reuse"):
@@ -797,7 +901,7 @@ def _generate(iid, *, transport, now, lookback_days, progress, retry_failed, rer
         row = row or one(
             c, "SELECT * FROM sentiment_analyses WHERE request_key=%s", (key,)
         )
-        return present(c, row)
+        return present(c, row, partial=True)
 
 
 def latest(conn, iid):
@@ -808,4 +912,5 @@ def latest(conn, iid):
             "SELECT * FROM sentiment_analyses WHERE instrument_id=%s ORDER BY (packet->>'cutoff')::timestamptz DESC,created_at DESC,id DESC LIMIT 1",
             (iid,),
         ),
+        partial=True,
     )

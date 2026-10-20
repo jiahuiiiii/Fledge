@@ -56,3 +56,45 @@ export function eventWindows(event) {
     throw new Error("Keep the complete schedule within ten years.");
   return windows;
 }
+
+// A new event needs only a description and a role; these fill the rest.
+export const DEFAULT_EVIDENCE =
+  "A report clearly stating that this has happened. Plans, rumours or a beta don't count.";
+
+// Recent news is in the source sample for seven days, so the default window
+// starts a week back and runs three months ahead (inclusive UTC dates).
+export function defaultEventWindow(today = new Date()) {
+  const day = (offset) =>
+    new Date(
+      Date.UTC(
+        today.getUTCFullYear(),
+        today.getUTCMonth(),
+        today.getUTCDate() + offset,
+      ),
+    )
+      .toISOString()
+      .slice(0, 10);
+  return { window_start: day(-7), deadline: day(90) };
+}
+
+const MONTHS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ");
+const shortDate = (text) => {
+  const [y, m, d] = text.split("-").map(Number);
+  return `${d} ${MONTHS[m - 1]} ${y}`;
+};
+
+// One plain sentence for the collapsed editor, so the dates stay visible.
+export function windowSummary(event) {
+  if (!event.window_start || !event.deadline)
+    return "Choose dates in More options.";
+  const range = `${shortDate(event.window_start)} to ${shortDate(event.deadline)}`;
+  const repeat = { 1: "every month", 3: "every 3 months", 12: "every year" }[
+    Number(event.repeat_months || 0)
+  ];
+  return (
+    (event.date_basis === "event_occurrence"
+      ? `Counts if it happened ${range}.`
+      : `Counts news published ${range}.`) +
+    (repeat ? ` Repeats ${repeat}, ${event.repeat_count} times.` : "")
+  );
+}

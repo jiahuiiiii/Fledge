@@ -138,22 +138,26 @@ def run(packet, *, transport=None):
     by_label = {s["label"]: s["id"] for s in packet["sources"]}
 
     def send(body):
-        from .sentiment_batching import has_attempt
+        from .sentiment_batching import has_attempt, HeldSources
         key = request_key(body)
+        held = [by_label[label] for label in
+                body["text"]["format"]["schema"]["properties"]["items"]["items"]["properties"]["label"]["enum"]]
         with transaction() as conn:
             saved = ledger.find(conn, key)
         if saved is None and has_attempt(key):
-            raise ledger.BudgetBlocked("An earlier quick relevance check has no settled response. No automatic retry; its charge needs review.")
+            raise HeldSources("An earlier quick relevance check has no settled response. No automatic retry; its charge needs review.", held)
         call = saved or ledger.execute(key, "sentiment:" + POLICY, body, transport=transport)
         if call["status"] != "settled":
-            raise ledger.BudgetBlocked(
-                "An earlier quick relevance check may already have been sent. No automatic retry; its charge needs review.")
+            raise HeldSources(
+                "An earlier quick relevance check may already have been sent. No automatic retry; its charge needs review.", held)
         return call
 
     # Quick-check batches are independent; a few run at once, read back in order.
     results, errors = parallel.run_all([lambda body=body: send(body) for body in bodies])
     if errors:
-        raise errors[min(errors)]
+        from .sentiment_batching import held_together, HeldSources
+        raise held_together(errors.values()) or next(
+            e for _, e in sorted(errors.items()) if not isinstance(e, HeldSources))
     skipped, calls, usable = [], [], 0
     for body, call in zip(bodies, results):
         calls.append(call)

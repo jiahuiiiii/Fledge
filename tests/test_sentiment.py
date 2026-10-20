@@ -194,7 +194,7 @@ def test_invalid_sentiment_batch_publishes_nothing(owner, fault):
         assert not rows(c, "SELECT * FROM sentiment_analyses")
 
 
-def test_withdrawn_social_source_withholds_aggregate_and_alerts(owner):
+def test_withdrawn_social_source_withholds_only_its_parts(owner):
     iid = prepare(owner)
     add_social(iid)
     result = sentiment.generate(iid, transport=provider())
@@ -202,13 +202,14 @@ def test_withdrawn_social_source_withholds_aggregate_and_alerts(owner):
         c.execute("UPDATE social_feeds SET enabled=false")
     try:
         with transaction() as c:
+            stored = one(c, "SELECT * FROM sentiment_analyses WHERE id=%s", (result["id"],))
+            assert sentiment.present(c, stored)["withheld"]
             current = sentiment.latest(c, iid)
-            assert (
-                current["withheld"]
-                and not current["items"]
-                and not current["sources"]
-                and not current["summary"]
-            )
+            assert not current["withheld"] and current["withheld_sources"] == 1
+            assert {i["channel"] for i in current["items"]} == {"news"}
+            assert {s["kind"] for s in current["sources"]} == {"news"}
+            assert current["summary"]["news"] == result["summary"]["news"]
+            assert "social" not in current["summary"]
     finally:
         with transaction(admin=True) as c:
             c.execute("UPDATE social_feeds SET enabled=true")
@@ -255,13 +256,12 @@ def test_new_risk_alert_is_grouped_idempotent_and_private(owner):
     with transaction(admin=True) as c:
         c.execute("UPDATE social_feeds SET enabled=false")
     try:
+        # The alert cites news only, so it stays; the social sources leave it.
         with transaction(owner) as c:
-            hidden = news_watch.list_alerts(c, owner)[0]
-            assert hidden["withheld"]
-            assert not any(
-                hidden[k]
-                for k in ("payload", "sources", "previous_items", "previous_sources")
-            )
+            shown = news_watch.list_alerts(c, owner)[0]
+            assert not shown["withheld"] and shown["payload"] == alerts[0]["payload"]
+            assert {i["channel"] for i in shown["previous_items"]} == {"news"}
+            assert {s["kind"] for s in shown["sources"] + shown["previous_sources"]} == {"news"}
     finally:
         with transaction(admin=True) as c:
             c.execute("UPDATE social_feeds SET enabled=true")

@@ -290,7 +290,9 @@ def test_renderer_reports_only_primary_evidence_that_survives_the_message_bound(
         detail=dict(symbol='😀'*18,payload=dict(reason='😀'*450,items=items,
             shifts=[dict(title='😀'*120,before=dict(tone='😀'*30),after=dict(tone='😀'*30))]*3),sources=[]))
     shown=[];message=render(record,shown=shown)
-    assert len(shown)<2 and '2' not in shown and visible_units(message)<=3800
+    # Since 20 Oct 2026 the rule paragraph is gone, so both bounded excerpts fit;
+    # shown must still name exactly the excerpts present, never the third item.
+    assert shown==['0','1'] and message.count('😀'*320)==2 and visible_units(message)<=3800
 
 
 def test_new_price_or_condition_event_is_not_suppressed_by_its_shared_news_context():

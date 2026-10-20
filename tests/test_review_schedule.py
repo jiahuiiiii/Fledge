@@ -416,3 +416,26 @@ def test_invalid_manifest_bounds_and_duplicates_rejected(owner, invalid):
                     Jsonb(m),
                 ),
             )
+
+
+def test_week_with_a_price_move_saves_and_rejects_a_fabricated_move(owner):
+    # 20 Oct 2026: every week with a price move failed to save (migration 068).
+    from test_move_alerts import setup as move_setup
+    from thesis.monitoring import move_alerts as M
+    from test_price_moves import NOW
+    event, _ = move_setup(owner)
+    eid = M.record(owner, event, now=NOW)
+    assert eid
+    due = (NOW + timedelta(hours=1)).replace(second=0, microsecond=0)
+    R.configure(owner, True, due.weekday(), due.hour * 60 + due.minute, "UTC", now=due - timedelta(days=1))
+    assert R.run_once(owner, now=due + timedelta(seconds=1))
+    item = R.history(owner)["items"][0]
+    with transaction(owner) as c:
+        row = one(c, "SELECT * FROM scheduled_reviews WHERE id=%s", (item["id"],))
+        assert one(c, "SELECT error FROM review_schedules WHERE owner_id=%s", (owner,))["error"] is None
+    assert [(r["kind"], r["id"]) for r in row["manifest"]["records"]] == [("move", str(eid))]
+    row["manifest"]["records"][0]["id"] = str(uuid4())
+    with pytest.raises(Exception, match="outside its owner or period"):
+        with transaction(owner) as c:
+            c.execute("INSERT INTO scheduled_reviews VALUES(%s,%s,%s,%s,%s,%s,%s,%s)",
+                      (uuid4(), owner, 99, row["scheduled_at"], row["generated_at"], "UTC", 0, Jsonb(row["manifest"])))

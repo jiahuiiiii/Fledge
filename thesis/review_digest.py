@@ -34,6 +34,12 @@ EVENTS = """WITH events AS (
 ) """
 
 
+def withheld_note(count):
+    noun = "source is" if count == 1 else "sources are"
+    return (f"{count} cited {noun} no longer available. That evidence and its "
+            "interpretation are withheld; the rest of this alert is unaffected.")
+
+
 def clock(value):
     parsed = (
         value
@@ -97,10 +103,16 @@ def coverage(conn, owner, company, now):
     cutoff = analysis["packet"]["cutoff"] if analysis else None
     if not analysis:
         concerns.append("No news/social sentiment sample has been analysed.")
-    elif sentiment.present(conn, analysis)["withheld"]:
+    elif (visible := sentiment.present(conn, analysis, partial=True))["withheld"]:
         concerns.append("Source access changed; sentiment interpretation is withheld.")
-    elif now - clock(cutoff) > timedelta(hours=24):
-        concerns.append("The analysed news/social sample is more than 24 hours old.")
+    else:
+        if visible["withheld_sources"]:
+            concerns.append(
+                f"{visible['withheld_sources']} saved sentiment source(s) are no longer available; "
+                "their interpretations and any tone totals that counted them are withheld."
+            )
+        if now - clock(cutoff) > timedelta(hours=24):
+            concerns.append("The analysed news/social sample is more than 24 hours old.")
     feed_rows = social.status(conn, iid)
     for f in feed_rows:
         if not f["enabled"]:
@@ -439,6 +451,8 @@ def render_report(report):
             items=[]
         elif event["kind"] == "company":
             parts.append(f'<p>{text(d["payload"]["reason"])}</p>')
+            if d["payload"].get("withheld_items"):
+                parts.append(f'<p>{withheld_note(d["payload"]["withheld_items"])}</p>')
             for label, limits in d.get("source_limits", {}).items():
                 if limits:
                     parts.append(

@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { eventWindows } from "./eventWindows.js";
+import {
+  eventWindows,
+  defaultEventWindow,
+  windowSummary,
+} from "./eventWindows.js";
 import { revisionPayload } from "./kestrelDiff.js";
 
 test("monthly preview anchors month ends without drifting", () => {
@@ -101,5 +105,38 @@ test("recurrence cannot overflow the calendar or its deadline boundary", () => {
       repeat_months: 0,
       repeat_count: 1,
     }),
+  );
+});
+
+test("a new event defaults to last week through three months ahead (UTC)", () => {
+  assert.deepEqual(defaultEventWindow(new Date("2026-10-19T23:30:00+08:00")), {
+    window_start: "2026-10-12",
+    deadline: "2027-01-17",
+  });
+  // Late evening in Singapore is still the earlier UTC day.
+  assert.equal(
+    defaultEventWindow(new Date("2026-10-20T07:59:00+08:00")).window_start,
+    "2026-10-12",
+  );
+});
+
+test("the collapsed editor states which dates count", () => {
+  const e = { window_start: "2026-10-01", deadline: "2026-10-31" };
+  assert.equal(
+    windowSummary(e),
+    "Counts news published 1 Oct 2026 to 31 Oct 2026.",
+  );
+  assert.equal(
+    windowSummary({
+      ...e,
+      date_basis: "event_occurrence",
+      repeat_months: 3,
+      repeat_count: 4,
+    }),
+    "Counts if it happened 1 Oct 2026 to 31 Oct 2026. Repeats every 3 months, 4 times.",
+  );
+  assert.equal(
+    windowSummary({ ...e, deadline: "" }),
+    "Choose dates in More options.",
   );
 });

@@ -1,0 +1,179 @@
+<title>Fledge Overnight Run</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one narrow column, a compact "tonight" strip, then two tick lists with a progress meter. */
+:root {
+  --bg: #f5f7f8; --panel: #ffffff; --fg: #17202a; --muted: #5b6875;
+  --line: #dde3e8; --accent: #1f6f8b; --accent-soft: #e3f0f5; --ok: #2d7a46; --warn: #a2620a; --warn-soft: #fbf0dc;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11171c; --panel: #182129; --fg: #e6ecf0; --muted: #9aa8b4;
+  --line: #2a3640; --accent: #5fb3d1; --accent-soft: #1b3440; --ok: #6fc28a; --warn: #e2a64a; --warn-soft: #3a2c14; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #11171c; --panel: #182129; --fg: #e6ecf0; --muted: #9aa8b4;
+  --line: #2a3640; --accent: #5fb3d1; --accent-soft: #1b3440; --ok: #6fc28a; --warn: #e2a64a; --warn-soft: #3a2c14; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--sans); }
+.wrap { max-width: 720px; margin: 0 auto; padding-block: 28px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 24px; }
+h1 { font-size: 1.6rem; font-weight: 600; margin: 0; text-wrap: balance; }
+h2 { font-size: .78rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+p { margin: 0; }
+.sub { color: var(--muted); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+header { display: grid; gap: 6px; }
+.strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--line);
+  border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.strip div { background: var(--panel); padding: 10px 12px; display: grid; gap: 2px; min-width: 0; }
+.strip b { font: 500 1.05rem var(--mono); font-variant-numeric: tabular-nums; }
+.strip span { font-size: .8rem; color: var(--muted); }
+section { display: grid; gap: 10px; }
+.head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.meter { font: .82rem var(--mono); color: var(--muted); }
+ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+li label { display: grid; grid-template-columns: 22px 1fr; gap: 12px; padding: 12px 14px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+li label:hover { border-color: var(--accent); }
+input[type="checkbox"] { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--accent); cursor: pointer; }
+input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.body { display: grid; gap: 4px; min-width: 0; }
+.t { font-weight: 600; }
+.pass { font-size: .88rem; }
+.pass em { font-style: normal; font-weight: 600; color: var(--ok); }
+.where { font-size: .84rem; color: var(--muted); }
+code { font: .84rem var(--mono); background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+li input:checked + .body .t { text-decoration: line-through; color: var(--muted); }
+.flag { background: var(--warn-soft); border: 1px solid var(--warn); border-radius: 8px; padding: 10px 14px; font-size: .9rem; }
+.flag b { color: var(--warn); }
+.notes { display: grid; gap: 6px; font-size: .88rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+button { font: 500 .82rem var(--sans); color: var(--accent); background: none; border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+button:hover, button:focus-visible { border-color: var(--accent); outline: none; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Fledge Overnight Run</h1>
+    <p class="sub">19 Oct 22:00 → 20 Oct 08:00 SGT. US market open 21:30–04:00. Five companies are watched: AVGO, GOOGL, META, NVDA, QCOM.</p>
+  </header>
+
+  <div class="strip" aria-label="What to expect">
+    <div><b>≈ US$0.25</b><span>expected AI cost</span></div>
+    <div><b>&lt; US$1.20</b><span>busy-night limit</span></div>
+    <div><b>0</b><span>GPT-5.4 calls, unless event checks are on</span></div>
+    <div><b>20:30–05:00</b><span>fast checks run</span></div>
+  </div>
+
+  <section>
+    <div class="head"><h2>Before you sleep</h2><span class="meter" id="m-night"></span></div>
+    <ol>
+      <li><label><input type="checkbox" id="n1"><div class="body">
+        <span class="t">Mac plugged in, lid open, kept awake</span>
+        <span class="pass">Run in your Terminal and leave it open: <code>caffeinate -dimsu -w 44846</code></span>
+        <span class="where">Closing the lid still puts the Mac to sleep. Last night it slept 47 times, and the short wake-ups left AI requests cut off.</span>
+      </div></label></li>
+      <li><label><input type="checkbox" id="n2"><div class="body">
+        <span class="t">Decide on price-move Telegram alerts</span>
+        <span class="pass">Currently <em>on</em>. Leave it on only if you want price-move messages tonight.</span>
+        <span class="where">The setting appears twice in your settings file. The second one (on) is the one used.</span>
+      </div></label></li>
+    </ol>
+  </section>
+
+  <section>
+    <div class="head"><h2>When you wake up</h2><span class="meter" id="m-morning"></span></div>
+    <p class="flag"><b>Fastest way:</b> ask Claude to “run the morning check” and you'll get the numbers for items 1, 2, 3 and 7 in one go.</p>
+    <ol>
+      <li><label><input type="checkbox" id="w1"><div class="body">
+        <span class="t">1. The app ran all night</span>
+        <span class="pass">Pass: <em>same app</em> as last night (started 18 Oct 23:40) and news checks happened every hour, 22:00–08:00.</span>
+        <span class="where">Any gap over an hour means the Mac slept or the app stopped.</span>
+      </div></label></li>
+      <li><label><input type="checkbox" id="w2"><div class="body">
+        <span class="t">2. Cost stayed low</span>
+        <span class="pass">Pass: <em>under US$1.20</em> for the night (about US$0.25 expected), and no GPT-5.4 calls.</span>
+        <span class="where">Most of the cost should be the quick relevance check (GPT-5.4 mini), then Luna.</span>
+      </div></label></li>
+      <li><label><input type="checkbox" id="w3"><div class="body">
+        <span class="t">3. Few failed AI requests</span>
+        <span class="pass">Pass: <em>fewer than 1 in 20</em> requests timed out or left unfinished.</span>
+        <span class="where">Failures are kept, not retried. A few unscored articles are normal.</span>
+      </div></label></li>
+      <li><label><input type="checkbox" id="w4"><div class="body">
+        <span class="t">4. Price moves</span>
+        <span class="pass">If a company moved ±3% in a session, 2 points against QQQ, or ±5% over two sessions: <em>one alert per move</em>, with a sourced explanation and no repeats.</span>
+        <span class="where">If nothing moved, write “no move”. The explanation is then still untested.</span>
+      </div></label></li>
+      <li><label><input type="checkbox" id="w5"><div class="body">
+        <span class="t">5. News alerts make sense</span>
+        <span class="pass">Pass: each overnight alert is about <em>the watched company</em> and the tone looks right.</span>
+        <span class="where">Rate them with the Telegram buttons. Those ratings count as evidence for the quality check.</span>
+      </div></label></li>
+      <li><label><input type="checkbox" id="w6"><div class="body">
+        <span class="t">6. Telegram behaved</span>
+        <span class="pass">Pass: messages arrived, <em>not too many</em>, and the rating buttons responded quickly.</span>
+        <span class="where">Write down roughly how many messages came in. Ten an hour would be too noisy.</span>
+      </div></label></li>
+      <li><label><input type="checkbox" id="w7"><div class="body">
+        <span class="t">7. Morning records were made</span>
+        <span class="pass">Pass: a <em>daily summary preview</em> around 07:00, and a cost record for 19 Oct just after midnight.</span>
+        <span class="where">These are saved in the app only. Nothing is sent from them.</span>
+      </div></label></li>
+      <li><label><input type="checkbox" id="w8"><div class="body">
+        <span class="t">8. Alert importance labels look sensible</span>
+        <span class="pass">Pass: the preview labels (immediate vs. recap) <em>match how urgent</em> each alert felt.</span>
+        <span class="where">Preview only. These labels don't change what gets sent.</span>
+      </div></label></li>
+    </ol>
+    <h2>Only if you set these up tonight</h2>
+    <ol>
+      <li><label><input type="checkbox" id="w9"><div class="body">
+        <span class="t">9. Event checks ran</span>
+        <span class="pass">Pass: the QCOM–Arm event shows <em>met</em> with a quoted passage, and the earnings events show <em>unknown</em> (results not out yet).</span>
+        <span class="where">Each check uses GPT-5.4 at about US$0.02–0.03. The overnight limit rises to about US$1.80.</span>
+      </div></label></li>
+      <li><label><input type="checkbox" id="w10"><div class="body">
+        <span class="t">10. Weekly review was prepared</span>
+        <span class="pass">Pass: a <em>ready review</em> appears under Updates at the time you chose, with the night's alerts in it.</span>
+        <span class="where">No AI cost. It only gathers saved records.</span>
+      </div></label></li>
+    </ol>
+  </section>
+
+  <div class="notes">
+    <p><b>Not part of tonight:</b> research answers, finding checks, idea review, expectations, discussion themes and briefs. They only run when you open them, and they use GPT-5.4. Event checks run automatically only for ideas you attach to a news watch.</p>
+    <p><b>Still open after tonight:</b> one night doesn't complete the five-day preview, the ten-day outcome check, or tone accuracy, which needs your ratings.</p>
+    <p><button type="button" id="reset">Clear all ticks</button></p>
+  </div>
+</div>
+
+<script>
+(function () {
+  var KEY = "fledge-overnight-2026-10-19";
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[type="checkbox"]'));
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  function meter() {
+    [["m-night", "n"], ["m-morning", "w"]].forEach(function (pair) {
+      var group = boxes.filter(function (b) { return b.id.charAt(0) === pair[1]; });
+      var done = group.filter(function (b) { return b.checked; }).length;
+      document.getElementById(pair[0]).textContent = done + " of " + group.length + " done";
+    });
+  }
+  function save() {
+    var state = {};
+    boxes.forEach(function (b) { state[b.id] = b.checked; });
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+    meter();
+  }
+  boxes.forEach(function (b) { b.checked = !!saved[b.id]; b.addEventListener("change", save); });
+  document.getElementById("reset").addEventListener("click", function () {
+    boxes.forEach(function (b) { b.checked = false; });
+    save();
+  });
+  meter();
+})();
+</script>

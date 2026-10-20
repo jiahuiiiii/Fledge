@@ -157,6 +157,25 @@ def split_parts(part):
     return children
 
 
+class HeldSources(ledger.BudgetBlocked):
+    """Some sources' request has no settled response and is never resent.
+
+    A scheduled reading leaves just these sources out and reads the rest.
+    """
+
+    def __init__(self, message, source_ids):
+        super().__init__(message)
+        self.source_ids = frozenset(source_ids)
+
+
+def held_together(errors):
+    """One HeldSources for every held batch, or None when another error is present."""
+    errors = list(errors)
+    if not errors or not all(isinstance(e, HeldSources) for e in errors):
+        return None
+    return HeldSources(str(errors[0]), frozenset().union(*(e.source_ids for e in errors)))
+
+
 def has_attempt(key):
     # The ledger permits redispatch after failures. This pipeline requires an
     # explicit retry key instead; uncertain charges must never be resent here.

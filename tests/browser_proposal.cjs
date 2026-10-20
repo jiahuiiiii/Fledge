@@ -26,6 +26,7 @@ let browser;
  assert.equal(await modal.getByLabel('Condition',{exact:true}).inputValue(),'<=');
  await modal.getByRole('checkbox').check();await modal.getByRole('button',{name:'Approve monitoring',exact:true}).click();
  await modal.getByRole('alert').waitFor();assert.match(await modal.innerText(),/choose an ordered date window/i);
+ {const more=modal.getByText('More options',{exact:true}).first();if(!(await more.evaluate(s=>s.parentElement.open)))await more.click();}
  await modal.getByLabel('Report window start 1',{exact:true}).fill('2025-01-01');await modal.getByLabel('Report deadline 1',{exact:true}).fill('2026-12-31');
  await modal.getByLabel('My reasoning',{exact:true}).fill('I edited this proposed reasoning and require completed renewal evidence.');
  await modal.getByRole('checkbox').check();await modal.getByRole('button',{name:'Approve monitoring',exact:true}).click();await modal.waitFor({state:'hidden'});
