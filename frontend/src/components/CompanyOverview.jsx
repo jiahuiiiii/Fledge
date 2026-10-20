@@ -20,6 +20,7 @@ import {
   sessionLabel,
 } from "../lib/priceRefresh";
 import ExtendedPrice from "./ExtendedPrice";
+import { freshPrice, LIVE_PRICE_MS } from "../lib/livePrice";
 import "./CompanyOverview.css";
 const stamp = (value) =>
   formatTimestamp(value, { fallback: "Date unavailable" });
@@ -102,6 +103,33 @@ export default function CompanyOverview({
       controller.abort();
     };
   }, [membership, refresh]);
+  // Home prices refresh on their own while the page is visible.
+  useEffect(() => {
+    let stopped = false;
+    const tick = async () => {
+      if (document.visibilityState !== "visible") return;
+      for (const company of current.current.catalogue) {
+        if (stopped) return;
+        if (company.mode !== "sec") continue;
+        try {
+          const history = await freshPrice(company.id);
+          if (stopped || history?.symbol !== company.symbol) continue;
+          setReadings((previous) =>
+            previous[company.id]
+              ? { ...previous, [company.id]: { ...previous[company.id], history } }
+              : previous,
+          );
+        } catch {
+          /* Keep the saved price on screen. */
+        }
+      }
+    };
+    const timer = setInterval(tick, LIVE_PRICE_MS);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [membership]);
   const loading = catalogue.some((company) => !readings[company.id]);
   // Your own companies first, then practice companies (the worked example,
   // Northstar, before the others), so newcomers see one that has data.

@@ -7,6 +7,7 @@ import {
   WorkspaceSidebar,
 } from "./components/WorkspaceControls";
 import { modelAvailability } from "./lib/modelAvailability";
+import { freshPrice, LIVE_PRICE_MS } from "./lib/livePrice";
 import EmptyWorkspace from "./components/EmptyWorkspace";
 import WorldNews from "./components/WorldNews";
 import CompanyAvatar from "./components/CompanyAvatar";
@@ -751,6 +752,32 @@ function CompanyWorkspace({
       .catch(() => {});
     return () => controller.abort();
   }, [scope, companyLoading, updatedAt]);
+  // Keep the open company's price current while the tab is visible.
+  useEffect(() => {
+    if (
+      companyLoading ||
+      !selectedCompanyId ||
+      data?.instrument?.mode === "recorded"
+    )
+      return;
+    let stopped = false;
+    const tick = () => {
+      if (document.visibilityState !== "visible") return;
+      freshPrice(instrumentId)
+        .then((result) => {
+          if (!stopped && activeScope.current === scope)
+            setPriceRead((old) =>
+              preferPriceRead(old, { data: result, error: "" }),
+            );
+        })
+        .catch(() => {});
+    };
+    const timer = setInterval(tick, LIVE_PRICE_MS);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [scope, companyLoading]);
   useEffect(() => {
     if (companyLoading || !data?.financials_pending || !needsFinancials) return;
     const controller = new AbortController();
@@ -1938,6 +1965,7 @@ function CompanyWorkspace({
                               : () => startLoading({ analyze: true, lookback_days: 7 })
                           }
                           rating={!!loadingRun?.active}
+                          priceHistory={priceRead?.data}
                         />
                       </RetainedView>
                       <RetainedView active={tab === "evidence"}>

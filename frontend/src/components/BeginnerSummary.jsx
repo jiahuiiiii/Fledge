@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { useProfile } from "../lib/profile";
+import { latestPriceQuote, quoteMovement } from "../lib/priceRefresh";
 import { companyName } from "../lib/companyIdentity";
 import { overviewNews } from "../lib/overviewSections";
 import { sourceCoverage } from "../lib/sourceCoverage";
@@ -42,6 +43,7 @@ export default function BeginnerSummary({
   onUpdate,
   onRate,
   rating = false,
+  priceHistory = null,
   practice = false,
 }) {
   const [world, setWorld] = useState(null);
@@ -59,7 +61,12 @@ export default function BeginnerSummary({
   }, [visible, instrumentId]);
 
   const name = companyName(data.instrument);
-  const price = priceLine(data.market?.quote?.quote);
+  // Same price and change as the header: the newest of Finnhub and Yahoo.
+  const latest = latestPriceQuote(data.market, priceHistory);
+  const live = latest && quoteMovement(data.market, priceHistory);
+  const price = live
+    ? priceLine({ price: Number(latest.price), change_percent: live.percent })
+    : priceLine(data.market?.quote?.quote);
   const reading = data.sentiment?.withheld ? null : data.sentiment;
   const scopes = sourceCoverage(reading).scopes;
   const newsTone = scopes.find((s) => s.scope === "news");
