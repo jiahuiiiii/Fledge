@@ -1,4 +1,10 @@
 import { readableLoad } from "../lib/loading";
+import {
+  countsLine,
+  groupByCompany,
+  toneClass,
+  weekLine,
+} from "../lib/reviewGroups";
 import LoadingSkeleton from "./LoadingSkeleton";
 import Select from "./Select";
 import { useEffect, useState } from "react";
@@ -129,63 +135,6 @@ export default function ReviewDigest({
           </button>
         </div>
       )}
-      {!savedId && (
-        <div className="review-filters">
-          <label>
-            Period
-            <Select
-              aria-label="Review period"
-              value={days}
-              disabled={busy}
-              onChange={(e) => {
-                setDays(Number(e.target.value));
-                reset();
-              }}
-            >
-              <option value="1">Last 24 hours</option>
-              <option value="7">Last 7 days</option>
-              <option value="30">Last 30 days</option>
-              <option value="0">All retained records</option>
-            </Select>
-          </label>
-          <label>
-            Company
-            <Select
-              aria-label="Review company"
-              value={company}
-              disabled={busy}
-              onChange={(e) => {
-                onCompanyChange?.(e.target.value);
-                reset();
-              }}
-            >
-              <option value="">All my ideas and watches</option>
-              {data?.companies.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.symbol} · {c.name}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <label>
-            Records
-            <Select
-              aria-label="Review record status"
-              value={review}
-              disabled={busy}
-              onChange={(e) => {
-                setReview(e.target.value);
-                reset();
-              }}
-            >
-              <option value="all">All statuses</option>
-              <option value="pending">Awaiting review</option>
-              <option value="unresolved">Left unresolved</option>
-              <option value="reviewed">Reviewed</option>
-            </Select>
-          </label>
-        </div>
-      )}
       {error && (
         <p className="warning" role="alert">
           {error}
@@ -196,157 +145,39 @@ export default function ReviewDigest({
       ) : (
         data && (
           <>
-            <p className="fine">
-              Updates recorded{" "}
-              {data.window_start
-                ? `from ${stamp(data.window_start)}`
-                : "across all retained dates"}{" "}
-              through {stamp(data.cutoff)}. Coverage and review status read{" "}
-              {stamp(data.generated_at)}.
-            </p>
-            {savedId && (
-              <p className="fine">
-                Scheduled for {stamp(data.scheduled_at)} (
-                {data.schedule_time_zone}). Source access checked{" "}
-                {stamp(data.access_checked_at)}.{" "}
-                {data.skipped_occurrences > 0 &&
-                  `${data.skipped_occurrences} earlier scheduled weeks were skipped; older unreviewed counts remain below.`}
-              </p>
-            )}
-            <div className="review-totals" aria-label="Review totals">
-              <div>
-                <strong>{data.totals.new_count}</strong>
-                <span>updates in this period</span>
-              </div>
-              <div>
-                <strong>{data.totals.pending_count}</strong>
-                <span>awaiting review through cutoff</span>
-              </div>
-              <div>
-                <strong>{data.totals.unresolved_count}</strong>
-                <span>left unresolved through cutoff</span>
-              </div>
-              <div>
-                <strong>{data.totals.quiet_checks}</strong>
-                <span>quiet private checks in period</span>
-              </div>
-            </div>
-            {data.totals.older_pending_count > 0 && (
-              <div className="review-carryover">
-                <p>
-                  {data.totals.older_pending_count} unreviewed updates were
-                  recorded before this period.
-                </p>
-                <button
-                  onClick={() => {
-                    selectSaved("");
-                    setDays(0);
-                    setReview("pending");
-                    reset();
-                  }}
-                >
-                  Include older unreviewed updates
-                </button>
-              </div>
-            )}
-            {!data.companies.length ? (
-              <p className="muted">
-                Save reasoning or add a company watch to begin a periodic
-                review.
-              </p>
-            ) : (
-              <div className="review-companies">
-                {scoped.map((c) => (
-                  <article className="review-company" key={c.id}>
-                    <div className="row">
-                      <h3>
-                        {c.symbol} <small>{c.name}</small>
-                      </h3>
-                      <span className="status">{c.status || "Watch only"}</span>
-                    </div>
-                    <p>{c.question || "No saved reasoning yet."}</p>
-                    <p className="fine">
-                      {c.new_count} updates in period · {c.pending_count}{" "}
-                      awaiting review · {c.unresolved_count} left unresolved.
-                    </p>
-                    {c.research_action?.action === "unresolved" && (
-                      <p className="warning">
-                        Research question left unresolved:{" "}
-                        {c.research_action.question}
-                      </p>
-                    )}
-                    <p className="fine">
-                      Local news/social watch:{" "}
-                      {c.coverage.watch?.enabled
-                        ? `on · every ${c.coverage.watch.interval_minutes === 60 ? "hour" : "four hours"} · ${c.coverage.watch.match_idea ? (c.coverage.watch.idea_purpose === "question" ? "answers to saved question" : "saved-reasoning connections") : "company updates"}`
-                        : "off"}
-                      .{" "}
-                      {c.coverage.mode === "recorded"
-                        ? "Recorded fictional scenario."
-                        : c.coverage.filing_watch?.enabled
-                          ? "Daily filing checks are on while the app runs."
-                          : "Daily filing checks are off; refresh manually."}
-                    </p>
-                    <p className="fine">
-                      Last alert review:{" "}
-                      {c.latest_review_at
-                        ? stamp(c.latest_review_at)
-                        : "None recorded"}
-                      .
-                    </p>
-                    {c.coverage.concerns.length > 0 && (
-                      <p className="coverage-note">{c.coverage.concerns[0]}</p>
-                    )}
-                    <details className="review-coverage">
-                      <summary>
-                        {c.coverage.concerns.length
-                          ? `${c.coverage.concerns.length} source coverage ${c.coverage.concerns.length === 1 ? "note" : "notes"}`
-                          : "Inspect source coverage"}
-                      </summary>
-                      <p className="fine">
-                        News check:{" "}
-                        {c.coverage.news_checked_at
-                          ? stamp(c.coverage.news_checked_at)
-                          : "No completed check"}
-                        . Analysed sample:{" "}
-                        {c.coverage.sentiment_cutoff
-                          ? stamp(c.coverage.sentiment_cutoff)
-                          : "Not available"}
-                        .
-                      </p>
-                      {c.coverage.concerns.map((note) => (
-                        <p key={note}>{note}</p>
-                      ))}
-                      {!c.coverage.concerns.length && (
-                        <p>
-                          Recent checks are recorded, but selected feeds and
-                          snippets do not cover all news or investor discussion.
-                        </p>
+            {data.main_points?.length > 0 && (
+              <div className="review-main">
+                <h3>Main points</h3>
+                <p className="review-week">{weekLine(data.main_points)}</p>
+                <ul className="review-points">
+                  {data.main_points.map((c) => (
+                    <li key={c.symbol}>
+                      <div className="review-point-head">
+                        <strong>{c.symbol}</strong>
+                        <span>{countsLine(c)}</span>
+                      </div>
+                      {c.top && (
+                        <>
+                          {c.top.tone && (
+                            <span
+                              className={`review-tone ${toneClass(c.top.tone)}`}
+                            >
+                              {c.top.tone}
+                            </span>
+                          )}
+                          <p className="review-point-headline">
+                            {c.top.headline}
+                          </p>
+                          <p className="review-why">{c.top.why}</p>
+                        </>
                       )}
-                    </details>
-                    <div className="sentiment-controls">
-                      <button
-                        onClick={() => {
-                          selectSaved("");
-                          onCompanyChange?.(c.id);
-                          reset();
-                        }}
-                      >
-                        Review {c.symbol} updates
-                      </button>
-                      <button onClick={() => onOpen(c.id, "workspace")}>
-                        Open {c.symbol} research ↗
-                      </button>
-                      <button onClick={() => onOpen(c.id, "idea")}>
-                        Open saved idea ↗
-                      </button>
-                    </div>
-                  </article>
-                ))}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
             <div className="market-section-head">
-              <h3>Saved updates</h3>
+              <h3>All updates</h3>
               {data.companies.length > 0 && (
                 <a
                   href={
@@ -368,109 +199,136 @@ export default function ReviewDigest({
             </p>
             {!data.records.length && (
               <p className="muted">
-                No saved updates match this view. Check coverage above; this
-                does not establish that nothing important happened.
+                No saved updates match this view. Check coverage under More
+                detail; this does not establish that nothing important happened.
               </p>
             )}
-            <div className="review-records">
-              {data.records.map((record) => (
-                <article
-                  className="review-record"
-                  key={`${record.kind}:${record.id}`}
-                >
-                  <div className="row">
-                    <strong>
-                      {record.detail.symbol} ·{" "}
-                      {record.kind === "idea"
-                        ? "Saved reasoning"
-                        : record.kind === "company"
-                          ? "News and sentiment"
-                          : record.kind === "move"
-                            ? "Price move"
-                            : "Condition assessment"}
-                    </strong>
-                    <time>{stamp(record.created_at)}</time>
-                  </div>
-                  <h4>{record.title}</h4>
-                  <p className="fine">{statusName(record.review_action)}</p>
-                  {savedId && (
-                    <button
-                      onClick={() => onOpen(record.instrument_id, "updates")}
+            {groupByCompany(data.records).map(([symbol, records]) => (
+              <section className="review-company-group" key={symbol}>
+                <h4 className="review-company-name">
+                  {symbol}{" "}
+                  <small>
+                    {records.length} update{records.length === 1 ? "" : "s"}
+                  </small>
+                </h4>
+                <div className="review-records">
+                  {records.map((record) => (
+                    <article
+                      className="review-record"
+                      key={`${record.kind}:${record.id}`}
                     >
-                      Open current Updates ↗
-                    </button>
-                  )}
-                  {record.kind === "condition" ? (
-                    <>
-                      <p>{record.detail.question}</p>
-                      {record.detail.withheld && (
-                        <p className="warning">
-                          Source access changed. Figures and interpretations are
-                          withheld here.
-                        </p>
-                      )}
-                      <button
-                        onClick={() =>
-                          onOpen(
-                            record.instrument_id,
-                            "history",
-                            record.detail.evaluation_id,
-                          )
-                        }
-                      >
-                        Open exact assessment ↗
-                      </button>
-                    </>
-                  ) : (
-                    <details>
-                      <summary>
-                        Inspect this{" "}
-                        {record.kind === "idea"
-                          ? "reasoning check"
-                          : record.kind === "move"
-                            ? "price move"
-                            : "company alert"}
-                      </summary>
-                      {record.kind === "move" ? (
-                        <MoveAlertCard
-                          alert={record.detail}
-                          busy={busy}
-                          readOnly={!!savedId}
-                          onOpen={onOpen}
-                          onReview={(id, action) =>
-                            acknowledge("move", id, action)
-                          }
-                        />
-                      ) : record.kind === "idea" ? (
-                        <IdeaAlertChecks
-                          readOnly={!!savedId}
-                          checks={[record.detail]}
-                          history
-                          busy={busy}
-                          onSource={onSource}
-                          onOpen={onOpen}
-                          onReview={(id, action) =>
-                            acknowledge("idea", id, action)
-                          }
-                        />
+                      <div className="row">
+                        <strong>
+                          {record.kind === "idea"
+                            ? "Saved reasoning"
+                            : record.kind === "company"
+                              ? "News and sentiment"
+                              : record.kind === "move"
+                                ? "Price move"
+                                : "Condition assessment"}
+                        </strong>
+                        <time>{stamp(record.created_at)}</time>
+                      </div>
+                      {record.kind === "company" && record.detail.brief ? (
+                        <>
+                          <p
+                            className={`review-tone ${toneClass(record.detail.brief.tone)}`}
+                          >
+                            {record.detail.brief.tone}
+                          </p>
+                          <h4>
+                            {record.detail.brief.headline || record.title}
+                          </h4>
+                          <p className="review-why">
+                            {record.detail.brief.why}
+                          </p>
+                        </>
                       ) : (
-                        <ResearchAlerts
-                          readOnly={!!savedId}
-                          alerts={[record.detail]}
-                          history
-                          busy={busy}
-                          onSource={onSource}
-                          onOpen={onOpen}
-                          onReview={(id, action) =>
-                            acknowledge("company", id, action)
-                          }
-                        />
+                        <h4>{record.title}</h4>
                       )}
-                    </details>
-                  )}
-                </article>
-              ))}
-            </div>
+                      <p className="fine">{statusName(record.review_action)}</p>
+                      {savedId && (
+                        <button
+                          onClick={() =>
+                            onOpen(record.instrument_id, "updates")
+                          }
+                        >
+                          Open current Updates ↗
+                        </button>
+                      )}
+                      {record.kind === "condition" ? (
+                        <>
+                          <p>{record.detail.question}</p>
+                          {record.detail.withheld && (
+                            <p className="warning">
+                              Source access changed. Figures and interpretations
+                              are withheld here.
+                            </p>
+                          )}
+                          <button
+                            onClick={() =>
+                              onOpen(
+                                record.instrument_id,
+                                "history",
+                                record.detail.evaluation_id,
+                              )
+                            }
+                          >
+                            Open exact assessment ↗
+                          </button>
+                        </>
+                      ) : (
+                        <details>
+                          <summary>
+                            Inspect this{" "}
+                            {record.kind === "idea"
+                              ? "reasoning check"
+                              : record.kind === "move"
+                                ? "price move"
+                                : "company alert"}
+                          </summary>
+                          {record.kind === "move" ? (
+                            <MoveAlertCard
+                              alert={record.detail}
+                              busy={busy}
+                              readOnly={!!savedId}
+                              onOpen={onOpen}
+                              onReview={(id, action) =>
+                                acknowledge("move", id, action)
+                              }
+                            />
+                          ) : record.kind === "idea" ? (
+                            <IdeaAlertChecks
+                              readOnly={!!savedId}
+                              checks={[record.detail]}
+                              history
+                              busy={busy}
+                              onSource={onSource}
+                              onOpen={onOpen}
+                              onReview={(id, action) =>
+                                acknowledge("idea", id, action)
+                              }
+                            />
+                          ) : (
+                            <ResearchAlerts
+                              readOnly={!!savedId}
+                              alerts={[record.detail]}
+                              history
+                              busy={busy}
+                              onSource={onSource}
+                              onOpen={onOpen}
+                              onReview={(id, action) =>
+                                acknowledge("company", id, action)
+                              }
+                            />
+                          )}
+                        </details>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ))}
             <div className="review-pagination">
               <button
                 disabled={data.page === 0 || busy}
@@ -494,6 +352,222 @@ export default function ReviewDigest({
                 Next records
               </button>
             </div>
+            <details className="review-more">
+              <summary>
+                More detail: filters, counts and source coverage
+              </summary>
+              {!savedId && (
+                <div className="review-filters">
+                  <label>
+                    Period
+                    <Select
+                      aria-label="Review period"
+                      value={days}
+                      disabled={busy}
+                      onChange={(e) => {
+                        setDays(Number(e.target.value));
+                        reset();
+                      }}
+                    >
+                      <option value="1">Last 24 hours</option>
+                      <option value="7">Last 7 days</option>
+                      <option value="30">Last 30 days</option>
+                      <option value="0">All retained records</option>
+                    </Select>
+                  </label>
+                  <label>
+                    Company
+                    <Select
+                      aria-label="Review company"
+                      value={company}
+                      disabled={busy}
+                      onChange={(e) => {
+                        onCompanyChange?.(e.target.value);
+                        reset();
+                      }}
+                    >
+                      <option value="">All my ideas and watches</option>
+                      {data?.companies.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.symbol} · {c.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </label>
+                  <label>
+                    Records
+                    <Select
+                      aria-label="Review record status"
+                      value={review}
+                      disabled={busy}
+                      onChange={(e) => {
+                        setReview(e.target.value);
+                        reset();
+                      }}
+                    >
+                      <option value="all">All statuses</option>
+                      <option value="pending">Awaiting review</option>
+                      <option value="unresolved">Left unresolved</option>
+                      <option value="reviewed">Reviewed</option>
+                    </Select>
+                  </label>
+                </div>
+              )}
+              <p className="fine">
+                Updates recorded{" "}
+                {data.window_start
+                  ? `from ${stamp(data.window_start)}`
+                  : "across all retained dates"}{" "}
+                through {stamp(data.cutoff)}. Coverage and review status read{" "}
+                {stamp(data.generated_at)}.
+              </p>
+              {savedId && (
+                <p className="fine">
+                  Scheduled for {stamp(data.scheduled_at)} (
+                  {data.schedule_time_zone}). Source access checked{" "}
+                  {stamp(data.access_checked_at)}.{" "}
+                  {data.skipped_occurrences > 0 &&
+                    `${data.skipped_occurrences} earlier scheduled weeks were skipped; older unreviewed counts remain below.`}
+                </p>
+              )}
+              <div className="review-totals" aria-label="Review totals">
+                <div>
+                  <strong>{data.totals.new_count}</strong>
+                  <span>updates in this period</span>
+                </div>
+                <div>
+                  <strong>{data.totals.pending_count}</strong>
+                  <span>awaiting review through cutoff</span>
+                </div>
+                <div>
+                  <strong>{data.totals.unresolved_count}</strong>
+                  <span>left unresolved through cutoff</span>
+                </div>
+                <div>
+                  <strong>{data.totals.quiet_checks}</strong>
+                  <span>quiet private checks in period</span>
+                </div>
+              </div>
+              {data.totals.older_pending_count > 0 && (
+                <div className="review-carryover">
+                  <p>
+                    {data.totals.older_pending_count} unreviewed updates were
+                    recorded before this period.
+                  </p>
+                  <button
+                    onClick={() => {
+                      selectSaved("");
+                      setDays(0);
+                      setReview("pending");
+                      reset();
+                    }}
+                  >
+                    Include older unreviewed updates
+                  </button>
+                </div>
+              )}
+              {!data.companies.length ? (
+                <p className="muted">
+                  Save reasoning or add a company watch to begin a periodic
+                  review.
+                </p>
+              ) : (
+                <div className="review-companies">
+                  {scoped.map((c) => (
+                    <article className="review-company" key={c.id}>
+                      <div className="row">
+                        <h3>
+                          {c.symbol} <small>{c.name}</small>
+                        </h3>
+                        <span className="status">
+                          {c.status || "Watch only"}
+                        </span>
+                      </div>
+                      <p>{c.question || "No saved reasoning yet."}</p>
+                      <p className="fine">
+                        {c.new_count} updates in period · {c.pending_count}{" "}
+                        awaiting review · {c.unresolved_count} left unresolved.
+                      </p>
+                      {c.research_action?.action === "unresolved" && (
+                        <p className="warning">
+                          Research question left unresolved:{" "}
+                          {c.research_action.question}
+                        </p>
+                      )}
+                      <p className="fine">
+                        Local news/social watch:{" "}
+                        {c.coverage.watch?.enabled
+                          ? `on · every ${c.coverage.watch.interval_minutes === 60 ? "hour" : "four hours"} · ${c.coverage.watch.match_idea ? (c.coverage.watch.idea_purpose === "question" ? "answers to saved question" : "saved-reasoning connections") : "company updates"}`
+                          : "off"}
+                        .{" "}
+                        {c.coverage.mode === "recorded"
+                          ? "Recorded fictional scenario."
+                          : c.coverage.filing_watch?.enabled
+                            ? "Daily filing checks are on while the app runs."
+                            : "Daily filing checks are off; refresh manually."}
+                      </p>
+                      <p className="fine">
+                        Last alert review:{" "}
+                        {c.latest_review_at
+                          ? stamp(c.latest_review_at)
+                          : "None recorded"}
+                        .
+                      </p>
+                      {c.coverage.concerns.length > 0 && (
+                        <p className="coverage-note">
+                          {c.coverage.concerns[0]}
+                        </p>
+                      )}
+                      <details className="review-coverage">
+                        <summary>
+                          {c.coverage.concerns.length
+                            ? `${c.coverage.concerns.length} source coverage ${c.coverage.concerns.length === 1 ? "note" : "notes"}`
+                            : "Inspect source coverage"}
+                        </summary>
+                        <p className="fine">
+                          News check:{" "}
+                          {c.coverage.news_checked_at
+                            ? stamp(c.coverage.news_checked_at)
+                            : "No completed check"}
+                          . Analysed sample:{" "}
+                          {c.coverage.sentiment_cutoff
+                            ? stamp(c.coverage.sentiment_cutoff)
+                            : "Not available"}
+                          .
+                        </p>
+                        {c.coverage.concerns.map((note) => (
+                          <p key={note}>{note}</p>
+                        ))}
+                        {!c.coverage.concerns.length && (
+                          <p>
+                            Recent checks are recorded, but selected feeds and
+                            snippets do not cover all news or investor
+                            discussion.
+                          </p>
+                        )}
+                      </details>
+                      <div className="sentiment-controls">
+                        <button
+                          onClick={() => {
+                            selectSaved("");
+                            onCompanyChange?.(c.id);
+                            reset();
+                          }}
+                        >
+                          Review {c.symbol} updates
+                        </button>
+                        <button onClick={() => onOpen(c.id, "workspace")}>
+                          Open {c.symbol} research ↗
+                        </button>
+                        <button onClick={() => onOpen(c.id, "idea")}>
+                          Open saved idea ↗
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </details>
             <p className="fine">{data.limitation}</p>
           </>
         )

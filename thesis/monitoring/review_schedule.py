@@ -160,6 +160,9 @@ def run_once(owner, *, now=None, prepare=None):
             # Persist membership and generation-time overview, never duplicate the
             # external source wording. Reopen through current access checks.
             manifest = deepcopy(report)
+            # Headlines are source wording; a saved review rebuilds them under
+            # current access each time it is opened.
+            manifest.pop("main_points", None)
             manifest["records"] = [
                 {
                     k: r[k]
@@ -271,17 +274,17 @@ def read(owner, rid, *, page=0, exporting=False):
             raise service.Missing("This saved review is unavailable.")
         report = deepcopy(row["manifest"])
         events = report["records"]
-        if not exporting:
-            events = events[page * digest.PAGE_SIZE : (page + 1) * digest.PAGE_SIZE]
         for event in events:
             event["owner_id"] = owner
-        records = digest.details(c, owner, events)
+        every = digest.details(c, owner, events)
+        records = every if exporting else every[page * digest.PAGE_SIZE : (page + 1) * digest.PAGE_SIZE]
         for record in records:
             # Freeze acknowledgement display, never acknowledge an underlying
             # alert by opening or marking the weekly reminder seen.
             record["detail"]["review_action"] = record["review_action"]
         report.update(
             records=records,
+            main_points=digest.highlights(every),
             page=page,
             saved_review_id=str(row["id"]),
             scheduled_at=row["scheduled_at"],

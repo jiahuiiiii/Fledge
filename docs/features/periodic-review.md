@@ -1,5 +1,9 @@
 # Periodic and scheduled research reviews
 
+## Main points first — 20 October 2026
+
+The review opens with **Main points**: one line for the period (updates, companies, price moves, bad-news items), then one row per company with its counts by tone and the single update most worth reading (bad news, then price moves, mixed, good). **All updates** follow, grouped by company with the same order; each news item shows its tone, the article headline and one "why" line built from saved labels only (the Telegram format). Filters, totals, older-unreviewed carry-over and per-company coverage sit under **More detail**. Main points cover every matching record, not only the visible page. A saved review still stores membership only: its main points and headlines are rebuilt under current source access each time it is opened. The weekly review is in-app only; a Telegram weekly digest needs a new delivery kind (migration 070) after migration 069 lands.
+
 Open **Updates → Open weekly review**, also available from My ideas. The page combines saved condition changes, company news/social alerts and private reasoning alerts. Reading it makes no source or AI request.
 
 ## Current-record review

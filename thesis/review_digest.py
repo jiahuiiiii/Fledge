@@ -177,6 +177,42 @@ def change_detail(conn, owner, event):
     return row
 
 
+TONE_KEYS = {"Bad news": "bad", "Mixed news": "mixed", "Good news": "good"}
+TOP_ORDER = {"Bad news": 0, "move": 1, "Mixed news": 2, "Good news": 3}
+
+
+def highlights(records):
+    """Main points of a review: per company, tone counts and the one update most
+    worth reading (bad news, then price moves, mixed, good). Uses saved labels."""
+    by_symbol = {}
+    for record in records:
+        detail = record["detail"]
+        symbol = detail.get("symbol") or "Other"
+        entry = by_symbol.setdefault(symbol, dict(
+            symbol=symbol, name=detail.get("name"), instrument_id=str(record["instrument_id"]),
+            total=0, bad=0, mixed=0, good=0, other=0, moves=0, top=None))
+        entry["total"] += 1
+        brief = detail.get("brief") or {}
+        if record["kind"] == "move":
+            entry["moves"] += 1
+            key, candidate = "move", dict(kind="move", tone=None, headline=record["title"], why="Price move")
+        elif record["kind"] == "company" and brief:
+            entry[TONE_KEYS.get(brief["tone"], "other")] += 1
+            key, candidate = brief["tone"], dict(kind="company", **brief)
+        else:
+            entry["other"] += 1
+            continue
+        if detail.get("withheld"):
+            continue
+        rank = (TOP_ORDER.get(key, 4), -datetime.fromisoformat(str(record["created_at"])).timestamp())
+        if entry["top"] is None or rank < entry["_rank"]:
+            entry["top"], entry["_rank"] = dict(candidate, created_at=record["created_at"]), rank
+    result = sorted(by_symbol.values(), key=lambda e: (-(e["bad"] + e["moves"]), -e["total"], e["symbol"]))
+    for entry in result:
+        entry.pop("_rank", None)
+    return result
+
+
 def details(conn, owner, events):
     from .monitoring import alert_feedback
     from .monitoring import alert_routing
@@ -198,6 +234,9 @@ def details(conn, owner, events):
         elif event["kind"] == "company":
             detail = news_watch.list_alerts(conn, owner, ids=[event["id"]], previous=False)[0]
             title = detail["payload"].get("title", "Company source alert")
+            if not detail.get("withheld"):
+                from .monitoring.telegram_message import company_summary
+                detail["brief"] = company_summary(detail)
         else:
             detail = change_detail(conn, owner, event)
             title = detail["summary"]
@@ -329,6 +368,13 @@ def prepare(
             args,
         )
         records = details(conn, owner, page_rows)
+        # Main points cover every matching record (up to 1,000), not only this page.
+        if exporting or (page == 0 and total <= len(page_rows)):
+            main_points = highlights(records)
+        else:
+            every = rows(conn, EVENTS + "SELECT * FROM events" + where
+                         + " ORDER BY created_at DESC,kind,id DESC LIMIT 1000", args)
+            main_points = highlights(details(conn, owner, every))
         scoped = [c for c in companies if iid is None or str(c["id"]) == iid]
         # One market event may be relevant to several companies. Company badges
         # include it for each member; the full-list totals count the event once.
@@ -352,6 +398,7 @@ def prepare(
             totals=dict(totals, quiet_checks=sum(c['quiet_checks'] for c in scoped)),
             companies=companies,
             records=records,
+            main_points=main_points,
             daily_reports_enabled=daily_enabled(),
             limitation="This review uses saved records. It does not fetch sources or call AI. Record dates are when this app recorded an update, not when the underlying event happened. Review status and source coverage are read now; a quiet list does not establish that nothing important happened.",
         )

@@ -2457,6 +2457,91 @@ input[type="checkbox"] {
   font-size: var(--text-sm);
   margin: 12px 0;
 }
+/* Weekly review: main points first, everything else under More detail
+   (owner feedback 20 Oct 2026: the page buried the news under counts). */
+.review-main {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0 28px;
+}
+.review-main h3 {
+  margin: 0;
+  font-size: var(--text-md);
+}
+.review-week {
+  margin: 0;
+  font-size: var(--text-base);
+  color: var(--color-text);
+}
+.review-points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.review-points li {
+  display: grid;
+  gap: 6px;
+  padding: 14px 0;
+  border-top: 1px solid var(--color-line);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.review-point-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+.review-point-head strong {
+  font-size: var(--text-base);
+}
+.review-point-head span,
+.review-why {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+.review-point-headline {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--color-text);
+}
+.review-tone {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.review-company-group {
+  margin-top: 20px;
+}
+.review-company-name {
+  margin: 0 0 4px;
+  font-size: var(--text-md);
+}
+.review-company-name small {
+  margin-left: 6px;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--color-muted);
+}
+.review-more {
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-line);
+}
+.review-more > summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-positive-light);
+}
+.review-more[open] > summary {
+  margin-bottom: 16px;
+}
 .review-pagination {
   display: flex;
   gap: 14px;

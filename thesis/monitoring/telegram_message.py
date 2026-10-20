@@ -73,6 +73,17 @@ def why_notified(payload, items):
     return "Why: " + plain(payload.get("title") or "new company news", 160) + "."
 
 
+def company_summary(detail):
+    """Tone, article headline and why for a company alert, for any reader of it
+    (Telegram and the weekly review), from saved labels only."""
+    payload = detail.get("payload") or {}
+    items = payload.get("items", [])[:2]
+    titles = {str(s["id"]): s.get("title") for s in detail.get("sources", [])}
+    headline = plain(titles.get(str(items[0]["source_id"])) if items else None, 180)
+    why = why_notified(payload, items).removeprefix("Why: ")
+    return dict(tone=news_tone(payload, items), headline=headline or None, why=why[:1].upper() + why[1:])
+
+
 def render(record,*,shown=None):
     d = record["detail"]
     kind = record["kind"]
