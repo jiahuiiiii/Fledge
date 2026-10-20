@@ -171,23 +171,36 @@ test("header uses the newer separately attributed quote and withholds withdrawn 
   );
 });
 
-test("extended sessions get plain labels and the regular close beside them", async () => {
-  const { sessionLabel, closeBeside } = await import("./priceRefresh.js");
+test("the close stays the main price and extended hours go underneath", async () => {
+  const { sessionLabel, extendedLine, latestPriceQuote } = await import(
+    "./priceRefresh.js"
+  );
   assert.equal(sessionLabel("pre-market"), "Pre-market");
   assert.equal(sessionLabel("after-hours"), "After hours");
   assert.equal(sessionLabel("regular session"), null);
-  const history = (session, regular) => ({
-    snapshot: { series: { latest_quote: { session }, regular_quote: regular } },
+  const regular = {
+    price: "100",
+    quoted_at: "2026-10-19T20:00:00+00:00",
+    session: "regular session",
+  };
+  const history = (latest, close = regular) => ({
+    available: true,
+    snapshot: { series: { latest_quote: latest, regular_quote: close } },
   });
-  assert.deepEqual(closeBeside(history("pre-market", { price: "100.5" })), {
-    label: "Previous close",
-    price: 100.5,
-  });
-  assert.deepEqual(closeBeside(history("after-hours", { price: "101" })), {
-    label: "At close",
-    price: 101,
-  });
-  assert.equal(closeBeside(history("regular session", { price: "101" })), null);
-  assert.equal(closeBeside(history("after-hours", null)), null);
-  assert.equal(closeBeside(history("after-hours", { price: "x" })), null);
+  const pre = {
+    price: "102",
+    quoted_at: "2026-10-20T12:30:00+00:00",
+    session: "pre-market",
+  };
+  assert.equal(latestPriceQuote(null, history(pre)), regular);
+  const line = extendedLine(history(pre));
+  assert.equal(line.label, "Pre-market");
+  assert.equal(line.price, 102);
+  assert.equal(line.movement.change, 2);
+  assert.equal(line.movement.percent, 2);
+  // Without a close to compare with, the extended price is the main one.
+  assert.equal(extendedLine(history(pre, null)), null);
+  assert.equal(latestPriceQuote(null, history(pre, null)), pre);
+  assert.equal(extendedLine(history(regular)), null);
+  assert.equal(extendedLine(history({ ...pre, price: "x" })), null);
 });
