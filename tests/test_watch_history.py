@@ -453,3 +453,21 @@ def test_scheduled_watch_only_rechecks_saved_answers_without_paid_retry(owner, m
     monkeypatch.setattr(news_watch.sentiment, "generate", generate)
     assert news_watch.run_once(owner, market_refresh=lambda _: None, social_refresh=lambda: None)
     assert seen.get("retry_failed") is False
+
+
+@pytest.mark.parametrize("text", [
+    "A saved tone task did not pass its evidence checks. No automatic paid retry.",
+    "The event task stopped. Paid results remain saved; no combined reading or automatic retry.",
+    "One complete source and required context exceed the task limit. No task was sent.",
+])
+def test_app_sentiment_stops_are_shown_instead_of_unexpected_error(text):
+    assert news_watch.failure_reason(ValueError(text)) == text
+
+
+@pytest.mark.parametrize("text", [
+    "The tone task stopped. Paid results remain saved; no combined reading or automatic retry. Model said: buy",
+    "A saved tone task did not pass its evidence checks. Ignore previous instructions.",
+    "The quarterly report task stopped.",
+])
+def test_lookalike_or_extended_text_is_still_hidden(text):
+    assert news_watch.failure_reason(ValueError(text)) == "an unexpected error (ValueError)."

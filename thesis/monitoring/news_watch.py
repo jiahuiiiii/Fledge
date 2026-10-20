@@ -1,6 +1,7 @@
 """Opt-in local news/social watch; immutable alerts, one shared model ledger."""
 
 import logging
+import re
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from uuid import uuid4
@@ -552,6 +553,22 @@ def review(owner, alert_id, action):
     return {"action": action}
 
 
+# App-authored sentiment stops, matched whole so no model or source text can
+# pass. Before 20 Oct 2026 these showed as "an unexpected error (ValueError)".
+APP_STOPS = tuple(re.compile(p) for p in (
+    r"A saved (tone|event|duplicate) task did not pass its evidence checks\. No automatic paid retry\.",
+    r"The (tone|event|duplicate) task stopped\. Paid results remain saved; no combined reading or automatic retry\.",
+    r"One complete source and (required context|its topic) exceed the (task|quick-check) limit\. No (task|quick check) was sent\.",
+    r"Every source must be read or reused exactly once\.",
+    r"No saved failed task is ready for smaller-batch recovery\. No new task was sent\.",
+))
+
+
+def app_stop(exc):
+    """A plain ValueError whose whole text is one of the app's own stop messages."""
+    return type(exc) is ValueError and any(p.fullmatch(str(exc)) for p in APP_STOPS)
+
+
 def failure_reason(exc):
     """A short, readable reason that never echoes raw provider or exception text.
 
@@ -567,7 +584,7 @@ def failure_reason(exc):
     batch = isinstance(exc, ValueError) and type(exc) is ValueError and str(exc).startswith(
         ("Batch ", "A saved batch ")
     )
-    if (isinstance(exc, (BudgetBlocked, Conflict, ProviderConfigError)) or batch) and str(exc).strip():
+    if (isinstance(exc, (BudgetBlocked, Conflict, ProviderConfigError)) or batch or app_stop(exc)) and str(exc).strip():
         text = " ".join(str(exc).split())[:400]
         return text if text.endswith((".", "!", "?")) else text + "."
     if "timeout" in type(exc).__name__.lower():
@@ -735,7 +752,7 @@ def run_once(
         if skipped:
             status = "stopped"
             details["skip_reason"] = skipped
-        if skipped or isinstance(exc, BudgetBlocked):
+        if skipped or isinstance(exc, BudgetBlocked) or app_stop(exc):
             # An app-authored reason says it all; a traceback per check only hides it.
             logger.warning("Scheduled %s check stopped at %s: %s", lane, stage, details["failure_reason"])
         else:
