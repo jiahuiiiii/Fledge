@@ -56,7 +56,7 @@ def companies(conn, owner):
     ]
 
 
-def quote_for(conn, iid):
+def finnhub_quote(conn, iid):
     row = one(
         conn,
         "SELECT quote,retrieved_at FROM market_quotes WHERE instrument_id=%s ORDER BY retrieved_at DESC LIMIT 1",
@@ -68,6 +68,39 @@ def quote_for(conn, iid):
     change = q.get("change_percent")
     return dict(price=q.get("price"), change_percent=round(change, 2) if change is not None else None,
                 quoted_at=q.get("quoted_at"))
+
+
+def yahoo_quote(conn, iid):
+    """The regular-session price from the refreshed Yahoo chart, with its change
+    from the last completed close before that session (as the company page)."""
+    from decimal import Decimal
+    from thesis.research import price_history
+    if not price_history.allowed(conn):
+        return None
+    row = one(conn, "SELECT s.series FROM price_history_state t JOIN price_history_snapshots s "
+                    "ON s.id=t.current_id WHERE t.instrument_id=%s", (iid,))
+    series = row and row["series"]
+    q = series and series.get("latest_quote")
+    if q and q.get("session") in ("pre-market", "after-hours") and series.get("regular_quote"):
+        q = series["regular_quote"]
+    try:
+        day = datetime.fromisoformat(q["quoted_at"]).astimezone(price_history.NY).date().isoformat()
+        closes = [b for b in series.get("bars", []) if b.get("provisional") is False and b["date"] < day]
+        previous, price = Decimal(closes[-1]["close"]), Decimal(q["price"])
+        if previous <= 0 or price <= 0:
+            return None
+    except (TypeError, KeyError, IndexError, ValueError, ArithmeticError):
+        return None
+    return dict(price=float(price), change_percent=round(float((price - previous) / previous * 100), 2),
+                quoted_at=q["quoted_at"])
+
+
+def quote_for(conn, iid):
+    """The newest saved price: Finnhub, or the Yahoo chart the pages refresh."""
+    quotes = [q for q in (finnhub_quote(conn, iid), yahoo_quote(conn, iid)) if q and q.get("quoted_at")]
+    if not quotes:
+        return None
+    return max(quotes, key=lambda q: datetime.fromisoformat(q["quoted_at"]))
 
 
 def news_for(conn, iid):

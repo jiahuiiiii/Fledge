@@ -191,3 +191,22 @@ def test_unrated_news_is_not_called_no_news():
     content, _ = portfolio.packet(listed, [], [])
     assert content['companies'][0]['news_rated'] is False
     assert 'news_rated is false' in portfolio.INSTRUCTIONS
+
+
+def test_list_uses_the_newest_price_from_the_refreshed_chart(owner, monkeypatch):
+    from tests.test_price_history import payload, setup
+    from thesis.research import price_history as ph
+    iid = setup(owner, monkeypatch)
+    raw = payload()
+    meta = raw['chart']['result'][0]['meta']
+    closes = raw['chart']['result'][0]['indicators']['quote'][0]['close']
+    now = datetime.now(timezone.utc)
+    meta.update(regularMarketPrice='110', regularMarketTime=int(now.timestamp()) - 60)
+    ph.refresh(iid, fetcher=lambda *_: raw)
+    with transaction(owner) as conn:
+        q = portfolio.quote_for(conn, iid)
+    assert q['price'] == 110.0
+    series = ph.normalize(raw, 'MSFT', *ph.window(now))
+    finals = [b for b in series['bars'] if b['provisional'] is False and b['date'] < now.astimezone(ph.NY).date().isoformat()]
+    previous = float(finals[-1]['close'])
+    assert q['change_percent'] == round((110 - previous) / previous * 100, 2)
