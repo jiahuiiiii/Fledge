@@ -262,7 +262,7 @@ export default function SentimentPanel({
         </p>
       )}
       {a && !a.withheld && a.repairs?.repaired > 0 && (
-        <p className="fine" role="status">
+        <p className="fine sentiment-repairs" role="status">
           {`${a.repairs.repaired} of ${a.repairs.total} labels needed repair: the AI's label and its evidence disagreed.`}
         </p>
       )}

@@ -196,3 +196,8 @@
 [data-detail-mode="explain"] .sample-count-explanation {
   display: none !important;
 }
+[data-detail-mode="explain"] .sentiment-repairs,
+[data-detail-mode="explain"] .news-section-status,
+[data-detail-mode="explain"] .current-news-summary {
+  display: none !important;
+}
