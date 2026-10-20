@@ -1,6 +1,10 @@
 # Telegram alerts
 
-Thesis now adapts the connect/disconnect and structured notification flow from our Kestrel project. A dedicated Telegram bot forwards **newly published** company, saved-idea and monitored-condition alerts to the private chat you connect. It does not create a new signal model, turn on watches, or make extra AI calls.
+## Full-article briefs — 20 October 2026
+
+Off unless `THESIS_ALERT_FULL_ARTICLE=true` and the sentiment model is GPT-6 Luna. Feeds supply only a headline and a short preview (median about 130 characters), so for a company alert about to be sent the app fetches the article page once from an allow-listed site (Yahoo Finance, CNBC and the free sites Yahoo syndicates: Motley Fool, TIKR, Trefis; Finnhub links are followed only to reach them). It keeps paragraph text only and checks the headline, length and paywall wording. Luna then returns one or two short sentences, each with an exact quote from the fetched text, checked character for character. The message labels the item **Full article** or **Preview only**. Any failure keeps the preview and never delays or drops the alert. The request and answer are recorded in the shared ledger at Luna rates (`openai-gpt-6-luna-article-brief-low-4000-20261020`), reused for identical text and never resent after an uncertain charge. Fetching happens before the send transaction, while the sender's lock is held. In a one-off test of 62 recent alert articles, 38 (61%) were readable; most failures were Google News links, premium sources and paywalls.
+
+Thesis now adapts the connect/disconnect and structured notification flow from our Kestrel project. A dedicated Telegram bot forwards **newly published** company, saved-idea and monitored-condition alerts to the private chat you connect. It does not create a new signal model or turn on watches, and it makes no extra AI calls except the optional full-article briefs described below.
 
 ## Connect your chat
 

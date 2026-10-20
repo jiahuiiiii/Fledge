@@ -119,14 +119,26 @@ def render(record,*,shown=None):
         if d.get("fictional"):
             parts.insert(0, "<b>Fictional demo · not actual company news</b>")
         parts.append(escape(why_notified(payload, items)))
+        # Full-article briefs exist only when that feature is on (None otherwise),
+        # so each item says whether its text came from the article or the preview.
+        briefs = d.get("article_briefs")
         for index, item in enumerate(items):
             source_ids.append(item["source_id"])
             basis = item.get("reporting_basis") or {}
             quotes = basis.get("citations") or item.get("citations") or []
-            if quotes:
-                prefix = "Unconfirmed report" if basis.get("kind") == "unconfirmed_event" else "Source excerpt"
-                also = titles.get(str(item["source_id"])) if index else None
-                head = f"<b>Also: {escape(plain(also, 150))}</b>\n" if also else ""
+            unconfirmed = basis.get("kind") == "unconfirmed_event"
+            also = titles.get(str(item["source_id"])) if index else None
+            head = f"<b>Also: {escape(plain(also, 150))}</b>\n" if also else ""
+            full = (briefs or {}).get(str(item["source_id"])) or {}
+            if full.get("kind") == "full" and full.get("points"):
+                label = ("Unconfirmed report" if unconfirmed else "What happened") + " · Full article"
+                said = " ".join(escape(plain(pt["sentence"], 240)) for pt in full["points"][:2])
+                parts.append(f"{head}<b>{label}</b>\n{said}\n“{escape(plain(full['points'][0]['quote'], 320))}”")
+                primary_parts[len(parts)-1]=item['source_id']
+            elif quotes:
+                prefix = "Unconfirmed report" if unconfirmed else "Source excerpt"
+                if briefs is not None:
+                    prefix += " · Preview only"
                 parts.append(f"{head}<b>{prefix}</b>\n“{escape(plain(quotes[0].get('quote'), 320))}”")
                 primary_parts[len(parts)-1]=item['source_id']
     elif kind == "idea":

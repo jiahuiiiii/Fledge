@@ -36,6 +36,7 @@ IDEA_EVIDENCE_PRICE_VERSION = "openai-gpt-5.4-idea-evidence-9000-20261003"
 REASONING_PRICE_VERSION = "openai-gpt-5.4-standard-20261002"
 MAX_REQUEST_BYTES = 64000
 MOVE_EXPLAINER_PRICE_VERSION = "move-explainer-low-2000-20261017"
+ARTICLE_BRIEF_MAX_OUTPUT = 4000
 
 
 @dataclass(frozen=True)
@@ -177,6 +178,14 @@ PROFILES += (
                  100, 10, 500, SENTIMENT_LOW_MAX_OUTPUT, "low", 125),
 )
 
+# Quoted brief of a fetched alert article (owner request 20 Oct 2026), same
+# GPT-6 Luna rates; its own version so existing sentiment profiles stay exact.
+LUNA_ARTICLE_BRIEF_PRICE_VERSION = "openai-gpt-6-luna-article-brief-low-4000-20261020"
+PROFILES += (
+    PriceProfile(OPENAI_SENTIMENT_MODEL, LUNA_ARTICLE_BRIEF_PRICE_VERSION,
+                 100, 10, 500, ARTICLE_BRIEF_MAX_OUTPUT, "low", 125),
+)
+
 
 def price_profile(model, version=None):
     for profile in PROFILES:
@@ -195,6 +204,8 @@ def _family(body):
         return MOVE_EXPLAINER_PRICE_VERSION
     if limit == SENTIMENT_LOW_MAX_OUTPUT and effort == {"effort": "low"} and name == "source_sentiment":
         return SENTIMENT_LOW_PRICE_VERSION
+    if limit == ARTICLE_BRIEF_MAX_OUTPUT and effort == {"effort": "low"} and name == "alert_article_brief":
+        return LUNA_ARTICLE_BRIEF_PRICE_VERSION
     if limit == SENTIMENT_DEPTH_MAX_OUTPUT and effort == {"effort": "high"} and name == "source_sentiment_reasoning_eval":
         return SENTIMENT_DEPTH_PRICE_VERSION
     if limit == IDEA_EVIDENCE_MAX_OUTPUT and effort == {"effort": "medium"} and name == "idea_answer_evidence":
@@ -226,6 +237,8 @@ def request_profile(body):
     if family is not None and model == REASONING_MODEL:
         return price_profile(REASONING_MODEL, family)
     if model == OPENAI_SENTIMENT_MODEL:
+        if family == LUNA_ARTICLE_BRIEF_PRICE_VERSION:
+            return price_profile(model, family)
         if family != SENTIMENT_LOW_PRICE_VERSION:
             raise ValueError("This model is priced only for low-effort sentiment readings")
         return price_profile(model, LUNA_SENTIMENT_PRICE_VERSION)
