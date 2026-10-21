@@ -1,6 +1,9 @@
 """Username and password sign-in for the test product.
 
-Passwords are stored only as salted scrypt hashes. Sessions are opaque random
+Passwords and recovery codes are stored only as salted scrypt hashes. A
+recovery code (shown once, at sign-up or when replaced) lets someone set a new
+password without email; using it signs out every other session and issues a
+new code. Sessions are opaque random
 cookies whose SHA-256 digest is kept server-side, like the email sign-in.
 Repeated wrong passwords are slowed down per username and per installation.
 """
@@ -61,6 +64,29 @@ def verify(password, stored):
 DUMMY = hash_password(secrets.token_urlsafe(16))
 
 
+# Recovery codes: 16 characters without look-alikes (no 0/O, 1/I/L), in four
+# groups, e.g. K7QF-2MXP-9TRA-H4WN. About 78 bits; attempts are rate limited.
+RECOVERY_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def new_recovery_code():
+    raw = "".join(secrets.choice(RECOVERY_ALPHABET) for _ in range(16))
+    return "-".join(raw[i:i + 4] for i in range(0, 16, 4))
+
+
+def clean_code(code):
+    """Accept the code typed with or without dashes, spaces or lower case."""
+    raw = re.sub(r"[\s-]", "", (code or "").upper())
+    return "-".join(raw[i:i + 4] for i in range(0, len(raw), 4))
+
+
+def set_recovery(conn, account, now):
+    code = new_recovery_code()
+    conn.execute('UPDATE password_credentials SET recovery_hash=%s,recovery_set_at=%s WHERE account_id=%s',
+                 (hash_password(code), now, account))
+    return code
+
+
 def digest(token):
     return hashlib.sha256(token.encode()).hexdigest()
 
@@ -94,7 +120,8 @@ def register(username, password, *, now=None, terms_version=None):
         if terms_version:
             conn.execute('INSERT INTO terms_acceptances(account_id,terms_version,accepted_at) VALUES(%s,%s,%s)',
                          (account, terms_version, now))
-        return new_session(conn, account, now)
+        code = set_recovery(conn, account, now)
+        return (*new_session(conn, account, now), code)
 
 
 def provision_owner(username, password):
@@ -167,6 +194,101 @@ def login(username, password, *, now=None):
         return new_session(conn, str(row['account_id']), now)
 
 
+def reset_with_code(username, code, new_password, *, now=None):
+    """Forgot password: the recovery code sets a new password.
+
+    Counts against the same per-username and installation-wide attempt limits
+    as sign-in. Success signs out every session, issues a new recovery code
+    (the old one stops working) and signs this browser in.
+    """
+    now = now or datetime.now(timezone.utc)
+    check_password(new_password)
+    try:
+        name = normalize(username)
+    except PasswordFailure:
+        raise PasswordFailure('Username or recovery code is incorrect.') from None
+    with transaction(admin=True) as conn:
+        wait = _admit(conn, name, now)
+    if wait:
+        raise PasswordFailure('Too many attempts. Try again after the countdown.', 429, wait)
+    with transaction(admin=True) as conn:
+        row = one(conn, 'SELECT account_id,recovery_hash FROM password_credentials WHERE username=%s', (name,))
+    stored = row['recovery_hash'] if row and row['recovery_hash'] else DUMMY
+    if not (verify(clean_code(code), stored) and row and row['recovery_hash']):
+        raise PasswordFailure('Username or recovery code is incorrect.')
+    account = str(row['account_id'])
+    with transaction(admin=True) as conn:
+        conn.execute('UPDATE password_credentials SET password_hash=%s WHERE account_id=%s',
+                     (hash_password(new_password), account))
+        conn.execute('DELETE FROM password_sessions WHERE account_id=%s', (account,))
+        conn.execute('UPDATE password_attempts SET failures=0 WHERE key=%s', ('user:' + name,))
+        fresh = set_recovery(conn, account, now)
+        return (*new_session(conn, account, now), fresh)
+
+
+def _check_current(account, password, now):
+    with transaction(admin=True) as conn:
+        row = one(conn, 'SELECT username,password_hash FROM password_credentials WHERE account_id=%s', (account,))
+    if not row:
+        raise PasswordFailure('This account has no username sign-in.', 409)
+    with transaction(admin=True) as conn:
+        wait = _admit(conn, row['username'], now)
+    if wait:
+        raise PasswordFailure('Too many attempts. Try again after the countdown.', 429, wait)
+    if not verify(password or '', row['password_hash']):
+        raise PasswordFailure('Your current password is incorrect.', 403)
+    return row['username']
+
+
+def change_password(account, current, new_password, *, now=None):
+    """Signed in: change the password after re-entering the current one.
+    Every other session is signed out; this browser gets a fresh session."""
+    now = now or datetime.now(timezone.utc)
+    check_password(new_password)
+    name = _check_current(account, current, now)
+    with transaction(admin=True) as conn:
+        conn.execute('UPDATE password_credentials SET password_hash=%s WHERE account_id=%s',
+                     (hash_password(new_password), account))
+        conn.execute('DELETE FROM password_sessions WHERE account_id=%s', (account,))
+        conn.execute('UPDATE password_attempts SET failures=0 WHERE key=%s', ('user:' + name,))
+        return new_session(conn, account, now)
+
+
+def replace_recovery_code(account, current, *, now=None):
+    """Signed in: show a new recovery code after re-entering the password.
+    Accounts made before recovery codes existed use this to get their first."""
+    now = now or datetime.now(timezone.utc)
+    name = _check_current(account, current, now)
+    with transaction(admin=True) as conn:
+        conn.execute('UPDATE password_attempts SET failures=0 WHERE key=%s', ('user:' + name,))
+        return set_recovery(conn, account, now)
+
+
+def has_recovery(account):
+    with transaction(admin=True) as conn:
+        row = one(conn, 'SELECT recovery_hash IS NOT NULL ok FROM password_credentials WHERE account_id=%s',
+                  (account,))
+    return bool(row and row['ok'])
+
+
+def admin_reset(username, new_password):
+    """Server shell only: someone lost both password and recovery code. The
+    person running Fledge sets a temporary password and tells them privately."""
+    name = normalize(username)
+    check_password(new_password)
+    with transaction(admin=True) as conn:
+        row = one(conn, 'SELECT account_id FROM password_credentials WHERE username=%s', (name,))
+        if not row:
+            raise PasswordFailure('No account has that username.', 404)
+        # The lost code may be in someone else's hands: it stops working too.
+        conn.execute('UPDATE password_credentials SET password_hash=%s, recovery_hash=NULL, '
+                     'recovery_set_at=NULL WHERE account_id=%s',
+                     (hash_password(new_password), row['account_id']))
+        conn.execute('DELETE FROM password_sessions WHERE account_id=%s', (row['account_id'],))
+        conn.execute('DELETE FROM password_attempts WHERE key=%s', ('user:' + name,))
+    return name
+
+
 def authenticate(cookie, *, now=None):
     if not cookie or len(cookie) > 256:
         return None
@@ -203,11 +325,17 @@ if __name__ == '__main__':
     sub = parser.add_subparsers(dest='command', required=True)
     owner_cmd = sub.add_parser('owner', help='Give the installation owner (existing research) a username and password.')
     owner_cmd.add_argument('username')
+    reset_cmd = sub.add_parser('reset', help='Set a temporary password for someone who lost both password and recovery code.')
+    reset_cmd.add_argument('username')
     args = parser.parse_args()
     first = getpass.getpass('New password: ')
     if first != getpass.getpass('Repeat password: '):
         sys.exit('Passwords did not match.')
     try:
-        print('Owner can now sign in as', provision_owner(args.username, first))
+        if args.command == 'owner':
+            print('Owner can now sign in as', provision_owner(args.username, first))
+        else:
+            print('Temporary password set for', admin_reset(args.username, first),
+                  '- they should change it in Account after signing in.')
     except PasswordFailure as failure:
         sys.exit(str(failure))

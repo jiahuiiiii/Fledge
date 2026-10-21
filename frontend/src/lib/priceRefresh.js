@@ -14,13 +14,49 @@ export function priceRefreshDelay(data, now = Date.now()) {
   return Math.max(0, (Number.isFinite(next) ? next : now) - now);
 }
 
+// The main price: the regular-session quote, even when a newer pre-market or
+// after-hours price exists (that one is shown underneath, as on Yahoo).
 export function latestPriceQuote(market, history) {
-  const quote = history?.snapshot?.series?.latest_quote;
+  const series = history?.snapshot?.series;
+  const quote =
+    sessionLabel(series?.latest_quote?.session) && series?.regular_quote
+      ? series.regular_quote
+      : series?.latest_quote;
   if (!history?.available || !quote) return null;
   return Date.parse(quote.quoted_at) >=
     (Date.parse(market?.quote?.quote?.quoted_at) || 0)
     ? quote
     : null;
+}
+
+// Plain labels for prices outside 09:30-16:00 New York time.
+export function sessionLabel(session) {
+  return session === "pre-market"
+    ? "Pre-market"
+    : session === "after-hours"
+      ? "After hours"
+      : null;
+}
+
+// The smaller pre-market/after-hours line under the closing price, with its
+// change from that close.
+export function extendedLine(history) {
+  if (!history?.available) return null;
+  const series = history?.snapshot?.series,
+    latest = series?.latest_quote,
+    regular = series?.regular_quote;
+  const label = sessionLabel(latest?.session);
+  if (!label || !regular) return null;
+  const price = Number(latest.price),
+    close = Number(regular.price);
+  if (!(price > 0) || !(close > 0)) return null;
+  const change = price - close;
+  return {
+    label,
+    price,
+    quoted_at: latest.quoted_at,
+    movement: { change, percent: (change / close) * 100, referenceDate: null },
+  };
 }
 
 const finite = (value) =>

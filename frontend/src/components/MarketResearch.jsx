@@ -4,8 +4,14 @@ import { currentCompanyHeadlines } from "../lib/companyHeadlines";
 import { newsSourceStatus } from "../lib/newsPresentation";
 import Select from "./Select";
 import { useId, useState } from "react";
-import { latestPriceQuote, quoteMovement } from "../lib/priceRefresh";
+import {
+  extendedLine,
+  latestPriceQuote,
+  quoteMovement,
+  sessionLabel,
+} from "../lib/priceRefresh";
 import PriceChange from "./PriceChange";
+import ExtendedPrice from "./ExtendedPrice";
 export const stamp = formatTimestamp;
 const money = (value) =>
   value == null
@@ -21,6 +27,7 @@ export function MarketQuote({ market, history, compact = false }) {
     status = market?.status;
   const latest = latestPriceQuote(market, history);
   const movement = quoteMovement(market, history);
+  const extended = extendedLine(history);
   const interrupted =
     status?.lease_until && new Date(status.lease_until) < new Date();
   return (
@@ -44,8 +51,22 @@ export function MarketQuote({ market, history, compact = false }) {
               )}
             </div>
             <small>
-              Yahoo Finance · {latest.session} · {stamp(latest.quoted_at)}
+              {extended ? (
+                <span className="quote-session">At close · </span>
+              ) : (
+                sessionLabel(latest.session) && (
+                  <span className="quote-session">
+                    {sessionLabel(latest.session)} ·{" "}
+                  </span>
+                )
+              )}
+              Yahoo Finance
+              {!extended &&
+                !sessionLabel(latest.session) &&
+                ` · ${latest.session}`}{" "}
+              · {stamp(latest.quoted_at)}
             </small>
+            {extended && <ExtendedPrice line={extended} />}
           </>
         ) : q ? (
           <>

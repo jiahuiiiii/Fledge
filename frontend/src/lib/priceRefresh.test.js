@@ -170,3 +170,37 @@ test("header uses the newer separately attributed quote and withholds withdrawn 
     null,
   );
 });
+
+test("the close stays the main price and extended hours go underneath", async () => {
+  const { sessionLabel, extendedLine, latestPriceQuote } = await import(
+    "./priceRefresh.js"
+  );
+  assert.equal(sessionLabel("pre-market"), "Pre-market");
+  assert.equal(sessionLabel("after-hours"), "After hours");
+  assert.equal(sessionLabel("regular session"), null);
+  const regular = {
+    price: "100",
+    quoted_at: "2026-10-19T20:00:00+00:00",
+    session: "regular session",
+  };
+  const history = (latest, close = regular) => ({
+    available: true,
+    snapshot: { series: { latest_quote: latest, regular_quote: close } },
+  });
+  const pre = {
+    price: "102",
+    quoted_at: "2026-10-20T12:30:00+00:00",
+    session: "pre-market",
+  };
+  assert.equal(latestPriceQuote(null, history(pre)), regular);
+  const line = extendedLine(history(pre));
+  assert.equal(line.label, "Pre-market");
+  assert.equal(line.price, 102);
+  assert.equal(line.movement.change, 2);
+  assert.equal(line.movement.percent, 2);
+  // Without a close to compare with, the extended price is the main one.
+  assert.equal(extendedLine(history(pre, null)), null);
+  assert.equal(latestPriceQuote(null, history(pre, null)), pre);
+  assert.equal(extendedLine(history(regular)), null);
+  assert.equal(extendedLine(history({ ...pre, price: "x" })), null);
+});

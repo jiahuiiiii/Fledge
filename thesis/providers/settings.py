@@ -1,6 +1,7 @@
 """Read only this project's private settings, without shell evaluation or logging."""
 
 import os
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from thesis.config import ROOT, DATA
 
@@ -49,6 +50,9 @@ SELECTION_KEYS = ("THESIS_MODEL_PROVIDER", "THESIS_MOVE_EXPLAINER_MODEL", "THESI
 )
 # This authorization is for this existing installation and its cumulative ledger.
 APPROVED_ROOT = Path("/Users/jiahuiwong/Documents/GitHub/Thesis")
+# A separate test copy (another laptop or a cloud server) may opt in with its own
+# key, its own database and cost record, and a total spending cap it must set.
+TEST_COPY_MAX_CAP_USD = Decimal("100")
 
 
 class ProviderConfigError(ValueError):
@@ -149,11 +153,41 @@ def provider_for(model):
     return "openai"
 
 
-def live_key(model=MODEL):
-    if ROOT.resolve() != APPROVED_ROOT or DATA.resolve() != APPROVED_ROOT / ".local":
+def original_installation():
+    return ROOT.resolve() == APPROVED_ROOT and DATA.resolve() == APPROVED_ROOT / ".local"
+
+
+def test_copy_cap(values=None):
+    """The spending cap (US$) of an opted-in test copy, or None for the original.
+
+    A test copy never shares the original's database or cost record: it must not
+    run from, or point its data at, the original folder. Its own .env says
+    THESIS_TEST_COPY=true and THESIS_TEST_COPY_CAP_USD (above 0, at most 100).
+    """
+    if original_installation():
+        return None
+    values = settings() if values is None else values
+    if values.get("THESIS_TEST_COPY") != "true":
         raise ProviderConfigError(
-            "Live requests require the original persistent Fledge database"
+            "Live requests require the original persistent Fledge database. On your own "
+            "copy, add THESIS_TEST_COPY=true and THESIS_TEST_COPY_CAP_USD to .env"
         )
+    if ROOT.resolve().is_relative_to(APPROVED_ROOT) or DATA.resolve().is_relative_to(APPROVED_ROOT):
+        raise ProviderConfigError("A test copy cannot use the original Fledge folder or database")
+    try:
+        cap = Decimal(values.get("THESIS_TEST_COPY_CAP_USD", ""))
+    except InvalidOperation:
+        cap = None
+    if cap is None or not cap.is_finite() or not Decimal(0) < cap <= TEST_COPY_MAX_CAP_USD:
+        raise ProviderConfigError(
+            f"Set THESIS_TEST_COPY_CAP_USD in .env to a total spending cap above 0 and at most "
+            f"{TEST_COPY_MAX_CAP_USD} US dollars"
+        )
+    return cap
+
+
+def live_key(model=MODEL):
+    test_copy_cap()  # The original passes; any other copy must opt in with a cap.
     if model not in (MODEL, REASONING_MODEL, SENTIMENT_MODEL) and (EXPLAINER_MODEL is None or model != EXPLAINER_MODEL):
         raise ProviderConfigError("The requested model has not been priced for this allowance")
     values = settings()

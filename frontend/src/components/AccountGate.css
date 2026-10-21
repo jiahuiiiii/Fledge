@@ -233,3 +233,83 @@
   font-weight: 600;
   cursor: pointer;
 }
+
+/* Password recovery */
+.account-card .account-forgot {
+  justify-self: end;
+  min-height: 44px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--color-accent);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.recovery-code {
+  margin: 16px 0 8px;
+  padding: 16px;
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  text-align: center;
+}
+.recovery-code code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: clamp(1rem, 4.6vw, 1.35rem);
+  letter-spacing: 0.06em;
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+.recovery-copy,
+.security-secondary,
+.account-menu .account-security button {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+.recovery-tip {
+  display: block;
+  margin: 12px 0;
+  color: var(--color-text-2);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.recovery-card .consent-check {
+  margin: 8px 0 12px;
+}
+.security-nudge {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  color: var(--color-text-2);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.account-menu .account-security {
+  margin: 12px 0;
+}
+.security-dialog .security-body {
+  box-sizing: border-box;
+  width: min(440px, calc(100vw - 32px));
+  padding: 16px 20px 20px;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+.security-dialog .account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.recovery-card .account-submit,
+.security-dialog .account-submit {
+  width: 100%;
+}

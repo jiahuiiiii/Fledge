@@ -149,3 +149,55 @@
 .skip-link:focus {
   top: 8px;
 }
+
+/* Pre-market / after-hours label and the regular close beside it. */
+.quote-session {
+  font: inherit;
+  color: var(--color-text);
+  font-weight: 600;
+}
+/* Smaller pre-market / after-hours price under the closing price. */
+.quote-extended {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin-top: 6px;
+  font-size: var(--text-sm);
+  color: var(--color-text-2);
+}
+.quote-extended .quote-extended-price {
+  color: var(--color-text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.quote-extended .price-change {
+  font-size: inherit;
+}
+.quote-extended .quote-session {
+  font: inherit;
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* Beginner: writing a view is just the view; alert rules live in Pro. */
+[data-detail-mode="explain"] .idea-monitoring {
+  display: none !important;
+}
+/* Beginner: "All news & posts" is a reading list, not a control panel. */
+[data-detail-mode="explain"] .sentiment-heading-actions,
+[data-detail-mode="explain"] .sentiment-panel > .secondary-details,
+[data-detail-mode="explain"] .sentiment-disabled-reason,
+[data-detail-mode="explain"] .sentiment-panel .evidence-button,
+[data-detail-mode="explain"] .sentiment-reading-limit,
+[data-detail-mode="explain"] .sentiment-meta,
+[data-detail-mode="explain"] .sample-method,
+[data-detail-mode="explain"] .sample-reconciliation,
+[data-detail-mode="explain"] .sample-count-explanation {
+  display: none !important;
+}
+[data-detail-mode="explain"] .sentiment-repairs,
+[data-detail-mode="explain"] .news-section-status,
+[data-detail-mode="explain"] .current-news-summary {
+  display: none !important;
+}

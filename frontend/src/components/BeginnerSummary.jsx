@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { useProfile } from "../lib/profile";
+import { latestPriceQuote, quoteMovement } from "../lib/priceRefresh";
 import { companyName } from "../lib/companyIdentity";
 import { overviewNews } from "../lib/overviewSections";
 import { sourceCoverage } from "../lib/sourceCoverage";
@@ -40,6 +41,9 @@ export default function BeginnerSummary({
   onSource,
   onWorld,
   onUpdate,
+  onRate,
+  rating = false,
+  priceHistory = null,
   practice = false,
 }) {
   const [world, setWorld] = useState(null);
@@ -57,7 +61,12 @@ export default function BeginnerSummary({
   }, [visible, instrumentId]);
 
   const name = companyName(data.instrument);
-  const price = priceLine(data.market?.quote?.quote);
+  // Same price and change as the header: the newest of Finnhub and Yahoo.
+  const latest = latestPriceQuote(data.market, priceHistory);
+  const live = latest && quoteMovement(data.market, priceHistory);
+  const price = live
+    ? priceLine({ price: Number(latest.price), change_percent: live.percent })
+    : priceLine(data.market?.quote?.quote);
   const reading = data.sentiment?.withheld ? null : data.sentiment;
   const scopes = sourceCoverage(reading).scopes;
   const newsTone = scopes.find((s) => s.scope === "news");
@@ -136,7 +145,6 @@ export default function BeginnerSummary({
       <section className="bs-price-row" aria-label="Share price">
         {price ? (
           <>
-            <strong>{price.price}</strong>
             {price.move && (
               <span className={`mood-${price.mood}`}>
                 <span aria-hidden="true">
@@ -146,9 +154,7 @@ export default function BeginnerSummary({
               </span>
             )}
           </>
-        ) : (
-          <span className="bs-muted">No share price saved yet</span>
-        )}
+        ) : null}
         {price?.move && (
           <p className="bs-price-note">
             Prices move for many reasons. The news below may not explain
@@ -179,9 +185,8 @@ export default function BeginnerSummary({
           ))}
         </ul>
         <p className="bs-key">
-          {rated && "Sorted by AI from saved headlines and posts; tap any item to check it. "}
-          ▲ mostly good · ▼ mostly bad · ◆ mixed. This shows the tone of what’s
-          being said, not whether to buy or sell.
+          {rated && "▲ mostly good · ▼ mostly bad · ◆ mixed. "}
+          This shows what’s being said, not whether to buy or sell.
         </p>
         {pointer && <p className="bs-pointer">{pointer}</p>}
       </section>
@@ -189,6 +194,14 @@ export default function BeginnerSummary({
       <section className="bs-card" id="bs-news" tabIndex={-1} aria-labelledby="bs-news-title">
         <h4 id="bs-news-title">News: what happened</h4>
         <p className="bs-meaning">{newsMeaning(newsGroups)}</p>
+        {onRate && !reading && (newsGroups.unrated.length > 0 || postGroups.unrated.length > 0) && (
+          <div className="bs-rate">
+            <button type="button" className="primary" onClick={onRate} disabled={rating}>
+              {rating ? "Rating… this takes a minute or two" : "Rate with AI"}
+            </button>
+            <small>Fledge reads the news and posts and marks each good, bad or mixed.</small>
+          </div>
+        )}
         {group("Good news", "good", newsGroups.good)}
         {group("Bad news", "bad", newsGroups.bad)}
         {group("Mixed: good and bad in one story", "mixed", newsGroups.mixed)}
@@ -201,7 +214,7 @@ export default function BeginnerSummary({
             <ul className="bs-headlines">{newsGroups.neutral.slice(0, 5).map(headline)}</ul>
           </details>
         )}
-        {group("Not rated yet", "none", newsGroups.unrated, 5)}
+        {!reading && group("Not rated yet", "none", newsGroups.unrated, 5)}
         {!news.length && onUpdate && (
           <button type="button" className="bs-link inline" onClick={onUpdate}>
             Get the latest news
@@ -225,7 +238,7 @@ export default function BeginnerSummary({
         {group("Upbeat posts (opinions)", "none", postGroups.good)}
         {group("Worried posts (opinions)", "none", postGroups.bad)}
         {group("Mixed posts: good and bad", "none", postGroups.mixed)}
-        {group("Not rated yet", "none", postGroups.unrated)}
+        {!reading && group("Not rated yet", "none", postGroups.unrated)}
       </section>
 
       <section className="bs-card" id="bs-world" tabIndex={-1} aria-labelledby="bs-world-title">

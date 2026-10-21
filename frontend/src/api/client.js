@@ -115,6 +115,22 @@ export const api = {
     }),
   acceptTerms: (terms_version) =>
     request("/terms/accept", { method: "POST", body: { terms_version } }),
+  passwordReset: (username, recovery_code, password) =>
+    request("/auth/password-reset", {
+      method: "POST",
+      body: { username, recovery_code, password },
+    }),
+  changePassword: (current_password, new_password) =>
+    request("/account/password", {
+      method: "POST",
+      body: { current_password, new_password },
+    }),
+  newRecoveryCode: (current_password) =>
+    request("/account/recovery-code", {
+      method: "POST",
+      body: { current_password },
+    }),
+  legal: () => request("/legal"),
   passwordLogin: (username, password) =>
     request("/auth/password-login", {
       method: "POST",
