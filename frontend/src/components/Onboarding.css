@@ -285,6 +285,8 @@
   border-radius: var(--radius-md);
   cursor: pointer;
 }
+/* ".account-card input" makes inputs full width; this checkbox must not be. */
+.account-card .onboarding-pro input,
 .onboarding-pro input {
   flex: none;
   width: 22px;
