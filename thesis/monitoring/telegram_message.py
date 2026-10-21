@@ -1,9 +1,10 @@
 """Deterministic, bounded alert cards; presentation never invokes a model."""
 from thesis.display_time import stamp
-from html import escape
+from html import escape, unescape
 from html.parser import HTMLParser
 from urllib.parse import urlsplit
 import ipaddress
+import re
 
 RELATIONS = {
     "supports": "May support your reasoning", "challenges": "May challenge your reasoning",
@@ -14,6 +15,43 @@ RELATIONS = {
 def plain(value, limit=400):
     value = " ".join(str(value or "").split())
     return value[:limit] + ("…" if len(value) > limit else "")
+
+
+# Feed previews sometimes glue a page's stats box onto the story
+# ("…Target: $195What Happened?Qualcomm will…"), open with a press-wire
+# dateline, and stop mid-sentence.
+GLUED_SENTENCE = re.compile(r"(?<=[a-z][.?!])(?=[A-Z])")
+WIRE_DATELINE = re.compile(r"\((?:GLOBE NEWSWIRE|BUSINESS WIRE|PR ?Newswire|ACCESS ?(?:WIRE|Newswire))\)\s*[-–—]+\s*", re.I)
+SENTENCE_END = re.compile(r"[.!?…][\"”’')\]]*$")
+
+
+def best_quote(quotes):
+    """The card already shows the headline, so prefer a body passage: it is
+    usually where the rated effect is stated."""
+    return next((q for q in quotes if q.get("passage_id") != "p0"), quotes[0] if quotes else None)
+
+
+def excerpt(quote, limit):
+    """Display text for a saved quote. The saved quote is unchanged; the card
+    shows the story after glued page furniture or a wire dateline, decodes
+    leftover HTML entities, shortens at a word and marks a cut-off ending."""
+    text = " ".join(unescape(str(quote.get("quote") or "")).split())
+    if quote.get("passage_id") == "p0":
+        return plain(text, limit)
+    lead = ""
+    wire = WIRE_DATELINE.search(text)
+    if wire and len(text) - wire.end() >= 30:
+        text, lead = text[wire.end():], "…"
+    segments = GLUED_SENTENCE.split(text)
+    if len(segments) > 1 and len(segments[-1]) >= 30:
+        text, lead = segments[-1], "…"
+    if len(text) > limit:
+        return lead + text[:limit].rsplit(" ", 1)[0].rstrip(",;:") + "…"
+    # Short passages without a full stop are usually titles, not cut text; a
+    # longer one ending on a lowercase word stopped mid-sentence.
+    words = text.split()
+    cut = not SENTENCE_END.search(text) and (len(text) >= 120 or (len(text) >= 80 and words[-1][:1].islower()))
+    return lead + text + ("…" if cut else "")
 
 
 def safe_url(value):
@@ -79,7 +117,7 @@ def company_summary(detail):
     payload = detail.get("payload") or {}
     items = payload.get("items", [])[:2]
     titles = {str(s["id"]): s.get("title") for s in detail.get("sources", [])}
-    headline = plain(titles.get(str(items[0]["source_id"])) if items else None, 180)
+    headline = plain(unescape(titles.get(str(items[0]["source_id"])) or "") if items else None, 180)
     why = why_notified(payload, items).removeprefix("Why: ")
     return dict(tone=news_tone(payload, items), headline=headline or None, why=why[:1].upper() + why[1:])
 
@@ -126,7 +164,7 @@ def render(record,*,shown=None):
         items = payload.get("items", [])[:2]
         titles = {str(s["id"]): s.get("title") for s in d.get("sources", [])}
         parts = [f"<b>{escape(symbol)} · {escape(news_tone(payload, items))}</b>",
-                 f"<b>{escape(plain(titles.get(str(items[0]['source_id'])) if items else None, 180) or plain(record['title'], 180))}</b>"]
+                 f"<b>{escape(plain(unescape(titles.get(str(items[0]['source_id'])) or '') if items else None, 180) or plain(record['title'], 180))}</b>"]
         if d.get("fictional"):
             parts.insert(0, "<b>Fictional demo · not actual company news</b>")
         parts.append(escape(why_notified(payload, items)))
@@ -138,20 +176,29 @@ def render(record,*,shown=None):
             basis = item.get("reporting_basis") or {}
             quotes = basis.get("citations") or item.get("citations") or []
             unconfirmed = basis.get("kind") == "unconfirmed_event"
-            also = titles.get(str(item["source_id"])) if index else None
-            head = f"<b>Also: {escape(plain(also, 150))}</b>\n" if also else ""
+            also = plain(unescape(titles.get(str(item["source_id"])) or ""), 150) if index else ""
             full = (briefs or {}).get(str(item["source_id"])) or {}
             if full.get("kind") == "full" and full.get("points"):
                 label = ("Unconfirmed report" if unconfirmed else "What happened") + " · Full article"
                 said = " ".join(escape(plain(pt["sentence"], 240)) for pt in full["points"][:2])
-                parts.append(f"{head}<b>{label}</b>\n{said}\n“{escape(plain(full['points'][0]['quote'], 320))}”")
-                primary_parts[len(parts)-1]=item['source_id']
+                quote = escape(plain(unescape(full["points"][0]["quote"]), 320))
             elif quotes:
-                prefix = "Unconfirmed report" if unconfirmed else "Source excerpt"
+                label = "Unconfirmed report" if unconfirmed else "Source excerpt"
                 if briefs is not None:
-                    prefix += " · Preview only"
-                parts.append(f"{head}<b>{prefix}</b>\n“{escape(plain(quotes[0].get('quote'), 320))}”")
-                primary_parts[len(parts)-1]=item['source_id']
+                    label += " · Preview only"
+                said, quote = None, escape(excerpt(best_quote(quotes), 320))
+            else:
+                continue
+            # A second story gets one bold line, its labels in brackets, so it
+            # does not stack two headings over its excerpt.
+            if also:
+                notes = ", ".join(n for n in (unconfirmed and "unconfirmed report",
+                                              "full article" if said else briefs is not None and "preview only") if n)
+                head = f"<b>Also{f' ({notes})' if notes else ''}: {escape(also)}</b>"
+            else:
+                head = f"<b>{label}</b>"
+            parts.append("\n".join(x for x in (head, said, f"“{quote}”") if x))
+            primary_parts[len(parts)-1]=item['source_id']
     elif kind == "idea":
         parts.append("<b>Your question</b>\n" + escape(plain(d.get("question"), 240)))
         for item in [i for i in d["items"] if i["relation"] in RELATIONS][:2]:
