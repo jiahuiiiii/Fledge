@@ -1964,7 +1964,11 @@ function CompanyWorkspace({
                               ? undefined
                               : () => startLoading({ analyze: true, lookback_days: 7 })
                           }
-                          rating={!!loadingRun?.active}
+                          rating={
+                            loadingRun?.active
+                              ? loadingRun.steps.find((s) => s.key === "analysis")?.status || false
+                              : false
+                          }
                           priceHistory={priceRead?.data}
                         />
                       </RetainedView>

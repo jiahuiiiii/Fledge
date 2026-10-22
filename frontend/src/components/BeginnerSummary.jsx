@@ -196,8 +196,12 @@ export default function BeginnerSummary({
         <p className="bs-meaning">{newsMeaning(newsGroups)}</p>
         {onRate && !reading && (newsGroups.unrated.length > 0 || postGroups.unrated.length > 0) && (
           <div className="bs-rate">
-            <button type="button" className="primary" onClick={onRate} disabled={rating}>
-              {rating ? "Rating… this takes a minute or two" : "Rate with AI"}
+            <button type="button" className="primary" onClick={onRate} disabled={!!rating}>
+              {rating === "running"
+                ? "Rating… about a minute"
+                : rating
+                  ? "Getting the latest posts first…"
+                  : "Rate with AI"}
             </button>
             <small>Fledge reads the news and posts and marks each good, bad or mixed.</small>
           </div>
