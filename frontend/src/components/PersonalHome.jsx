@@ -15,7 +15,7 @@ export default function PersonalHome({ onAddCompany, onOpenCompany, practice }) 
       <section className="personal-home" aria-label="Your home">
         <div className="personal-home-main">
           <h2>Welcome to Fledge</h2>
-          <p>Start with the practice company to see how it works.</p>
+          <p>Add a company you own, use or want to understand.</p>
         </div>
         <div className="personal-home-actions">
           {practice && (
@@ -48,7 +48,10 @@ export default function PersonalHome({ onAddCompany, onOpenCompany, practice }) 
     step.action === "add_company"
       ? watchlist.full
         ? null
-        : ["Add a company", onAddCompany]
+        : [
+            profile.goal === "explore" ? "Browse companies" : "Add a company",
+            onAddCompany,
+          ]
       : first
         ? [`Open ${first.symbol}`, () => onOpenCompany(first.id)]
         : null;

@@ -10,7 +10,7 @@ EXPERIENCE = ('new', 'etf', 'stocks', 'active')
 INTERESTS = ('technology', 'banks', 'healthcare', 'consumer', 'energy',
              'industrials', 'property', 'communications', 'unsure')
 HORIZONS = ('short', 'medium', 'long', 'unsure')
-GOALS = ('learn', 'check', 'monitor', 'news')
+GOALS = ('learn', 'check', 'monitor', 'news', 'explore')
 MODES = ('explain', 'data')
 FREQUENCIES = ('daily', 'weekly', 'monthly', 'rarely', 'unsure')
 DROPS = ('sell', 'hold', 'add', 'check', 'unsure')

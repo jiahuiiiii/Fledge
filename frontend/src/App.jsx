@@ -1014,10 +1014,13 @@ function CompanyWorkspace({
     watchlist?.started ||
     data.watchlist_started ||
     data.catalogue.some(watched);
+  // Practice companies (Northstar, Aurora) are no longer listed: real
+  // companies only.
   const visibleCompanies = data.catalogue.filter(
     (company) =>
+      company.mode !== "recorded" &&
       !hiddenCompanies.includes(company.id) &&
-      (!usesWatchlist || watched(company) || company.mode === "recorded"),
+      (!usesWatchlist || watched(company)),
   );
   const hiddenCatalogue = data.catalogue.filter((company) =>
     hiddenCompanies.includes(company.id),

@@ -31,6 +31,9 @@ import "./BeginnerSummary.css";
 // online, World) readable in seconds, one-line reasons, a merged list of what
 // happened, and the user's own view. No charts. Everything rewords saved
 // readings; Fledge never says buy or sell.
+// One automatic world check per company per page load of the app.
+const worldChecked = new Set();
+
 export default function BeginnerSummary({
   data,
   instrumentId,
@@ -53,7 +56,27 @@ export default function BeginnerSummary({
     let active = true;
     api
       .worldNews()
-      .then((page) => active && setWorld(page))
+      .then(async (page) => {
+        if (!active) return;
+        setWorld(page);
+        // Link world headlines to this company automatically (a small AI
+        // check; the same headlines and list reuse the saved answer).
+        const covered = page?.check?.company_ids?.includes(instrumentId);
+        const fresh =
+          page?.check &&
+          Date.now() - Date.parse(page.check.checked_at) < 3 * 3600 * 1000;
+        if (
+          practice ||
+          !page?.ai?.available ||
+          !page?.articles?.length ||
+          (covered && fresh) ||
+          worldChecked.has(instrumentId)
+        )
+          return;
+        worldChecked.add(instrumentId);
+        const next = await api.checkWorldNews().catch(() => null);
+        if (active && next) setWorld(next);
+      })
       .catch(() => active && setWorld({ articles: [] }));
     return () => {
       active = false;
@@ -125,7 +148,7 @@ export default function BeginnerSummary({
   );
   const group = (label, mood, list, limit = 3) =>
     list.length > 0 && (
-      <div className="bs-group">
+      <div className={`bs-group tone-${mood}`}>
         <h5>
           <span className={`bs-dot mood-${mood}`} aria-hidden="true"></span>
           {label} <span className="bs-count">{list.length}</span>
@@ -210,7 +233,7 @@ export default function BeginnerSummary({
         {group("Bad news", "bad", newsGroups.bad)}
         {group("Mixed: good and bad in one story", "mixed", newsGroups.mixed)}
         {newsGroups.neutral.length > 0 && (
-          <details className="bs-group">
+          <details className="bs-group tone-neutral">
             <summary>
               Neutral, neither good nor bad{" "}
               <span className="bs-count">{newsGroups.neutral.length}</span>
@@ -244,9 +267,9 @@ export default function BeginnerSummary({
               .join(" · ")}
           </p>
         )}
-        {group("Upbeat posts (opinions)", "none", postGroups.good)}
-        {group("Worried posts (opinions)", "none", postGroups.bad)}
-        {group("Mixed posts: good and bad", "none", postGroups.mixed)}
+        {group("Upbeat posts (opinions)", "good", postGroups.good)}
+        {group("Worried posts (opinions)", "bad", postGroups.bad)}
+        {group("Mixed posts: good and bad", "mixed", postGroups.mixed)}
         {!reading && group("Not rated yet", "none", postGroups.unrated)}
       </section>
 
