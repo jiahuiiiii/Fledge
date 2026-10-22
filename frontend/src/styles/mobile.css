@@ -185,7 +185,8 @@
   display: none !important;
 }
 /* Beginner: "All news & posts" is a reading list, not a control panel. */
-[data-detail-mode="explain"] .sentiment-heading-actions,
+[data-detail-mode="explain"] .sentiment-window,
+[data-detail-mode="explain"] .sentiment-analyse-button,
 [data-detail-mode="explain"] .sentiment-panel > .secondary-details,
 [data-detail-mode="explain"] .sentiment-disabled-reason,
 [data-detail-mode="explain"] .sentiment-panel .evidence-button,

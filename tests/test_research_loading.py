@@ -188,3 +188,17 @@ def test_interrupted_worker_cannot_overwrite_recovery(owner):
         return {}
     loading.work_once(owner,execute)
     assert loading.latest(owner,iid)['steps'][0]['status']=='interrupted'
+
+
+def test_rating_asked_during_first_check_joins_that_run(owner):
+    iid=prepare(owner)
+    first=loading.start(owner,iid,initial=True)
+    run=loading.start(owner,iid,analyze=True)
+    assert run['id']==first['id']
+    assert [s['key'] for s in run['steps']][-1]=='analysis'
+    # Asking again does not add a second rating step.
+    again=loading.start(owner,iid,analyze=True)
+    assert [s['key'] for s in again['steps']].count('analysis')==1
+    seen=[]
+    while loading.work_once(owner,lambda run,key: seen.append(key) or {}): pass
+    assert seen[-1]=='analysis' and set(seen)==set(loading.LABELS)
