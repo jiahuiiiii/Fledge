@@ -339,3 +339,25 @@ def test_summary_escapes_source_text_keeps_links_beside_it_and_bounds_whole_bloc
     assert links==[('https://example.test/a?x=1&y=2','Authored Wire')]
     record['detail']['payload']['items'][0]['citations'][0]['quote']='😀'*1000
     assert visible_units(DT.summary(record,1)[0])<=680
+
+
+def test_recap_company_item_leads_with_tone_and_headline_and_cleans_excerpt():
+    from thesis.monitoring.daily_telegram import summary
+    item=dict(source_id='s1',sentiment='neutral',reporting_basis=dict(kind='reported_event',impact='not_stated',citations=[
+        dict(passage_id='p1',quote='Key Stats for Alphabet StockPrice change: 2%$GOOGL Target: $348What Happened?Alphabet (GOOGL:NASDAQ) has proposed a deal with Xcel Energy.')]))
+    wire=dict(source_id='s2',sentiment='neutral',reporting_basis=dict(kind='reported_event',impact='not_stated',citations=[
+        dict(passage_id='p1',quote='Agreement Supports FedEx InfrastructurePALO ALTO, Calif., Oct. 20, 2026 (GLOBE NEWSWIRE) -- Broadcom Inc. (NASDAQ: AVGO), a global technology leader that designs, develops and supplies semiconductor and infrastructure software')]))
+    headline=dict(source_id='s3',sentiment='negative',reporting_basis=dict(kind='unconfirmed_event',impact='not_stated',citations=[
+        dict(passage_id='p0',quote='RBC Considers Blocking Meta’s AI Agent')]))
+    sources=[dict(id='s1',title='Google Partners With Xcel Energy'),dict(id='s2',title='Broadcom Renews FedEx Deal'),dict(id='s3',title='RBC Considers Blocking Meta’s AI Agent')]
+    def text(it,symbol):
+        record=dict(kind='company',title='New company developments to review',
+                    detail=dict(symbol=symbol,payload=dict(kind='important_reporting',items=[it]),sources=sources))
+        return summary(record,1)[0]
+    googl=text(item,'GOOGL')
+    assert googl.split('\n')[:2]==['<b>1. GOOGL · Neutral news</b>','Google Partners With Xcel Energy']
+    assert '“…Alphabet (GOOGL:NASDAQ) has proposed a deal with Xcel Energy.”' in googl and '$348' not in googl
+    avgo=text(wire,'AVGO')
+    assert '“…Broadcom Inc. (NASDAQ: AVGO), a global technology leader' in avgo and 'NEWSWIRE' not in avgo and avgo.endswith('…”')
+    meta=text(headline,'META')
+    assert meta.split('\n')[1:]==['RBC Considers Blocking Meta’s AI Agent','Unconfirmed report'] and 'New company developments' not in meta

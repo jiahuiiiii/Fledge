@@ -94,6 +94,7 @@ import EventAssessment, {
   EventDefinitions,
 } from "./components/EventConditions";
 import ProposalPanel from "./components/ProposalPanel";
+import { statusLine, watchItems } from "./lib/ideaWatch";
 import { combineSuggestions } from "./lib/proposals";
 import ReviewDownload from "./components/ReviewDownload";
 import ReportingAge, { ageLabel } from "./components/ReportingAge";
@@ -102,7 +103,12 @@ import Onboarding from "./components/Onboarding";
 import PortfolioRead from "./components/PortfolioRead";
 import PersonalHome from "./components/PersonalHome";
 import { SettingsMenu } from "./components/DetailModeToggle";
-import { ProfileContext, readLocalMode, writeLocalMode, useProfile } from "./lib/profile";
+import {
+  ProfileContext,
+  readLocalMode,
+  writeLocalMode,
+  useProfile,
+} from "./lib/profile";
 import ReportExpectationEditor, {
   ReportExpectationText,
 } from "./components/ReportExpectation";
@@ -223,8 +229,8 @@ function SourceLibrary({ documents, instrument, filterMentions, onOpen }) {
   const [shown, setShown] = useState(12);
   const mentioned = filterMentions
     ? documents.filter(
-        (d) => d.kind !== "news" || mentionsCompany(d, instrument),
-      )
+      (d) => d.kind !== "news" || mentionsCompany(d, instrument),
+    )
     : documents;
   const list = all ? documents : mentioned;
   const hidden = documents.length - mentioned.length;
@@ -315,9 +321,9 @@ function ResearchApp({ signOut, session }) {
     try {
       return parseHiddenCompanies(
         localStorage.getItem(companyVisibilityKey) ??
-          (session.is_installation_owner
-            ? localStorage.getItem(hiddenCompaniesKey)
-            : null),
+        (session.is_installation_owner
+          ? localStorage.getItem(hiddenCompaniesKey)
+          : null),
       );
     } catch {
       return [];
@@ -434,18 +440,18 @@ function ResearchApp({ signOut, session }) {
             detail_mode: profile.detail_mode,
           })),
         )
-        .catch(() => {});
+        .catch(() => { });
     },
   };
   return (
     <ProfileContext.Provider value={profileValue}>
       {home?.profile &&
-      (retakeQuiz || (!home.profile.completed && !onboardingSkipped)) ? (
+        (retakeQuiz || (!home.profile.completed && !onboardingSkipped)) ? (
         <Onboarding
           stage={retakeQuiz ? "type" : "start"}
           profile={home.profile}
           onSkip={retakeQuiz ? () => setRetakeQuiz(false) : skipOnboarding}
-          onTurnOnPro={() => api.saveDetailMode("data").catch(() => {})}
+          onTurnOnPro={() => api.saveDetailMode("data").catch(() => { })}
           onDone={(profile) => {
             setRetakeQuiz(false);
             focusMainHeading();
@@ -710,9 +716,9 @@ function CompanyWorkspace({
       if (loadedScope !== scope)
         setQuestion(
           next.question_library?.selected_question ||
-            next.versions[0]?.question ||
-            next.research_action?.question ||
-            questionDefault,
+          next.versions[0]?.question ||
+          next.research_action?.question ||
+          questionDefault,
         );
       setLoadedScope(scope);
       setLoadError("");
@@ -749,7 +755,7 @@ function CompanyWorkspace({
         if (!controller.signal.aborted && activeScope.current === scope)
           setModelStatus(result);
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => controller.abort();
   }, [scope, companyLoading, updatedAt]);
   // Keep the open company's price current while the tab is visible.
@@ -770,7 +776,7 @@ function CompanyWorkspace({
               preferPriceRead(old, { data: result, error: "" }),
             );
         })
-        .catch(() => {});
+        .catch(() => { });
     };
     const timer = setInterval(tick, LIVE_PRICE_MS);
     return () => {
@@ -841,9 +847,9 @@ function CompanyWorkspace({
           setLoadedScope(scope);
           setQuestion(
             d.question_library?.selected_question ||
-              d.versions[0]?.question ||
-              d.research_action?.question ||
-              questionDefault,
+            d.versions[0]?.question ||
+            d.research_action?.question ||
+            questionDefault,
           );
         }
       })
@@ -897,7 +903,7 @@ function CompanyWorkspace({
     } catch (e) {
       if (activeScope.current !== scope) return;
       setError(e.message);
-      await refresh().catch(() => {});
+      await refresh().catch(() => { });
     } finally {
       if (activeScope.current !== scope) return;
       setBusy(false);
@@ -925,16 +931,16 @@ function CompanyWorkspace({
           <nav aria-label="Workspace navigation">
             {(beginner
               ? [
-                  ["workspace", "Home"],
-                  ["world", "World"],
-                  ["ideas", "My views"],
-                ]
+                ["workspace", "Home"],
+                ["world", "World"],
+                ["ideas", "My views"],
+              ]
               : [
-                  ["workspace", "Home"],
-                  ["ideas", "My views"],
-                  ["updates", "Updates"],
-                  ["world", "World"],
-                ]
+                ["workspace", "Home"],
+                ["ideas", "My views"],
+                ["updates", "Updates"],
+                ["world", "World"],
+              ]
             ).map(([key, label]) => (
               <button
                 key={key}
@@ -1034,7 +1040,7 @@ function CompanyWorkspace({
         setWatchlist(summary);
         dispatchEvent(new Event("fledge:home-changed"));
       })
-      .catch(() => {});
+      .catch(() => { });
   }
   async function followCompany(id) {
     try {
@@ -1042,7 +1048,7 @@ function CompanyWorkspace({
       setWatchlistMessage("");
       // A newly registered company is not in the loaded catalogue yet.
       if (!data.catalogue.some((company) => company.id === id))
-        refresh().catch(() => {});
+        refresh().catch(() => { });
       dispatchEvent(new Event("fledge:home-changed"));
       return true;
     } catch (failure) {
@@ -1057,10 +1063,10 @@ function CompanyWorkspace({
     data.idea_alerts?.some((a) => a.published && !a.review_action);
   const displayInstrument = companyLoading
     ? data.catalogue.find((company) => company.id === instrumentId) || {
-        name: "Company research",
-        symbol: "",
-        sector: "",
-      }
+      name: "Company research",
+      symbol: "",
+      sector: "",
+    }
     : data.instrument;
   const isRecorded = displayInstrument.mode === "recorded";
   const filing = data.filing_calculations?.find(
@@ -1105,7 +1111,12 @@ function CompanyWorkspace({
       setFormError("Resolve the saved-versus-draft comparison before saving.");
       return;
     }
-    if (beginner && status === "draft" && !proposalIds.length && !editor.reasoning?.trim()) {
+    if (
+      beginner &&
+      status === "draft" &&
+      !proposalIds.length &&
+      !editor.reasoning?.trim()
+    ) {
       setFormError("Write a sentence or two in “Your answer” first.");
       return;
     }
@@ -1115,11 +1126,11 @@ function CompanyWorkspace({
       const draft =
         status === "draft" && !proposalIds.length
           ? {
-              ...editor,
-              conditions: editor.conditions.filter(
-                (c) => String(c.value ?? "").trim() !== "",
-              ),
-            }
+            ...editor,
+            conditions: editor.conditions.filter(
+              (c) => String(c.value ?? "").trim() !== "",
+            ),
+          }
           : editor;
       const definition = {
         ...revisionPayload(draft, status),
@@ -1159,7 +1170,7 @@ function CompanyWorkspace({
         setApproved(false);
         if (proposalIds.length) {
           setProposalStale(true);
-          await refresh().catch(() => {});
+          await refresh().catch(() => { });
           return;
         }
         try {
@@ -1209,13 +1220,13 @@ function CompanyWorkspace({
         busy={busy}
         onCheck={
           !historical &&
-          version.id === current?.id &&
-          (!review || version.events?.some((e) => e.repeat_months))
+            version.id === current?.id &&
+            (!review || version.events?.some((e) => e.repeat_months))
             ? (periods) =>
-                act(
-                  () => api.checkEvents(version.id, snapshot, periods),
-                  "Event evidence check saved. Current monitoring uses only its matching window; earlier-window checks are in History.",
-                )
+              act(
+                () => api.checkEvents(version.id, snapshot, periods),
+                "Event evidence check saved. Current monitoring uses only its matching window; earlier-window checks are in History.",
+              )
             : undefined
         }
         unavailableReason={
@@ -1224,44 +1235,53 @@ function CompanyWorkspace({
       />
     );
   }
-  function resultsPanel(e, v, history = false, compact = false) {
+  function resultsPanel(
+    e,
+    v,
+    history = false,
+    compact = false,
+    evidence = true,
+  ) {
     const linkedChange = data.changes.find((c) => c.evaluation_id === e.id);
     const previous = linkedChange
       ? v.evaluations.find(
-          (other) => other.id === linkedChange.previous_evaluation_id,
-        )
+        (other) => other.id === linkedChange.previous_evaluation_id,
+      )
       : v.evaluations[
-          v.evaluations.findIndex((other) => other.id === e.id) + 1
-        ];
+      v.evaluations.findIndex((other) => other.id === e.id) + 1
+      ];
     return (
       <>
-        <IdeaEvidenceReview
-          evaluation={e}
-          previous={previous}
-          version={v}
-          documents={data.documents}
-          change={linkedChange}
-          onSource={openSource}
-          review={v.evidence_reviews?.find((r) => r.evaluation_id === e.id)}
-          onCompare={
-            !e.manifest.snapshot_id
-              ? undefined
-              : () =>
+        {evidence && (
+          <IdeaEvidenceReview
+            evaluation={e}
+            previous={previous}
+            version={v}
+            documents={data.documents}
+            change={linkedChange}
+            onSource={openSource}
+            review={v.evidence_reviews?.find((r) => r.evaluation_id === e.id)}
+            onCompare={
+              !e.manifest.snapshot_id
+                ? undefined
+                : () =>
                   act(
                     () =>
                       api.compareEvidence(v.id, e.manifest.snapshot_id, e.id),
                     "Evidence comparison saved for this revision.",
                   )
-          }
-          busy={busy}
-          error={error}
-          unavailableReason={
-            modelAvailability(modelStatus, "comparison_enabled").message || null
-          }
-          compact={compact}
-          showReasoning={!history}
-          onOpen={() => onChoose(instrumentId, "history", e.id)}
-        />
+            }
+            busy={busy}
+            error={error}
+            unavailableReason={
+              modelAvailability(modelStatus, "comparison_enabled").message ||
+              null
+            }
+            compact={compact}
+            showReasoning={!history}
+            onOpen={() => onChoose(instrumentId, "history", e.id)}
+          />
+        )}
         {!compact && eventPanel(v, e, null, history)}
         <p className="numeric-scope-note">
           {v.events?.length ? (
@@ -1313,8 +1333,8 @@ function CompanyWorkspace({
             ? e.manifest.expiry.find((a) => a.condition_id === r.condition_id)
             : null;
           const observation = data.observations.find(
-              (o) => o.id === r.observation_id,
-            ),
+            (o) => o.id === r.observation_id,
+          ),
             prev = previous?.results.find(
               (p) => p.condition_id === r.condition_id,
             );
@@ -1663,24 +1683,24 @@ function CompanyWorkspace({
         <nav aria-label="Workspace navigation">
           {(beginner
             ? [
-                ["workspace", "Home"],
-                ["world", "World"],
-                ["ideas", "My views"],
-                ...(updatesWaiting ? [["updates", "Updates"]] : []),
-              ]
+              ["workspace", "Home"],
+              ["world", "World"],
+              ["ideas", "My views"],
+              ...(updatesWaiting ? [["updates", "Updates"]] : []),
+            ]
             : [
-                ["workspace", "Home"],
-                ["ideas", "My views"],
-                ["updates", "Updates"],
-                ["world", "World"],
-              ]
+              ["workspace", "Home"],
+              ["ideas", "My views"],
+              ["updates", "Updates"],
+              ["world", "World"],
+            ]
           ).map(([key, label]) => (
             <button
               key={key}
               className={
                 view === key ||
-                (view === "idea" && key === "ideas") ||
-                (view === "review" && key === "updates")
+                  (view === "idea" && key === "ideas") ||
+                  (view === "review" && key === "updates")
                   ? "active"
                   : ""
               }
@@ -1821,7 +1841,7 @@ function CompanyWorkspace({
                 {isRecorded
                   ? "Fictional company"
                   : displayInstrument.sector &&
-                      displayInstrument.sector !== "Not yet classified"
+                    displayInstrument.sector !== "Not yet classified"
                     ? displayInstrument.sector
                     : "Company research"}
               </p>
@@ -1945,7 +1965,10 @@ function CompanyWorkspace({
                             openEditor();
                             if (!current) {
                               const plain = `What do I think about ${data.instrument.name}, and why?`;
-                              setEditor({ ...formFor(null, plain), question: plain });
+                              setEditor({
+                                ...formFor(null, plain),
+                                question: plain,
+                              });
                             }
                           }}
                           onView={(next) => {
@@ -1953,7 +1976,9 @@ function CompanyWorkspace({
                             requestAnimationFrame(() => {
                               window.scrollTo(0, 0);
                               document
-                                .querySelectorAll(".main-workspace, .workspace-grid")
+                                .querySelectorAll(
+                                  ".main-workspace, .workspace-grid",
+                                )
                                 .forEach((el) => el.scrollTo?.(0, 0));
                             });
                           }}
@@ -1986,7 +2011,9 @@ function CompanyWorkspace({
                                 requestAnimationFrame(() => {
                                   window.scrollTo(0, 0);
                                   document
-                                    .querySelectorAll(".main-workspace, .workspace-grid")
+                                    .querySelectorAll(
+                                      ".main-workspace, .workspace-grid",
+                                    )
                                     .forEach((el) => el.scrollTo?.(0, 0));
                                 });
                               }}
@@ -2586,8 +2613,9 @@ function CompanyWorkspace({
                       onAddCompany={() => setAddingCompany(true)}
                       onOpenCompany={(id) => onChoose(id)}
                       practice={
-                        visibleCompanies.find((c) => c.id === INSTRUMENT_DEMO) ||
-                        visibleCompanies.find((c) => c.mode === "recorded")
+                        visibleCompanies.find(
+                          (c) => c.id === INSTRUMENT_DEMO,
+                        ) || visibleCompanies.find((c) => c.mode === "recorded")
                       }
                     />
                     <PortfolioRead onOpenCompany={(id) => onChoose(id)} />
@@ -2599,169 +2627,275 @@ function CompanyWorkspace({
                   </Suspense>
                 ) : !selectedCompanyId && view === "history" ? null : view ===
                   "workspace" ? null : view === "review" ? (
-                  <Suspense
-                    fallback={
-                      <LoadingSkeleton label="Reading weekly review…" />
-                    }
-                  >
-                    {" "}
-                    <ReviewDigest
-                      onOpen={onChoose}
-                      onSource={setSource}
-                      selectedCompanyId={selectedCompanyId}
-                      onCompanyChange={chooseCompany}
-                    />
-                  </Suspense>
-                ) : ["ideas", "updates", "world"].includes(view) ? null : view ===
-                  "idea" ? (
-                  <section className="focus-page reasoning-page">
-                    <span className="section-label">YOUR REASONING</span>
-                    <h2>
-                      {current?.question ||
-                        "Give your research somewhere to live."}
-                    </h2>
-                    {!current && (
-                      <p className="reasoning large">
-                        Save what you think, what you are unsure about, and what
-                        could change your mind. A draft needs no monitoring
-                        rules.
-                      </p>
-                    )}
-                    <button className="primary" onClick={openEditor}>
-                      {current ? "Edit my idea" : "Save an idea"}{" "}
-                      <Icon name="arrow" />
-                    </button>
-                    <ProposalPanel
-                      proposals={data.proposals}
-                      current={current}
-                      busy={busy}
-                      unavailableReason={
-                        modelAvailability(modelStatus, "comparison_enabled")
-                          .message || null
+                    <Suspense
+                      fallback={
+                        <LoadingSkeleton label="Reading weekly review…" />
                       }
-                      onGenerate={() =>
-                        act(async () => {
-                          const result = await api.suggest({
-                            instrument_id: instrumentId,
-                            snapshot_id: data.snapshot_id,
-                            base_version_id: current?.id || null,
-                            question,
-                          });
-                          if (activeScope.current === scope)
-                            setNotice(result.explanation);
-                        })
-                      }
-                      onReview={(chosen) => {
-                        try {
-                          const candidate = combineSuggestions(chosen);
-                          setEditor(
-                            formFor(
-                              {
-                                ...candidate,
-                                revision: candidate.expected_revision,
-                              },
-                              candidate.question,
-                            ),
-                          );
-                          setProposalIds(chosen.map((p) => p.id));
-                          setProposalStale(false);
-                          setApproved(false);
-                          setFormError("");
-                          setConflict(null);
-                        } catch (e) {
-                          setError(e.message);
-                        }
-                      }}
-                      onReject={(id) =>
-                        act(
-                          () => api.rejectSuggestion(id),
-                          "Suggestion rejected. Your saved idea is unchanged.",
-                        )
-                      }
-                      onSource={openSource}
-                      onOpen={(id) =>
-                        onChoose(instrumentId, "history", `revision:${id}`)
-                      }
-                    />
-                    {current && (
-                      <>
-                        <div className="divider" />
+                    >
+                      {" "}
+                      <ReviewDigest
+                        onOpen={onChoose}
+                        onSource={setSource}
+                        selectedCompanyId={selectedCompanyId}
+                        onCompanyChange={chooseCompany}
+                      />
+                    </Suspense>
+                  ) : ["ideas", "updates", "world"].includes(
+                    view,
+                  ) ? null : view === "idea" ? (
+                    <section className="focus-page reasoning-page idea-page">
+                      <header className="idea-head">
                         <span className="section-label">
-                          REVISION {current.revision} ·{" "}
-                          {current.status.toUpperCase()}
+                          {data.instrument.symbol} ·{" "}
+                          {beginner ? "MY VIEW" : "MY IDEA"}
                         </span>
-                        <ReviewDownload
-                          version={current}
-                          evaluation={evaluation}
-                          comparison={current.evidence_reviews?.find((r) =>
+                        <h2>
+                          {current?.question ||
+                            "What do you want to watch for this company?"}
+                        </h2>
+                        <p
+                          className={
+                            current?.reasoning?.trim()
+                              ? "idea-reasoning"
+                              : "idea-reasoning empty"
+                          }
+                        >
+                          {current?.reasoning?.trim() ||
+                            (current
+                              ? "No reasoning written yet."
+                              : "Write what you think and what would change your mind, then choose what to watch.")}
+                        </p>
+                        <p
+                          className={`idea-status ${current?.status === "monitoring" ? "on" : "off"}`}
+                        >
+                          {checkingCurrent
+                            ? "Checking recorded evidence…"
+                            : statusLine(current, evaluation)}
+                        </p>
+                        <div className="idea-actions">
+                          <button
+                            className="primary"
+                            onClick={openEditor}
+                            aria-label={current ? "Edit my idea" : "Save an idea"}
+                          >
+                            {current ? "Edit" : "Start an idea"}
+                          </button>
+                          {current && (
+                            <>
+                              <ReviewDownload
+                                inline
+                                version={current}
+                                evaluation={evaluation}
+                                comparison={current.evidence_reviews?.find((r) =>
+                                  evaluation
+                                    ? r.evaluation_id === evaluation.id
+                                    : r.evaluation_id == null &&
+                                    r.snapshot_id === data.snapshot_id,
+                                )}
+                              />
+                              <button
+                                className="text-button"
+                                onClick={() => onChoose(instrumentId, "history")}
+                              >
+                                History
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </header>
+                      <section className="idea-section">
+                        <h3>What I'm watching</h3>
+                        {current && watchItems(current, evaluation).length ? (
+                          <ul className="idea-watch-list">
+                            {watchItems(current, evaluation).map((item) => (
+                              <li key={item.key}>
+                                <span className="idea-watch-type">
+                                  {item.type}
+                                </span>
+                                <span className="idea-watch-label">
+                                  {item.label}
+                                </span>
+                                <span className="idea-watch-state">
+                                  {item.state}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="idea-empty">
+                            Nothing yet. Add an event or a number in Edit, and you
+                            get an alert when it happens.
+                          </p>
+                        )}
+                        <div className="idea-tools">
+                          <ProposalPanel
+                            embedded
+                            proposals={data.proposals}
+                            current={current}
+                            busy={busy}
+                            unavailableReason={
+                              modelAvailability(modelStatus, "comparison_enabled")
+                                .message || null
+                            }
+                            onGenerate={() =>
+                              act(async () => {
+                                const result = await api.suggest({
+                                  instrument_id: instrumentId,
+                                  snapshot_id: data.snapshot_id,
+                                  base_version_id: current?.id || null,
+                                  question,
+                                });
+                                if (activeScope.current === scope)
+                                  setNotice(result.explanation);
+                              })
+                            }
+                            onReview={(chosen) => {
+                              try {
+                                const candidate = combineSuggestions(chosen);
+                                setEditor(
+                                  formFor(
+                                    {
+                                      ...candidate,
+                                      revision: candidate.expected_revision,
+                                    },
+                                    candidate.question,
+                                  ),
+                                );
+                                setProposalIds(chosen.map((p) => p.id));
+                                setProposalStale(false);
+                                setApproved(false);
+                                setFormError("");
+                                setConflict(null);
+                              } catch (e) {
+                                setError(e.message);
+                              }
+                            }}
+                            onReject={(id) =>
+                              act(
+                                () => api.rejectSuggestion(id),
+                                "Suggestion rejected. Your saved idea is unchanged.",
+                              )
+                            }
+                            onSource={openSource}
+                            onOpen={(id) =>
+                              onChoose(instrumentId, "history", `revision:${id}`)
+                            }
+                          />
+                          {current &&
+                            !evaluation &&
+                            current.events?.length > 0 && (
+                              <button
+                                className="text-button"
+                                disabled={busy}
+                                onClick={() =>
+                                  act(
+                                    () =>
+                                      api.checkEvents(
+                                        current.id,
+                                        data.snapshot_id,
+                                        {},
+                                      ),
+                                    "Event check saved.",
+                                  )
+                                }
+                              >
+                                Check events now (AI)
+                              </button>
+                            )}
+                        </div>
+                      </section>
+                      {current && evaluation && (
+                        <section className="idea-section">
+                          <h3>Latest check</h3>
+                          {resultsPanel(evaluation, current, false, false, false)}
+                        </section>
+                      )}
+                      {current &&
+                        (() => {
+                          const review = current.evidence_reviews?.find((r) =>
                             evaluation
                               ? r.evaluation_id === evaluation.id
                               : r.evaluation_id == null &&
-                                r.snapshot_id === data.snapshot_id,
-                          )}
-                        />
-                        {evaluation ? (
-                          resultsPanel(evaluation, current)
-                        ) : (
-                          <>
-                            <p className="muted">
-                              {checkingCurrent
-                                ? "Checking recorded evidence…"
-                                : "No active assessment. Save and explicitly approve monitoring when you are ready."}
-                            </p>
-                            {eventPanel(current)}
-                            <IdeaEvidenceReview
-                              evaluation={{
-                                id: null,
-                                manifest: {
-                                  snapshot_id: data.snapshot_id,
-                                  document_ids: data.documents.map((d) => d.id),
-                                  active_document_id: data.active_document_id,
-                                  cutoff: data.demo.as_of,
-                                },
-                              }}
-                              version={current}
-                              documents={data.documents}
-                              onSource={openSource}
-                              draft
-                              onCompare={() =>
-                                act(
-                                  () =>
-                                    api.compareEvidence(
-                                      current.id,
-                                      data.snapshot_id,
-                                    ),
-                                  "Evidence comparison saved for this revision.",
-                                )
-                              }
-                              busy={busy}
-                              error={error}
-                              unavailableReason={
-                                modelAvailability(
-                                  modelStatus,
-                                  "comparison_enabled",
-                                ).message || null
-                              }
-                              review={current.evidence_reviews?.find(
-                                (r) =>
-                                  r.evaluation_id == null &&
-                                  r.snapshot_id === data.snapshot_id,
+                              r.snapshot_id === data.snapshot_id,
+                          );
+                          const compare = () =>
+                            act(
+                              () =>
+                                evaluation
+                                  ? api.compareEvidence(
+                                    current.id,
+                                    evaluation.manifest.snapshot_id,
+                                    evaluation.id,
+                                  )
+                                  : api.compareEvidence(
+                                    current.id,
+                                    data.snapshot_id,
+                                  ),
+                              "Comparison saved for this revision.",
+                            );
+                          const unavailable =
+                            modelAvailability(modelStatus, "comparison_enabled")
+                              .message || null;
+                          return (
+                            <section className="idea-section">
+                              <h3>Check my reasoning</h3>
+                              {review ? (
+                                <IdeaEvidenceReview
+                                  evaluation={
+                                    evaluation || {
+                                      id: null,
+                                      manifest: {
+                                        snapshot_id: data.snapshot_id,
+                                        document_ids: data.documents.map(
+                                          (d) => d.id,
+                                        ),
+                                        active_document_id:
+                                          data.active_document_id,
+                                        cutoff: data.demo.as_of,
+                                      },
+                                    }
+                                  }
+                                  version={current}
+                                  documents={data.documents}
+                                  onSource={openSource}
+                                  draft={!evaluation}
+                                  onCompare={compare}
+                                  busy={busy}
+                                  error={error}
+                                  unavailableReason={unavailable}
+                                  review={review}
+                                  showReasoning={false}
+                                />
+                              ) : (
+                                <>
+                                  <p className="idea-empty">
+                                    {current.reasoning?.trim()
+                                      ? "Compare what you wrote with this company's recent news. Uses AI."
+                                      : "Write your reasoning in Edit first, then compare it with recent news."}
+                                  </p>
+                                  <div className="idea-tools">
+                                    <button
+                                      className="text-button"
+                                      disabled={
+                                        busy ||
+                                        !!unavailable ||
+                                        !current.reasoning?.trim()
+                                      }
+                                      onClick={compare}
+                                    >
+                                      Compare with recent news (AI)
+                                    </button>
+                                  </div>
+                                  {unavailable && (
+                                    <p className="fine">{unavailable}</p>
+                                  )}
+                                </>
                               )}
-                            />
-                          </>
-                        )}
-                      </>
-                    )}
-                    <details
-                      className="idea-history"
-                      open={!!initialEvaluation}
-                      key={initialEvaluation || "idea-history"}
-                    >
-                      <summary>History · versions and evidence checks</summary>
-                      {renderIdeaHistory()}
-                    </details>
-                  </section>
-                ) : (
+                            </section>
+                          );
+                        })()}
+                    </section>
+                  ) : (
                   renderIdeaHistory()
                 )}
               </div>
@@ -2835,7 +2969,7 @@ function CompanyWorkspace({
                           activeScope.current === scope &&
                           setModelStatus(value),
                       )
-                      .catch(() => {})
+                      .catch(() => { })
                   }
                   onDraft={(q) => {
                     openEditor();
@@ -2910,7 +3044,7 @@ function CompanyWorkspace({
                           Assessed{" "}
                           {dateTime(
                             evaluation.manifest.assessed_at ||
-                              evaluation.manifest.cutoff,
+                            evaluation.manifest.cutoff,
                           )}{" "}
                           · revision {current.revision}
                         </small>
@@ -2948,11 +3082,11 @@ function CompanyWorkspace({
                       (j) =>
                         j.status === "failed" && j.version_id === current?.id,
                     ) && (
-                      <p role="alert" className="warning">
-                        Assessment unavailable. Your saved idea is intact. Edit
-                        and save a new revision to check again.
-                      </p>
-                    )}
+                        <p role="alert" className="warning">
+                          Assessment unavailable. Your saved idea is intact. Edit
+                          and save a new revision to check again.
+                        </p>
+                      )}
                     <details className="secondary-details monitoring-details">
                       <summary>Monitoring details</summary>
                       <p className="fine">
@@ -3227,15 +3361,15 @@ function CompanyWorkspace({
         {source && (
           <div className="source-modal">
             {!beginner && (
-            <span className="demo-tag">
-              {source.kind === "recorded"
-                ? "AUTHORED FICTIONAL SOURCE"
-                : source.kind === "news"
-                  ? "NEWS · PROVIDER SNIPPET"
-                  : source.kind === "social"
-                    ? "SOCIAL · PUBLIC DISCUSSION"
-                    : "CALCULATED FROM SEC FACTS"}
-            </span>
+              <span className="demo-tag">
+                {source.kind === "recorded"
+                  ? "AUTHORED FICTIONAL SOURCE"
+                  : source.kind === "news"
+                    ? "NEWS · PROVIDER SNIPPET"
+                    : source.kind === "social"
+                      ? "SOCIAL · PUBLIC DISCUSSION"
+                      : "CALCULATED FROM SEC FACTS"}
+              </span>
             )}
             <h3>{source.title}</h3>
             <p className="muted">
@@ -3362,32 +3496,33 @@ function CompanyWorkspace({
           >
             {proposalIds.length > 0 && (
               <div className="warning">
-                Review the complete resulting idea below. Fill every missing
-                threshold and date, and edit any wording before saving. Nothing
-                has changed yet.{" "}
+                Suggestions are filled in below. Check them and edit anything
+                before saving. Nothing is saved yet.{" "}
                 {proposalStale &&
                   "The idea or evidence changed while reviewing. Close this draft and request fresh suggestions; it cannot be silently applied to the new revision."}
               </div>
             )}
             <section className="idea-writing">
-              <p className="idea-intro">
-                {beginner
-                  ? "Say in your own words what you think of this company and why, whether you like it or not."
-                  : "Start with your question and your point of view. Add monitoring rules when you’re ready."}
-              </p>
+              {!proposalIds.length && (
+                <p className="idea-intro">
+                  {beginner
+                    ? "Say in your own words what you think of this company and why, whether you like it or not. Alerts are optional."
+                    : "Start with your question and your point of view. Add monitoring rules when you’re ready."}
+                </p>
+              )}
               {(!beginner || !editor.question.trim()) && (
-              <label className="field">
-                {beginner ? "Your question" : "Research question"}
-                <input
-                  value={editor.question}
-                  maxLength={200}
-                  required
-                  onChange={(e) => {
-                    setApproved(false);
-                    setEditor({ ...editor, question: e.target.value });
-                  }}
-                />
-              </label>
+                <label className="field">
+                  {beginner ? "Your question" : "Research question"}
+                  <input
+                    value={editor.question}
+                    maxLength={200}
+                    required
+                    onChange={(e) => {
+                      setApproved(false);
+                      setEditor({ ...editor, question: e.target.value });
+                    }}
+                  />
+                </label>
               )}
               <div className="field">
                 <label htmlFor="idea-reasoning">
@@ -3427,7 +3562,9 @@ function CompanyWorkspace({
               <summary>
                 <span>
                   <strong>
-                    {beginner ? "Get alerts (optional)" : "Add monitoring rules"}
+                    {beginner
+                      ? "Get alerts (optional)"
+                      : "Add monitoring rules"}
                   </strong>
                   <small>
                     {beginner
@@ -3548,7 +3685,7 @@ function CompanyWorkspace({
                     </button>
                     <small className="threshold-reference">
                       {latest(c.metric).value != null &&
-                      latest(c.metric).period_type ===
+                        latest(c.metric).period_type ===
                         (c.period_type || "quarter")
                         ? `Latest reported: ${displayNumber(latest(c.metric).value)}% · ${latest(c.metric).period}. This is context, not a suggested threshold.`
                         : "No comparable figure is available for this reporting scope."}
@@ -3583,14 +3720,14 @@ function CompanyWorkspace({
                           conditions: editor.conditions.map((r, j) =>
                             j === i
                               ? {
-                                  ...r,
-                                  ...(field === "clear"
-                                    ? {
-                                        expected_period_end: "",
-                                        expected_report_by: "",
-                                      }
-                                    : { [field]: value }),
-                                }
+                                ...r,
+                                ...(field === "clear"
+                                  ? {
+                                    expected_period_end: "",
+                                    expected_report_by: "",
+                                  }
+                                  : { [field]: value }),
+                              }
                               : r,
                           ),
                         });
@@ -3766,6 +3903,16 @@ function CompanyWorkspace({
               </section>
             )}
             <footer className="form-actions">
+              {current && (
+                <button
+                  type="button"
+                  className="archive-button"
+                  disabled={busy || !!conflict}
+                  onClick={() => save("archived")}
+                >
+                  Archive idea and stop monitoring
+                </button>
+              )}
               <button
                 type="submit"
                 className={approved ? "secondary" : "primary"}
@@ -3803,16 +3950,6 @@ function CompanyWorkspace({
                 </button>
               )}
             </footer>
-            {current && (
-              <button
-                type="button"
-                className="archive-button"
-                disabled={busy || !!conflict}
-                onClick={() => save("archived")}
-              >
-                Archive idea and stop monitoring
-              </button>
-            )}
           </form>
         )}
       </Modal>

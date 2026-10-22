@@ -13,7 +13,7 @@ from thesis.db import one,rows
 from thesis import review_digest
 from thesis.display_time import stamp
 from . import daily_updates as D
-from .telegram_message import plain,safe_url,visible_units
+from .telegram_message import plain,safe_url,visible_units,best_quote,excerpt
 
 KINDS={'digest','cost'}
 MAX_ITEMS=5
@@ -74,14 +74,23 @@ def summary(record,number,*,shown=None):
     source_ids=[]
     if detail.get('fictional'):parts.append('Fictional demo · not actual company news')
     if kind=='company':
-        payload=detail['payload'];parts.append(escape(plain(record['title'],90)))
+        # Same lead as the alert card: tone, then the article's headline rather
+        # than the generic alert title, then article text when there is any.
+        from .telegram_message import company_summary
+        payload=detail['payload'];lead=company_summary(detail)
+        parts[0]=f"<b>{number}. {escape(plain(detail.get('symbol'),18))} · {escape(lead['tone'])}</b>"
+        parts.append(escape(plain(lead['headline'],120) if lead['headline'] else plain(record['title'],90)))
         items=payload.get('items',[])
         if items:
             item=items[0];source_ids.append(item['source_id'])
             basis=item.get('reporting_basis') or {};quotes=basis.get('citations') or item.get('citations') or []
-            if quotes:
-                label='Unconfirmed source report' if basis.get('kind')=='unconfirmed_event' else 'Source excerpt'
-                parts.append(label+': “'+escape(plain(quotes[0].get('quote'),140))+'”')
+            unconfirmed=basis.get('kind')=='unconfirmed_event'
+            quote=best_quote(quotes)
+            if quote and not (lead['headline'] and quote.get('passage_id')=='p0'):
+                label='Unconfirmed source report' if unconfirmed else 'Source excerpt'
+                parts.append(label+': “'+escape(excerpt(quote,140))+'”')
+            elif unconfirmed:
+                parts.append('Unconfirmed report')
         else:
             for change in payload.get('shifts',[])[:2]:
                 parts.append(escape(plain(change.get('title'),45))+': '+escape(plain(change['before']['tone'],20))+' → '+escape(plain(change['after']['tone'],20)))
@@ -93,7 +102,7 @@ def summary(record,number,*,shown=None):
             from .telegram_message import RELATIONS
             parts.append(RELATIONS[item['relation']]+': '+escape(plain(item.get('explanation'),90)))
             quotes=item.get('citations') or []
-            if quotes:parts.append('Source excerpt: “'+escape(plain(quotes[0].get('quote'),80))+'”')
+            if quotes:parts.append('Source excerpt: “'+escape(excerpt(best_quote(quotes),80))+'”')
     elif kind=='condition':
         parts.append(escape(plain(record['title'],90)))
         for item in detail.get('details',{}).get('affected_conditions',[])[:2]:

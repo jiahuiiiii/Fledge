@@ -8,7 +8,7 @@ let browser;
  await page.route('**/*',r=>{const u=new URL(r.request().url());if(!['127.0.0.1','localhost'].includes(u.hostname)){external.push(u.href);return r.abort();}if(/\/(generate|event-review|evidence-review|brief)$/.test(u.pathname))paid.push(u.href);return r.continue();});
  const base=process.env.THESIS_TEST_URL;
  await page.goto(base+'/?company=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa&view=idea');
- const panel=page.getByRole('region',{name:'Reviewable suggestions',exact:true});await panel.getByRole('heading',{name:'Make your idea testable',exact:true}).waitFor();
+ const panel=page.getByRole('region',{name:'Reviewable suggestions',exact:true});await panel.waitFor(); // The idea page embeds suggestions under What I'm watching (20 Oct 2026).
  assert.equal(await panel.getByRole('checkbox').count(),3);for(const c of await panel.getByRole('checkbox').all())assert.equal(await c.isChecked(),false);
  const before=(await(await page.request.get(base+'/api/v1/workspace')).json()).result;
  for(const c of await panel.getByRole('checkbox').all())await c.check();

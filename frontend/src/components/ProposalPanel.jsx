@@ -57,6 +57,7 @@ export function DefinitionText({ value, kind }) {
   );
 }
 export default function ProposalPanel({
+  embedded = false,
   proposals = [],
   current,
   busy,
@@ -171,34 +172,45 @@ export default function ProposalPanel({
     (p) => selected.includes(p.id) && !p.source_unavailable,
   );
   return (
-    <section className="proposal-panel" aria-label="Reviewable suggestions">
-      <h3>Make your idea testable</h3>
-      <p className="fine">
-        Compare suggested changes with your original idea. Nothing changes until
-        you choose a suggestion, review it and save.
-      </p>
+    <section
+      className={embedded ? "proposal-panel embedded" : "proposal-panel"}
+      aria-label="Reviewable suggestions"
+    >
+      {!embedded && (
+        <>
+          <h3>Make your idea testable</h3>
+          <p className="fine">
+            Compare suggested changes with your original idea. Nothing changes
+            until you choose a suggestion, review it and save.
+          </p>
+        </>
+      )}
       <button
-        className="secondary"
+        className={embedded ? "text-button" : "secondary"}
         onClick={onGenerate}
         disabled={busy || !!unavailableReason || current?.status === "archived"}
       >
         {busy
           ? "Working…"
           : current
-            ? "Suggest checks for my idea"
+            ? embedded
+              ? "Suggest things to watch (AI)"
+              : "Suggest checks for my idea"
             : "Suggest a starting idea"}
       </button>
       {unavailableReason && <p className="fine">{unavailableReason}</p>}
-      <details className="proposal-method">
-        <summary>How suggestions work</summary>
-        <p className="fine">
-          Suggestions use AI and the available sources. Thresholds and dates are
-          assumptions for you to choose or edit. Checks can describe a
-          requirement or a risk. A request uses the shared AI budget; the
-          selected sources cannot establish that every important risk has been
-          detected.
-        </p>
-      </details>
+      {!embedded && (
+        <details className="proposal-method">
+          <summary>How suggestions work</summary>
+          <p className="fine">
+            Suggestions use AI and the available sources. Thresholds and dates
+            are assumptions for you to choose or edit. Checks can describe a
+            requirement or a risk. A request uses the shared AI budget; the
+            selected sources cannot establish that every important risk has been
+            detected.
+          </p>
+        </details>
+      )}
       {pending.map(card)}
       {chosen.length > 0 && (
         <button

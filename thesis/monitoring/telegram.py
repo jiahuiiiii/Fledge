@@ -6,6 +6,7 @@ database advisory lock prevents concurrent sends; ambiguous sends are not retrie
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
+import logging
 import secrets
 import re
 from uuid import uuid4
@@ -191,12 +192,38 @@ def event(conn, owner, kind, identity,*,delivery_id=None):
     return detail
 
 
+NEXT_JOB = "SELECT * FROM telegram_deliveries WHERE owner_id=%s AND status='queued' AND (retry_at IS NULL OR retry_at<=%s) ORDER BY created_at,id LIMIT 1"
+
+
+def article_briefs(owner, now):
+    """Full-article briefs for the next queued company alert, prepared outside any
+    transaction: fetching a page and calling the model must not hold database work."""
+    from thesis.research import full_article
+    if not full_article.enabled():
+        return None
+    with transaction(owner) as conn:
+        job = one(conn, NEXT_JOB, (owner, now))
+        record = event(conn, owner, "company", job["event_id"]) if job and job["kind"] == "company" else None
+    if not job or job["kind"] != "company":
+        return None
+    detail = (record or {}).get("detail") or {}
+    if not record or detail.get("withheld") or detail.get("preview"):
+        return dict(job_id=job["id"], briefs={})
+    return dict(job_id=job["id"], briefs=full_article.for_alert(record))
+
+
 def run_once(owner):
     from . import telegram_stories as stories
     with serial(owner, wait=False) as acquired:
         if not acquired:
             return False
         now = clock()
+        try:
+            prepared = article_briefs(owner, now)
+        except Exception:
+            # Briefs are optional: never hold an alert back because one failed.
+            logging.getLogger("thesis").warning("Full-article preparation failed; alerts keep their preview.")
+            prepared = dict(job_id=None, briefs={})
         # A previous process may have died after HTTP dispatch but before saving
         # Telegram's acknowledgement. Never automatically resend that message.
         with transaction(owner) as conn:
@@ -223,9 +250,15 @@ def run_once(owner):
                 enqueue(conn,owner,cfg,now)
             if cfg.get("next_send_at") and cfg["next_send_at"] > now:
                 return False
-            job = one(conn, "SELECT * FROM telegram_deliveries WHERE owner_id=%s AND status='queued' AND (retry_at IS NULL OR retry_at<=%s) ORDER BY created_at,id LIMIT 1", (owner, now))
+            job = one(conn, NEXT_JOB, (owner, now))
             if not job:
                 return False
+            if job["kind"] == "company" and prepared is None:
+                from thesis.research import full_article
+                if full_article.enabled():
+                    return True  # Queued this pass; its article is prepared on the next one.
+            if job["kind"] == "company" and prepared is not None and prepared["job_id"] not in (None, job["id"]):
+                return True  # A different alert is next now; prepare that one first.
             why = None;defer=None;story_keys=set();guarded=stories.enabled(now)
             if job["event_at"] < now-timedelta(hours=24):
                 why = "Alert is older than 24 hours; review it in Updates."
@@ -252,6 +285,8 @@ def run_once(owner):
             elif job["kind"] != "test":
                 try:
                     record = event(conn, owner, job["kind"], job["event_id"])
+                    if record and prepared is not None and job["kind"] == "company":
+                        record["detail"]["article_briefs"] = prepared["briefs"]
                     if not record:
                         why = "The saved idea changed or the original alert is unavailable."
                     elif record["detail"].get("withheld"):
