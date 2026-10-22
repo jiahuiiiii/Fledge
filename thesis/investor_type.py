@@ -20,7 +20,7 @@ POINTS = {
     'drop_reaction': {'sell': {S: 1, A: 2}, 'hold': {B: 2, L: 1}, 'add': {L: 2, B: 1},
                       'check': {L: 1, S: 1}, 'unsure': {B: 1}},
     'goal': {'learn': {B: 1}, 'check': {L: 1, S: 1}, 'monitor': {S: 1, A: 1},
-             'news': {S: 1, L: 1}},
+             'news': {S: 1, L: 1}, 'explore': {B: 1}},
 }
 
 

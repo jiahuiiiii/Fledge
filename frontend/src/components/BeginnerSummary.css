@@ -513,3 +513,20 @@
   color: var(--color-text-2);
   font-size: var(--text-sm);
 }
+
+/* Good, bad, mixed and neutral each get their own tinted box. */
+.bs-group.tone-good,
+.bs-group.tone-bad,
+.bs-group.tone-mixed,
+.bs-group.tone-neutral {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border-left: 4px solid transparent;
+}
+.bs-group.tone-good { background: var(--color-positive-soft); border-left-color: var(--color-positive); }
+.bs-group.tone-good h5 { color: var(--color-positive-light); }
+.bs-group.tone-bad { background: var(--color-negative-soft); border-left-color: var(--color-negative); }
+.bs-group.tone-bad h5 { color: var(--color-negative-light); }
+.bs-group.tone-mixed { background: var(--color-gold-soft); border-left-color: var(--color-gold); }
+.bs-group.tone-mixed h5 { color: var(--color-gold); }
+.bs-group.tone-neutral { background: var(--color-surface-2); border-left-color: var(--color-line-strong); }
