@@ -223,6 +223,11 @@ export default function BeginnerSummary({
         <button type="button" className="bs-more" onClick={() => onView?.("evidence")}>
           All news & posts →
         </button>
+        {!practice && onRate && (
+          <button type="button" className="bs-more" onClick={() => onView?.("evidence")}>
+            Turn on news alerts →
+          </button>
+        )}
       </section>
 
       <section className="bs-card" id="bs-people" tabIndex={-1} aria-labelledby="bs-people-title">
