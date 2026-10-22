@@ -17,6 +17,7 @@ STARTER_ORDER = {
     'check': ['risks', 'outlook', 'growth', 'business'],
     'monitor': ['outlook', 'risks', 'growth', 'business'],
     'news': ['outlook', 'risks', 'business', 'growth'],
+    'explore': ['business', 'growth', 'risks', 'outlook'],
 }
 
 HEADLINES = {
@@ -24,6 +25,7 @@ HEADLINES = {
     'check': 'Test your stock ideas against the evidence',
     'monitor': 'Keep track of what changes for the companies you follow',
     'news': 'Keep up with the news behind your companies',
+    'explore': 'Not sure where to start? Begin with a company you already know',
 }
 
 
@@ -31,7 +33,12 @@ def next_step(profile, listed):
     if not profile['completed']:
         return dict(action='onboarding', label='Answer two quick questions so Fledge can fit your home page to you')
     if not listed:
+        if profile['goal'] == 'explore':
+            return dict(action='add_company', label='Think of an app, shop or product you use every day. '
+                        'Look up the company behind it; the list also shows the ones people look up most.')
         return dict(action='add_company', label='Add a company you own or want to understand')
+    if profile['goal'] == 'explore':
+        return dict(action='read_overview', label='See what’s happening with it, then add another company you know')
     if profile['goal'] == 'monitor':
         return dict(action='watch', label='Turn on news alerts for a company on your list')
     if profile['goal'] == 'news':

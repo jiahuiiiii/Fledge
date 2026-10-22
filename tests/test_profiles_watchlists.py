@@ -134,3 +134,13 @@ def test_emptied_watchlist_stays_in_use(owner):
     assert result['watchlist_started'] is True
     assert not any(c['watchlisted'] for c in result['catalogue'])
     assert client.get('/api/v1/home').json()['result']['watchlist']['started'] is True
+
+
+def test_not_sure_what_to_look_at_gets_a_starting_point(owner):
+    who = account()
+    saved = profile.save(who, 'new', goal='explore')
+    assert saved['goal'] == 'explore'
+    page = home.build(who)
+    assert page['headline'].startswith('Not sure where to start')
+    assert page['next_step']['action'] == 'add_company'
+    assert 'product you use' in page['next_step']['label']

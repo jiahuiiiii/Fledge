@@ -219,6 +219,15 @@ def start(owner, iid, *, initial=False, analyze=False, lookback_days=7,
         if not one(conn, 'SELECT 1 FROM sec_companies WHERE instrument_id=%s', (iid,)):
             raise ValueError('Choose a registered company for research.')
         old = one(conn, 'SELECT * FROM research_loads WHERE instrument_id=%s ORDER BY created_at DESC,id DESC LIMIT 1', (iid,))
+        if (old and old['active'] and analyze and not (reread or split_failed)
+                and not any(s['key'] == 'analysis' for s in old['steps'])):
+            # Asked to rate while the first source check is still running: add
+            # the rating to that run instead of silently doing nothing. It
+            # starts as soon as the sources finish.
+            steps = old['steps'] + [dict(key='analysis', label=LABELS['analysis'], status='queued',
+                                         message='Waiting for news and discussions')]
+            return one(conn, 'UPDATE research_loads SET steps=%s,updated_at=now() WHERE id=%s RETURNING *',
+                       (Jsonb(steps), old['id']))
         if old and (initial or old['active']):
             return old
         # Clicking again within a short interval cannot churn provider requests.

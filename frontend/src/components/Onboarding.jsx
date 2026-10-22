@@ -29,6 +29,7 @@ export const START_QUESTIONS = [
       ["learn", "Understand a company", "Plain-English explanations"],
       ["check", "Check a stock idea", "The case for and against"],
       ["monitor", "Watch what I own", "Alerts when something changes"],
+      ["explore", "Not sure what to look at", "Help me find companies to start with"],
     ],
   },
 ];
