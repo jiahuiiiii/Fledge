@@ -10,7 +10,9 @@ import Select from "./Select";
 import ManagementOutlook from "./ManagementOutlook";
 import FmpPanel from "./FmpPanel";
 import PeerContext from "./PeerContext";
-import { Disclosure, SectionHeader } from "./ui";
+import { Disclosure, DisclosureGroup, EvidenceDialog, SectionHeader, TrendTile } from "./ui";
+import { evidenceDialogRows } from "../lib/financialEvidence";
+import { trendPoints } from "../lib/financialTrends";
 import TermHelp from "./TermHelp";
 import LoadingSkeleton from "./LoadingSkeleton";
 import {
@@ -236,6 +238,7 @@ export default function FinancialsPage({
   management,
 }) {
   const [analystOpen, setAnalystOpen] = useState(false);
+  const [figure, setFigure] = useState(null);
   const [attempt, setAttempt] = useState(0);
   const [story, setStory] = useState(null),
     [error, setError] = useState("");
@@ -335,16 +338,22 @@ export default function FinancialsPage({
           : `${((number(growth.rows[0].value) / number(growth.rows[1].value) - 1) * 100).toFixed(1)}%`,
       rows: growth.rows,
       detail: growth,
+      trend: "revenue_growth",
+      tone: "info",
     },
     {
       label: `Operating margin · ${basisLabel.toLowerCase()}`,
       value: percent(metric(active, "operating_margin")?.value),
       rows: [metric(active, "operating_margin")],
+      trend: "operating_margin",
+      tone: "caution",
     },
     {
       label: `Free cash flow · ${basisLabel.toLowerCase()}`,
       value: money(metric(active, "free_cash_flow")?.value),
       rows: [metric(active, "free_cash_flow")],
+      trend: "free_cash_flow",
+      tone: "cashflow",
     },
   ];
   return (
@@ -408,44 +417,25 @@ export default function FinancialsPage({
       {safe && safe.status !== "available" && <p>{safe.reason}</p>}
       {safe && (
         <>
-          <div className="financial-summary-row" aria-label="Financial summary">
+          <div className="financial-summary-row" aria-label="Financial trends">
             {summary.map((item) => (
-              <article key={item.label}>
-                <span>{item.label}</span>
-                <Evidence
-                  rows={item.rows}
-                  title={item.label}
-                  label={<strong>{item.value}</strong>}
-                >
-                  {item.detail && (
-                    <>
-                      <p>
-                        {item.detail.title}
-                        {item.value !== "Unavailable" && ` · ${item.value}`}
-                      </p>
-                      <p>{item.detail.detail}</p>
-                    </>
-                  )}
-                </Evidence>
-                <small>
-                  {active
-                    ? `${day(active.start)} – ${day(active.end)}`
-                    : "No compatible saved period"}
-                </small>
-              </article>
+              <TrendTile
+                key={item.label}
+                title={item.label}
+                value={item.value}
+                caption={active ? `${day(active.start)} – ${day(active.end)}` : "No compatible saved period"}
+                points={trendPoints(incomeRows, item.trend)}
+                tone={item.tone}
+                onOpen={() => setFigure(item)}
+              />
             ))}
           </div>
-          <p className="figure-help">
-            Select an underlined figure to inspect its source and calculation.
-          </p>
+          <RevenueBreakdown data={workspace.segment_revenue} />
           <section
             className="financial-story-section"
             aria-label="Revenue and expense story"
           >
-            <Heading title="How sales become profit">
-              Follow revenue through costs to the reported result. The chart
-              labels its own selected fiscal period.
-            </Heading>
+            <Heading title="How sales become profit" />
             <RevenueFlow
               data={workspace.income_flow}
               segments={workspace.segment_revenue}
@@ -465,6 +455,13 @@ export default function FinancialsPage({
               series={incomeSeries}
             />
           </section>
+          <EvidenceDialog
+            open={!!figure}
+            onClose={() => setFigure(null)}
+            title={figure?.label || "Evidence"}
+            intro={figure?.detail ? `${figure.detail.title}. ${figure.detail.detail}` : null}
+            rows={figure ? evidenceDialogRows(figure.rows) : []}
+          />
           <section className="financial-story-section" aria-labelledby="management-expects">
             <SectionHeader level="section" as="h2" id="management-expects" title="What management expects" tabIndex={-1} />
             <ManagementOutlook data={management} />
@@ -505,78 +502,57 @@ export default function FinancialsPage({
               </label>
             )}
             <BalanceSummary period={balance} />
+            <DisclosureGroup>
+              <Disclosure title="Near-term and longer-term obligations" variant="inset">
+                <BalancePairs period={balance} />
+                <Insights readings={positionReadings.slice(0, 1)} />
+              </Disclosure>
+              <Disclosure title="Borrowing, cash and equity over time" variant="inset">
+                <FinancialHistory
+                  rows={balances}
+                  series={balanceSeries}
+                  active={balance}
+                  onSelect={setBalanceId}
+                  label="Borrowing, cash and equity"
+                />
+                <Insights readings={debtReadings} />
+              </Disclosure>
+              <Disclosure title="What makes up the balance sheet" variant="inset">
+                <div className="story-balance-maps">
+                  <BalanceMap period={balance} side="assets" />
+                  <BalanceMap period={balance} side="funding" />
+                </div>
+                <p className="story-footnote">
+                  Block area shows share of total assets. Book values may differ from resale values. Goodwill and intangible assets are not cash.
+                </p>
+              </Disclosure>
+              <Disclosure title={`Reading these figures · ${basisLabel.toLowerCase()}`} variant="inset">
+                <Insights readings={readings} />
+              </Disclosure>
+            </DisclosureGroup>
           </section>
         </>
       )}
-      <details className="financial-more-detail">
-        <summary>
-          More detail{" "}
-          <span>Segments, liquidity, reported figures &amp; filings</span>
-        </summary>
-        <RevenueBreakdown data={workspace.segment_revenue} />
-        <section
-          className="financial-story-section"
-          aria-label="Financial readings"
-        >
-          <Heading title="Reading the figures">
-            {basisLabel} · {day(active?.end)}
-          </Heading>
-          <Insights readings={readings} />
-        </section>
-        <section
-          className="financial-story-section"
-          aria-label="Borrowing and equity history"
-        >
-          <Heading title="Borrowing, cash & equity over time" />
-          <FinancialHistory
-            rows={balances}
-            series={balanceSeries}
-            active={balance}
-            onSelect={setBalanceId}
-            label="Borrowing, cash and equity"
-          />
-          <Insights readings={debtReadings} />
-        </section>
-        <section
-          className="financial-story-section"
-          aria-label="Liquidity detail"
-        >
-          <Heading title="Near-term and longer-term obligations" />
-          <BalancePairs period={balance} />
-          <Insights readings={positionReadings.slice(0, 1)} />
-        </section>
-        <section
-          className="financial-story-section"
-          aria-label="Balance-sheet breakdown"
-        >
-          <Heading title="What makes up the balance sheet?" />
-          <div className="story-balance-maps">
-            <BalanceMap period={balance} side="assets" />
-            <BalanceMap period={balance} side="funding" />
-          </div>
-          <p className="story-footnote">
-            Block area shows share of total assets. Book values may differ from
-            resale values. Goodwill and intangible assets are not cash.
-          </p>
-        </section>
-        {children}
+      <DisclosureGroup>
+        {children && (
+          <Disclosure title="Reported figures and filings" variant="inset">
+            {children}
+          </Disclosure>
+        )}
         {safe?.limitations && (
-          <details className="story-secondary">
-            <summary>Financial definitions &amp; coverage</summary>
+          <Disclosure title="Definitions and coverage" variant="inset">
             {safe.limitations.map((line) => (
               <p key={line}>{line}</p>
             ))}
             <p>
-              SEC filing data checked {formatTimestamp(safe.checked_at)}. First
-              saved observation: {formatTimestamp(safe.first_recorded_at)}.
-              Method: {safe.method}.
+              SEC filing data checked {formatTimestamp(safe.checked_at)}. First saved observation: {formatTimestamp(safe.first_recorded_at)}. Method: {safe.method}.
             </p>
             {workspace.performance?.source_status?.last_error && (
               <p>The latest source check failed; these are retained figures.</p>
             )}
-          </details>
+          </Disclosure>
         )}
-      </details>
+      </DisclosureGroup>
     </div>
   );
 }

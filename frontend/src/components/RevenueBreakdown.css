@@ -171,3 +171,5 @@
     animation: none;
   }
 }
+.revenue-mix .mix-figure { padding: 0; border: 0; background: none; color: var(--color-text); font: inherit; cursor: pointer; text-decoration: underline dotted var(--color-line-strong); text-underline-offset: 3px; }
+.revenue-mix .mix-figure:hover { text-decoration-color: var(--color-accent); }

@@ -418,14 +418,9 @@ export default function RevenueFlow({
               {note}
             </p>
           ))}
-          <details
-            key={selected.id}
-            className="flow-all-figures"
-            open={!graph || undefined}
-          >
-            <summary>View all figures &amp; evidence</summary>
-            {connectedSources && sourceFigures}
-            <div className="flow-figures" aria-label="Income statement figures">
+          {connectedSources && sourceFigures}
+          {!graph && (
+            <div className="flow-figures" aria-label="Income statement figures" key={selected.id}>
               {values.map((row) => (
                 <button
                   key={row.key}
@@ -445,7 +440,7 @@ export default function RevenueFlow({
                 </button>
               ))}
             </div>
-          </details>
+          )}
           {selected.expense_parts.length > 0 && (
             <details className="flow-expenses">
               <summary>What makes up operating expenses?</summary>

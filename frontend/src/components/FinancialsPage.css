@@ -894,3 +894,9 @@ a.recovery-part:hover {
 .story-history-notes > article p {
   margin: 0.4rem 0;
 }
+
+/* Trend tiles sit three across; the page stays one calm column otherwise. */
+.financials-story .financial-summary-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+.financials-story .financial-summary-row .ui-trend-tile { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
+@media (max-width: 760px) { .financials-story .financial-summary-row { grid-template-columns: minmax(0, 1fr); } }
+.financials-story .ui-disclosure-group { margin-top: var(--space-3); }

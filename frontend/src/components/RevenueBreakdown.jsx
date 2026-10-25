@@ -1,7 +1,8 @@
 import { formatTimestamp } from "../lib/dateTime";
 import { useId, useState } from "react";
 import Select from "./Select";
-import { FinancialEvidenceRow } from "./FinancialEvidence";
+import { EvidenceDialog } from "./ui";
+import { evidenceDialogRows } from "../lib/financialEvidence";
 import "./RevenueBreakdown.css";
 
 const day = (value) =>
@@ -34,27 +35,35 @@ const colours = [
 const sourceLink = (group, input) =>
   `${group.url}${input?.fact_id ? `#${encodeURIComponent(input.fact_id)}` : ""}`;
 
-function Evidence({ group, row, label = "Inspect figure" }) {
+// The figure itself is the button; one flat dialog shows its filing.
+function Evidence({ group, row, children }) {
+  const [open, setOpen] = useState(false);
+  const dialogRow = {
+    ...row,
+    label: row.label || "Reported revenue",
+    unit: "USD",
+    start: group.start,
+    end: group.end,
+    inputs: row.inputs.map((input) => ({
+      ...input,
+      start: group.start,
+      end: group.end,
+      form: group.form,
+      filing_url: sourceLink(group, input),
+    })),
+  };
   return (
-    <details className="mix-evidence">
-      <summary>{label}</summary>
-      <FinancialEvidenceRow
-        row={{
-          ...row,
-          label: row.label || "Reported revenue",
-          unit: "USD",
-          start: group.start,
-          end: group.end,
-          inputs: row.inputs.map((input) => ({
-            ...input,
-            start: group.start,
-            end: group.end,
-            form: group.form,
-            filing_url: sourceLink(group, input),
-          })),
-        }}
+    <>
+      <button type="button" className="mix-figure" onClick={() => setOpen(true)} aria-haspopup="dialog">
+        {children}
+      </button>
+      <EvidenceDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={dialogRow.label}
+        rows={evidenceDialogRows([dialogRow])}
       />
-    </details>
+    </>
   );
 }
 
@@ -129,7 +138,9 @@ export default function RevenueBreakdown({ data }) {
             <div className="mix-total" aria-live="polite">
               <div>
                 <span>Company revenue</span>
-                <strong>{amount(group.total)}</strong>
+                <Evidence group={group} row={{ label: "Company revenue", value: group.total, inputs: group.total_inputs }}>
+                  <strong>{amount(group.total)}</strong>
+                </Evidence>
               </div>
               <p>
                 {group.period}
@@ -179,7 +190,9 @@ export default function RevenueBreakdown({ data }) {
                       {member.label}
                     </span>
                     <span className="mix-value">
-                      <strong>{amount(member.value)}</strong>
+                      <Evidence group={group} row={member}>
+                        <strong>{amount(member.value)}</strong>
+                      </Evidence>
                       {group.chartable && (
                         <span>{share(member.percentage)}</span>
                       )}
@@ -195,15 +208,9 @@ export default function RevenueBreakdown({ data }) {
                       />
                     </div>
                   )}
-                  <Evidence group={group} row={member} />
                 </li>
               ))}
             </ul>
-            <Evidence
-              group={group}
-              row={{ value: group.total, inputs: group.total_inputs }}
-              label="Inspect company total"
-            />
             <p className="mix-note">
               SEC accepted {formatTimestamp(group.accepted_at)} ·{" "}
               <a href={group.url} target="_blank" rel="noreferrer">

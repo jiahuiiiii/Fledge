@@ -35,7 +35,7 @@ export default function RevenueHistory({
   const [context, setContext] = useState(null),
     [error, setError] = useState("");
   const [sourceKey, setSourceKey] = useState(""),
-    [assumedSource, setAssumedSource] = useState(null);
+    [declinedSource, setDeclinedSource] = useState(null);
   const [evidence, setEvidence] = useState(null),
     [attempt, setAttempt] = useState(0);
   const generation = useRef(0);
@@ -90,7 +90,9 @@ export default function RevenueHistory({
       .filter((p) => p.periodKind === kind && !p.currency)
       .map((p) => [p.id, p.observedAt, p.value, p.low, p.high]),
   );
-  const assumeUSD = assumedSource === assumptionKey;
+  // On by default: estimates with no stated currency are plotted as USD and
+  // marked as assumed; the reader can switch the assumption off.
+  const assumeUSD = declinedSource !== assumptionKey;
   const { plotted, excluded } = chartForecasts(points, rows, kind, assumeUSD);
   const pendingCurrency = excluded.filter(
     (p) => !p.currency && p.reason === "The source does not state a currency.",
@@ -221,8 +223,8 @@ export default function RevenueHistory({
                 <Checkbox
                   checked={assumeUSD}
                   onChange={(event) =>
-                    setAssumedSource(
-                      event.target.checked ? assumptionKey : null,
+                    setDeclinedSource(
+                      event.target.checked ? null : assumptionKey,
                     )
                   }
                 />
@@ -230,8 +232,8 @@ export default function RevenueHistory({
               </label>
               <p>
                 {hasAssumed
-                  ? "USD is your chart assumption for the marked estimates. Their source has not confirmed it."
-                  : "Some sources don’t state a currency. Their estimates are shown below and stay off the dollar chart unless you choose this assumption."}
+                  ? "Marked estimates assume USD; their source doesn’t state a currency."
+                  : "Estimates with no stated currency are off the chart while this is unticked."}
               </p>
             </div>
           )}
