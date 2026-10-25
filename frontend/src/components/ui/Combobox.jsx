@@ -10,6 +10,8 @@ export default function Combobox({
   placeholder = "Search",
   emptyText = "No matches",
   disabled = false,
+  filter = true,
+  onQueryChange,
   className = "",
 }) {
   const id = useId();
@@ -18,9 +20,11 @@ export default function Combobox({
   const [active, setActive] = useState(0);
   const root = useRef(null);
   const needle = query.trim().toLowerCase();
+  // filter={false}: the caller already searched (for example on the server).
   const shown = options
-    .filter((o) => !needle || `${o.label} ${o.hint || ""}`.toLowerCase().includes(needle))
+    .filter((o) => !filter || !needle || `${o.label} ${o.hint || ""}`.toLowerCase().includes(needle))
     .slice(0, 8);
+  const listed = open && (filter || needle);
   useEffect(() => {
     const close = (e) => {
       if (!root.current?.contains(e.target)) setOpen(false);
@@ -40,16 +44,17 @@ export default function Combobox({
         type="text"
         role="combobox"
         aria-label={label}
-        aria-expanded={open}
+        aria-expanded={!!listed}
         aria-controls={`${id}-list`}
         aria-autocomplete="list"
-        aria-activedescendant={open && shown[active] ? `${id}-${active}` : undefined}
+        aria-activedescendant={listed && shown[active] ? `${id}-${active}` : undefined}
         autoComplete="off"
         disabled={disabled}
         placeholder={placeholder}
         value={query}
         onChange={(e) => {
           setQuery(e.target.value);
+          onQueryChange?.(e.target.value);
           setActive(0);
           setOpen(true);
         }}
@@ -62,13 +67,13 @@ export default function Combobox({
           } else if (e.key === "ArrowUp") {
             e.preventDefault();
             setActive((a) => Math.max(a - 1, 0));
-          } else if (e.key === "Enter" && open) {
+          } else if (e.key === "Enter" && listed) {
             e.preventDefault();
             choose(shown[active]);
           } else if (e.key === "Escape") setOpen(false);
         }}
       />
-      {open && (
+      {listed && (
         <ul id={`${id}-list`} role="listbox" className="ui-combobox__list">
           {shown.length ? (
             shown.map((o, i) => (

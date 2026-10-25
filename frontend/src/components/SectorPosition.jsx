@@ -1,3 +1,4 @@
+import { Combobox } from "./ui";
 import { formatTimestamp } from "../lib/dateTime";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
@@ -897,57 +898,28 @@ export default function SectorPosition({
         <>
           <div className="position-group">
             <h3>Peers</h3>
-            <label className="position-search">
-              Peer ticker or company
-              <input
-                value={search}
+            <div className="position-search">
+              <span>Add a peer</span>
+              <Combobox
+                label="Peer ticker or company"
                 placeholder="Type a ticker or company name"
                 disabled={busy || (draft || []).length >= 8}
-                onChange={(event) => searchPeers(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter" || searched !== search) return;
-                  const choices = searchResults.filter(
-                    (c) => !draft?.includes(c.symbol),
-                  );
-                  const exact = choices.find(
-                    (c) => c.symbol === search.trim().toUpperCase(),
-                  );
-                  if (exact || choices.length === 1) {
-                    event.preventDefault();
-                    addPeer((exact || choices[0]).symbol);
-                  }
-                }}
+                filter={false}
+                onQueryChange={searchPeers}
+                options={searchResults
+                  .filter((c) => !draft?.includes(c.symbol))
+                  .map((c) => ({ value: c.symbol, label: `${c.symbol} · ${companyName(c)}` }))}
+                emptyText={
+                  searchError ||
+                  (searched !== search
+                    ? "Searching…"
+                    : searchResults.length
+                      ? "Already selected"
+                      : "No matching company")
+                }
+                onSelect={addPeer}
               />
-            </label>
-            {search.trim() && (
-              <div className="position-search-results" aria-live="polite">
-                {searchError ? (
-                  <p role="alert">{searchError}</p>
-                ) : searched !== search ? (
-                  <p>Searching…</p>
-                ) : searchResults.filter((c) => !draft?.includes(c.symbol))
-                    .length ? (
-                  searchResults
-                    .filter((c) => !draft?.includes(c.symbol))
-                    .slice(0, 6)
-                    .map((c) => (
-                      <button
-                        key={c.symbol}
-                        disabled={busy}
-                        onClick={() => addPeer(c.symbol)}
-                      >
-                        {c.symbol} · {companyName(c)}
-                      </button>
-                    ))
-                ) : (
-                  <p>
-                    {searchResults.length
-                      ? "Already selected."
-                      : "No matching company."}
-                  </p>
-                )}
-              </div>
-            )}
+            </div>
             <ul
               className="position-peer-list"
               aria-label="Selected peers"

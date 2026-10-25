@@ -111,7 +111,6 @@ import ReportExpectationEditor, {
   ReportExpectationText,
 } from "./components/ReportExpectation";
 
-const FmpPanel = lazy(() => import("./components/FmpPanel"));
 
 const metrics = {
   revenue_growth: "Revenue growth",
@@ -2490,20 +2489,8 @@ function CompanyWorkspace({
                             instrument={data.instrument}
                             performance={data.performance}
                             quote={data.market?.quote?.quote}
+                            priceBars={priceRead?.data?.snapshot?.series?.bars}
                           />
-                          {!isRecorded && (
-                            <Suspense fallback={<p>Loading comparisons…</p>}>
-                              <FmpPanel
-                                key={`peers-${instrumentId}`}
-                                mode="ratios"
-                                revision={updatedAt}
-                                instrumentId={instrumentId}
-                                visible={
-                                  view === "workspace" && tab === "valuation"
-                                }
-                              />
-                            </Suspense>
-                          )}
                         </>
                       </RetainedView>
                       <RetainedView active={tab === "fundamentals"}>

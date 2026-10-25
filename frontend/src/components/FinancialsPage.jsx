@@ -476,7 +476,7 @@ export default function FinancialsPage({
                 setAnalystOpen(event.currentTarget.open);
             }}
           >
-            {analystOpen && <FmpPanel instrumentId={instrumentId} visible={visible} revision={revision} mode="outlook" />}
+            {analystOpen && <FmpPanel instrumentId={instrumentId} visible={visible} revision={revision} />}
           </Disclosure>
           <section
             className="financial-story-section"

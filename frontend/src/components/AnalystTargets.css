@@ -1,0 +1,15 @@
+.analyst-targets .target-chart { width: 100%; height: auto; max-height: 260px; }
+.target-chart__line { stroke: var(--color-info); stroke-width: 2; }
+.target-chart__now { stroke: var(--color-line-strong); stroke-dasharray: 3 4; }
+.target-chart__dot { fill: var(--color-info); }
+.target-chart__band { fill: var(--color-surface-3); opacity: 0.6; }
+.target-chart__target line { stroke: var(--color-muted); stroke-dasharray: 4 4; }
+.target-chart__target circle { fill: var(--color-muted); }
+.target-chart__target text { fill: var(--color-text-2); font-size: 11px; }
+.target-chart__target .target-chart__delta { fill: var(--color-muted); }
+.target-chart__target.is-up line, .target-chart__target.is-up circle { stroke: var(--color-positive); }
+.target-chart__target.is-up circle { fill: var(--color-positive); }
+.target-chart__target.is-up .target-chart__delta { fill: var(--color-positive); }
+.target-chart__target.is-down line, .target-chart__target.is-down circle { stroke: var(--color-negative); }
+.target-chart__target.is-down circle { fill: var(--color-negative); }
+.target-chart__target.is-down .target-chart__delta { fill: var(--color-negative); }
