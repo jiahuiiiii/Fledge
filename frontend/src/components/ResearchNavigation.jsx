@@ -16,19 +16,13 @@ const sections = {
   fundamentals: {
     label: "Financials",
     description:
-      "Read reported performance and trace the numbers to company filings.",
+      "Read reported performance, management guidance and analyst forecasts.",
     icon: "M5 20V10m7 10V4m7 16v-7M3 20h18",
-  },
-  expectations: {
-    label: "Outlook",
-    description:
-      "Read management guidance, analyst forecasts and expectations reported in the news.",
-    icon: "M4 19 10 13l4 3 6-11M14 5h6v6",
   },
   business: {
     label: "Overview",
     description:
-      "Understand the business through original company disclosures.",
+      "See the price, current signals and the business at a glance.",
     icon: "M4 21V7h10v14M14 11h6v10M8 11h2m-2 4h2m-2 4h2M2 21h20",
   },
   valuation: {
@@ -43,15 +37,8 @@ const sections = {
 export function researchTabs({ recorded, beginner }) {
   if (beginner) return ["summary", "evidence"];
   return recorded
-    ? ["summary", "business", "fundamentals", "evidence"]
-    : [
-        "summary",
-        "business",
-        "fundamentals",
-        "evidence",
-        "expectations",
-        "valuation",
-      ];
+    ? ["business", "evidence", "fundamentals"]
+    : ["business", "evidence", "fundamentals", "valuation"];
 }
 
 export default function ResearchNavigation({

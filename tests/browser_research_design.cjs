@@ -86,9 +86,8 @@ let browser;
   }
   assert.deepEqual(labels, [
     "Overview",
-    "Financials",
     "News & discussion",
-    "Outlook",
+    "Financials",
     "Compare & value",
   ]);
   assert.equal(
@@ -98,8 +97,10 @@ let browser;
     "true",
   );
   assert.equal(
-    await page.locator(".company-chart-disclosure").getAttribute("open"),
-    null,
+    await page
+      .getByRole("region", { name: "Daily price history", exact: true })
+      .isVisible(),
+    true,
   );
   for (const width of [1920, 1600, 1440, 1024, 768, 390, 320]) {
     await page.setViewportSize({ width, height: 1000 });

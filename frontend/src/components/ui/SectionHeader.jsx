@@ -17,6 +17,7 @@ export default function SectionHeader({
   description,
   actions,
   id,
+  tabIndex,
   className = "",
 }) {
   const Heading = as || HEADINGS[level];
@@ -36,7 +37,7 @@ export default function SectionHeader({
         {eyebrow && (
           <Text className="ui-section-header__eyebrow">{eyebrow}</Text>
         )}
-        <Heading id={id} className="ui-section-header__title">
+        <Heading id={id} tabIndex={tabIndex} className="ui-section-header__title">
           {title}
         </Heading>
         {description && (

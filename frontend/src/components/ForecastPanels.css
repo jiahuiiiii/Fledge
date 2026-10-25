@@ -1,10 +1,10 @@
-.outlook-page {
+.financials-story {
   display: grid;
   gap: var(--space-7);
   padding-top: var(--space-5);
   min-width: 0;
 }
-.app-shell .outlook-page h2 {
+.app-shell .financials-story h2 {
   font-size: var(--text-xl);
   line-height: 1.3;
   letter-spacing: -0.02em;
@@ -13,8 +13,8 @@
   margin: 0 0 var(--space-2);
 }
 .outlook-section-heading p,
-.app-shell .outlook-page .outlook-source-time,
-.app-shell .outlook-page .outlook-data-note {
+.app-shell .financials-story .outlook-source-time,
+.app-shell .financials-story .outlook-data-note {
   color: var(--color-muted);
   line-height: 1.6;
 }
@@ -29,7 +29,7 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.outlook-page .outlook-analysts {
+.financials-story .outlook-analysts {
   padding: var(--space-6) 0 0;
   border-top: 1px solid var(--color-line);
 }
@@ -76,12 +76,12 @@
   line-height: 1.5;
   white-space: nowrap;
 }
-.app-shell .outlook-page .outlook-source-time,
-.app-shell .outlook-page .outlook-data-note {
+.app-shell .financials-story .outlook-source-time,
+.app-shell .financials-story .outlook-data-note {
   font-size: var(--text-sm);
   margin: var(--space-3) 0;
 }
-.app-shell .outlook-page .outlook-source-notice {
+.app-shell .financials-story .outlook-source-notice {
   color: var(--color-caution-light);
   padding-left: var(--space-3);
   font-size: var(--text-sm);
@@ -132,42 +132,11 @@
   font-size: var(--text-sm);
   margin-top: var(--space-2);
 }
-.outlook-page p,
-.outlook-page a,
-.outlook-page h3,
-.outlook-page h4 {
+.financials-story p,
+.financials-story a,
+.financials-story h3,
+.financials-story h4 {
   overflow-wrap: anywhere;
-}
-.outlook-news {
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-xl);
-  background: var(--color-surface);
-  padding: 0 var(--space-5);
-  min-width: 0;
-}
-.outlook-news > summary {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 88px;
-}
-.outlook-news > summary > span:first-child {
-  flex: 1;
-  min-width: 0;
-}
-.outlook-news > summary strong {
-  font-size: var(--text-base);
-  font-weight: 600;
-}
-.outlook-news > summary small {
-  display: block;
-  color: var(--color-muted);
-  font-size: var(--text-sm);
-  margin-top: var(--space-1);
-}
-.outlook-news .expectations-panel {
-  border-top: 1px solid var(--color-line);
-  padding-top: var(--space-5);
 }
 .outlook-empty {
   margin-top: var(--space-5);
@@ -200,26 +169,11 @@
   }
 }
 @media (max-width: 600px) {
-  .outlook-page {
-    gap: var(--space-6);
-  }
   .outlook-provider,
   .outlook-empty {
     padding: var(--space-4);
   }
-  .outlook-news {
-    padding: 0 var(--space-4);
-  }
-  .outlook-news > summary {
-    padding: var(--space-4) 0;
-    flex-wrap: wrap;
-  }
-  .outlook-news > summary > span:first-child {
-    flex-basis: calc(100% - 36px);
-  }
-  .outlook-news > summary > .outlook-status {
-    margin-left: var(--space-5);
-  }
+
 }
 
 .outlook-unavailable {

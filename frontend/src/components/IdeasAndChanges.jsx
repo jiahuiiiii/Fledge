@@ -5,6 +5,7 @@ import { useState } from "react";
 import CompanyAvatar from "./CompanyAvatar";
 import { companyName } from "../lib/companyIdentity";
 import { useProfile } from "../lib/profile";
+import { LightbulbIcon, RefreshIcon, SectionHeader } from "./ui";
 import "./IdeasAndChanges.css";
 const metrics = {
   revenue_growth: "Revenue growth",
@@ -37,24 +38,32 @@ export default function IdeasAndChanges({
       className={`collection-page${mode === "ideas" ? " ideas-page" : ""}`}
       aria-label={mode === "ideas" ? "Saved ideas" : undefined}
     >
-      {mode !== "ideas" && <span className="section-label">YOUR RESEARCH</span>}
-      <div className="ideas-heading">
-        <div>
-          <h2>{mode === "ideas" ? "My views" : "What changed"}</h2>
-          <p className="muted">
-            {mode === "ideas"
-              ? "The views you chose to save, in your own words."
-              : "New evidence, age limits and coverage changes, linked to the reasoning you saved at the time."}
-          </p>
-        </div>
-        {mode === "ideas" && (
-          <span className="ideas-scope">
-            {selectedCompany && <span>{selectedCompany.symbol}</span>}
-            {ideas.length} saved{" "}
-            {beginner ? (ideas.length === 1 ? "view" : "views") : ideas.length === 1 ? "idea" : "ideas"}
-          </span>
-        )}
-      </div>
+      <SectionHeader
+        level="page"
+        as="h2"
+        icon={mode === "ideas" ? <LightbulbIcon /> : <RefreshIcon />}
+        title={mode === "ideas" ? "My views" : "What changed"}
+        description={
+          mode === "ideas"
+            ? "The views you chose to save, in your own words."
+            : "New evidence, age limits and coverage changes, linked to the reasoning you saved at the time."
+        }
+        actions={
+          mode === "ideas" && (
+            <span className="ideas-scope">
+              {selectedCompany && <span>{selectedCompany.symbol}</span>}
+              {ideas.length} saved{" "}
+              {beginner
+                ? ideas.length === 1
+                  ? "view"
+                  : "views"
+                : ideas.length === 1
+                  ? "idea"
+                  : "ideas"}
+            </span>
+          )
+        }
+      />
       {mode === "ideas" ? (
         ideas.length ? (
           <div className="idea-collection">

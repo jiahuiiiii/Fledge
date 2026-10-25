@@ -217,6 +217,14 @@ def details(conn, owner, events):
     from .monitoring import alert_feedback
     from .monitoring import alert_routing
     feedback_enabled=alert_feedback.enabled()
+    # Company alerts share sentiment readings. Load them in bounded batches so
+    # each request evaluates a reading once instead of once per alert.
+    company_ids = [event["id"] for event in events if event["kind"] == "company"]
+    company_details = {}
+    for start in range(0, len(company_ids), 100):
+        chunk = company_ids[start : start + 100]
+        for item in news_watch.list_alerts(conn, owner, ids=chunk, previous=False):
+            company_details[item["id"]] = item
     result = []
     for event in events:
         if event["kind"] == "idea":
@@ -232,7 +240,7 @@ def details(conn, owner, events):
             detail = move_alerts.present(conn, owner, event["id"])
             title = detail["title"]
         elif event["kind"] == "company":
-            detail = news_watch.list_alerts(conn, owner, ids=[event["id"]], previous=False)[0]
+            detail = company_details[str(event["id"])]
             title = detail["payload"].get("title", "Company source alert")
             if not detail.get("withheld"):
                 from .monitoring.telegram_message import company_summary
@@ -368,13 +376,10 @@ def prepare(
             args,
         )
         records = details(conn, owner, page_rows)
-        # Main points cover every matching record (up to 1,000), not only this page.
-        if exporting or (page == 0 and total <= len(page_rows)):
-            main_points = highlights(records)
-        else:
-            every = rows(conn, EVENTS + "SELECT * FROM events" + where
-                         + " ORDER BY created_at DESC,kind,id DESC LIMIT 1000", args)
-            main_points = highlights(details(conn, owner, every))
+        # Main points summarise the visible page. Loading every matching record
+        # here made the inbox wait on repeated sentiment/source checks; the
+        # explicit export still covers the full retained window.
+        main_points = highlights(records)
         scoped = [c for c in companies if iid is None or str(c["id"]) == iid]
         # One market event may be relevant to several companies. Company badges
         # include it for each member; the full-list totals count the event once.

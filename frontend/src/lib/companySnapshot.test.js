@@ -131,7 +131,7 @@ test("checks pass, fail or stay unknown from the data", () => {
     health.checks.map((c) => c.state),
     ["pass", "fail", "pass"],
   );
-  const outlook = sections.find((s) => s.title === "Outlook");
+  const outlook = sections.find((s) => s.title === "Guidance and forecasts");
   assert.equal(outlook.checks[1].label, "Not yet compared with results");
   assert.equal(outlook.checks[1].state, "unknown");
 });

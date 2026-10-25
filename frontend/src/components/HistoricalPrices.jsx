@@ -11,11 +11,13 @@ export default function HistoricalPrices({
   loadStep,
   visible = false,
   onRead,
+  autoRefresh = false,
 }) {
   const [data, setData] = useState(initialRead?.data || null),
     [error, setError] = useState(initialRead?.error || "");
   const [checking, setChecking] = useState(false);
   const [paused, setPaused] = useState(false);
+  const [refreshChosen, setRefreshChosen] = useState(false);
   const [pageVisible, setPageVisible] = useState(!document.hidden);
   const generation = useRef(0);
   const inFlight = useRef(false);
@@ -92,12 +94,12 @@ export default function HistoricalPrices({
     }
   }, [instrumentId, onRead]);
   useEffect(() => {
-    if (!visible || !pageVisible || paused || checking) return;
+    if (!visible || !pageVisible || paused || checking || (!autoRefresh && !refreshChosen)) return;
     const delay = priceRefreshDelay(data);
     if (delay == null) return;
     const timer = setTimeout(refreshPrices, Math.max(1000, delay));
     return () => clearTimeout(timer);
-  }, [data, visible, pageVisible, paused, checking, refreshPrices]);
+  }, [data, visible, pageVisible, paused, checking, refreshPrices, autoRefresh, refreshChosen]);
   const snapshot = data?.snapshot,
     series = snapshot?.series;
   const bars =
@@ -117,7 +119,7 @@ export default function HistoricalPrices({
           <span className="fine"> · Yahoo Finance</span>
         </div>
         <button
-          onClick={refreshPrices}
+          onClick={() => { setRefreshChosen(true); refreshPrices(); }}
           disabled={checking || !data?.available || !data?.configured}
         >
           {checking ? "Checking prices…" : "Refresh prices"}
@@ -151,7 +153,9 @@ export default function HistoricalPrices({
             ? " Updates paused after a failed check. Choose Refresh prices to try again."
             : !data?.configured
               ? " Price checks are unavailable while this source connection is disabled."
-              : " Updates every minute while this chart is open and visible."}
+              : refreshChosen || autoRefresh
+                ? " Updates every minute while this chart is open and visible."
+                : " Showing saved prices. Choose Refresh prices for a newer check."}
           {series.delay_minutes > 0
             ? ` Yahoo reports a ${series.delay_minutes}-minute data delay.`
             : " Data may be delayed by the source."}

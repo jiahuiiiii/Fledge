@@ -79,6 +79,7 @@ const AllHistory = lazy(() =>
 );
 import BusinessPanel from "./components/BusinessPanel";
 import CompanySnapshot from "./components/CompanySnapshot";
+import ExpectationsPanel from "./components/ExpectationsPanel";
 import CompanionGuide, { ExplorationPrompt } from "./components/CompanionGuide";
 import AccountGate from "./components/AccountGate";
 import FilingWatch from "./components/FilingWatch";
@@ -101,7 +102,7 @@ import PortfolioRead from "./components/PortfolioRead";
 import PersonalHome from "./components/PersonalHome";
 import AccountPage from "./components/AccountPage";
 import WorkspaceHeader from "./components/WorkspaceHeader";
-import { Button, UserIcon } from "./components/ui";
+import { Button, Disclosure, UserIcon } from "./components/ui";
 import {
   ProfileContext,
   readLocalMode,
@@ -113,7 +114,6 @@ import ReportExpectationEditor, {
 } from "./components/ReportExpectation";
 
 const FmpPanel = lazy(() => import("./components/FmpPanel"));
-const OutlookPage = lazy(() => import("./components/OutlookPage"));
 
 const metrics = {
   revenue_growth: "Revenue growth",
@@ -647,7 +647,7 @@ function CompanyWorkspace({
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [updatesOpen, setUpdatesOpen] = useState(false);
   const [updatePressed, setUpdatePressed] = useState(false);
-  const [priceChartOpen, setPriceChartOpen] = useState(false);
+  const [newsExpectationsOpen, setNewsExpectationsOpen] = useState(false);
   useEffect(() => {
     mainPane.current?.scrollTo(0, 0);
   }, [view, initialEvaluation, scope]);
@@ -777,8 +777,27 @@ function CompanyWorkspace({
   }
   // Beginner mode shows only Summary and News & discussion.
   const recordedCompany = data?.instrument?.mode === "recorded";
+  const [focusManagement, setFocusManagement] = useState(false);
+  useEffect(() => {
+    if (tab === "expectations") {
+      setFocusManagement(true);
+      setTab("fundamentals");
+    } else if (tab === "summary" && !beginner) setTab("business");
+  }, [tab, beginner]);
+  useEffect(() => {
+    if (!focusManagement || tab !== "fundamentals" || data?.financials_pending) return;
+    const timer = setTimeout(() => {
+      const heading = document.getElementById("management-expects");
+      if (!heading) return;
+      heading.focus({ preventScroll: true });
+      heading.scrollIntoView({ block: "start", behavior: "instant" });
+      setFocusManagement(false);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [focusManagement, tab, data?.financials_pending]);
   useEffect(() => {
     const allowed = researchTabs({ recorded: recordedCompany, beginner });
+    if (tab === "expectations" || (tab === "summary" && !beginner)) return;
     if (!allowed.includes(tab)) setTab(allowed[0]);
   }, [beginner, recordedCompany, tab]);
   const workspaceLane = useRef(createReadLane());
@@ -787,7 +806,8 @@ function CompanyWorkspace({
     sourcesOpen ||
     (view === "workspace" &&
       !!selectedCompanyId &&
-      ["summary", "business", "fundamentals"].includes(tab));
+      (["business", "fundamentals"].includes(tab) ||
+        (beginner && tab === "summary")));
   const includeFinancials = useRef(false);
   includeFinancials.current =
     !companyLoading && !data?.financials_pending && needsFinancials;
@@ -920,7 +940,8 @@ function CompanyWorkspace({
     setResearchOpen(false);
     setSourcesOpen(false);
     setUpdatesOpen(false);
-    setPriceChartOpen(false);
+    setNewsExpectationsOpen(false);
+    setFocusManagement(false);
     setEditor(null);
     setApproved(false);
     setFormError("");
@@ -1032,6 +1053,51 @@ function CompanyWorkspace({
       ),
     };
   }, [data, alertDetail]);
+  // Beginner Summary content, reused by the merged Overview for fictional
+  // sample companies so removing the Pro Summary tab did not hide their news.
+  const summaryPanel = (active) => (
+    <BeginnerSummary
+      key={`summary-${instrumentId}`}
+      practice={recordedCompany}
+      data={data}
+      instrumentId={instrumentId}
+      visible={view === "workspace" && active}
+      savedView={current}
+      onSaveView={() => {
+        openEditor();
+        if (!current) {
+          const plain = `What do I think about ${data.instrument.name}, and why?`;
+          setEditor({
+            ...formFor(null, plain),
+            question: plain,
+          });
+        }
+      }}
+      onView={(next) => {
+        setTab(next);
+        requestAnimationFrame(() => {
+          window.scrollTo(0, 0);
+          document
+            .querySelectorAll(".main-workspace, .workspace-grid")
+            .forEach((el) => el.scrollTo?.(0, 0));
+        });
+      }}
+      onSource={setSource}
+      onWorld={() => setView("world")}
+      onUpdate={isRecorded ? undefined : () => setUpdatesOpen(true)}
+      onRate={
+        isRecorded
+          ? undefined
+          : () => startLoading({ analyze: true, lookback_days: 7 })
+      }
+      rating={
+        loadingRun?.active
+          ? loadingRun.steps.find((s) => s.key === "analysis")?.status || false
+          : false
+      }
+      priceHistory={priceRead?.data}
+    />
+  );
   if (!data)
     return (
       <div
@@ -1658,7 +1724,7 @@ function CompanyWorkspace({
               : "These metrics use a quarterly reporting period."}{" "}
             Growth and margin use reported inputs; SEC ratios are calculated in
             the app. Guidance is an expectation, not an observed result. Read
-            forecasts separately in Outlook.
+            forecasts separately in Financials.
           </p>
         </div>
       </>
@@ -1984,51 +2050,7 @@ function CompanyWorkspace({
                         }}
                       />
                       <RetainedView active={tab === "summary"}>
-                        <BeginnerSummary
-                          key={`summary-${instrumentId}`}
-                          practice={recordedCompany}
-                          data={data}
-                          instrumentId={instrumentId}
-                          visible={view === "workspace" && tab === "summary"}
-                          savedView={current}
-                          onSaveView={() => {
-                            openEditor();
-                            if (!current) {
-                              const plain = `What do I think about ${data.instrument.name}, and why?`;
-                              setEditor({
-                                ...formFor(null, plain),
-                                question: plain,
-                              });
-                            }
-                          }}
-                          onView={(next) => {
-                            setTab(next);
-                            requestAnimationFrame(() => {
-                              window.scrollTo(0, 0);
-                              document
-                                .querySelectorAll(
-                                  ".main-workspace, .workspace-grid",
-                                )
-                                .forEach((el) => el.scrollTo?.(0, 0));
-                            });
-                          }}
-                          onSource={setSource}
-                          onWorld={() => setView("world")}
-                          onUpdate={
-                            isRecorded ? undefined : () => setUpdatesOpen(true)
-                          }
-                          onRate={
-                            isRecorded
-                              ? undefined
-                              : () => startLoading({ analyze: true, lookback_days: 7 })
-                          }
-                          rating={
-                            loadingRun?.active
-                              ? loadingRun.steps.find((s) => s.key === "analysis")?.status || false
-                              : false
-                          }
-                          priceHistory={priceRead?.data}
-                        />
+                        {summaryPanel(tab === "summary")}
                       </RetainedView>
                       <RetainedView active={tab === "evidence"}>
                         <>
@@ -2171,6 +2193,32 @@ function CompanyWorkspace({
                                 )
                               }
                             />
+                          )}
+                          {!isRecorded && !beginner && (
+                            <Disclosure
+                              title="Expectations reported in the news"
+                              description="Optional AI reading from saved stories"
+                              open={newsExpectationsOpen}
+                              onToggle={(event) => {
+                                if (event.target === event.currentTarget)
+                                  setNewsExpectationsOpen(event.currentTarget.open);
+                              }}
+                            >
+                              {newsExpectationsOpen && (
+                                <ExpectationsPanel
+                                  key={instrumentId}
+                                  visible={view === "workspace" && tab === "evidence"}
+                                  instrumentId={instrumentId}
+                                  enabled={modelStatus?.briefing_enabled}
+                                  onSource={setSource}
+                                  onView={setTab}
+                                  onDraft={(q) => {
+                                    openEditor();
+                                    setEditor({ ...formFor(current, q), question: q });
+                                  }}
+                                />
+                              )}
+                            </Disclosure>
                           )}
                           {!isRecorded && (
                             <MarketResearch
@@ -2343,32 +2391,6 @@ function CompanyWorkspace({
                           </div>
                         </>
                       </RetainedView>
-                      <RetainedView active={tab === "expectations"}>
-                        <Suspense
-                          fallback={<p role="status">Loading outlook…</p>}
-                        >
-                          <OutlookPage
-                            key={instrumentId}
-                            revision={updatedAt}
-                            management={data.management_outlook}
-                            includeForecasts={!isRecorded}
-                            instrumentId={instrumentId}
-                            visible={
-                              view === "workspace" && tab === "expectations"
-                            }
-                            enabled={modelStatus?.briefing_enabled}
-                            onSource={setSource}
-                            onView={setTab}
-                            onDraft={(q) => {
-                              openEditor();
-                              setEditor({
-                                ...formFor(current, q),
-                                question: q,
-                              });
-                            }}
-                          />
-                        </Suspense>
-                      </RetainedView>
                       {isRecorded && (
                         <RetainedView active={tab === "business"}>
                           <div className="overview-welcome">
@@ -2387,6 +2409,7 @@ function CompanyWorkspace({
                               Read news &amp; discussion
                             </button>
                           </div>
+                          {!beginner && summaryPanel(tab === "business")}
                         </RetainedView>
                       )}
                       {!isRecorded && (
@@ -2401,7 +2424,7 @@ function CompanyWorkspace({
                               focusTopic={
                                 exploration?.topic ? exploration : null
                               }
-                              businessPanel={
+                              businessPanel={() =>
                                 <BusinessPanel
                                   key={`business-${instrumentId}`}
                                   instrumentId={instrumentId}
@@ -2433,8 +2456,11 @@ function CompanyWorkspace({
                               financialError={financialError}
                               onRetryFinancials={retryFinancials}
                               instrumentId={instrumentId}
+                              priceHistory={priceRead?.data}
+                              onWorld={() => setView("world")}
                               onView={(next, destination) => {
                                 setTab(next);
+                                if (destination === "management") setFocusManagement(true);
                                 if (destination === "scenario")
                                   requestAnimationFrame(() => {
                                     const panel =
@@ -2455,28 +2481,14 @@ function CompanyWorkspace({
                               onAsk={() => setResearchOpen(true)}
                               onUpdate={() => setUpdatesOpen(true)}
                               chart={
-                                <details
-                                  className="company-chart-disclosure"
-                                  onToggle={(event) =>
-                                    setPriceChartOpen(event.currentTarget.open)
-                                  }
-                                >
-                                  <summary>Price chart · past year</summary>
-                                  <HistoricalPrices
-                                    key={`prices-${instrumentId}`}
-                                    instrumentId={instrumentId}
-                                    initialRead={priceRead || pendingPriceRead}
-                                    visible={
-                                      priceChartOpen &&
-                                      view === "workspace" &&
-                                      tab === "business"
-                                    }
-                                    onRead={setPriceRead}
-                                    loadStep={loadingRun?.steps.find(
-                                      (s) => s.key === "prices",
-                                    )}
-                                  />
-                                </details>
+                                <HistoricalPrices
+                                  key={`prices-${instrumentId}`}
+                                  instrumentId={instrumentId}
+                                  initialRead={priceRead || pendingPriceRead}
+                                  visible={view === "workspace" && tab === "business"}
+                                  onRead={setPriceRead}
+                                  loadStep={loadingRun?.steps.find((s) => s.key === "prices")}
+                                />
                               }
                             />
                           </>
@@ -2556,6 +2568,7 @@ function CompanyWorkspace({
                                 }
                                 onCompare={() => setTab("valuation")}
                                 onRefresh={refresh}
+                                management={data.management_outlook}
                               >
                                 {renderFinancialReports()}
                               </FinancialsPage>

@@ -183,9 +183,34 @@ let browser;
   assert.equal(await main.locator(".loading-skeleton:visible").count(), 0);
   await nav.getByRole("button", { name: "Workspace", exact: true }).click();
   // Delayed research subsection changes have their own loading surface.
+  // The expectations reading now opens from News & discussion.
+  {
+    let releasePanel;
+    const panelHeld = new Promise((resolve) => (releasePanel = resolve));
+    const panelRoute = "**/api/v1/companies/" + google + "/expectations";
+    await page.route(panelRoute, async (r) => {
+      await panelHeld;
+      await r.continue();
+    });
+    await page
+      .getByRole("tab", { name: "News & discussion", exact: true })
+      .click();
+    const disclosure = page
+      .locator(".ui-disclosure")
+      .filter({ hasText: "Expectations reported in the news" });
+    await disclosure.locator("summary").first().click();
+    const panel = page.getByRole("region", {
+      name: "Company expectations",
+      exact: true,
+    });
+    await panel.locator(".skeleton-panel").waitFor();
+    await sameShell();
+    releasePanel();
+    await page.unroute(panelRoute);
+    await panel.locator(".loading-skeleton").waitFor({ state: "hidden" });
+  }
   for (const [tabName, endpoint, regionName] of [
-    ["Expectations", "expectations", "Company expectations"],
-    ["Valuation", "valuation", "Valuation scenarios"],
+    ["Compare & value", "valuation", "Valuation scenarios"],
   ]) {
     let releasePanel;
     const panelHeld = new Promise((resolve) => (releasePanel = resolve));

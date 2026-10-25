@@ -7,7 +7,10 @@ import RevenueFlow from "./RevenueFlow";
 import RevenueBreakdown from "./RevenueBreakdown";
 import FinancialRecovery from "./FinancialRecovery";
 import Select from "./Select";
+import ManagementOutlook from "./ManagementOutlook";
+import FmpPanel from "./FmpPanel";
 import PeerContext from "./PeerContext";
+import { Disclosure, SectionHeader } from "./ui";
 import TermHelp from "./TermHelp";
 import LoadingSkeleton from "./LoadingSkeleton";
 import {
@@ -26,6 +29,7 @@ import {
 import FinancialHistory from "./FinancialHistory";
 import RevenueHistory from "./RevenueHistory";
 import "./FinancialsPage.css";
+import "./ForecastPanels.css";
 
 function Evidence({
   rows,
@@ -229,7 +233,9 @@ export default function FinancialsPage({
   onCompare,
   onRefresh,
   revision,
+  management,
 }) {
+  const [analystOpen, setAnalystOpen] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [story, setStory] = useState(null),
     [error, setError] = useState("");
@@ -459,6 +465,22 @@ export default function FinancialsPage({
               series={incomeSeries}
             />
           </section>
+          <section className="financial-story-section" aria-labelledby="management-expects">
+            <SectionHeader level="section" as="h2" id="management-expects" title="What management expects" tabIndex={-1} />
+            <ManagementOutlook data={management} />
+          </section>
+          <Disclosure
+            className="financial-analyst-disclosure"
+            title="Analyst forecasts table"
+            description="Numbers behind the forecast points"
+            open={analystOpen}
+            onToggle={(event) => {
+              if (event.target === event.currentTarget)
+                setAnalystOpen(event.currentTarget.open);
+            }}
+          >
+            {analystOpen && <FmpPanel instrumentId={instrumentId} visible={visible} revision={revision} mode="outlook" />}
+          </Disclosure>
           <section
             className="financial-story-section"
             aria-label="What it owns and owes"

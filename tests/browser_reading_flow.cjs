@@ -244,7 +244,7 @@ let browser;
     .locator("#specific-question")
     .fill("What would change my view of this company?");
   await page.keyboard.press("Escape");
-  await sections.getByRole("tab", { name: "Outlook", exact: true }).click();
+  await sections.getByRole("tab", { name: "Financials", exact: true }).click();
   await page.getByRole("button", { name: "Notebook", exact: true }).click();
   assert.equal(
     await notebook.locator("#specific-question").inputValue(),

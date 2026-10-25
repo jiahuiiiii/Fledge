@@ -8,30 +8,23 @@ import { sourceCoverage } from "../lib/sourceCoverage";
 import {
   countLabel,
   countMood,
-  dayLabel,
   groupByTone,
   newsMeaning,
   peopleMeaning,
   plainTone,
-  platformName,
   priceLine,
   socialTones,
   worldForCompany,
   worldLight,
 } from "../lib/beginnerSummary";
-
-const EFFECT_WORDS = {
-  could_help: "Could help",
-  could_hurt: "Could hurt",
-  mixed_or_unclear: "Could go either way",
-};
-// The saved world-link effect, shown with the matching tone badge.
-const EFFECT_TONE = {
-  could_help: "positive",
-  could_hurt: "negative",
-  mixed_or_unclear: "mixed",
-};
-import { Badge, Button, Card, ChevronRightIcon, SectionHeader } from "./ui";
+import { Button, Card, ChevronRightIcon, SectionHeader } from "./ui";
+import {
+  PriceMoveLine,
+  SignalLights,
+  ToneHeadlineGroups,
+  WorldSignalCard,
+  YourViewCard,
+} from "./OverviewShared";
 import "./BeginnerSummary.css";
 
 // Beginner summary, "Signals" layout: the price, three lights (News, People
@@ -134,28 +127,6 @@ export default function BeginnerSummary({
     : newsGroups.bad.length > newsGroups.good.length
       ? "There has been more bad news than good recently. Read both sides below."
       : null;
-  const headline = (item) => (
-    <li key={item.id}>
-      <button type="button" className="bs-link" onClick={() => onSource?.(item)}>
-        {item.headline}
-      </button>
-      <small>
-        {item.kind === "social"
-          ? platformName(item.platform)
-          : item.source || item.publisher || "News"}{" "}
-        · {dayLabel(item.published_at)}
-      </small>
-    </li>
-  );
-  const group = (label, mood, list, limit = 3) =>
-    list.length > 0 && (
-      <div className={`bs-group tone-${mood}`}>
-        <h5>
-          {label} <Badge>{list.length}</Badge>
-        </h5>
-        <ul className="bs-headlines">{list.slice(0, limit).map(headline)}</ul>
-      </div>
-    );
 
   return (
     <div className="beginner-summary signals">
@@ -165,23 +136,8 @@ export default function BeginnerSummary({
           that show how Fledge works.
         </p>
       )}
-      {price?.move && <section className="bs-price-row" aria-label="Share price">
-        <Badge tone={price.mood} shape={false}>{price.move}</Badge>
-        <span className="bs-price-note">Price moves may have other causes.</span>
-      </section>}
-      <section aria-label={`${name} at a glance`}>
-        <ul className="bs-summary-cards">
-          {lights.map(light=><li key={light.key}>
-            <Card as="a" interactive href={`#bs-${light.key}`} className="bs-summary-card"
-              aria-label={`${light.title}: ${light.status}. Show details.`}>
-              <SectionHeader level="card" as="span" title={light.title}
-                actions={<span className="bs-summary-arrow" aria-hidden="true"><ChevronRightIcon /></span>} />
-              <span className="bs-summary-status">{light.status}</span>
-            </Card>
-          </li>)}
-        </ul>
-        {pointer && <p className="bs-pointer">{pointer}</p>}
-      </section>
+      {price?.move && <PriceMoveLine price={price} />}
+      <SignalLights name={name} lights={lights} pointer={pointer} />
 
       <Card id="bs-news" tabIndex={-1} aria-labelledby="bs-news-title">
         <SectionHeader level="card" as="h4" id="bs-news-title" title="News: what happened" />
@@ -198,19 +154,7 @@ export default function BeginnerSummary({
             <small>Fledge reads the news and posts and marks each good, bad or mixed.</small>
           </div>
         )}
-        {group("Good news", "good", newsGroups.good)}
-        {group("Bad news", "bad", newsGroups.bad)}
-        {group("Mixed: good and bad in one story", "mixed", newsGroups.mixed)}
-        {newsGroups.neutral.length > 0 && (
-          <details className="bs-group tone-neutral">
-            <summary>
-              Neutral, neither good nor bad{" "}
-              <Badge>{newsGroups.neutral.length}</Badge>
-            </summary>
-            <ul className="bs-headlines">{newsGroups.neutral.slice(0, 5).map(headline)}</ul>
-          </details>
-        )}
-        {!reading && group("Not rated yet", "none", newsGroups.unrated, 5)}
+        <ToneHeadlineGroups groups={newsGroups} onSource={onSource} reading={reading} />
         {!news.length && onUpdate && (
           <p>
             <Button variant="tertiary" size="inline" onClick={onUpdate}>
@@ -255,78 +199,11 @@ export default function BeginnerSummary({
               .join(" · ")}
           </p>
         )}
-        {group("Upbeat posts (opinions)", "good", postGroups.good)}
-        {group("Worried posts (opinions)", "bad", postGroups.bad)}
-        {group("Mixed posts: good and bad", "mixed", postGroups.mixed)}
-        {!reading && group("Not rated yet", "none", postGroups.unrated)}
+        <ToneHeadlineGroups groups={postGroups} onSource={onSource} reading={reading} social />
       </Card>
 
-      <Card id="bs-world" tabIndex={-1} aria-labelledby="bs-world-title">
-        <SectionHeader
-          level="card"
-          as="h4"
-          id="bs-world-title"
-          title="World news that may matter"
-        />
-        {links.length ? (
-          <ul className="bs-world">
-            {links.map(({ article, link }) => (
-              <li key={article.id}>
-                <Badge tone={EFFECT_TONE[link.effect]}>
-                  {EFFECT_WORDS[link.effect]}
-                </Badge>
-                <a href={article.url} target="_blank" rel="noopener noreferrer">
-                  {article.headline}
-                </a>
-                <small className="bs-meta">
-                  {article.publisher} · {dayLabel(article.published_at)}
-                </small>
-                <p>{link.reason}</p>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="bs-muted">{worldState.reason}</p>
-        )}
-        {links.length > 0 && (
-          <p className="bs-caveat">
-            These are possibilities to think about, not predictions or tips.
-          </p>
-        )}
-        <div className="bs-actions">
-          <Button
-            variant="tertiary"
-            size="sm"
-            iconEnd={<ChevronRightIcon />}
-            onClick={onWorld}
-          >
-            World news
-          </Button>
-        </div>
-      </Card>
-
-      <Card aria-labelledby="bs-yourview">
-        <SectionHeader level="card" as="h4" id="bs-yourview" title="Your view" />
-        {savedView?.question ? (
-          <>
-            <p>{savedView.question}</p>
-            {savedView.reasoning && <p className="bs-muted">{savedView.reasoning}</p>}
-          </>
-        ) : (
-          <p className="bs-muted">
-            Why are you interested in {name}? Write it down in a sentence. Later,
-            you can turn on news alerts to hear when news backs it up or goes
-            against it.
-          </p>
-        )}
-        {onSaveView && (
-          <div className="bs-actions">
-            <Button variant="primary" onClick={onSaveView}>
-              {savedView ? "Edit my view" : "Write my view"}
-            </Button>
-          </div>
-        )}
-      </Card>
+      <WorldSignalCard links={links} worldState={worldState} onWorld={onWorld} />
+      <YourViewCard savedView={savedView} name={name} onSaveView={onSaveView} />
 
       {mode === "explain" ? (
         <p className="bs-note">

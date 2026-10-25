@@ -92,7 +92,7 @@
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
-.app-shell .outlook-page .outlook-definition {
+.app-shell .financials-story .outlook-definition {
   font-size: var(--text-sm);
   color: var(--color-muted);
   line-height: 1.6;

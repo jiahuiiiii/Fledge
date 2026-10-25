@@ -12,9 +12,10 @@ data" and uses the same saved setting (`detail_mode`: `explain` = Beginner,
 server; accounts that skipped them keep it in this browser (default Pro).
 
 - **Beginner**: a company shows only **Summary** and **News & discussion**.
-  Overview, Financials, Outlook and Compare & value are hidden, and "?" term
-  help and reading notes open by default.
-- **Pro**: every tab, with **Summary** added first.
+  Overview, Financials and Compare & value are hidden, and "?" term help and
+  reading notes open by default.
+- **Pro**: four tabs — **Overview**, **News & discussion**, **Financials** and
+  **Compare & value**. There is no separate Pro Summary tab.
 
 ## The Summary page ("Signals", chosen 15 October 2026)
 

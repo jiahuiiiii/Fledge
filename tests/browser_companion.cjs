@@ -258,7 +258,7 @@ let browser, page;
   await choose("What do analysts and management expect");
   assert.equal(
     await page
-      .getByRole("tab", { name: "Outlook", exact: true })
+      .getByRole("tab", { name: "Financials", exact: true })
       .getAttribute("aria-selected"),
     "true",
   );

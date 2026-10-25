@@ -1,6 +1,6 @@
 # Pro research tabs: four-tab restructure
 
-Drafted 25 October 2026. Status: **approved, not built.** The owner approved the four destinations below, reviewed wireframes of all four tabs, and settled the price chart behaviour and the News & discussion order. No open decisions remain. This guide is the implementation contract; record dated progress and verification in `docs/reviews/YYYY-MM-DD/`, not here.
+Drafted 25 October 2026. Status: **approved and built 25 October 2026** ([verification](../reviews/2026-10-25/pro-tab-restructure.md)). The owner approved the four destinations below, reviewed wireframes of all four tabs, and settled the price chart behaviour and the News & discussion order. No open decisions remain. This guide is the implementation contract; record dated progress and verification in `docs/reviews/YYYY-MM-DD/`, not here.
 
 ## Why
 

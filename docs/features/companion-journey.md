@@ -28,7 +28,7 @@ Keep shared company research and explicit paid private actions. A single US$0.70
 
 ## Implemented first slice
 
-- **Ask a question** opens **Your research**, where **Start with a question** opens four optional reading shortcuts. Business and risks lead to their exact Overview topics (or the missing/withheld state); growth opens Financials; expectations opens Outlook. The fictional sample omits the unsupported Outlook shortcut and identifies its recorded scenario. This shares the existing research entry. There is no compulsory modal on page load, new fixed warning strip or onboarding completion score.
+- **Ask a question** opens **Your research**, where **Start with a question** opens four optional reading shortcuts. Business and risks lead to their exact Overview topics (or the missing/withheld state); growth opens Financials; expectations opens Financials at **What management expects**. The fictional sample omits the unsupported expectations shortcut and identifies its recorded scenario. This shares the existing research entry. There is no compulsory modal on page load, new fixed warning strip or onboarding completion score.
 - A selected shortcut shows a temporary question and reading prompt only in its relevant section. **Close guide** removes it. It resets when changing company/account, without storing private drafts in browser preferences. Reading shortcuts do not save a library selection, request an AI answer, refresh a provider or enable a watch. Existing first-company source loading remains a separate, unchanged behaviour.
 - **Ask my own question** opens the existing private question interface. The same four plain questions are also choices in its existing library selector; selecting there retains its explicit save behaviour. Existing defaults, selections, answers and historical questions are preserved.
 - **Save my reasoning** opens the original editor. With a new idea, the selected starter fills the question only; reasoning remains empty. With a saved idea, its exact question and reasoning remain intact. The sentence template and brief help invite one reason and one uncertainty, including a decision not to invest. They are hints, never saved user words. Draft/approval/conflict/cancel behaviour is unchanged.
@@ -118,7 +118,7 @@ Stopping after step 4 or step 5 is a valid outcome. Deciding not to invest is a 
 | Risk | Jargon, too many caveats, assuming a price move was caused by a headline |
 | Success signal | She can say how the company makes money and name one uncertainty |
 
-- **Exists:** Overview snapshot, Financials reading, News & discussion, Outlook, evidence dialogs with exact sources.
+- **Exists:** Overview snapshot, Financials reading with guidance and analyst forecasts, News & discussion, evidence dialogs with exact sources.
 - **Proposed with revision:** a plain **Evidence status** entry can group explanations, preserving distinct limitations and consequential notices beside affected claims; no aggregate confidence score.
 - **Implemented first slice:** short tap/keyboard explanations beside common terms, with a definition and what to check. No unsupported “why this matters for this company” is generated.
 
@@ -214,7 +214,7 @@ Stopping after step 4 or step 5 is a valid outcome. Deciding not to invest is a 
 ## Daniel's path: preparing a club pitch
 
 1. Searches a company he has never owned and picks **"What could go wrong?"**
-2. Reads Overview, Compare & value (peers, analyst targets) and Outlook.
+2. Reads Overview, Financials and Compare & value (peers, analyst targets).
 3. Writes a draft idea and a counter-argument.
 4. Exports a sourced research record to share with the club. **Exists:** review export. **New:** a pitch-friendly summary layout.
 5. Concludes "interesting business, too expensive for me right now" and records that decision. Thesis treats this as a completed piece of research.

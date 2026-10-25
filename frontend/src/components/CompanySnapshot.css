@@ -6,6 +6,24 @@
   gap: var(--space-4);
   margin-bottom: var(--space-6);
 }
+.pro-overview-headlines, .overview-read-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+.pro-overview .bs-summary-cards { max-width: none; }
+.pro-overview .bs-price-row { justify-content: flex-start; gap: var(--space-3); }
+.pro-overview .historical-prices { min-width: 0; }
+.overview-sections.overview-sections-compact { gap: var(--space-4); padding-top: 0; }
+.overview-read-card { min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.overview-read-card p { margin: 0; color: var(--color-text-2); line-height: 1.5; }
+.overview-read-figures { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+.overview-read-figures span { display: flex; flex-direction: column; }
+.overview-read-figures small { color: var(--color-muted); }
+.overview-read-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: auto; }
+@media (max-width: 640px) {
+  .pro-overview-headlines, .overview-read-grid { grid-template-columns: minmax(0, 1fr); }
+}
 .research-content .glance > h3 {
   margin: 0;
   font-size: var(--text-xl);

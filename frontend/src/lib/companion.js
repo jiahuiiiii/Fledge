@@ -32,8 +32,8 @@ export const starterQuestions = [
   {
     id: "outlook",
     question: "What do analysts and management expect?",
-    section: "expectations",
-    destination: "Outlook · Guidance and forecasts",
+    section: "fundamentals",
+    destination: "Financials · What management expects",
     prompt:
       "Compare management’s own guidance with analyst forecasts. Check the dates, periods and accounting basis; expectations are not reported results.",
   },

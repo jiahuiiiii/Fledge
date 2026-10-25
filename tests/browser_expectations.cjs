@@ -8,8 +8,8 @@ const assert=require('node:assert/strict'),fs=require('node:fs');let browser;
  await page.route('**/api/v1/model-status',r=>r.fulfill({json:{result:{briefing_enabled:true,budget:{unresolved:0,remaining_usd:'10'}}}}));
  const base=process.env.THESIS_TEST_URL,iid='c767e09f-35ea-5eaf-a626-ff5d3aa4709b';
  await page.goto(base+'/?company='+iid+'&view=workspace');
- await page.getByRole('tab',{name:'Outlook',exact:true}).click();
- await page.locator('.outlook-news > summary').click();
+ const openNewsExpectations=async()=>{await page.getByRole('tab',{name:'News & discussion',exact:true}).click();const disclosure=page.locator('.ui-disclosure').filter({hasText:'Expectations reported in the news'});if(!await disclosure.evaluate(el=>el.open))await disclosure.locator('summary').first().click();return disclosure;};
+ await openNewsExpectations();
  const panel=page.getByRole('region',{name:'Company expectations',exact:true});await panel.getByLabel('Saved expectations').waitFor();
  assert.equal(await panel.locator('.expectation-card').count(),2);
  assert.match(await panel.innerText(),/Reported management outlook/);assert.match(await panel.innerText(),/INDIVIDUAL VIEW · NOT CONSENSUS/);
@@ -29,9 +29,9 @@ const assert=require('node:assert/strict'),fs=require('node:fs');let browser;
  for(const width of [320,390,1440]){await page.setViewportSize({width,height:1050});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`overflow ${width}`);await page.screenshot({path:`/private/tmp/thesis-expectations-${width}.png`,fullPage:true});}
  // A current matching reading can remain selectable even outside the first history page.
  await page.route('**/api/v1/companies/*/expectations',async r=>{if(r.request().method()!=='GET')return r.continue();const response=await r.fetch();const body=await response.json();body.result.items=body.result.items.filter(i=>i.id!==body.result.current_reading.id);await r.fulfill({response,json:body});});
- await page.reload();await page.getByRole('tab',{name:'Outlook',exact:true}).click();await page.locator('.outlook-news > summary').click();await panel.getByLabel('Saved expectations').waitFor();assert.equal(await panel.getByLabel('Saved expectations').inputValue(),records.current_reading.id);assert.equal(await panel.locator('.expectation-card').count(),2);await page.unroute('**/api/v1/companies/*/expectations');
+ await page.reload();await openNewsExpectations();await panel.getByLabel('Saved expectations').waitFor();assert.equal(await panel.getByLabel('Saved expectations').inputValue(),records.current_reading.id);assert.equal(await panel.locator('.expectation-card').count(),2);await page.unroute('**/api/v1/companies/*/expectations');
  await panel.getByRole('button',{name:'Open reported performance ↗',exact:true}).click();assert.equal(await page.getByRole('tab',{name:'Financials',exact:true}).getAttribute('aria-selected'),'true');
- await page.getByRole('tab',{name:'Outlook',exact:true}).click();await panel.getByLabel('Saved expectations').waitFor();
+ await openNewsExpectations();await panel.getByLabel('Saved expectations').waitFor();
  await page.route('**/api/v1/companies/*/expectations',r=>r.request().method()==='POST'?r.fulfill({status:503,json:{result:{errors:[{error_message:'Authored extraction unavailable.'}]}}}):r.continue());
  await panel.getByRole('button',{name:'Extract from saved news',exact:true}).click();await panel.getByRole('alert').waitFor();assert.equal(await panel.locator('.expectation-card').count(),2);
  assert.deepEqual(errors,[]);assert.deepEqual(external,[]);console.log('Expectations browser passed: separate management/analyst views, missing values/horizons, source inspection, inert export, draft without save, cache reuse, immutable history, failure preserves saved reading, navigation and 320/390/1440 layouts. No paid calls.');

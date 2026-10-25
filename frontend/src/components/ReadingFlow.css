@@ -214,7 +214,10 @@
 .app-shell[data-view="history"] .company-header,
 .app-shell[data-view="updates"] .company-header,
 .app-shell[data-view="review"] .company-header,
-.app-shell[data-view="updates"] .mobile-company-picker {
+.app-shell[data-view="ideas"] .mobile-company-picker,
+.app-shell[data-view="history"] .mobile-company-picker,
+.app-shell[data-view="updates"] .mobile-company-picker,
+.app-shell[data-view="review"] .mobile-company-picker {
   display: none;
 }
 .app-shell

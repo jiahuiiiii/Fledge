@@ -4,6 +4,8 @@ let browser;
 (async () => {
   browser = await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH ? {executablePath:process.env.CHROMIUM_PATH} : {})});
   const page = await browser.newPage({viewport:{width:1440,height:1000}});
+  const openFinancials=async()=>{await page.getByRole('tab',{name:'Financials',exact:true}).click();};
+  const openAnalystForecasts=async()=>{await openFinancials();const d=page.locator('.financial-analyst-disclosure');await d.waitFor();if(!await d.evaluate(el=>el.open))await d.locator('summary').first().click();};
   const errors=[], external=[];let mockedLogos=0,peerWrites=0;page.on('pageerror',e=>errors.push(e.message));
   page.on('request',r=>{if(r.url().endsWith('/fmp/peers')&&r.method()==='PUT')peerWrites++;});
   await page.route('**/*',route=>{
@@ -75,23 +77,25 @@ let browser;
   await page.getByRole('dialog').getByText('Software | 120',{exact:true}).waitFor();
   assert.match(await page.getByRole('dialog').innerText(),/Software \| 120/);
   await page.keyboard.press('Escape');
-  await page.getByRole('tab',{name:'Outlook',exact:true}).click();
-  for(const title of ['Analyst forecast values and data sources','Company guidance and original evidence']){const disclosure=page.locator('.outlook-company-detail').filter({has:page.getByText(title,{exact:true})});if(!await disclosure.evaluate(el=>el.open))await disclosure.getByText(title,{exact:true}).click();}
+  await page.getByRole('tab',{name:'Financials',exact:true}).click();
+  await page.locator('.financial-analyst-disclosure > summary').click();
   const forecasts=page.getByRole('region',{name:'Analyst forecasts',exact:true});
   await forecasts.locator('.forecast-average').first().filter({hasText:'120'}).waitFor();
   const fmpRanges=forecasts.getByRole('region',{name:'FMP financial expectations',exact:true}).locator('.forecast-range');
   assert.match(await fmpRanges.nth(1).innerText(),/-1/);
   assert.equal(await fmpRanges.nth(1).locator('.forecast-track > span').evaluate(el=>parseFloat(el.style.left)),50);
   assert.match(await fmpRanges.nth(1).locator('.forecast-endpoints').innerText(),/-2[\s\S]*0/);
-  const newsDisclosure=page.locator('.outlook-news');
+  // Expectations now live in News & discussion, closed until opened.
+  await page.getByRole('tab',{name:'News & discussion',exact:true}).click();
+  const newsDisclosure=page.locator('.ui-disclosure').filter({hasText:'Expectations reported in the news'});
   assert.equal(await newsDisclosure.evaluate(el=>el.open),false);
   await newsDisclosure.locator('summary').first().focus();await page.keyboard.press('Enter');
   await newsDisclosure.getByRole('heading',{name:'What the news says is expected',exact:true}).waitFor();
   await page.getByRole('tab',{name:'Financials',exact:true}).click();
-  await page.getByRole('tab',{name:'Outlook',exact:true}).click();
-  for(const title of ['Analyst forecast values and data sources','Company guidance and original evidence']){const disclosure=page.locator('.outlook-company-detail').filter({has:page.getByText(title,{exact:true})});if(!await disclosure.evaluate(el=>el.open))await disclosure.getByText(title,{exact:true}).click();}
+  await page.getByRole('tab',{name:'News & discussion',exact:true}).click();
   assert.equal(await newsDisclosure.evaluate(el=>el.open),true);
   await newsDisclosure.locator('summary').first().click();
+  await page.getByRole('tab',{name:'Financials',exact:true}).click();
   assert.match(await forecasts.innerText(),/currency: not supplied/i);
   await page.getByRole('tab',{name:'Compare & value',exact:true}).click();
   const fmp=page.getByRole('region',{name:'Comparison peers',exact:true});
@@ -190,8 +194,7 @@ let browser;
   assert.equal(await fmp.getByLabel('Why is this comparison useful?').inputValue(),'Revised authored comparison: preserve the saved reasoning after a late read.');
   assert.equal(peerWrites,2);
   await peers.locator('.peer-chart-row').nth(1).getByText('Source & comparison context',{exact:true}).click();
-  await page.getByRole('tab',{name:'Outlook',exact:true}).click();
-  for(const title of ['Analyst forecast values and data sources','Company guidance and original evidence']){const disclosure=page.locator('.outlook-company-detail').filter({has:page.getByText(title,{exact:true})});if(!await disclosure.evaluate(el=>el.open))await disclosure.getByText(title,{exact:true}).click();}
+  await openAnalystForecasts();
   const publicForecasts=page.getByRole('region',{name:'Public annual financial forecasts',exact:true});
   await publicForecasts.getByRole('heading',{name:/FY 2026/}).waitFor();
   assert.match(await publicForecasts.innerText(),/currency is not stated/);
@@ -217,8 +220,6 @@ let browser;
   await page.getByRole('tab',{name:'Financials',exact:true}).click();
   // Financials presents saved figures as charts and plain-language readings.
   await page.locator('.financials-story').getByRole('heading',{name:'What the financials show',exact:true}).waitFor();
-  await page.getByRole('tab',{name:'Outlook',exact:true}).click();
-  for(const title of ['Analyst forecast values and data sources','Company guidance and original evidence']){const disclosure=page.locator('.outlook-company-detail').filter({has:page.getByText(title,{exact:true})});if(!await disclosure.evaluate(el=>el.open))await disclosure.getByText(title,{exact:true}).click();}
   const outlook=page.getByRole('region',{name:'Management outlook',exact:true});
   await outlook.getByText('≈ $34.8bn',{exact:true}).waitFor();
   assert.match(await outlook.innerText(),/Accounting basis unspecified · currency unspecified/);
@@ -342,8 +343,6 @@ let browser;
   });
   await page.reload();
   await page.getByRole('tab',{name:'Financials',exact:true}).click();
-  await page.getByRole('tab',{name:'Outlook',exact:true}).click();
-  for(const title of ['Analyst forecast values and data sources','Company guidance and original evidence']){const disclosure=page.locator('.outlook-company-detail').filter({has:page.getByText(title,{exact:true})});if(!await disclosure.evaluate(el=>el.open))await disclosure.getByText(title,{exact:true}).click();}
   assert.equal(await outlook.locator('.outlook-value').count(),0);
   assert.match(await outlook.innerText(),/Original-filing source access is unavailable/);
   await page.getByRole('tab',{name:'Financials',exact:true}).click();
@@ -364,8 +363,7 @@ let browser;
   });
   await page.reload();
   await page.getByRole('tab',{name:'Compare & value',exact:true}).click();
-  await page.getByRole('tab',{name:'Outlook',exact:true}).click();
-  for(const title of ['Analyst forecast values and data sources','Company guidance and original evidence']){const disclosure=page.locator('.outlook-company-detail').filter({has:page.getByText(title,{exact:true})});if(!await disclosure.evaluate(el=>el.open))await disclosure.getByText(title,{exact:true}).click();}
+  await openAnalystForecasts();
   const alternative=forecasts.getByRole('link',{name:'Inspect public financial forecasts on Stock Analysis ↗',exact:true});
   await alternative.waitFor();
   assert.equal(await alternative.getAttribute('href'),'https://stockanalysis.com/stocks/msft/forecast/');
@@ -390,8 +388,7 @@ let browser;
     payload.result.public_forecasts.available=false;
     return route.fulfill({response,json:payload});
   });
-  await page.reload();await page.getByRole('tab',{name:'Outlook',exact:true}).click();
-  for(const title of ['Analyst forecast values and data sources','Company guidance and original evidence']){const disclosure=page.locator('.outlook-company-detail').filter({has:page.getByText(title,{exact:true})});if(!await disclosure.evaluate(el=>el.open))await disclosure.getByText(title,{exact:true}).click();}
+  await page.reload();await openAnalystForecasts();
   await fmpRanges.first().waitFor();
   assert.match(await fmpRanges.first().locator('.forecast-average').innerText(),/^0/);
   assert.match(await fmpRanges.first().locator('.forecast-endpoints').innerText(),/Not available/);

@@ -4,12 +4,16 @@ import "./CompanySnapshot.css";
 import TermHelp from "./TermHelp";
 import OverviewSections from "./OverviewSections";
 import { companyName } from "../lib/companyIdentity";
-import { LightbulbIcon } from "./ui";
+import { Button, Card, Disclosure, SectionHeader } from "./ui";
+import { useEffect, useState } from "react";
+import { api } from "../api/client";
+import { latestPriceQuote, quoteMovement } from "../lib/priceRefresh";
+import { countLabel, countMood, groupByTone, newsMeaning, peopleMeaning, priceLine, worldForCompany, worldLight } from "../lib/beginnerSummary";
+import { PriceMoveLine, SignalLights, ToneHeadlineGroups, YourViewCard, WorldSignalCard } from "./OverviewShared";
+import "./BeginnerSummary.css";
 import {
   currentGuidance,
-  headlinesAfterReading,
   overviewNews,
-  recentHeadlines,
   revenueComparisons,
 } from "../lib/overviewSections";
 
@@ -37,162 +41,6 @@ function Freshness({ data }) {
   );
 }
 
-// The product's core loop: save a view, then get told what supports or challenges it.
-function YourView({ data, savedView, onSaveView }) {
-  if (!onSaveView) return null;
-  const name = companyName(data.instrument);
-  if (!savedView)
-    return (
-      <section className="glance-view" aria-labelledby="glance-view-title">
-        <div>
-          <h4 id="glance-view-title">
-            <span className="glance-view-icon" aria-hidden="true">
-              <LightbulbIcon />
-            </span>
-            <span>What do you think of {name}?</span>
-          </h4>
-          <p>
-            Write your view in a sentence or two. Fledge then watches news,
-            filings and results for evidence that supports or challenges it.
-          </p>
-        </div>
-        <div className="glance-view-actions">
-          <button className="primary" onClick={onSaveView}>
-            Save my view
-          </button>
-        </div>
-      </section>
-    );
-  return (
-    <section className="glance-view saved" aria-labelledby="glance-view-title">
-      <div>
-        <h4 id="glance-view-title">
-          Your view{" "}
-          <span
-            className={`status ${savedView.status === "monitoring" ? "met" : ""}`}
-          >
-            {savedView.status === "monitoring" ? "Watching" : "Draft"}
-          </span>
-        </h4>
-        {savedView.question && <p>{savedView.question}</p>}
-        {savedView.reasoning && (
-          <p className="glance-view-reasoning">{savedView.reasoning}</p>
-        )}
-      </div>
-      <div className="glance-view-actions">
-        <button onClick={onSaveView}>Edit my view</button>
-      </div>
-    </section>
-  );
-}
-
-function Activity({ data, instrumentId, onUpdates, onView, onSource }) {
-  const quote = data?.market?.quote?.quote;
-  const watch = data?.news_watch;
-  const headlines = overviewNews(data);
-  const today = recentHeadlines(headlines).slice(0, 3);
-  const notInTone = headlinesAfterReading(data?.sentiment, headlines);
-  const unread = [
-    ...(data?.research_alerts || []),
-    ...(data?.idea_alerts || []),
-  ].filter(
-    // Status-only alerts wait for their details before counting.
-    (a) =>
-      a.instrument_id === instrumentId &&
-      !a.review_action &&
-      !a.status_only &&
-      !a.withheld,
-  ).length;
-  const items = [];
-  if (quote?.change_percent != null && quote?.quoted_at) {
-    const down = quote.change_percent < 0;
-    items.push(
-      <li key="price" className={down ? "down" : "up"}>
-        <span aria-hidden="true">{down ? "▼" : "▲"}</span>
-        Share price {down ? "fell" : "rose"}{" "}
-        {Math.abs(quote.change_percent).toFixed(1)}% in the session to{" "}
-        {when(quote.quoted_at)}
-      </li>,
-    );
-  }
-  // Shown beside the price, not as its cause: a headline is not proof of why
-  // the price moved.
-  if (today.length)
-    items.push(
-      <li key="headlines" className="headlines">
-        <span aria-hidden="true">≡</span>
-        <div>
-          <span>Company headlines in the past day</span>
-          <ul>
-            {today.map((source) => (
-              <li key={source.id}>
-                <button
-                  className="glance-headline"
-                  onClick={() => onSource?.(source)}
-                >
-                  {source.headline}
-                </button>
-                <small>
-                  {source.source || "News"} · {when(source.published_at)}
-                </small>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </li>,
-    );
-  if (notInTone.length && data?.sentiment?.created_at)
-    items.push(
-      <li key="tone" className="watch">
-        <span aria-hidden="true">◎</span>
-        The AI tone reading was saved {when(data.sentiment.created_at)} and does
-        not include {notInTone.length} newer news{" "}
-        {notInTone.length === 1 ? "headline" : "headlines"}
-        <button className="glance-link" onClick={() => onView("evidence")}>
-          News & discussion →
-        </button>
-      </li>,
-    );
-  if (unread)
-    items.push(
-      <li key="alerts" className="alert">
-        <span aria-hidden="true">●</span>
-        {unread} update{unread === 1 ? "" : "s"} waiting for your review
-        {onUpdates && (
-          <button className="glance-link" onClick={onUpdates}>
-            Review
-          </button>
-        )}
-      </li>,
-    );
-  if (watch?.enabled && watch.last_check_at)
-    items.push(
-      <li key="watch" className="watch">
-        <span aria-hidden="true">◎</span>
-        Your news watch last {watch.error
-          ? "attempted an update"
-          : "checked"}{" "}
-        {when(watch.last_check_at)}
-        {watch.error && (
-          <>
-            {" "}
-            · {watch.error}{" "}
-            <button className="glance-link" onClick={() => onView("evidence")}>
-              Source details →
-            </button>
-          </>
-        )}
-      </li>,
-    );
-  if (!items.length) return null;
-  return (
-    <div className="glance-activity">
-      <h4>Latest activity</h4>
-      <ul>{items}</ul>
-    </div>
-  );
-}
-
 export default function CompanySnapshot({
   data,
   instrumentId,
@@ -207,86 +55,67 @@ export default function CompanySnapshot({
   onSaveView,
   financialError,
   onRetryFinancials,
+  priceHistory,
+  onWorld,
 }) {
   const { sentences, growth } = snapshot(data);
   const { latestQuarter } = revenueComparisons(
     data,
     currentGuidance(data?.management_outlook),
   );
+  const [world, setWorld] = useState(null);
+  const [briefOpen, setBriefOpen] = useState(false);
+  useEffect(() => { if (focusTopic) setBriefOpen(true); }, [focusTopic]);
+  useEffect(() => {
+    if (!visible) return;
+    let active = true;
+    api.worldNews().then(page => { if (active) setWorld(page); }).catch(() => { if (active) setWorld({ articles: [] }); });
+    return () => { active = false; };
+  }, [visible, instrumentId]);
+  const name = companyName(data.instrument);
+  const latest = latestPriceQuote(data.market, priceHistory);
+  const live = latest && quoteMovement(data.market, priceHistory);
+  const price = live ? priceLine({ price: Number(latest.price), change_percent: live.percent }) : priceLine(data.market?.quote?.quote);
+  const reading = data.sentiment?.withheld ? null : data.sentiment;
+  const items = overviewNews(data);
+  const analysedNews = items.filter(item => item.kind === "news");
+  const news = analysedNews.length ? analysedNews : (data.documents || []).filter(d => d.title).map(d => ({ ...d, headline: d.title })).sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at));
+  const newsGroups = groupByTone(news);
+  const postGroups = groupByTone(items.filter(item => item.kind === "social"));
+  const { linked } = worldForCompany(world, instrumentId, 2);
+  const links = linked.filter(item => item.link);
+  const worldState = worldLight(linked, name);
+  const lights = [
+    { key: "news", title: "News", mood: countMood(newsGroups), status: countLabel(newsGroups) },
+    { key: "people", title: "People online", mood: countMood(postGroups), status: countLabel(postGroups, { good: "upbeat", bad: "worried", neutral: "neutral" }) },
+    { key: "world", title: "World", mood: worldState.mood, status: worldState.status },
+  ];
+  const pointer = worldState.hurt ? worldState.reason : newsGroups.bad.length > newsGroups.good.length ? "There has been more bad news than good recently. Read both sides below." : null;
   return (
-    <section className="glance" aria-label="Company summary">
-      {data.financials_pending ? (
-        <p className="glance-summary muted" role="status">
-          {financialError || "Loading saved financials…"}
-          {financialError && (
-            <button onClick={onRetryFinancials}>Try again</button>
-          )}
-        </p>
-      ) : sentences.length ? (
-        <p className="glance-summary">
-          {latestQuarter ? (
-            <span className="glance-growth">
-              <span className="glance-growth-title">
-                <strong>
-                  Revenue {latestQuarter.growth >= 0 ? "up" : "down"}{" "}
-                  {Math.abs(latestQuarter.growth).toFixed(1)}% · latest quarter
-                  vs a year earlier
-                </strong>
-                <TermHelp term="revenue_growth" />
-              </span>
-              <small>
-                Quarter to {day(latestQuarter.current.end)} vs quarter to{" "}
-                {day(latestQuarter.previous.end)}
-                {growth &&
-                  ` · fiscal year to ${day(growth.periodEnd)}: ${growth.growth >= 0 ? "+" : "−"}${Math.abs(growth.growth).toFixed(1)}%`}
-              </small>
-            </span>
-          ) : (
-            growth && (
-              <span className="glance-growth">
-                <span className="glance-growth-title">
-                  <strong>
-                    Revenue {growth.growth >= 0 ? "grew" : "fell"}{" "}
-                    {Math.abs(growth.growth).toFixed(1)}% · last fiscal year
-                  </strong>
-                  <TermHelp term="revenue_growth" />
-                </span>
-                <small>
-                  Year ended {day(growth.periodEnd)} vs year ended{" "}
-                  {day(growth.previousEnd)}
-                </small>
-              </span>
-            )
-          )}
-          {sentences.slice(growth ? 1 : 0).join(" ")}
-        </p>
-      ) : (
-        <p className="glance-summary muted">
-          A short summary appears once filings and news are loaded. Use Update
-          to load them.
-        </p>
-      )}
-      <Freshness data={data} />
-      <YourView data={data} savedView={savedView} onSaveView={onSaveView} />
-      <Activity
-        data={data}
-        instrumentId={instrumentId}
-        onUpdates={onUpdates}
-        onView={onView}
-        onSource={onSource}
-      />
+    <section className="glance pro-overview" aria-label="Company overview">
+      <PriceMoveLine price={price} pro />
       {chart}
-      {!data.financials_pending && (
-        <OverviewSections
-          data={data}
-          instrumentId={instrumentId}
-          visible={visible}
-          onView={onView}
-          onSource={onSource}
-          businessPanel={businessPanel}
-          focusTopic={focusTopic}
-        />
-      )}
+      <SectionHeader level="section" as="h2" title="At a glance" />
+      {data.financials_pending ? <p className="glance-summary muted" role="status">{financialError || "Loading saved financials…"}{financialError && <Button variant="tertiary" onClick={onRetryFinancials}>Try again</Button>}</p> : sentences.length ?
+        <p className="glance-summary">{latestQuarter ? <span className="glance-growth"><span className="glance-growth-title"><strong>Revenue {latestQuarter.growth >= 0 ? "up" : "down"} {Math.abs(latestQuarter.growth).toFixed(1)}% · latest quarter vs a year earlier</strong><TermHelp term="revenue_growth" /></span><small>Quarter to {day(latestQuarter.current.end)} vs quarter to {day(latestQuarter.previous.end)}{growth && ` · fiscal year to ${day(growth.periodEnd)}: ${growth.growth >= 0 ? "+" : "−"}${Math.abs(growth.growth).toFixed(1)}%`}</small></span> : growth && <span className="glance-growth"><span className="glance-growth-title"><strong>Revenue {growth.growth >= 0 ? "grew" : "fell"} {Math.abs(growth.growth).toFixed(1)}% · last fiscal year</strong><TermHelp term="revenue_growth" /></span><small>Year ended {day(growth.periodEnd)} vs year ended {day(growth.previousEnd)}</small></span>}{sentences.slice(growth ? 1 : 0).join(" ")}</p> :
+        <p className="glance-summary muted">A short summary appears once filings and news are loaded. Use Update to load them.</p>}
+      <Freshness data={data} />
+      <SignalLights name={name} lights={lights} pointer={pointer} />
+      <YourViewCard savedView={savedView} name={name} onSaveView={onSaveView} />
+      <SectionHeader level="section" as="h2" title="What's being said" />
+      <div className="pro-overview-headlines">
+        <Card id="bs-news" tabIndex={-1} aria-labelledby="bs-news-title"><SectionHeader level="card" as="h3" id="bs-news-title" title="News" /><p className="bs-meaning">{newsMeaning(newsGroups)}</p><ToneHeadlineGroups groups={newsGroups} onSource={onSource} reading={reading} includeUnrated /></Card>
+        <Card id="bs-people" tabIndex={-1} aria-labelledby="bs-people-title"><SectionHeader level="card" as="h3" id="bs-people-title" title="People online" /><p className="bs-meaning">{peopleMeaning(postGroups)}</p><ToneHeadlineGroups groups={postGroups} onSource={onSource} reading={reading} social includeUnrated /></Card>
+      </div>
+      <Button variant="tertiary" onClick={() => onView("evidence")}>All news and posts →</Button>
+      {!data.financials_pending && <OverviewSections data={data} instrumentId={instrumentId} visible={visible} onView={onView} />}
+      <WorldSignalCard links={links} worldState={worldState} onWorld={onWorld} limit={2} />
+      <Disclosure title="Understand the business" description="Saved brief, original evidence and questions to research next" open={briefOpen} onToggle={(event) => {
+        if (event.target === event.currentTarget) setBriefOpen(event.currentTarget.open);
+      }}>
+        {briefOpen && (typeof businessPanel === "function" ? businessPanel() : businessPanel)}
+      </Disclosure>
+      <p className="bs-note">These readings help investigate the business, not whether to buy or sell.</p>
     </section>
   );
 }
