@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { api } from "../api/client";
 import Select from "./Select";
-import { Button } from "./ui";
+import Checkbox from "./Checkbox";
+import { Button, Card, Disclosure, SectionHeader } from "./ui";
 import { day, money } from "../lib/financialStory";
 
 export default function FinancialRecovery({ instrumentId, onApplied }) {
@@ -283,8 +284,7 @@ export default function FinancialRecovery({ instrumentId, onApplied }) {
                             className="recovery-checklist-row"
                             key={doc.id}
                           >
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={Boolean(
                                 available && selectedIds.includes(doc.id),
                               )}
@@ -330,8 +330,8 @@ export default function FinancialRecovery({ instrumentId, onApplied }) {
                       </p>
                     )}
                     <div className="recovery-run">
-                      <button
-                        className="primary"
+                      <Button
+                        variant="primary"
                         disabled={!selected.length || Boolean(busy)}
                         onClick={() => runAll(selected)}
                       >
@@ -339,7 +339,7 @@ export default function FinancialRecovery({ instrumentId, onApplied }) {
                         {selected.length > 0
                           ? ` · ${selected.length} ${selected.length === 1 ? "report" : "reports"}`
                           : ""}
-                      </button>
+                      </Button>
                       <span className="muted" aria-live="polite">
                         {selected.length > 0 &&
                           `At most US$${(Math.ceil(selectedCost * 10000) / 10000).toFixed(4)} in total`}
@@ -354,22 +354,21 @@ export default function FinancialRecovery({ instrumentId, onApplied }) {
                   </>
                 )}
                 {reviewed.length > 0 && (
-                  <div className="recovery-apply-all">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      disabled={Boolean(busy)}
-                      onClick={applyAllReports}
-                    >
+                  <Card variant="inset" className="recovery-apply-all">
+                    <div>
+                      <strong>Use every suggestion at once</strong>
+                      <p>
+                        Puts every suggested figure from{" "}
+                        {reviewed.length === 1 ? "this report" : `all ${reviewed.length} reports`} into
+                        your charts. Each keeps its calculation and original rows, and you can untick and
+                        save any report’s choices later. No AI is used.
+                      </p>
+                      {applyNote && <p role="status">{applyNote}</p>}
+                    </div>
+                    <Button variant="primary" disabled={Boolean(busy)} onClick={applyAllReports}>
                       Use all suggestions from {reviewed.length === 1 ? "this report" : `all ${reviewed.length} reports`}
                     </Button>
-                    <small>
-                      Puts every suggested figure into your charts. Each one keeps its
-                      calculation and original rows below, and you can untick and save
-                      any report&apos;s choices later. No AI is used.
-                    </small>
-                    {applyNote && <small role="status">{applyNote}</small>}
-                  </div>
+                  </Card>
                 )}
                 {reviewed.length > 0 && (
                   <label className="recovery-report">
@@ -410,16 +409,22 @@ export default function FinancialRecovery({ instrumentId, onApplied }) {
                     className="recovery-results"
                     aria-label="Suggested figures"
                   >
-                    <div className="recovery-results-head">
-                      <h4>Suggested figures</h4>
-                      <a
-                        href={reading.document.url}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Check the original {reading.document.form} ↗
-                      </a>
-                    </div>
+                    <SectionHeader
+                      level="card"
+                      as="h4"
+                      title="Suggested figures"
+                      actions={
+                        <Button
+                          variant="tertiary"
+                          size="sm"
+                          href={reading.document.url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Check the original {reading.document.form} ↗
+                        </Button>
+                      }
+                    />
                     <p className="muted">
                       Check each figure against the original report before using
                       it.
@@ -427,7 +432,9 @@ export default function FinancialRecovery({ instrumentId, onApplied }) {
                     {items.map((item) => {
                       const using = accepted.includes(item.id);
                       return (
-                        <article
+                        <Card
+                          as="article"
+                          variant="inset"
                           className={`recovery-card${using ? " using" : ""}`}
                           key={item.id}
                         >
@@ -444,8 +451,7 @@ export default function FinancialRecovery({ instrumentId, onApplied }) {
                               </small>
                             </div>
                             <label className="recovery-use">
-                              <input
-                                type="checkbox"
+                              <Checkbox
                                 disabled={Boolean(busy)}
                                 checked={using}
                                 onChange={(event) =>
@@ -499,8 +505,11 @@ export default function FinancialRecovery({ instrumentId, onApplied }) {
                           <p className="recovery-note">
                             AI note: {item.explanation}
                           </p>
-                          <details className="recovery-rows">
-                            <summary>Show the original statement rows</summary>
+                          <Disclosure
+                            variant="flush"
+                            className="recovery-rows"
+                            title="Show the original statement rows"
+                          >
                             <table>
                               <tbody>
                                 {item.inputs.map((input) => {
@@ -522,14 +531,14 @@ export default function FinancialRecovery({ instrumentId, onApplied }) {
                               As printed in the filing, usually in millions. The
                               first column is normally this report’s date.
                             </p>
-                          </details>
-                        </article>
+                          </Disclosure>
+                        </Card>
                       );
                     })}
                     {items.length > 0 && (
                       <div className="recovery-run">
                         {items.length > 1 && (
-                          <button
+                          <Button
                             disabled={
                               Boolean(busy) ||
                               items.every((item) => accepted.includes(item.id))
@@ -539,15 +548,15 @@ export default function FinancialRecovery({ instrumentId, onApplied }) {
                             }
                           >
                             Use all {items.length}
-                          </button>
+                          </Button>
                         )}
-                        <button
-                          className="primary"
+                        <Button
+                          variant="primary"
                           disabled={Boolean(busy) || unchanged}
                           onClick={save}
                         >
                           {unchanged ? "Choices saved" : "Save my choices"}
-                        </button>
+                        </Button>
                         <span className="muted">
                           Untick and save to remove a figure.
                         </span>

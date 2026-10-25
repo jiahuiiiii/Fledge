@@ -31,7 +31,7 @@ export function PriceMoveLine({ price, pro = false }) {
   );
 }
 
-export function SignalLights({ name, lights, pointer, onSelect }) {
+export function SignalLights({ name, lights, pointer, onSelect, pointerLink }) {
   return (
     <section aria-label={`${name} at a glance`}>
       <ul className="bs-summary-cards">
@@ -61,7 +61,27 @@ export function SignalLights({ name, lights, pointer, onSelect }) {
           </li>
         ))}
       </ul>
-      {pointer && <p className="bs-pointer">{pointer}</p>}
+      {pointer && (
+        <p className="bs-pointer">
+          {pointer}
+          {pointerLink && (
+            <>
+              {" "}
+              <Button
+                variant="tertiary"
+                size="inline"
+                onClick={() => {
+                  const el = document.getElementById(pointerLink.target);
+                  el?.scrollIntoView({ block: "start", behavior: "instant" });
+                  el?.focus({ preventScroll: true });
+                }}
+              >
+                {pointerLink.label} ↓
+              </Button>
+            </>
+          )}
+        </p>
+      )}
     </section>
   );
 }

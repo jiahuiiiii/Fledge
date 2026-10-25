@@ -9,8 +9,8 @@ import { Button, Card, Disclosure, SectionHeader } from "./ui";
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { latestPriceQuote, quoteMovement } from "../lib/priceRefresh";
-import { countLabel, countMood, groupByTone, priceLine, worldForCompany, worldLight } from "../lib/beginnerSummary";
-import { PriceMoveLine, SignalLights, YourViewCard, WorldSignalCard } from "./OverviewShared";
+import { countLabel, countMood, groupByTone, newsMeaning, peopleMeaning, priceLine, worldForCompany, worldLight } from "../lib/beginnerSummary";
+import { PriceMoveLine, SignalLights, ToneHeadlineGroups, YourViewCard, WorldSignalCard } from "./OverviewShared";
 import "./BeginnerSummary.css";
 import {
   currentGuidance,
@@ -77,6 +77,7 @@ export default function CompanySnapshot({
   const latest = latestPriceQuote(data.market, priceHistory);
   const live = latest && quoteMovement(data.market, priceHistory);
   const price = live ? priceLine({ price: Number(latest.price), change_percent: live.percent }) : priceLine(data.market?.quote?.quote);
+  const reading = data.sentiment?.withheld ? null : data.sentiment;
   const items = overviewNews(data);
   const analysedNews = items.filter(item => item.kind === "news");
   const news = analysedNews.length ? analysedNews : (data.documents || []).filter(d => d.title).map(d => ({ ...d, headline: d.title })).sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at));
@@ -99,11 +100,16 @@ export default function CompanySnapshot({
         <p className="glance-summary">{latestQuarter ? <span className="glance-growth"><span className="glance-growth-title"><strong>Revenue {latestQuarter.growth >= 0 ? "up" : "down"} {Math.abs(latestQuarter.growth).toFixed(1)}% · latest quarter vs a year earlier</strong><TermHelp term="revenue_growth" /></span><small>Quarter to {day(latestQuarter.current.end)} vs quarter to {day(latestQuarter.previous.end)}{growth && ` · fiscal year to ${day(growth.periodEnd)}: ${growth.growth >= 0 ? "+" : "−"}${Math.abs(growth.growth).toFixed(1)}%`}</small></span> : growth && <span className="glance-growth"><span className="glance-growth-title"><strong>Revenue {growth.growth >= 0 ? "grew" : "fell"} {Math.abs(growth.growth).toFixed(1)}% · last fiscal year</strong><TermHelp term="revenue_growth" /></span><small>Year ended {day(growth.periodEnd)} vs year ended {day(growth.previousEnd)}</small></span>}{sentences.slice(growth ? 1 : 0).join(" ")}</p> :
         <p className="glance-summary muted">A short summary appears once filings and news are loaded. Use Update to load them.</p>}
       <Freshness data={data} />
-      <SignalLights name={name} lights={lights} pointer={pointer} onSelect={(key) => key === "world" ? document.getElementById("bs-world")?.scrollIntoView({ block: "start", behavior: "instant" }) : onView("evidence")} />
+      <SignalLights name={name} lights={lights} pointer={pointer?.replace(/\s*Read (?:why|both sides) below\.?$/, "")} pointerLink={pointer ? { target: worldState.hurt ? "bs-world" : "bs-news", label: worldState.hurt ? "Read why" : "Read both sides" } : null} />
+      <SectionHeader level="section" as="h2" title="What's being said" actions={<Button variant="tertiary" size="sm" onClick={() => onView("evidence")}>All news and posts →</Button>} />
+      <div className="pro-overview-headlines">
+        <Card id="bs-news" tabIndex={-1} aria-labelledby="bs-news-title"><SectionHeader level="card" as="h3" id="bs-news-title" title="News" /><p className="bs-meaning">{newsMeaning(newsGroups)}</p><ToneHeadlineGroups groups={newsGroups} onSource={onSource} reading={reading} includeUnrated /></Card>
+        <Card id="bs-people" tabIndex={-1} aria-labelledby="bs-people-title"><SectionHeader level="card" as="h3" id="bs-people-title" title="People online" /><p className="bs-meaning">{peopleMeaning(postGroups)}</p><ToneHeadlineGroups groups={postGroups} onSource={onSource} reading={reading} social includeUnrated /></Card>
+      </div>
+      <WorldSignalCard links={links} worldState={worldState} onWorld={onWorld} limit={2} />
       <YourViewCard savedView={savedView} name={name} onSaveView={onSaveView} />
       <LatestActivity data={data} instrumentId={instrumentId} onUpdates={onUpdates} onView={onView} onSource={onSource} />
       {!data.financials_pending && <OverviewSections data={data} instrumentId={instrumentId} visible={visible} onView={onView} businessPanel={businessPanel} briefOpen={briefOpen} onBriefToggle={setBriefOpen} />}
-      <WorldSignalCard links={links} worldState={worldState} onWorld={onWorld} limit={2} />
       <Disclosure title="Price chart · past year" description="Saved prices; choose Refresh prices inside for a newer check">
         {chart}
       </Disclosure>

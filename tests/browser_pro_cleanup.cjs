@@ -104,7 +104,9 @@ let browser;
   assert.deepEqual(await page.getByRole("tab").allInnerTexts(), ["Overview", "News & discussion", "Financials", "Compare & value"]);
   const main = page.getByRole("tabpanel");
   await main.getByRole("heading", { name: "The business" }).waitFor();
-  assert.equal(await main.getByText("What's being said").count(), 0, "news and people live on the News tab");
+  // Overview shows the same News / People online cards as Beginner, with the world card right after.
+  assert.equal(await main.getByRole("heading", { name: "What's being said" }).count(), 1);
+  assert.equal(await main.locator("#bs-news, #bs-people, #bs-world").count(), 3);
   assert.equal(await main.getByRole("button", { name: "View evidence" }).count(), 0);
   assert.equal(await main.getByText("The business in four reads").count(), 0);
   assert.equal(await main.getByRole("group", { name: "Business topic" }).getByRole("button").count(), 4);

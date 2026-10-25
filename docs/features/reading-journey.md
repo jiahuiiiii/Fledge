@@ -133,3 +133,7 @@ existing contracts. Supporting details stay expandable, and controls remain
 usable at 320 px. Actions align left, without ornamental left-edge highlights.
 The component gallery is available at `/?ui-preview`; reusable APIs are documented
 in `frontend/src/components/ui/README.md`. See [verification](../reviews/2026-10-25/shared-reading-pages.md).
+
+## Overview shows News and People online again — 25 October 2026 (later)
+
+The Pro Overview repeats the Beginner layout for what people are saying: the three signal lights, then **What's being said** with the News and People online cards side by side (top three per tone group), the World card directly after, then Your view, Latest activity and The business. The signal pointer ("One world event could hurt …") now ends in a **Read why ↓** link that jumps to the World card instead of the vague "below". News & discussion keeps the full analysed list. Fill missing figures uses the shared Card, Checkbox, Disclosure and Button parts at a 13px minimum text size, with one **Use all suggestions** strip.

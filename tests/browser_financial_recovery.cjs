@@ -264,6 +264,10 @@ module.exports = async function checkFinancialRecovery(page, folder) {
     .click();
   await panel.getByText(/Now using \d+ suggested/).waitFor();
   assert.ok(saved.get("report-c").accepted.length > 0);
+  await panel.screenshot({
+    path: path.join(folder, "recovery-results.png"),
+    animations: "disabled",
+  });
   assert.equal(calls.length, 2);
   // Batch stops at the first failure; successful suggestions survive. No retry.
   saved = new Map();
