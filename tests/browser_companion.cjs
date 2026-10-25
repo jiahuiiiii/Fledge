@@ -355,7 +355,7 @@ let browser, page;
   await browser.close();
   browser = null;
   console.log(
-    "Companion passed: four routes, exact focus/source, missing and withheld data, unsaved/cancelled and existing drafts, term explanations, no implicit writes, responsive layouts.",
+    "Companion passed: four routes, exact focus/source, missing and withheld data, unsaved/cancelled and existing drafts, Pro glossary visibility, no implicit writes, responsive layouts.",
   );
 })().catch(async (error) => {
   console.error(error);

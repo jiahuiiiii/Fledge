@@ -226,11 +226,16 @@ def context(owner,iid):
                     limitation='Review the business/product overlap and accounting conventions before comparing. Vendor TTM P/E and P/S remain separate from code-calculated SEC financials. Missing ratios, dates or estimates are unknown; this is not an investment ranking.')
 
 
-def refresh_company(owner,iid,*,fetcher=None):
+def refresh_company(owner,iid,*,fetcher=None,only=None):
     with transaction(owner) as conn:
         target=company(conn,iid);selected=rows(conn,'SELECT symbol FROM peer_selections WHERE owner_id=%s AND instrument_id=%s',(owner,iid))
     outcomes=[]
-    for dataset,symbol in [('profile',target['symbol']),('peers',target['symbol']),('estimates',target['symbol']),('ratios',target['symbol'])]+[(dataset,r['symbol']) for r in selected for dataset in ('profile','ratios')]:
+    plan=[('profile',target['symbol']),('peers',target['symbol']),('estimates',target['symbol']),('ratios',target['symbol'])]+[(dataset,r['symbol']) for r in selected for dataset in ('profile','ratios')]
+    if only is not None:
+        if only not in DATASETS:raise ValueError('Unknown FMP dataset.')
+        # One dataset for the target company, e.g. only the similar-companies list.
+        plan=[(only,target['symbol'])]
+    for dataset,symbol in plan:
         try:outcomes.append(dict(dataset=dataset,symbol=symbol,**refresh(dataset,symbol,fetcher=fetcher)))
         except (ValueError,Conflict) as failure:outcomes.append(dict(dataset=dataset,symbol=symbol,status='unavailable',message=str(failure)))
         with transaction() as conn:

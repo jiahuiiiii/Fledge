@@ -1,4 +1,5 @@
 import { Button, Combobox, FilterGroup, SectionHeader } from "./ui";
+import { describeVendorCheck } from "../lib/vendorStatus";
 import { formatTimestamp } from "../lib/dateTime";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
@@ -700,7 +701,7 @@ export default function SectorPosition({
     setError("");
     setNotice("");
     try {
-      const result = await api.refreshFmp(instrumentId);
+      const result = await api.refreshFmp(instrumentId, "peers");
       const next = await load(true);
       // Say what actually happened: the peers check can be refused (plan or
       // key), paused, or rate-limited, which is different from "none found".
@@ -709,8 +710,10 @@ export default function SectorPosition({
         setNotice("Similar companies loaded. Save & compare to keep them, or change the list.");
       else if (!outcome || outcome.status !== "ready") {
         const refused = (result?.outcomes || []).find((o) => o.status !== "ready" && o.message);
+        // An hour-gap refusal hides what the earlier check did, so say that too.
+        const earlier = describeVendorCheck(next?.vendor_status, (v) => formatTimestamp(v));
         setError(
-          `FMP did not provide similar companies: ${outcome?.message || refused?.message || "the check did not run"}`,
+          `FMP did not provide similar companies: ${outcome?.message || refused?.message || "the check did not run"}. ${earlier}`,
         );
       } else
         setNotice("FMP answered but listed no similar companies for this company. Add your own below.");
@@ -963,7 +966,9 @@ export default function SectorPosition({
                   Suggest similar companies
                 </Button>
                 <span className="position-caption">
-                  Or add your own below. Suggestions come from FMP and are not a competitor list.
+                  {data.vendor_status?.last_attempt_at
+                    ? describeVendorCheck(data.vendor_status, (v) => formatTimestamp(v))
+                    : "Or add your own below. Suggestions come from FMP and are not a competitor list."}
                 </span>
               </div>
             )}

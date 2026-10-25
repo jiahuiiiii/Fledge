@@ -277,7 +277,7 @@ let browser;
       });
     }
   }
-  // Opening evidence retains the old classification and the exact source.
+  // The flat evidence dialog keeps the exact original source and its link.
   const card = page.locator(".inbox-record");
   await card.getByRole('button',{name:'Inspect evidence',exact:true}).focus();
   await page.keyboard.press('Enter');
@@ -308,7 +308,7 @@ let browser;
     oneNotebookEntry: true,
     retainedQuestionDraft: true,
     horizontalKeyboardNavigation: true,
-    threeFinancialChapters: true,
+    financialChartsAndDisclosures: true,
     groupedEvidence: true,
     exactSourcePreview: true,
     withholding: true,

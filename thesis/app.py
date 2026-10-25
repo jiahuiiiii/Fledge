@@ -895,9 +895,9 @@ def sector_position(instrument_id: UUID, peers: str | None = None):
 
 
 @app.post("/api/v1/companies/{instrument_id}/fmp/refresh")
-def fmp_refresh(instrument_id: UUID):
+def fmp_refresh(instrument_id: UUID, only: str | None = None):
     from .research.fmp import refresh_company
-    return {"result": refresh_company(auth.current_owner(), str(instrument_id))}
+    return {"result": refresh_company(auth.current_owner(), str(instrument_id), only=only)}
 
 
 @app.post("/api/v1/companies/{instrument_id}/financial-forecasts/refresh")

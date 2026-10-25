@@ -92,8 +92,10 @@ export const api = {
     request(
       `/companies/${id}/sector-position${peers == null ? "" : `?peers=${encodeURIComponent(peers.join(","))}`}`,
     ),
-  refreshFmp: (id) =>
-    request(`/companies/${id}/fmp/refresh`, { method: "POST" }),
+  refreshFmp: (id, only) =>
+    request(`/companies/${id}/fmp/refresh${only ? `?only=${only}` : ""}`, {
+      method: "POST",
+    }),
   refreshPublicForecasts: (id) =>
     request(`/companies/${id}/financial-forecasts/refresh`, { method: "POST" }),
   savePeers: (id, selections) =>

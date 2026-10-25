@@ -32,10 +32,14 @@ def test_five_default_peers_are_read_only_and_missing_companies_stay_unknown(own
 
 def test_other_companies_default_to_vendor_similar_companies_without_same_issuer_shares(owner):
     directory();iid=add_company('NVDA')['instrument_id']
-    assert sector_position.context(owner,iid)['basis']=='unselected'
+    first=sector_position.context(owner,iid)
+    assert first['basis']=='unselected' and first['vendor_status']['status']=='empty' and first['vendor_status']['last_attempt_at'] is None
     rows=[dict(symbol=s,companyName=s+' authored',mktCap=cap) for s,cap in [('AMD',300),('GOOG',900),('MU',200),('QCOM',250),('MRVL',100),('AVGO',800),('GOOGL',950)]]
-    fmp.refresh('peers','NVDA',fetcher=lambda *_:rows)
+    outcome=fmp.refresh_company(owner,iid,fetcher=lambda *_:rows,only='peers')
+    assert [o['dataset'] for o in outcome['outcomes']]==['peers']
     result=sector_position.context(owner,iid)
+    status=result['vendor_status']
+    assert status['status']=='saved' and status['count']==7 and status['next_attempt_at']>status['last_attempt_at']
     # Largest first, five at most; saved private choices would still override them.
     assert result['basis']=='suggested' and result['suggestion_origin']=='fmp'
     assert result['peers']==result['vendor_suggestions']==['GOOGL','AVGO','AMD','QCOM','MU']

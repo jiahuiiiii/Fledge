@@ -254,7 +254,7 @@ let browser;
     authoredData: true,
     positions,
     noPersistentStatusStrips: true,
-    onDemandRefreshProgressAndBillingDetail: true,
+    onDemandRefreshProgressAndAIStatus: true,
     disabledAIControls: true,
     keyboardFocus: true,
     annualTrailingPeriodDates: true,
