@@ -132,7 +132,7 @@ let browser;
     const y = (await overview.boundingBox()).y;
     positions.push({ width, height, overviewTop: y });
     if (width < 600)
-      assert.ok(y < 390, `Overview starts too low: ${width} ${y}`);
+      assert.ok(y < height - 160, `Overview must leave reading space in the first viewport: ${width} ${y}`);
     assert.equal(await page.locator(".demo-bar,.ai-activity").count(), 0);
     assert.equal(
       await page
@@ -146,7 +146,7 @@ let browser;
       ),
       `overflow ${width}`,
     );
-    for (const name of ["Notebook", "Data & sources", "Update data"])
+    for (const name of ["Research questions", "Data & sources", "Update data"])
       assert.ok(
         await page
           .getByRole("button", { name, exact: true })
@@ -167,14 +167,14 @@ let browser;
   await tools.focus();
   await page.keyboard.press("Enter");
   const dialog = page.getByRole("dialog", {
-    name: "Update data",
+    name: "Update Microsoft",
     exact: true,
   });
   await dialog.waitFor();
-  assert.match(await dialog.innerText(), /10-K|filed/);
+  assert.match(await dialog.innerText(), /filings, prices, analyst targets and forecasts/);
   assert.equal(
     await dialog
-      .getByRole("button", { name: "Refresh research", exact: true })
+      .getByRole("button", { name: "Update now", exact: true })
       .isEnabled(),
     true,
   );
@@ -190,7 +190,7 @@ let browser;
     .getByRole("button", { name: "View progress", exact: true })
     .click();
   assert.match(await dialog.innerText(), /Authored saved sources checked/);
-  await dialog.getByText("AI request details", { exact: true }).click();
+  await dialog.getByText("New AI analysis is paused", { exact: true }).click();
   assert.match(await dialog.innerText(), /without a confirmed charge/);
   await page.keyboard.press("Escape");
   assert.equal(
@@ -228,51 +228,24 @@ let browser;
     /Year ended 30 Sept? 2025 vs year ended 30 Sept? 2024/,
   );
   await page.getByRole("tab", { name: "Financials", exact: true }).click();
-  const history = page.getByRole("region", {
-    name: "Earnings and cash-flow history",
-    exact: true,
-  });
-  const sales = history
-    .locator(".financial-insight")
-    .filter({ hasText: "Sales grew" });
+  const story = page.locator('.financials-story');
+  const readings = await require('./browser_helpers.cjs').disclosure(page, 'Reading these figures');
+  const sales = readings.locator('.financial-insight').filter({hasText:'Sales grew'});
   await sales.waitFor();
-  assert.match(
-    await sales.innerText(),
-    /Trailing 12 months[\s\S]*60.0% higher[\s\S]*1 Jul 2025 – 30 Jun 2026 vs 1 Jul 2024 – 30 Jun 2025/,
-  );
-  await history
-    .getByRole("button", { name: "Annual reports", exact: true })
-    .click();
-  assert.match(
-    await sales.innerText(),
-    /Fiscal year[\s\S]*23.1% higher[\s\S]*1 Oct 2024 – 30 Sept? 2025 vs 1 Oct 2023 – 30 Sept? 2024/,
-  );
-  await history
-    .getByRole("button", { name: "Figures & calculations", exact: true })
-    .click();
-  await page
-    .getByRole("dialog", {
-      name: "Performance · figures & calculations",
-      exact: true,
-    })
-    .waitFor();
-  assert.match(
-    await page
-      .getByRole("dialog", {
-        name: "Performance · figures & calculations",
-        exact: true,
-      })
-      .innerText(),
-    /64000000000 USD/,
-  );
-  await page.keyboard.press("Escape");
-  for (const name of ["My ideas", "Updates", "History"]) {
-    await nav.getByRole("button", { name, exact: true }).click();
-    assert.equal(await page.locator(".demo-bar,.ai-activity").count(), 0);
-    assert.doesNotMatch(
-      await page.locator("body").innerText(),
-      /confirmed charge/,
-    );
+  assert.match(await sales.innerText(), /Trailing 12 months[\s\S]*60.0% higher[\s\S]*1 Jul 2025 – 30 Jun 2026 vs 1 Jul 2024 – 30 Jun 2025/);
+  await page.getByRole('group',{name:'Financial history period basis'}).getByRole('button',{name:'Fiscal year',exact:true}).click();
+  assert.match(await sales.innerText(), /Fiscal year[\s\S]*23.1% higher[\s\S]*1 Oct 2024 – 30 Sept? 2025 vs 1 Oct 2023 – 30 Sept? 2024/);
+  await page.getByRole('group',{name:'Financial trends'}).getByRole('button').first().click();
+  const figures = page.getByRole('dialog',{name:'Revenue growth · fiscal year',exact:true});
+  await figures.waitFor();
+  assert.match(await figures.innerText(), /US\$64 bil/);
+  assert.match(await figures.innerText(), /US\$52 bil/);
+  await page.keyboard.press('Escape');
+  for (const name of ['My views','Updates','History']) {
+    if (name === 'History') await page.goto(base + `/?company=${iid}&view=history`);
+    else await nav.getByRole('button',{name,exact:true}).click();
+    assert.equal(await page.locator('.demo-bar,.ai-activity').count(),0);
+    assert.doesNotMatch(await page.locator('body').innerText(),/confirmed charge/);
   }
   assert.deepEqual(errors, []);
   assert.deepEqual(writes, []);

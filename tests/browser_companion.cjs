@@ -18,6 +18,7 @@ let browser, page;
     viewport: { width: 1440, height: 1050 },
     reducedMotion: "reduce",
   });
+  page.setDefaultTimeout(10000);
   const errors = [],
     writes = [],
     external = [];
@@ -84,7 +85,7 @@ let browser, page;
     exact: true,
   });
   const entry = page.getByRole("button", {
-    name: "Ask a question",
+    name: "Research questions",
     exact: true,
   });
   async function openGuide() {
@@ -113,18 +114,8 @@ let browser, page;
     true,
   );
   await page.keyboard.press("Escape");
-  for (const title of ["Revenue growth", "Operating margin", "Revenue"]) {
-    const control = page
-      .getByRole("button", { name: `Explain ${title}`, exact: true })
-      .first();
-    await control.click();
-    await page.getByRole("dialog", { name: title, exact: true }).waitFor();
-    await page.keyboard.press("Escape");
-    assert.equal(
-      await control.evaluate((el) => document.activeElement === el),
-      true,
-    );
-  }
+  // Pro deliberately hides the Beginner glossary controls.
+  assert.equal(await page.getByRole('button',{name:/^Explain /}).count(),0);
   // Responsive, keyboard-accessible choice panel, without a compulsory wizard.
   for (const width of [1440, 980, 390, 320]) {
     await page.setViewportSize({ width, height: width < 600 ? 812 : 1050 });
@@ -221,35 +212,8 @@ let browser, page;
       exact: true,
     })
     .waitFor();
-  const cashHelp = page
-    .getByRole("button", { name: "Explain Free cash flow", exact: true })
-    .first();
-  await cashHelp.click();
-  const term = page.getByRole("dialog", {
-    name: "Free cash flow",
-    exact: true,
-  });
-  await term.waitFor();
-  assert.match(await term.innerText(), /minus cash capital spending/);
-  for (const width of [390, 320]) {
-    await page.setViewportSize({ width, height: 812 });
-    assert.ok(await term.evaluate((el) => el.scrollWidth <= el.clientWidth));
-    await page.screenshot({
-      path: path.join(folder, `term-${width}.png`),
-      animations: "disabled",
-    });
-  }
-  await page.keyboard.press("Escape");
-  assert.equal(
-    await cashHelp.evaluate((el) => document.activeElement === el),
-    true,
-  );
-  assert.ok((await cashHelp.boundingBox()).height >= 44);
-  assert.ok(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  );
+  await page.setViewportSize({width:320,height:812});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await prompt.scrollIntoViewIfNeeded();
   await page.screenshot({
     path: path.join(folder, "prompt-320.png"),
@@ -365,7 +329,7 @@ let browser, page;
   await page
     .getByRole("button", { name: "Add your first company", exact: false })
     .waitFor();
-  assert.match(await page.locator("main").innerText(), /keep your reasoning/);
+  assert.match(await page.locator("main").innerText(), /Test your stock ideas against the evidence/);
   assert.match(await page.locator("main").innerText(), /don’t need a position/);
   const after = (
     await (

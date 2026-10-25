@@ -30,6 +30,19 @@ def test_five_default_peers_are_read_only_and_missing_companies_stay_unknown(own
         assert one(conn,"SELECT count(*) n FROM instruments WHERE symbol='AMD'")['n']==0
 
 
+def test_other_companies_default_to_vendor_similar_companies_without_same_issuer_shares(owner):
+    directory();iid=add_company('NVDA')['instrument_id']
+    assert sector_position.context(owner,iid)['basis']=='unselected'
+    rows=[dict(symbol=s,companyName=s+' authored',mktCap=cap) for s,cap in [('AMD',300),('GOOG',900),('MU',200),('QCOM',250),('MRVL',100),('AVGO',800),('GOOGL',950)]]
+    fmp.refresh('peers','NVDA',fetcher=lambda *_:rows)
+    result=sector_position.context(owner,iid)
+    # Largest first, five at most; saved private choices would still override them.
+    assert result['basis']=='suggested' and result['suggestion_origin']=='fmp'
+    assert result['peers']==result['vendor_suggestions']==['GOOGL','AVGO','AMD','QCOM','MU']
+    with transaction(owner) as conn:
+        assert one(conn,'SELECT count(*) n FROM peer_selections')['n']==0
+
+
 def test_saved_peers_override_default_and_are_private(owner):
     directory();iid=add_company('AVGO')['instrument_id']
     peers=[dict(symbol=s,rationale='Compare whole-company growth; business mix differs.') for s in ['NVDA','AMD','MRVL','MU','QCOM']]

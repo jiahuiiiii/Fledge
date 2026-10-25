@@ -146,74 +146,26 @@ let browser;
     name: "Workspace navigation",
     exact: true,
   });
-  await nav.getByRole("button", { name: "My ideas", exact: true }).click();
-  assert.equal(await ideas.locator(".idea-summary").count(), 1);
+  await nav.getByRole("button", { name: "My views", exact: true }).click();
+  assert.equal(await ideas.locator(".idea-summary").count(), saved.length);
   const empty = data.catalogue.find((c) => c.symbol === "AURQ");
   assert.ok(empty && !empty.status);
   await page.goto(base + `/?company=${empty.id}&view=ideas`);
-  await ideas
-    .getByRole("heading", { name: "Save your view on AURQ", exact: true })
-    .waitFor();
-  assert.equal(await ideas.locator(".idea-summary").count(), 0);
-  assert.match(
-    await ideas.locator(".ideas-scope").innerText(),
-    /0 saved ideas/,
-  );
-  for (const width of [1440, 980, 390, 320]) {
-    await page.setViewportSize({ width, height: 1050 });
-    await page.evaluate(() => {
-      document.querySelector(".main-workspace").scrollTop = 0;
-      window.scrollTo(0, 0);
-    });
-    assert.ok(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
-      `empty ideas overflow ${width}`,
-    );
-    assert.ok(
-      await ideas
-        .getByRole("button", { name: "Save my reasoning", exact: true })
-        .evaluate((el) => el.getBoundingClientRect().height >= 44),
-    );
-    assert.equal(await page.locator(".periodic-review-entry").count(), 0);
-    await screenshot(`empty-${width}`);
-  }
-  await ideas
-    .getByRole("button", { name: "Save my reasoning", exact: true })
-    .focus();
-  await page.keyboard.press("Enter");
-  const create = page.getByRole("dialog", {
-    name: "Save your reasoning",
-    exact: true,
-  });
+  // My views now lists every saved company, even from a selected company.
+  await ideas.locator('.idea-summary').first().waitFor();
+  assert.equal(await ideas.locator('.idea-summary').count(),saved.length);
+  await nav.getByRole('button',{name:'Home',exact:true}).click();
+  await page.getByRole('button',{name:'Research questions',exact:true}).click();
+  const research = page.getByRole('dialog',{name:'Your research',exact:true});
+  const createTrigger = research.getByRole('button',{name:'Save my reasoning',exact:true});
+  await createTrigger.focus(); await page.keyboard.press('Enter');
+  const create = page.getByRole('dialog',{name:'Save your reasoning',exact:true});
   await create.waitFor();
-  await create
-    .getByRole("textbox", { name: "My reasoning", exact: true })
-    .fill("An unsaved test thought.");
-  await page.keyboard.press("Escape");
-  await create.waitFor({ state: "hidden" });
-  assert.equal(
-    await ideas
-      .getByRole("button", { name: "Save my reasoning", exact: true })
-      .evaluate((el) => el === document.activeElement),
-    true,
-  );
-  assert.equal(
-    (
-      await (
-        await page.request.get(
-          base + `/api/v1/workspace?instrument_id=${empty.id}`,
-        )
-      ).json()
-    ).result.versions.length,
-    0,
-  );
-  await ideas
-    .getByRole("button", { name: "Read company research", exact: true })
-    .click();
-  assert.equal(new URL(page.url()).searchParams.get("view"), "workspace");
-  assert.equal(new URL(page.url()).searchParams.get("company"), empty.id);
+  await create.getByRole('textbox',{name:'My reasoning',exact:true}).fill('An unsaved test thought.');
+  await page.keyboard.press('Escape'); await create.waitFor({state:'hidden'});
+  assert.equal(await createTrigger.evaluate(el=>el===document.activeElement),true);
+  assert.equal((await (await page.request.get(base+`/api/v1/workspace?instrument_id=${empty.id}`)).json()).result.versions.length,0);
+  await page.keyboard.press('Escape');
   // Authored all-company empty state must lead to the existing company browser.
   await page.route("**/api/v1/workspace*", async (route) => {
     const response = await route.fetch(),
@@ -232,6 +184,12 @@ let browser;
       exact: true,
     })
     .waitFor();
+  for (const width of [1440,980,390,320]) {
+    await page.setViewportSize({width,height:1050});
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`empty ideas overflow ${width}`);
+    assert.ok(await ideas.getByRole('button',{name:'Choose a company',exact:true}).evaluate(el=>el.getBoundingClientRect().height>=44));
+    await screenshot(`empty-${width}`);
+  }
   await screenshot("all-empty-320");
   await ideas
     .getByRole("button", { name: "Choose a company", exact: true })

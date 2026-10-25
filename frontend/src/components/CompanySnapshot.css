@@ -421,3 +421,14 @@
   color: var(--color-muted);
   font-size: var(--text-xs);
 }
+
+/* Business brief: only topics with evidence, flat cards, one honest competitors block. */
+.app-shell .brief-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-3); }
+.app-shell .brief-topic { border: 0; border-radius: var(--radius-md); background: var(--color-surface-2); padding: var(--space-3) var(--space-4); }
+.app-shell .brief-topic h3 { font-size: var(--text-base); font-weight: 600; margin: 0 0 var(--space-2); }
+.app-shell .brief-topic li p { font-size: var(--text-sm); line-height: 1.5; }
+.app-shell .brief-competitors { display: flex; flex-direction: column; gap: var(--space-2); }
+.app-shell .brief-peers { display: grid; gap: var(--space-1); }
+.app-shell .brief-peers small { color: var(--color-muted); font-size: var(--text-xs); }
+.app-shell .brief-peers > div { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.app-shell .brief-missing { margin: var(--space-3) 0 0; }

@@ -59,3 +59,7 @@ Phone charts scroll within their own frame; the page does not overflow. Native t
 ## Peer search and analyst targets — 25 October 2026
 
 The peer search is a floating combobox: the list opens over the page, so typing never resizes the card. "Other comparison measures" was removed. Analyst price targets are drawn as saved daily closes with the low, mean and high targets projected to the right, each labelled with its distance from the last price; one line gives the source, analyst count, fetch time and a stale note, and the rest sits under **Source details and limits**.
+
+## Similar companies as the starting group — 25 October 2026 (later)
+
+With no saved peers, Broadcom still defaults to its curated five. Any other company now starts with FMP's similar companies (exchange, sector and size), largest first, at most five, one per issuer (a second share class is skipped). They are an unsaved starting group, labelled "not a verified list of competitors"; **Save & compare** keeps them and saved private peers always override them. When none have been collected, **Suggest similar companies** runs the explicit FMP check (no AI) and re-reads the position. The business brief's **Who it competes with** block shows what the filing says (with its source) or that it names none, plus these comparison companies with their origin, and a link to change them. The brief now lists only topics with evidence (cash and obligations dropped; Financials covers it) and one line naming what the passages did not cover.

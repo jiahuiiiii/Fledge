@@ -17,6 +17,10 @@ let browser;
   fixture.next_refresh_at = new Date(time).toISOString();
   fixture.snapshot.retrieved_at = new Date(time - 120000).toISOString();
   fixture.snapshot.series.delay_minutes = 15;
+  // Date the authored latest bar explicitly; the seed is completed history.
+  fixture.snapshot.series.bars = fixture.snapshot.series.bars.filter(b=>b.date<'2026-10-08');
+  fixture.snapshot.series.bars.push({date:'2026-10-08',open:'110',high:'120',low:'100',close:'111',volume:null,provisional:true});
+  fixture.snapshot.series.latest_quote = {price:'111',quoted_at:new Date(time-120000).toISOString(),session:'regular session'};
   await page.clock.install({ time: new Date(time) });
   await page.route('**/*', async route => {
     const req = route.request(), url = new URL(req.url());
@@ -43,7 +47,9 @@ let browser;
     return route.continue();
   });
   await page.goto(base + '/?company=' + iid + '&view=workspace');
+  await require('./browser_helpers.cjs').disclosure(page, 'Price chart · past year');
   const panel = page.getByRole('region', { name: 'Daily price history', exact: true });
+  await page.mouse.move(1,1);
   await panel.getByText(/latest session price · provisional/).waitFor();
   assert.equal(refreshes, 0, 'opening the chart reads saved prices only');
   assert.match(await panel.innerText(), /Showing saved prices\. Choose Refresh prices for a newer check\./);
@@ -52,6 +58,7 @@ let browser;
   await panel.getByRole('button', { name: 'Refresh prices', exact: true }).click();
   await page.clock.runFor(1100);
   assert.match(await panel.innerText(), /Updates every minute while this chart is open and visible\./);
+  await page.mouse.move(1,1);
   await panel.getByText(/latest session price · provisional/).waitFor();
   assert.equal(refreshes, 1);
   assert.match(await panel.innerText(), /2026-10-08/);

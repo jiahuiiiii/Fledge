@@ -681,3 +681,4 @@
 .sector-position .position-row-end { top: var(--space-1); bottom: var(--space-1); }
 .sector-position .position-scale { height: 22px; }
 @media (max-width: 560px) { .sector-position .position-row-period { display: none; } }
+.sector-position .position-suggest { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }

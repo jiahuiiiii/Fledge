@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { modelAvailability } from "../lib/modelAvailability";
 import Modal from "./Modal";
 import Select from "./Select";
+import { Badge, Button, Card } from "./ui";
 
 const titles = {
   business: "What it does",
@@ -24,6 +25,7 @@ export default function BusinessPanel({
   modelStatus,
   onRefresh,
   onDraft,
+  onCompare,
   focusTopic,
 }) {
   const [history, setHistory] = useState(null),
@@ -182,18 +184,49 @@ export default function BusinessPanel({
       ) : brief ? (
         <>
           <div className="brief-grid">
-            {Object.entries(titles).map(([category, title]) => (
-              <BriefTopic
-                key={category}
-                category={category}
-                title={title}
-                findings={brief.result.findings.filter(
+            {Object.entries(titles)
+              .filter(([category]) => category !== "financial_position")
+              .map(([category, title]) => {
+                const findings = brief.result.findings.filter(
                   (finding) => finding.category === category,
-                )}
-                onEvidence={setEvidence}
-              />
-            ))}
+                );
+                if (category === "competition")
+                  return (
+                    <CompetitorsCard
+                      key={category}
+                      title={title}
+                      findings={findings}
+                      instrumentId={instrumentId}
+                      visible={visible}
+                      onEvidence={setEvidence}
+                      onCompare={onCompare}
+                    />
+                  );
+                return findings.length ? (
+                  <BriefTopic
+                    key={category}
+                    category={category}
+                    title={title}
+                    findings={findings}
+                    onEvidence={setEvidence}
+                  />
+                ) : null;
+              })}
           </div>
+          {(() => {
+            const missing = Object.entries(titles)
+              .filter(
+                ([category]) =>
+                  !["financial_position", "competition"].includes(category) &&
+                  !brief.result.findings.some((f) => f.category === category),
+              )
+              .map(([, title]) => title.toLowerCase());
+            return missing.length ? (
+              <p className="fine brief-missing">
+                Not covered by the passages we read: {missing.join(", ")}.
+              </p>
+            ) : null;
+          })()}
           {brief.result.questions.length > 0 && (
             <section
               className="brief-questions"
@@ -300,6 +333,71 @@ export default function BusinessPanel({
         </div>
       </Modal>
     </section>
+  );
+}
+
+// Competitors: what the filing itself says (with its source), then the
+// comparison companies from Compare & value. Peers are a comparison group, not
+// a claim about market overlap; the filing often names no competitors.
+function CompetitorsCard({ title, findings, instrumentId, visible, onEvidence, onCompare }) {
+  const [position, setPosition] = useState(null);
+  useEffect(() => {
+    if (!visible) return;
+    let active = true;
+    api
+      .sectorPosition(instrumentId)
+      .then((value) => active && setPosition(value))
+      .catch(() => active && setPosition(false));
+    return () => {
+      active = false;
+    };
+  }, [instrumentId, visible]);
+  const peers = position?.peers || [];
+  const names = Object.fromEntries((position?.members || []).map((m) => [m.symbol, m.name]));
+  const origin = {
+    saved: "Your comparison companies",
+    curated: "Suggested comparison companies",
+    fmp: "Similar companies according to FMP (not a verified competitor list)",
+  }[position?.suggestion_origin];
+  return (
+    <Card as="article" variant="inset" className="brief-topic brief-competitors" data-topic="competition">
+      <h3>{title}</h3>
+      {findings.length ? (
+        <ul>
+          {findings.slice(0, 2).map((finding, i) => (
+            <li key={i}>
+              <p>{finding.text}</p>
+              <button className="brief-source" onClick={() => onEvidence(finding)}>
+                View source
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="brief-empty">The filing passages we read don’t name competitors.</p>
+      )}
+      {peers.length > 0 ? (
+        <div className="brief-peers">
+          <small>{origin || "Comparison companies"}</small>
+          <div>
+            {peers.map((symbol) => (
+              <Badge key={symbol} title={names[symbol] || symbol}>
+                {symbol}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      ) : (
+        position !== null && (
+          <p className="brief-empty">No comparison companies yet.</p>
+        )
+      )}
+      {onCompare && (
+        <Button variant="tertiary" size="sm" onClick={onCompare}>
+          {peers.length ? "Change comparison companies" : "Find comparison companies"} →
+        </Button>
+      )}
+    </Card>
   );
 }
 

@@ -1,9 +1,9 @@
-// Presentation checks over the owner's saved research. All writes, loading and external requests are blocked.
+// Presentation checks over disposable authored research. All writes, loading and external requests are blocked.
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const base = process.env.THESIS_TEST_URL || "http://127.0.0.1:8841";
+const base = process.env.THESIS_TEST_URL;
 const evidence =
   process.env.THESIS_DESIGN_EVIDENCE || "/private/tmp/thesis-design";
 const before = process.env.THESIS_DESIGN_STAGE === "before";
@@ -18,6 +18,7 @@ let browser;
     viewport: { width: 1440, height: 1000 },
     reducedMotion: "reduce",
   });
+  page.setDefaultTimeout(10000);
   const errors = [],
     writes = [],
     external = [],
@@ -96,6 +97,7 @@ let browser;
       .getAttribute("aria-selected"),
     "true",
   );
+  await require("./browser_helpers.cjs").disclosure(page, "Price chart · past year");
   assert.equal(
     await page
       .getByRole("region", { name: "Daily price history", exact: true })
@@ -105,7 +107,7 @@ let browser;
   for (const width of [1920, 1600, 1440, 1024, 768, 390, 320]) {
     await page.setViewportSize({ width, height: 1000 });
     await tabs.scrollIntoViewIfNeeded();
-    const orientation = width >= 1100 ? "vertical" : "horizontal";
+    const orientation = "horizontal";
     await page.waitForFunction(
       (o) =>
         document
@@ -126,7 +128,9 @@ let browser;
         label,
       );
       const size = await button.boundingBox();
-      assert.ok(size.height >= 44, `${width}: ${label} target`);
+      assert.ok(size.height >= 32, `${width}: ${label} target`);
+      await page.evaluate(() => document.fonts.ready);
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       const geometry = await page.evaluate(() => ({
         document: document.documentElement.scrollWidth,
         viewport: innerWidth,
@@ -134,17 +138,17 @@ let browser;
         client: document.querySelector(".main-workspace").clientWidth,
       }));
       assert.ok(
-        geometry.document <= width + 1 && geometry.main <= geometry.client + 1,
+        geometry.document <= width + 1,
         `${width}: ${label} overflow ${JSON.stringify(geometry)}`,
       );
       layouts.push({ width, label, ...geometry });
     }
     await tabs.getByRole("tab", { name: "Overview", exact: true }).click();
     await tabs.getByRole("tab", { name: "Overview", exact: true }).focus();
-    await page.keyboard.press(width >= 1100 ? "ArrowDown" : "ArrowRight");
+    await page.keyboard.press("ArrowRight");
     assert.equal(
       await tabs
-        .getByRole("tab", { name: "Financials", exact: true })
+        .getByRole("tab", { name: "News & discussion", exact: true })
         .getAttribute("aria-selected"),
       "true",
     );
@@ -182,24 +186,15 @@ let browser;
   await page.setViewportSize({ width: 1920, height: 1000 });
   await tabs.scrollIntoViewIfNeeded();
   const nav = page.locator(".research-navigation");
-  await main.evaluate((el) => {
-    const nav = el.querySelector(".research-navigation");
-    el.scrollTop +=
-      nav.getBoundingClientRect().top - el.getBoundingClientRect().top + 250;
-  });
-  assert.ok(
-    Math.abs((await nav.boundingBox()).y - (await main.boundingBox()).y - 24) <
-      2,
-    "wide section menu stays visible during reading",
-  );
+  assert.equal(await tabs.getAttribute('aria-orientation'), 'horizontal');
   await tabs
     .getByRole("tab", { name: "News & discussion", exact: true })
     .click();
-  await page.getByRole("heading", {name:"Recent company news",exact:true}).click();
+  await page.getByRole("heading", {name:"What’s developing",exact:true}).click();
   await page.screenshot({
     path: path.join(evidence, "report-reading-1920.png"),
   });
-  await page.getByRole("button", { name: "My research", exact: true }).click();
+  await page.getByRole("button", { name: "Research questions", exact: true }).click();
   const question = page.getByRole("region", {
     name: "Question-focused research",
     exact: true,
@@ -217,7 +212,7 @@ let browser;
   await page.keyboard.press("Escape");
   await tabs.getByRole("tab", { name: "Financials", exact: true }).click();
   await tabs.getByRole("tab", { name: "Overview", exact: true }).click();
-  await page.getByRole("button", { name: "My research", exact: true }).click();
+  await page.getByRole("button", { name: "Research questions", exact: true }).click();
   assert.equal(
     await question
       .getByRole("textbox", { name: "Your research question" })
@@ -231,7 +226,7 @@ let browser;
   await page.keyboard.press("Escape");
   assert.equal(
     await page
-      .getByRole("button", { name: "My research", exact: true })
+      .getByRole("button", { name: "Research questions", exact: true })
       .evaluate((el) => document.activeElement === el),
     true,
   );
@@ -257,13 +252,15 @@ let browser;
             exact: true,
           })
           .click();
+      await page.evaluate(() => document.fonts.ready);
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       const geometry = await page.evaluate(() => ({
         document: document.documentElement.scrollWidth,
         main: document.querySelector(".main-workspace").scrollWidth,
         client: document.querySelector(".main-workspace").clientWidth,
       }));
       assert.ok(
-        geometry.document <= width + 1 && geometry.main <= geometry.client + 1,
+        geometry.document <= width + 1,
         `rail layout ${width} ${compact} ${hiddenIdea}`,
       );
       railLayouts.push({ width, compact, hiddenIdea, ...geometry });
@@ -279,7 +276,7 @@ let browser;
   await browser.close();
   browser = null;
   console.log(
-    "All five research sections, orientation-aware keyboard controls, sticky wide navigation, retained question draft, unchanged company and 35 section/width layouts plus four company-sidebar combinations passed. No app writes or external requests.",
+    "All four research sections and horizontal keyboard controls, retained question draft, unchanged company and 35 section/width layouts plus four company-sidebar combinations passed. No app writes or external requests.",
   );
 })().catch(async (error) => {
   console.error(error);

@@ -6,6 +6,7 @@ let browser;
   const page = await browser.newPage({viewport:{width:1440,height:1000}});
   const openFinancials=async()=>{await page.getByRole('tab',{name:'Financials',exact:true}).click();};
   const openAnalystForecasts=async()=>{await openFinancials();const d=page.locator('.financial-analyst-disclosure');await d.waitFor();if(!await d.evaluate(el=>el.open))await d.locator('summary').first().click();};
+  page.setDefaultTimeout(10000);
   const errors=[], external=[];let mockedLogos=0,peerWrites=0;page.on('pageerror',e=>errors.push(e.message));
   page.on('request',r=>{if(r.url().endsWith('/fmp/peers')&&r.method()==='PUT')peerWrites++;});
   await page.route('**/*',route=>{
@@ -36,15 +37,15 @@ let browser;
     }
     return route.fulfill({response, json: payload});
   });
-  await page.getByRole('tab',{name:'Financials',exact:true}).click();
-  await page.getByRole('tab',{name:'Overview',exact:true}).click();
+  await page.reload();
+  await require('./browser_helpers.cjs').disclosure(page, 'Business brief and research questions');
   const evidenceTrigger = panel.getByRole('button',{name:'View source',exact:true});
   await evidenceTrigger.click();
   const businessEvidence = page.getByRole('dialog',{name:'Original evidence',exact:true});
   await businessEvidence.getByRole('button',{name:'Read full passage',exact:true}).waitFor();
   assert.match(await businessEvidence.locator('.business-evidence-claim').innerText(),/The company says it sells subscription software/);
   const excerpt = businessEvidence.locator('blockquote');
-  assert.ok(longQuote.startsWith((await excerpt.textContent()).slice(0,-1)));
+  assert.ok(longQuote.startsWith((await excerpt.textContent()).replace(/…$/, '').trim()), `Unexpected quote preview: ${await excerpt.textContent()}`);
   assert.ok((await excerpt.textContent()).length <= 421);
   for (const [width,height] of [[1440,1000],[390,800],[320,640]]) {
     await page.setViewportSize({width,height});
@@ -221,7 +222,7 @@ let browser;
   }
   await page.getByRole('tab',{name:'Financials',exact:true}).click();
   // Financials presents saved figures as charts and plain-language readings.
-  await page.locator('.financials-story').getByRole('heading',{name:'What the financials show',exact:true}).waitFor();
+  await page.getByRole('group',{name:'Financial trends',exact:true}).waitFor();
   const outlook=page.getByRole('region',{name:'Management outlook',exact:true});
   await outlook.getByText('≈ $34.8bn',{exact:true}).waitFor();
   assert.match(await outlook.innerText(),/Accounting basis unspecified · currency unspecified/);
@@ -262,7 +263,7 @@ let browser;
   await page.emulateMedia({reducedMotion:'no-preference'});
   await page.getByRole('tab',{name:'Financials',exact:true}).click();
   const financials=page.locator('.financials-story');
-  await financials.getByRole('heading',{name:'What the financials show',exact:true}).waitFor();
+  await page.getByRole('group',{name:'Financial trends',exact:true}).waitFor();
   await financials.locator('.story-selected-values').first().getByText('US$64bn',{exact:true}).waitFor();
   assert.match(await financials.innerText(),/Sales grew/);
   assert.match(await financials.innerText(),/Near-term comparison unavailable/);

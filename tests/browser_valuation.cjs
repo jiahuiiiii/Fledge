@@ -4,6 +4,7 @@ let browser;
 (async () => {
   browser = await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{})});
   const page = await browser.newPage({viewport:{width:1440,height:1000}});
+  page.setDefaultTimeout(10000);
   const errors=[],external=[],blockedLogos=[];page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/*', route => {
     const r=route.request(),u=new URL(r.url());
@@ -17,19 +18,18 @@ let browser;
   const panel=page.getByRole('region',{name:'Valuation scenarios',exact:true});
   await panel.getByText('Explore the assumptions',{exact:true}).waitFor();
   const targets=page.getByRole('region',{name:'Analyst price targets',exact:true});
-  await targets.getByText('USD 125.50',{exact:true}).first().waitFor();
-  assert.match(await targets.innerText(),/12 analysts in the reported poll/);
-  // Failed refresh never clears a retained snapshot or changes scenario inputs.
-  await page.route('**/analyst-targets/refresh',async r=>{
-    await new Promise(resolve=>setTimeout(resolve,300));
-    await r.fulfill({status:503,json:{result:{errors:[{error_message:'Authored source outage; saved targets retained.'}]}}});
-  });
-  await targets.getByRole('button',{name:'Refresh analyst targets',exact:true}).click();
-  await targets.getByRole('status').waitFor();
-  assert.ok(await targets.getByText('USD 125.50',{exact:true}).first().isVisible());
-  await targets.getByRole('alert').filter({hasText:'Authored source outage'}).waitFor();
-  assert.ok(await targets.getByText('USD 125.50',{exact:true}).first().isVisible());
-  await page.unroute('**/analyst-targets/refresh');
+  const targetChart = targets.getByRole('img', {name:/Analyst targets: low US\$100.00, mean US\$125.50, high US\$160.00/});
+  await targetChart.waitFor();
+  assert.match(await targets.innerText(),/12 analysts/);
+  // Section updates now open the shared company update dialog. Opening it
+  // retains the target chart and makes no acquisition request.
+  const targetWrites = [];
+  page.on('request',request=>{if(request.method()==='POST' && request.url().includes('/analyst-targets'))targetWrites.push(request.url());});
+  await targets.getByRole('button',{name:'Update data',exact:true}).click();
+  await page.getByRole('dialog',{name:'Update Microsoft',exact:true}).waitFor();
+  await page.keyboard.press('Escape');
+  assert.equal(await targetChart.isVisible(),true);
+  assert.deepEqual(targetWrites,[]);
   assert.equal(await panel.locator('form').isVisible(), false);
   await panel.getByRole('button',{name:'Build a scenario',exact:true}).click();
   await panel.getByText('Compare reference multiples',{exact:true}).click();

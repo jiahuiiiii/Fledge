@@ -1,4 +1,4 @@
-import { Combobox, FilterGroup, SectionHeader } from "./ui";
+import { Button, Combobox, FilterGroup, SectionHeader } from "./ui";
 import { formatTimestamp } from "../lib/dateTime";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
@@ -692,6 +692,27 @@ export default function SectorPosition({
     setSearched("");
     searchVersion.current++;
   }
+  // Explicit provider check (no AI): collects FMP's similar-company list for
+  // this company, then re-reads the position with those as the starting group.
+  async function suggestSimilar() {
+    if (acting.current) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await api.refreshFmp(instrumentId);
+      const next = await load(true);
+      setNotice(
+        next?.vendor_suggestions?.length
+          ? "Similar companies loaded. Save & compare to keep them, or change the list."
+          : "FMP returned no similar companies for this company. Add your own below.",
+      );
+    } catch (failure) {
+      setError(failure.message);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function save() {
     if (acting.current) return;
     let selected = [...(draft || [])];
@@ -922,6 +943,23 @@ export default function SectorPosition({
                 onSelect={addPeer}
               />
             </div>
+            {data.suggestion_origin === "fmp" && (
+              <p className="position-caption">
+                Suggested: similar companies by exchange, sector and size according to
+                FMP, largest first. This is a starting point, not a verified list of
+                competitors. Save &amp; compare keeps them; change the list any time.
+              </p>
+            )}
+            {data.basis === "unselected" && !data.vendor_suggestions?.length && (
+              <div className="position-suggest">
+                <Button variant="secondary" size="sm" disabled={busy} onClick={suggestSimilar}>
+                  Suggest similar companies
+                </Button>
+                <span className="position-caption">
+                  Or add your own below. Suggestions come from FMP and are not a competitor list.
+                </span>
+              </div>
+            )}
             <ul
               className="position-peer-list"
               aria-label="Selected peers"

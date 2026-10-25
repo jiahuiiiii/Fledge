@@ -2408,6 +2408,7 @@ function CompanyWorkspace({
                                   }
                                   disclosures={data.disclosures}
                                   modelStatus={modelStatus}
+                                  onCompare={() => setTab("valuation")}
                                   onRefresh={() =>
                                     act(
                                       () =>
