@@ -1,44 +1,8 @@
 import { useEffect, useState } from "react";
-import { ProModeSwitch } from "./DetailModeToggle";
 import { api } from "../api/client";
-import { useProfile } from "../lib/profile";
-import { typeName } from "../lib/investorTypes";
 import { TERMS_VERSION } from "../lib/terms";
-import {
-  AccountSecurityDialog,
-  ForgotPasswordForm,
-  RecoveryCodeScreen,
-} from "./AccountSecurity";
+import { ForgotPasswordForm, RecoveryCodeScreen } from "./AccountSecurity";
 import "./AccountGate.css";
-
-function InvestorTypeLine() {
-  const { profile } = useProfile();
-  if (!profile) return null;
-  const name = profile.completed && typeName(profile.investor_type);
-  return (
-    <div className="account-type">
-      {name ? (
-        <>
-          Your investor type
-          <strong>{name}</strong>
-        </>
-      ) : (
-        "What kind of investor are you? "
-      )}
-      <button
-        type="button"
-        onClick={(event) => {
-          event.currentTarget.closest("details")?.removeAttribute("open");
-          dispatchEvent(new Event("fledge:retake-quiz"));
-        }}
-      >
-        {name
-          ? "Retake the quiz"
-          : `Find out in ${profile.completed ? 2 : 4} questions`}
-      </button>
-    </div>
-  );
-}
 
 // Accounts made before consent existed (or after the terms change) accept
 // once before continuing. New sign-ups accept on the form itself.
@@ -70,11 +34,11 @@ function TermsGate({ onAccepted, onSignOut }) {
           fledge<span>↗</span>
         </a>
         <h1>Before you continue</h1>
-        <p>
-          We’ve added Terms of Use and a Privacy Notice. In short:
-        </p>
+        <p>We’ve added Terms of Use and a Privacy Notice. In short:</p>
         <ul>
-          <li>Fledge is for learning and research. It is not financial advice.</li>
+          <li>
+            Fledge is for learning and research. It is not financial advice.
+          </li>
           <li>
             We keep your answers, saved companies and notes only to run your
             account. We don’t sell your data or show ads.
@@ -148,14 +112,14 @@ export default function AccountGate({ children }) {
   const setRecovery = (value) => {
     setRecoveryState(value);
     try {
-      if (value) sessionStorage.setItem("fledge:recovery", JSON.stringify(value));
+      if (value)
+        sessionStorage.setItem("fledge:recovery", JSON.stringify(value));
       else sessionStorage.removeItem("fledge:recovery");
     } catch {
       /* Storage can be unavailable; the screen still shows once. */
     }
   };
   const [forgot, setForgot] = useState(false);
-  const [securityOpen, setSecurityOpen] = useState(false);
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -354,76 +318,12 @@ export default function AccountGate({ children }) {
       />
     );
   if (session?.authenticated)
-    return children(
-      session,
-      session.mode === "managed" || session.mode === "password" ? (
-        <details className="account-menu">
-          <summary
-            aria-label="Account menu"
-            onKeyDown={(event) => {
-              if (event.key === "Escape")
-                event.currentTarget.parentElement.removeAttribute("open");
-            }}
-          >
-            Account
-          </summary>
-          <div
-            onKeyDown={(event) => {
-              if (event.key !== "Escape") return;
-              const menu = event.currentTarget.parentElement;
-              menu.removeAttribute("open");
-              menu.querySelector("summary")?.focus();
-            }}
-          >
-            <span className="section-label">SIGNED IN AS</span>
-            <p className="account-identity">
-              {session.username || session.email || "Research account"}
-            </p>
-            <InvestorTypeLine />
-            <ProModeSwitch />
-            {session.mode === "password" && session.username && (
-              <div className="account-security">
-                {session.has_recovery_code === false && (
-                  <p className="security-nudge">
-                    Add a recovery code so you can reset a forgotten password.
-                  </p>
-                )}
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.currentTarget.closest("details")?.removeAttribute("open");
-                    setSecurityOpen(true);
-                  }}
-                >
-                  Password and recovery code
-                </button>
-                <AccountSecurityDialog
-                  open={securityOpen}
-                  onClose={() => setSecurityOpen(false)}
-                  hasRecoveryCode={!!session.has_recovery_code}
-                  onCodeChanged={refreshSession}
-                />
-              </div>
-            )}
-            <p>
-              News and company data are the same for everyone. Your answers,
-              notes and settings are private to you.
-            </p>
-            <button
-              onClick={signOut}
-              disabled={busy}
-              className="account-signout"
-            >
-              Sign out
-            </button>
-            <p className="account-legal">
-              <a href="/terms" target="_blank" rel="noopener">Terms</a>
-              <a href="/privacy" target="_blank" rel="noopener">Privacy</a>
-            </p>
-          </div>
-        </details>
-      ) : null,
-    );
+    return children(session, {
+      onSignOut: signOut,
+      onCodeChanged: refreshSession,
+      busy,
+      error,
+    });
   return (
     <main className="account-page">
       <section className="account-card">
@@ -474,7 +374,9 @@ export default function AccountGate({ children }) {
                 autoCapitalize="none"
                 maxLength={30}
                 placeholder={creating ? "Letters or numbers, no spaces" : ""}
-                aria-describedby={fieldError.username ? "username-error" : undefined}
+                aria-describedby={
+                  fieldError.username ? "username-error" : undefined
+                }
                 aria-invalid={!!fieldError.username}
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
@@ -493,7 +395,9 @@ export default function AccountGate({ children }) {
                 autoComplete={creating ? "new-password" : "current-password"}
                 maxLength={128}
                 placeholder={creating ? "At least 8 characters" : ""}
-                aria-describedby={fieldError.password ? "password-error" : undefined}
+                aria-describedby={
+                  fieldError.password ? "password-error" : undefined
+                }
                 aria-invalid={!!fieldError.password}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}

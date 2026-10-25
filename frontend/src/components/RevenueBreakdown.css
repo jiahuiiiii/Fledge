@@ -134,7 +134,6 @@
 }
 .revenue-mix .mix-unavailable {
   padding: 14px;
-  border-left: 2px solid var(--color-caution-light);
   background: color-mix(in srgb, var(--color-caution-light) 4%, transparent);
   line-height: 1.7;
   font-size: var(--text-base);

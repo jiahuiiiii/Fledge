@@ -1,3 +1,4 @@
+import { Button } from "./ui";
 import Select from "./Select";
 import { useState } from "react";
 import { stamp } from "./MarketResearch";
@@ -74,9 +75,13 @@ function MatchEvidence({ item, sources, onSource }) {
           <blockquote key={i}>{c.quote}</blockquote>
         ))}
         <SentimentContext value={item.conversation} purpose="connection" />
-        <button className="source-link" onClick={() => onSource(source)}>
+        <Button
+          variant="plain"
+          className="source-link"
+          onClick={() => onSource(source)}
+        >
           Open cited source ↗
-        </button>
+        </Button>
       </details>
     </article>
   );
@@ -248,9 +253,12 @@ export default function IdeaAlertChecks({
               </>
             )}
             <div className="sentiment-controls">
-              <button onClick={() => onOpen(c.instrument_id, "idea")}>
+              <Button
+                variant="plain"
+                onClick={() => onOpen(c.instrument_id, "idea")}
+              >
                 Open current idea ↗
-              </button>
+              </Button>
               <a href={`/api/v1/idea-alerts/${c.id}/export`} download>
                 Download this check
               </a>
@@ -266,18 +274,20 @@ export default function IdeaAlertChecks({
               c.published &&
               !readOnly && (
                 <div className="sentiment-controls">
-                  <button
+                  <Button
+                    variant="plain"
                     disabled={busy}
                     onClick={() => onReview(c.id, "reviewed")}
                   >
                     Mark idea alert reviewed
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="plain"
                     disabled={busy}
                     onClick={() => onReview(c.id, "unresolved")}
                   >
                     Leave idea alert unresolved
-                  </button>
+                  </Button>
                 </div>
               )
             )}

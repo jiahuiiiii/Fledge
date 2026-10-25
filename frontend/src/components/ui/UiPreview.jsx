@@ -1,5 +1,11 @@
 import { useState } from "react";
 import {
+  Disclosure,
+  EmptyState,
+  FilterGroup,
+  MetaRow,
+  Pagination,
+  StoryCard,
   Badge,
   BookmarkIcon,
   Button,
@@ -246,12 +252,74 @@ function Example() {
   );
 }
 
+function ReadingParts() {
+  const [filter, setFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  return (
+    <div className="ui-preview__grid">
+      <div className="ui-preview__section">
+        <FilterGroup
+          label="Example story filters"
+          value={filter}
+          onValueChange={setFilter}
+          options={[
+            { value: "all", label: "All", count: 3 },
+            { value: "company", label: "Company", count: 2 },
+          ]}
+        />
+        <StoryCard
+          title="Example company announces an expansion"
+          href="https://example.com/"
+          tags={<Badge>Company news</Badge>}
+          meta={
+            <>
+              <span>Example Wire</span>
+              <time dateTime="2026-10-25">25 Oct 2026</time>
+            </>
+          }
+        >
+          <p>
+            Authored example text. The same story card presents company and
+            world headlines.
+          </p>
+        </StoryCard>
+        <Pagination
+          page={page}
+          totalPages={3}
+          onPrevious={() => setPage((n) => n - 1)}
+          onNext={() => setPage((n) => n + 1)}
+        />
+      </div>
+      <div className="ui-preview__section">
+        <Disclosure
+          title="Inspect evidence"
+          description="Saved excerpts and original sources"
+        >
+          <MetaRow>
+            <Badge>EXMP</Badge>
+            <span>Example source</span>
+          </MetaRow>
+          <p>
+            Native keyboard-accessible disclosure. Reading it makes no request.
+          </p>
+        </Disclosure>
+        <EmptyState
+          title="No updates in this view"
+          description="Choose another filter to continue."
+          actions={<Button variant="tertiary">Show all</Button>}
+        />
+      </div>
+    </div>
+  );
+}
+
 const SECTIONS = [
   ["Buttons", ButtonBoard],
   ["Badges", Badges],
   ["Section headers", Headers],
   ["Cards", Cards],
   ["Put together", Example],
+  ["Reading and evidence", ReadingParts],
 ];
 
 export default function UiPreview() {
@@ -263,7 +331,7 @@ export default function UiPreview() {
           level="page"
           icon={<GridIcon />}
           title="Shared UI parts"
-          description="Card, section header, badge and button. Sample text only; nothing here reads your saved research."
+          description="Shared cards, controls and reading patterns. Authored examples only."
           actions={
             <Button
               variant="plain"

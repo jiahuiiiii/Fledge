@@ -9,6 +9,8 @@ import "./components/ContentFirstLayout.css";
 import "./components/ReadingFlow.css";
 import "./styles/mobile.css";
 import "./styles/header.css";
+import "./components/ResearchNavigation.css";
+import "./components/NewsDiscussionLayout.css";
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     {new URLSearchParams(location.search).has("ui-preview") ? (

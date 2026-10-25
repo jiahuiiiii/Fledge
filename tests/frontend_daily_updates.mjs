@@ -62,7 +62,7 @@ await page.route('**/*',route=>{requests.push(route.request().url());return rout
 try{
  await page.setContent('<style>'+css+'</style><div id="root"></div>');await page.addScriptTag({content:js});
  const panel=page.getByRole('group',{name:'Daily recaps and AI spending'});
- await panel.locator(':scope > summary').getByText(/Daily recaps · AI today US\$5.00/).waitFor();
+ await panel.locator(':scope > summary').getByText(/^Daily recaps$/).waitFor();
  assert.equal((await page.evaluate(()=>window.actions)).filter(a=>a.kind==='read-digest').length,0);
  await panel.locator(':scope > summary').click();
  await page.getByRole('region',{name:"Today's AI spending"}).locator(':scope > p').filter({hasText:/US\$0.70 maximum awaiting confirmation/}).waitFor();

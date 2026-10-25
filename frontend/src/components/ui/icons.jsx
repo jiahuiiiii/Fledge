@@ -65,3 +65,30 @@ export const NewsIcon = () => (
     <path d="M16 9h3v9a1 1 0 0 1-1 1h-2M8 9h5M8 12h5M8 15h3" />
   </Icon>
 );
+
+export const LightbulbIcon = () => (
+  <Icon>
+    <path d="M9 18h6M10 21h4" />
+    <path d="M9 15c0-2-3-3-3-6a6 6 0 0 1 12 0c0 3-3 4-3 6z" />
+  </Icon>
+);
+
+export const GlobeIcon = () => (
+  <Icon>
+    <circle cx="12" cy="12" r="9" />
+    <ellipse cx="12" cy="12" rx="4" ry="9" />
+    <path d="M3 12h18M5 6h14M5 18h14" />
+  </Icon>
+);
+export const RefreshIcon = () => (
+  <Icon>
+    <path d="M20 7v5h-5M4 17v-5h5" />
+    <path d="M5.5 8a7 7 0 0 1 11.6-3L20 8M4 16l2.9 3A7 7 0 0 0 18.5 16" />
+  </Icon>
+);
+export const UserIcon = () => (
+  <Icon>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 21v-2a8 8 0 0 1 16 0v2" />
+  </Icon>
+);

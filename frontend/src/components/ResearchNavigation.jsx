@@ -1,3 +1,5 @@
+import { Tabs, TabsList, TabsTrigger, SectionHeader } from "./ui";
+
 const sections = {
   summary: {
     label: "Summary",
@@ -42,67 +44,43 @@ export function researchTabs({ recorded, beginner }) {
   if (beginner) return ["summary", "evidence"];
   return recorded
     ? ["summary", "business", "fundamentals", "evidence"]
-    : ["summary", "business", "fundamentals", "evidence", "expectations", "valuation"];
+    : [
+        "summary",
+        "business",
+        "fundamentals",
+        "evidence",
+        "expectations",
+        "valuation",
+      ];
 }
 
-export default function ResearchNavigation({ selected, onChange, recorded, beginner }) {
+export default function ResearchNavigation({
+  selected,
+  onChange,
+  recorded,
+  beginner,
+}) {
   const keys = researchTabs({ recorded, beginner });
   return (
     <div className="research-navigation">
-      <div
-        className="content-tabs"
-        role="tablist"
-        aria-label="Research views"
-        aria-orientation="horizontal"
-      >
-        {keys.map((key) => (
-          <button
-            role="tab"
-            id={`research-tab-${key}`}
-            aria-controls="research-panel"
-            aria-selected={selected === key}
-            tabIndex={selected === key ? 0 : -1}
-            key={key}
-            onClick={() => onChange(key)}
-            onKeyDown={(event) => {
-              const previous = "ArrowLeft";
-              const next = "ArrowRight";
-              if (![previous, next, "Home", "End"].includes(event.key)) return;
-              event.preventDefault();
-              const buttons = [
-                ...event.currentTarget.parentElement.querySelectorAll(
-                  '[role="tab"]',
-                ),
-              ];
-              const index = buttons.indexOf(event.currentTarget);
-              const target =
-                event.key === "Home"
-                  ? 0
-                  : event.key === "End"
-                    ? buttons.length - 1
-                    : (index + (event.key === next ? 1 : -1) + buttons.length) %
-                      buttons.length;
-              buttons[target].focus();
-              buttons[target].click();
-            }}
-          >
-            <svg
-              width="19"
-              height="19"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
+      <Tabs value={selected} onValueChange={onChange}>
+        <TabsList
+          variant="line"
+          className="content-tabs"
+          aria-label="Research views"
+        >
+          {keys.map((key) => (
+            <TabsTrigger
+              key={key}
+              value={key}
+              id={`research-tab-${key}`}
+              aria-controls="research-panel"
             >
-              <path d={sections[key].icon} />
-            </svg>
-            <span>{sections[key].label}</span>
-          </button>
-        ))}
-      </div>
+              {sections[key].label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
     </div>
   );
 }
@@ -111,7 +89,7 @@ export function ResearchSectionHeader({ selected }) {
   const section = sections[selected] || sections.evidence;
   return (
     <header className="research-section-heading">
-      <h2>{section.label}</h2>
+      <SectionHeader level="page" as="h2" title={section.label} />
     </header>
   );
 }

@@ -83,7 +83,6 @@
 }
 .app-shell .outlook-page .outlook-source-notice {
   color: var(--color-caution-light);
-  border-left: 2px solid var(--color-caution);
   padding-left: var(--space-3);
   font-size: var(--text-sm);
   line-height: 1.6;

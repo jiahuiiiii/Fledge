@@ -29,3 +29,14 @@ Ten frontend tests and the build pass. Thirty-seven focused backend checks cover
 The new authored browser fixture has 26 published updates across two companies and all three types. It checks exact page order/counts, filters, source inspection, independent review, exact condition navigation, delayed-response rejection, failed-request recovery, withheld previews and 320/390/1440px layouts. Existing sentiment, private-alert, changed-report, weekly-review and condition-expiry journeys also pass. Phone/desktop screenshots were visually inspected. These tests use disposable authored records and mocked providers, with no paid calls.
 
 Evidence is retained in `.local/live-tests/review-inbox-20261002T092150Z/`. Initial test failures are preserved: a heading locator became ambiguous after previews were added, the older weekly test expected one private alert despite a two-alert fixture, and the new inbox test initially read a filter result before its request completed. Final checks retain the original behavioral expectations and wait for the corresponding view.
+
+
+## Shared presentation — 25 October 2026
+
+Updates uses the reusable page header, buttons, badges, disclosures, metadata,
+empty states and pagination. Company/private/price evidence remains expandable,
+with the existing review/rating and source controls. Daily recaps use the same
+shared surfaces and still read records lazily. The closed recap heading no
+longer repeats its spending total; owner-only exact and unresolved spending
+remains available inside. Older layout rules were removed to keep phone
+chevrons aligned. See [UI verification](../reviews/2026-10-25/shared-reading-pages.md).

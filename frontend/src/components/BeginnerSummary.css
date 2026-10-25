@@ -92,7 +92,9 @@
 }
 /* .bs-card remains for PortfolioRead until it moves to the shared Card. */
 @media (max-width: 640px) {
-  .bs-card { padding: var(--space-4); }
+  .bs-card {
+    padding: var(--space-4);
+  }
 }
 
 /* ---- Signals layout ---- */
@@ -106,8 +108,12 @@
   font-size: 34px;
   line-height: 1.1;
 }
-.bs-price-row .mood-good { color: var(--color-positive); }
-.bs-price-row .mood-bad { color: var(--color-negative); }
+.bs-price-row .mood-good {
+  color: var(--color-positive);
+}
+.bs-price-row .mood-bad {
+  color: var(--color-negative);
+}
 .bs-lights {
   list-style: none;
   margin: 0;
@@ -145,22 +151,24 @@
   text-transform: uppercase;
   color: var(--color-muted);
 }
-.bs-dot {
-  flex: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--color-faint);
+.bs-light.mood-good {
+  background: var(--color-positive-soft);
 }
-.bs-light.mood-good { background: var(--color-positive-soft); }
-.bs-light.mood-good .bs-light-title { color: var(--color-positive-light); }
-.bs-light.mood-good .bs-dot, .bs-dot.mood-good { background: var(--color-positive); }
-.bs-light.mood-bad { background: var(--color-negative-soft); }
-.bs-light.mood-bad .bs-light-title { color: var(--color-negative-light); }
-.bs-light.mood-bad .bs-dot, .bs-dot.mood-bad { background: var(--color-negative); }
-.bs-light.mood-mixed { background: var(--color-gold-soft); }
-.bs-light.mood-mixed .bs-light-title { color: var(--color-gold); }
-.bs-light.mood-mixed .bs-dot, .bs-dot.mood-mixed { background: var(--color-gold); }
+.bs-light.mood-good .bs-light-title {
+  color: var(--color-positive-light);
+}
+.bs-light.mood-bad {
+  background: var(--color-negative-soft);
+}
+.bs-light.mood-bad .bs-light-title {
+  color: var(--color-negative-light);
+}
+.bs-light.mood-mixed {
+  background: var(--color-gold-soft);
+}
+.bs-light.mood-mixed .bs-light-title {
+  color: var(--color-gold);
+}
 .bs-pointer {
   margin: var(--space-3) 0 0;
   font-size: var(--text-sm);
@@ -210,10 +218,6 @@
     min-height: 44px;
   }
 }
-.bs-group h5 .bs-dot {
-  width: 10px;
-  height: 10px;
-}
 .bs-platforms {
   font-size: var(--text-sm);
 }
@@ -256,10 +260,18 @@
   font-size: 18px;
   line-height: 1;
 }
-.bs-light.mood-good .bs-shape { color: var(--color-positive); }
-.bs-light.mood-bad .bs-shape { color: var(--color-negative); }
-.bs-light.mood-mixed .bs-shape { color: var(--color-gold); }
-.bs-light.mood-none .bs-shape { color: var(--color-faint); }
+.bs-light.mood-good .bs-shape {
+  color: var(--color-positive);
+}
+.bs-light.mood-bad .bs-shape {
+  color: var(--color-negative);
+}
+.bs-light.mood-mixed .bs-shape {
+  color: var(--color-gold);
+}
+.bs-light.mood-none .bs-shape {
+  color: var(--color-faint);
+}
 .bs-key {
   margin: var(--space-3) 0 0;
   font-size: var(--text-sm);
@@ -301,16 +313,25 @@
     row-gap: 2px;
     padding: var(--space-3) var(--space-4);
   }
-  .bs-light .bs-shape { grid-area: shape; font-size: 18px; }
-  .bs-light .bs-light-title { grid-area: title; }
-  .bs-light strong { grid-area: status; }
+  .bs-light .bs-shape {
+    grid-area: shape;
+    font-size: 18px;
+  }
+  .bs-light .bs-light-title {
+    grid-area: title;
+  }
+  .bs-light strong {
+    grid-area: status;
+  }
   .bs-light::after {
     content: "›";
     grid-area: go;
     color: var(--color-muted);
     font-size: 22px;
   }
-  .bs-price-row strong { font-size: 30px; }
+  .bs-price-row strong {
+    font-size: 30px;
+  }
 }
 /* Large screens: use the width. News and people sit side by side. */
 @media (min-width: 1180px) {
@@ -356,24 +377,78 @@
   font-size: var(--text-sm);
 }
 
-/* Good, bad, mixed and neutral each get a quiet box: the tone shows in the
-   left edge, dot and heading colour rather than a full tinted fill. */
+/* Tone groups use quiet surfaces and labelled, coloured headings. */
 .bs-group.tone-good,
 .bs-group.tone-bad,
 .bs-group.tone-mixed,
 .bs-group.tone-neutral {
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-sm);
-  border-left: 3px solid var(--color-line-strong);
   background: var(--color-surface-2);
 }
-/* Closed, the neutral box is a single row. */
-.bs-group.tone-neutral:not([open]) {
+/* The neutral box keeps the same top padding open or closed, so its heading
+   stays put when toggled; only the space below grows when it opens. */
+.bs-group.tone-neutral {
   padding-block: var(--space-1);
 }
-.bs-group.tone-good { border-left-color: var(--color-positive); }
-.bs-group.tone-good h5 { color: var(--color-positive-light); }
-.bs-group.tone-bad { border-left-color: var(--color-negative); }
-.bs-group.tone-bad h5 { color: var(--color-negative-light); }
-.bs-group.tone-mixed { border-left-color: var(--color-gold); }
-.bs-group.tone-mixed h5 { color: var(--color-gold); }
+.bs-group.tone-neutral[open] {
+  padding-bottom: var(--space-3);
+}
+.bs-group.tone-good h5 {
+  color: var(--color-positive-light);
+}
+.bs-group.tone-bad h5 {
+  color: var(--color-negative-light);
+}
+.bs-group.tone-mixed h5 {
+  color: var(--color-gold);
+}
+
+/* Summary uses the same neutral cards and headings as the research pages. */
+.bs-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.bs-summary-cards > li {
+  min-width: 0;
+}
+.app-shell .bs-summary-cards .bs-summary-card {
+  height: 100%;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--ui-surface);
+  color: var(--ui-text-2);
+}
+.bs-summary-arrow {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  color: var(--ui-muted);
+}
+.bs-summary-status {
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.app-shell .bs-price-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.app-shell .bs-price-row .bs-price-note {
+  flex-basis: auto;
+  font-size: var(--text-xs);
+  color: var(--ui-muted);
+}
+@media (max-width: 600px) {
+  .bs-summary-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

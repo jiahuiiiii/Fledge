@@ -58,3 +58,7 @@
     justify-content: space-between;
   }
 }
+.app-shell .topbar-tools > .ui-button[aria-current="page"] {
+  background: var(--ui-surface-2);
+  color: var(--ui-text);
+}

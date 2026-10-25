@@ -13,6 +13,18 @@ import DailyUpdates from "./DailyUpdates";
 import { ConditionChange } from "./IdeasAndChanges";
 import { inboxSummary, recordKey } from "../lib/inbox";
 import "./UpdateInbox.css";
+import {
+  Badge,
+  BellIcon,
+  Button,
+  Card,
+  Disclosure,
+  EmptyState,
+  MetaRow,
+  Pagination,
+  RefreshIcon,
+  SectionHeader,
+} from "./ui";
 
 const kindName = {
   idea: "Your saved idea",
@@ -157,40 +169,39 @@ export default function UpdateInbox({
   );
   return (
     <section className="update-inbox" aria-label="Research update inbox">
-      <div className="market-section-head">
-        <div>
-          <h2>Updates</h2>
-          <p className="inbox-intro">
-            Price moves, company reporting and changes to your saved research.
-          </p>
-        </div>
-        <div className="inbox-heading-actions">
-          {onWeeklyReview && (
-            <button onClick={onWeeklyReview}>
-              Weekly review{unseenReviews > 0 ? ` · ${unseenReviews} new` : ""}
-            </button>
-          )}
-          <button onClick={reload} disabled={loading || busy}>
-            Refresh inbox
-          </button>
-        </div>
+      <SectionHeader
+        level="page"
+        as="h2"
+        icon={<BellIcon />}
+        title="Updates"
+        description="Price moves, company reporting and changes to your saved research."
+      />
+      <div className="reading-page-actions inbox-heading-actions">
+        {onWeeklyReview && (
+          <Button onClick={onWeeklyReview}>
+            Weekly review
+            {unseenReviews > 0 && (
+              <Badge status="accent">{unseenReviews} new</Badge>
+            )}
+          </Button>
+        )}
+        <Button
+          variant="plain"
+          icon={<RefreshIcon />}
+          onClick={reload}
+          disabled={loading || busy}
+        >
+          Refresh inbox
+        </Button>
       </div>
       {!company && data?.daily_reports_enabled && (
         <DailyUpdates refresh={refresh} onOpen={onOpen} onSource={onSource} />
       )}
-      <details className="inbox-filter-disclosure">
-        <summary>
-          Filter updates{" "}
-          <span>
-            {companies.find((c) => c.id === company)?.symbol || "All companies"}{" "}
-            ·{" "}
-            {loading
-              ? "Loading…"
-              : data
-                ? `${data.total} ${review === "all" ? (data.total === 1 ? "update" : "updates") : reviewName(review === "pending" ? null : review).toLowerCase()} · newest first`
-                : "Choose a review status"}
-          </span>
-        </summary>
+      <Disclosure
+        className="inbox-filter-disclosure"
+        title="Filter updates"
+        description={`${companies.find((c) => c.id === company)?.symbol || "All companies"} · ${review === "all" ? "All updates" : reviewName(review === "pending" ? null : review)}`}
+      >
         <div className="inbox-filters">
           <label>
             Company
@@ -235,7 +246,21 @@ export default function UpdateInbox({
             source event dates may be earlier.
           </p>
         )}
-      </details>
+      </Disclosure>
+      {!loading && data && !isEmptyCompany && (
+        <MetaRow aria-label="Update counts">
+          <span>
+            {data.total}{" "}
+            {review === "pending"
+              ? "awaiting review"
+              : data.total === 1
+                ? "update"
+                : "updates"}
+          </span>
+          <span>Newest first</span>
+          <span>Through {stamp(data.cutoff)}</span>
+        </MetaRow>
+      )}
       {notice && (
         <p role="status" className="notice">
           {notice}
@@ -244,35 +269,37 @@ export default function UpdateInbox({
       {error && (
         <div role="alert" className="warning">
           <p>{error}</p>
-          <button onClick={reload} disabled={busy}>
+          <Button onClick={reload} disabled={busy}>
             Retry inbox
-          </button>
+          </Button>
         </div>
       )}
       {loading && <LoadingSkeleton label="Loading saved updates…" />}
       {!loading && isEmptyCompany && (
-        <div className="empty-history">
-          <h3>No updates in this view</h3>
-          <p>No saved idea or watch exists for this company yet.</p>
-          <button onClick={() => onOpen(company, "workspace")}>
-            Open company research ↗
-          </button>
-        </div>
+        <EmptyState
+          title="No updates in this view"
+          description="No saved idea or watch exists for this company yet."
+          actions={
+            <Button
+              variant="tertiary"
+              onClick={() => onOpen(company, "workspace")}
+            >
+              Open company research ↗
+            </Button>
+          }
+        />
       )}
       {!loading && !error && !isEmptyCompany && data && (
         <>
           {!data.records.length && (
-            <div className="empty-history">
-              <h3>
-                {review === "pending"
+            <EmptyState
+              title={
+                review === "pending"
                   ? "Nothing awaiting review"
-                  : "No updates in this view"}
-              </h3>
-              <p>
-                Check source coverage below, or choose another company or review
-                status. Quiet checks remain in History.
-              </p>
-            </div>
+                  : "No updates in this view"
+              }
+              description="Choose another company or review status. Source coverage and quiet checks remain available below."
+            />
           )}
           <div className="inbox-records change-collection">
             {data.records.map((record) => {
@@ -280,7 +307,8 @@ export default function UpdateInbox({
                 summary = inboxSummary(record);
               if (record.kind === "condition")
                 return (
-                  <article
+                  <Card
+                    as="article"
                     className="inbox-record"
                     data-kind={record.kind}
                     data-record-id={record.id}
@@ -290,78 +318,86 @@ export default function UpdateInbox({
                     <ConditionChange change={d} onOpen={onOpen} />
                     <AlertRoutingPreview record={record} />
                     <AlertRating record={record} />
-                  </article>
+                  </Card>
                 );
               return (
-                <details
+                <Disclosure
                   className="inbox-record"
+                  indicator={false}
                   data-kind={record.kind}
                   data-record-id={record.id}
                   key={recordKey(record)}
-                >
-                  <summary>
-                    <div className="inbox-record-head">
-                      <strong>{d.symbol}</strong>
-                      <span className="inbox-kind">
-                        {kindName[record.kind]}
-                      </span>
-                      <time>{stamp(record.created_at)}</time>
-                    </div>
-                    <h3>{summary.title}</h3>
-                    <p className="inbox-preview">{summary.text}</p>
-                    {record.kind === "company" && d.preview && (
-                      <p className="fine">Preview · not sent to Telegram</p>
-                    )}
-                    {summary.source && (
-                      <p className="inbox-source-caption">
-                        {summary.source}
-                        {summary.publishedAt
-                          ? ` · Source dated ${stamp(summary.publishedAt)}`
-                          : ""}
-                        {summary.more > 0
-                          ? ` · +${summary.more} more saved sources`
-                          : ""}
-                      </p>
-                    )}
-                    {summary.alert && (
-                      <p className="inbox-alert-caption">
-                        {record.kind === "move"
-                          ? summary.alert
-                          : `Flagged for review: ${summary.alert}`}
-                      </p>
-                    )}
-                    {summary.question && (
-                      <p className="fine inbox-preview">
-                        Your question: {summary.question}
-                      </p>
-                    )}
-                    <div className="inbox-record-footer">
-                      <span
-                        className={`inbox-review-status${record.review_action ? "" : " pending"}`}
-                      >
-                        {reviewName(record.review_action)}
-                      </span>
-                      <span className="inbox-evidence-control">
-                        <span className="inbox-inspect-label">
-                          Inspect evidence
+                  summary={
+                    <>
+                      <MetaRow className="inbox-record-head">
+                        <Badge>{d.symbol}</Badge>
+                        <span className="inbox-kind">
+                          {kindName[record.kind]}
                         </span>
-                        <span className="inbox-hide-label">Hide evidence</span>
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.7"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
+                        <time dateTime={record.created_at}>
+                          {stamp(record.created_at)}
+                        </time>
+                      </MetaRow>
+                      <h3>{summary.title}</h3>
+                      <p className="inbox-preview">{summary.text}</p>
+                      {record.kind === "company" && d.preview && (
+                        <p className="fine">Preview · not sent to Telegram</p>
+                      )}
+                      {summary.source && (
+                        <p className="inbox-source-caption">
+                          {summary.source}
+                          {summary.publishedAt
+                            ? ` · Source dated ${stamp(summary.publishedAt)}`
+                            : ""}
+                          {summary.more > 0
+                            ? ` · +${summary.more} more saved sources`
+                            : ""}
+                        </p>
+                      )}
+                      {summary.alert && (
+                        <p className="inbox-alert-caption">
+                          {record.kind === "move"
+                            ? summary.alert
+                            : `Flagged for review: ${summary.alert}`}
+                        </p>
+                      )}
+                      {summary.question && (
+                        <p className="fine inbox-preview">
+                          Your question: {summary.question}
+                        </p>
+                      )}
+                      <div className="inbox-record-footer">
+                        <Badge
+                          className="inbox-review-status"
+                          status={record.review_action ? "neutral" : "accent"}
                         >
-                          <path d="m9 5 7 7-7 7" />
-                        </svg>
-                      </span>
-                    </div>
-                  </summary>
+                          {reviewName(record.review_action)}
+                        </Badge>
+                        <span className="inbox-evidence-control">
+                          <span className="inbox-inspect-label">
+                            Inspect evidence
+                          </span>
+                          <span className="inbox-hide-label">
+                            Hide evidence
+                          </span>
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.7"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="m9 5 7 7-7 7" />
+                          </svg>
+                        </span>
+                      </div>
+                    </>
+                  }
+                >
                   <div className="inbox-detail">
                     {record.kind === "move" ? (
                       <MoveAlertCard
@@ -398,41 +434,28 @@ export default function UpdateInbox({
                     <AlertRoutingPreview record={record} />
                     <AlertRating record={record} />
                   </div>
-                </details>
+                </Disclosure>
               );
             })}
           </div>
           {data.total > data.page_size && (
-            <div className="review-pagination">
-              <button
-                disabled={busy || page === 0}
-                onClick={() => turnPage(-1)}
-              >
-                Previous updates
-              </button>
-              <span>
-                Page {page + 1} of {Math.ceil(data.total / data.page_size)}
-              </span>
-              <button
-                disabled={busy || (page + 1) * data.page_size >= data.total}
-                onClick={() => turnPage(1)}
-              >
-                Next updates
-              </button>
-            </div>
+            <Pagination
+              className="review-pagination"
+              label="Update pages"
+              page={page + 1}
+              totalPages={Math.ceil(data.total / data.page_size)}
+              disabled={busy}
+              previousLabel="Previous updates"
+              nextLabel="Next updates"
+              onPrevious={() => turnPage(-1)}
+              onNext={() => turnPage(1)}
+            />
           )}
-          <details
+          <Disclosure
             className={`inbox-coverage${gaps.length ? " has-concerns" : ""}`}
+            title="Source coverage"
+            description={`${gaps.length ? `${gaps.length} ${gaps.length === 1 ? "company needs" : "companies need"} attention` : "Inspect latest checks"}${off.length ? ` · ${off.length} ${off.length === 1 ? "watch" : "watches"} off` : ""}`}
           >
-            <summary>
-              Source coverage ·{" "}
-              {gaps.length
-                ? `${gaps.length} ${gaps.length === 1 ? "company needs" : "companies need"} attention`
-                : "inspect latest checks"}
-              {off.length
-                ? ` · ${off.length} ${off.length === 1 ? "watch" : "watches"} off`
-                : ""}
-            </summary>
             <p className="fine">
               A quiet inbox does not mean nothing important happened. These are
               the latest recorded checks; opening this inbox does not refresh
@@ -461,12 +484,12 @@ export default function UpdateInbox({
                     {message}
                   </p>
                 ))}
-                <button onClick={() => onOpen(c.id, "workspace")}>
+                <Button onClick={() => onOpen(c.id, "workspace")}>
                   Open {c.symbol} research ↗
-                </button>
+                </Button>
               </div>
             ))}
-          </details>
+          </Disclosure>
           <p className="fine">
             Marking an alert reviewed records your attention. It does not
             approve the investment, resolve a risk or change your saved idea.

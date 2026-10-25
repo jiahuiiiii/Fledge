@@ -218,7 +218,6 @@
 }
 .position-reading {
   background: var(--color-accent-soft);
-  border-left: 3px solid var(--color-accent-mid);
   padding: var(--space-4);
   border-radius: var(--radius-md);
   margin-bottom: var(--space-4);

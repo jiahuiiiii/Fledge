@@ -204,7 +204,6 @@
   flex-direction: column;
   align-items: start;
   min-width: 0;
-  border-left: 2px solid var(--series-color);
   padding: var(--space-3) var(--space-4);
   background: var(--color-surface);
   border-radius: var(--radius-sm);
@@ -505,7 +504,6 @@
 }
 .story-gap {
   padding: var(--space-4);
-  border-left: 2px solid var(--color-line-strong);
   color: var(--color-muted);
   background: var(--color-surface);
 }
@@ -615,19 +613,48 @@
 .financial-recovery {
   margin-bottom: 20px;
 }
-.financial-recovery > summary {
-  min-height: 44px;
-  cursor: pointer;
-  font-weight: 600;
+.financial-recovery-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-3);
 }
-/* Title and gap note wrap together, beside the chevron. */
+.financial-recovery-header > button {
+  min-height: 44px;
+  flex-shrink: 0;
+}
+.app-shell .financial-recovery-header .financial-recovery-toggle {
+  display: flex;
+  flex: 0 1 auto;
+  justify-content: flex-start;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-2) 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-weight: 600;
+  text-align: left;
+}
+.app-shell .financial-recovery-toggle:hover {
+  color: var(--color-accent);
+}
+.recovery-chevron {
+  flex: 0 0 13px;
+}
+.financial-recovery-toggle[aria-expanded="true"] .recovery-chevron {
+  transform: rotate(90deg);
+}
 .financial-recovery-label {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 2px 12px;
+  overflow-wrap: anywhere;
 }
-.financial-recovery > summary small {
+.financial-recovery-label small {
   color: var(--color-muted);
   font-size: var(--text-sm);
   font-weight: 400;
@@ -653,10 +680,71 @@
   color: var(--color-muted);
   font-size: var(--text-sm);
 }
-.recovery-offer,
 .recovery-results {
   display: grid;
   gap: var(--space-3);
+}
+.recovery-checklist {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.recovery-checklist-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+}
+.recovery-checklist-row + .recovery-checklist-row {
+  border-top: 1px solid var(--color-line);
+}
+.recovery-checklist-row:has(input:checked) {
+  background: var(--color-surface-2);
+}
+.recovery-checklist-row:has(input:disabled) {
+  cursor: default;
+}
+.recovery-checklist-row input {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+  accent-color: var(--color-accent);
+}
+.recovery-checklist-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.recovery-common-gaps {
+  color: var(--color-text-2);
+  font-size: var(--text-sm);
+}
+.recovery-checklist-copy > span {
+  color: var(--color-text-2);
+  font-size: var(--text-sm);
+}
+.recovery-checklist-copy > small {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+@media (max-width: 480px) {
+  .financial-recovery-header {
+    flex-wrap: wrap;
+    gap: 0 var(--space-3);
+  }
+  .financial-recovery-header > button:not(.financial-recovery-toggle) {
+    margin-left: 25px;
+  }
+  .financial-recovery-body {
+    padding-left: 0;
+  }
 }
 .recovery-run {
   display: flex;

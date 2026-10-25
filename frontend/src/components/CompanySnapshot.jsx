@@ -4,6 +4,7 @@ import "./CompanySnapshot.css";
 import TermHelp from "./TermHelp";
 import OverviewSections from "./OverviewSections";
 import { companyName } from "../lib/companyIdentity";
+import { LightbulbIcon } from "./ui";
 import {
   currentGuidance,
   headlinesAfterReading,
@@ -44,7 +45,12 @@ function YourView({ data, savedView, onSaveView }) {
     return (
       <section className="glance-view" aria-labelledby="glance-view-title">
         <div>
-          <h4 id="glance-view-title">What do you think of {name}?</h4>
+          <h4 id="glance-view-title">
+            <span className="glance-view-icon" aria-hidden="true">
+              <LightbulbIcon />
+            </span>
+            <span>What do you think of {name}?</span>
+          </h4>
           <p>
             Write your view in a sentence or two. Fledge then watches news,
             filings and results for evidence that supports or challenges it.

@@ -224,52 +224,6 @@
   > p {
   display: none;
 }
-.app-shell .update-inbox .inbox-filter-disclosure {
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-lg);
-  padding: var(--space-2) var(--space-4);
-  background: var(--color-surface);
-  margin-bottom: var(--space-4);
-}
-.app-shell .update-inbox .inbox-filter-disclosure > summary {
-  min-height: 44px;
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--color-text);
-  flex-wrap: wrap;
-}
-.inbox-filter-disclosure > summary > span {
-  color: var(--color-muted);
-  font-weight: 400;
-  margin-left: auto;
-}
-.app-shell .update-inbox .inbox-filter-disclosure .inbox-filters {
-  border: 0;
-  background: transparent;
-  padding: var(--space-3) 0 0;
-}
-.app-shell .update-inbox .inbox-list-meta {
-  margin: var(--space-2) 0 var(--space-3);
-}
-.app-shell .update-inbox .inbox-list-meta > summary {
-  font-size: var(--text-xs);
-  color: var(--color-muted);
-  min-height: 36px;
-}
-.app-shell .update-inbox .inbox-records + .inbox-coverage,
-.app-shell .update-inbox .review-pagination + .inbox-coverage {
-  margin-top: var(--space-5);
-}
-@media (max-width: 600px) {
-  .inbox-filter-disclosure > summary > span {
-    width: 100%;
-    margin-left: var(--space-5);
-  }
-  .app-shell .update-inbox .inbox-filter-disclosure > summary {
-    gap: var(--space-1) var(--space-2);
-  }
-}
-
 /* One topic per page, three main financial charts, evidence on the figures. */
 .app-shell .financial-main-flow {
   gap: var(--space-5);
@@ -457,26 +411,6 @@
   font-size: var(--text-xs);
   line-height: 1.5;
 }
-.news-section-status {
-  border-block: 1px solid var(--color-line);
-  margin-block: var(--space-3);
-}
-.app-shell .news-section-status > summary {
-  min-height: 44px;
-  font-size: var(--text-xs);
-  color: var(--color-muted);
-  font-weight: 400;
-  line-height: 1.6;
-}
-.status-details-label {
-  color: var(--color-accent);
-  margin-left: auto;
-}
-.news-status-details {
-  padding: var(--space-3);
-  background: var(--color-surface);
-  font-size: var(--text-sm);
-}
 .app-shell .sample-reconciliation {
   color: var(--color-text);
 }
@@ -523,9 +457,6 @@
   .app-shell .sentiment-panel .sentiment-disabled-reason {
     text-align: left;
   }
-  .news-section-status > summary {
-    flex-wrap: wrap;
-  }
   .financial-more-detail {
     padding: var(--space-3);
   }
@@ -550,19 +481,4 @@
   padding: 0;
   color: var(--color-accent);
   background: transparent;
-}
-
-.app-shell .news-section-status > summary {
-  display: grid;
-  grid-template-columns: 14px minmax(0, 1fr) auto;
-  gap: var(--space-2);
-}
-.app-shell .news-section-status > summary::before {
-  grid-column: 1;
-}
-.app-shell .news-section-status > summary > span:first-of-type {
-  grid-column: 2;
-}
-.app-shell .news-section-status > summary > .status-details-label {
-  grid-column: 3;
 }

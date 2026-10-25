@@ -20,7 +20,7 @@ The browser receives a random HttpOnly, SameSite Strict session cookie. Only its
 
 New sign-ins with a provider refresh token last at most seven days. Access tokens keep their original at-most-one-hour lifetime and renew within 60 seconds of expiry under a session lock. Renewal verifies the returned identity and rotates both server-only tokens without extending absolute session expiry. Pre-upgrade sessions retain their original expiry and need a fresh sign-in for renewal. Identity is also checked every minute. Provider outages deny requests with retryable errors while keeping the local session; invalid/revoked/expired/wrong-subject sessions cannot access research. Logout deletes the session. Private UI unmounts on logout/401. Same-origin and mutation-header checks remain; tokens are never exposed in responses or logs.
 
-The Account menu identifies the verified email. Focus checks and account-labelled responses detect another tab's account change. Expected-account headers are compared to server-verified identity, rejecting mismatches before private writes/logout; they cannot authenticate or select an account. Hidden-company preferences are account-scoped; only the installation owner adopts its old browser preference.
+The dedicated Account page identifies the verified email. Focus checks and account-labelled responses detect another tab's account change. Expected-account headers are compared to server-verified identity, rejecting mismatches before private writes/logout; they cannot authenticate or select an account. Hidden-company preferences are account-scoped; only the installation owner adopts its old browser preference.
 
 Email requests retain one/minute/address and ten/hour/installation limits. Resend countdowns prevent accidental repeats. Supabase's delivery limits are separate and unknown reset times remain unknown. See [recovery and isolation verification](../reviews/2026-10-09/session-recovery-and-account-isolation.md).
 
@@ -41,3 +41,13 @@ The actual backup path and restoration evidence are recorded in the [phase revie
 Controlled provider-response tests cover PKCE, confirmation, owner linking, two-account API/RLS isolation, expiry, failed verification, logout, flow replay, CSRF, server-only token tables and operator rollback. A guarded browser journey verifies the sign-in form without sending an email. The owner subsequently completed two real verified sign-ins: one linked to the existing owner and one to a separate account. The signed-in local workspace was also inspected read-only. This proves those configured identities worked; it does not establish delivery to every participant address or universal provider availability.
 
 Primary references: [Supabase PKCE](https://supabase.com/docs/guides/auth/sessions/pkce-flow), [passwordless email](https://supabase.com/docs/guides/auth/auth-email-passwordless), [redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls).
+
+
+## Account page — 25 October 2026
+
+The top-right Account link now opens the existing application's `?view=account`
+route. The page reuses the current session, profile/display and sign-out controls;
+username/password accounts reuse their existing recovery dialog. Managed-email
+accounts do not acquire password-management controls. This is a frontend change:
+identity verification, expected-account headers, consent, expiry, RLS and logout
+remain at the same server and AccountGate boundaries. See [presentation verification](../reviews/2026-10-25/summary-account.md).

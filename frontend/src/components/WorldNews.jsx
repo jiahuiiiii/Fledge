@@ -9,6 +9,19 @@ import {
 } from "../lib/worldNews";
 import { useProfile } from "../lib/profile";
 import "./WorldNews.css";
+import {
+  Badge,
+  Button,
+  Card,
+  Disclosure,
+  EmptyState,
+  FilterGroup,
+  GlobeIcon,
+  MetaRow,
+  RefreshIcon,
+  SectionHeader,
+  StoryCard,
+} from "./ui";
 
 // World view: major market headlines (central banks, conflicts, trade, energy)
 // and which watchlist companies they might touch. Possibilities to read, not advice.
@@ -85,176 +98,219 @@ export default function WorldNews({ active, onOpenCompany }) {
   const mineCount = filterArticles(page?.articles, "mine").length;
 
   return (
-    <section className="world-news" aria-labelledby="world-news-title">
-      <header className="world-news-head">
-        <div>
-          <span className="section-label">WORLD NEWS</span>
-          <h2 id="world-news-title">What’s happening in the world</h2>
-          <p>
-            Rate decisions, conflicts, trade and oil: the big headlines, and
-            which of your companies they might touch.
-          </p>
-        </div>
-        <div className="world-news-actions">
-          <button
-            type="button"
-            onClick={refresh}
-            disabled={!!busy || !page?.configured || !page?.can_refresh}
-            title={
-              page && !page.can_refresh
-                ? "World news refreshes are ten minutes apart."
-                : undefined
-            }
-          >
-            {busy === "refresh" ? "Refreshing…" : "Refresh"}
-          </button>
-          {!(beginner && blocker) && (
-          <button
-            type="button"
-            className="primary"
+    <section
+      className="world-news reading-page"
+      aria-labelledby="world-news-title"
+    >
+      <SectionHeader
+        level="page"
+        as="h2"
+        id="world-news-title"
+        icon={<GlobeIcon />}
+        title="World news"
+        description="Rates, trade, energy and events that may affect your companies."
+      />
+      <div className="reading-page-actions">
+        <Button
+          icon={<RefreshIcon />}
+          onClick={refresh}
+          disabled={!!busy || !page?.configured || !page?.can_refresh}
+          title={
+            page && !page.can_refresh
+              ? "World news refreshes are ten minutes apart."
+              : undefined
+          }
+        >
+          {busy === "refresh" ? "Refreshing…" : "Refresh"}
+        </Button>
+        {!(beginner && blocker) && (
+          <Button
+            variant="plain"
             onClick={check}
             disabled={!!busy || !!blocker}
             aria-describedby={blocker ? "world-check-blocker" : undefined}
           >
             {busy === "check" ? "Checking…" : "Check against my watchlist"}
-          </button>
+          </Button>
+        )}
+      </div>
+      {page && (
+        <MetaRow className="world-news-status">
+          {page.checked_at && (
+            <span>
+              Finnhub · past 3 days · updated {formatTimestamp(page.checked_at)}
+            </span>
           )}
-        </div>
-      </header>
-      <p className="world-news-status fine">
-        {page?.checked_at &&
-          `Market news from Finnhub, last 3 days. Last updated ${formatTimestamp(page.checked_at)}.`}
-        {beginner && page && !page.configured && page.articles.length > 0 && (
-          <span> These are the latest saved headlines.</span>
-        )}
-        {!beginner && blocker && page && (
-          <span id="world-check-blocker">
-            {" "}
-            Watchlist check: {blocker}
-          </span>
-        )}
-        {!beginner && page?.check && (
-          <span>
-            {" "}
-            Last watchlist check {formatTimestamp(page.check.checked_at)}.
-          </span>
-        )}
-      </p>
-      {page && !page.configured && !beginner && page.articles.length > 0 && (
-        <p className="warning" role="status">
-          New headlines can’t load right now, so these are the last saved ones.
+          {page.check && !beginner && (
+            <span>
+              Watchlist checked {formatTimestamp(page.check.checked_at)}
+            </span>
+          )}
+        </MetaRow>
+      )}
+      {!beginner && blocker && page && (
+        <p id="world-check-blocker" className="reading-page-note">
+          {blocker.startsWith("needs AI")
+            ? "Watchlist checks are unavailable while AI is off."
+            : blocker}
         </p>
+      )}
+      {page && !page.configured && page.articles.length > 0 && (
+        <Card variant="inset" role="status">
+          Showing saved headlines. New headlines are unavailable.
+        </Card>
       )}
       {page?.error && (
-        <p className="warning" role="status">
+        <Card variant="inset" role="status">
           The last refresh failed: {page.error} Earlier headlines are kept.
-        </p>
+        </Card>
       )}
       {message && (
-        <p className="warning" role="alert">
+        <Card variant="inset" role="alert">
           {message}
-        </p>
+        </Card>
       )}
-
       {page?.articles.length > 0 && (
-        <div
+        <FilterGroup
           className="world-news-filters"
-          role="group"
-          aria-label="Filter headlines"
-        >
-          {[
-            { id: "all", label: "All", count: page.articles.length },
-            { id: "mine", label: "About my companies", count: mineCount },
-            ...themeCounts(page.articles, page.themes),
-          ].map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              aria-pressed={filter === option.id}
-              className={filter === option.id ? "active" : ""}
-              onClick={() => setFilter(option.id)}
-            >
-              {option.label} <span>{option.count}</span>
-            </button>
-          ))}
-        </div>
+          label="Filter headlines"
+          value={filter}
+          onValueChange={setFilter}
+          options={[
+            { value: "all", label: "All", count: page.articles.length },
+            { value: "mine", label: "About my companies", count: mineCount },
+            ...themeCounts(page.articles, page.themes).map((option) => ({
+              ...option,
+              value: option.id,
+            })),
+          ]}
+        />
       )}
-
       {!page ? (
-        <p className="fine">Loading world news…</p>
+        message ? (
+          <EmptyState
+            title="World news unavailable"
+            description="Try loading the saved headlines again."
+            actions={<Button onClick={load}>Try again</Button>}
+          />
+        ) : (
+          <p role="status" className="reading-page-note">
+            Loading world news…
+          </p>
+        )
       ) : articles.length === 0 ? (
-        <p className="world-news-empty">
-          {filter === "all"
-            ? page.configured
-              ? "No headlines from the last three days yet."
-              : "World headlines aren’t connected yet."
-            : filter === "mine"
-              ? "No recent headline names your companies. Run the watchlist check to look for indirect effects, like rates or tariffs."
-              : "No recent headlines on this theme."}
-        </p>
+        <EmptyState
+          icon={<GlobeIcon />}
+          title={
+            filter === "all"
+              ? "No world headlines yet"
+              : "No headlines in this view"
+          }
+          description={
+            filter === "all"
+              ? page.configured
+                ? "No headlines from the last three days yet."
+                : "World headlines aren’t connected yet."
+              : filter === "mine"
+                ? "No recent headline names your companies. A watchlist check can look for indirect effects."
+                : "No recent headlines on this theme."
+          }
+          actions={
+            filter !== "all" ? (
+              <Button variant="tertiary" onClick={() => setFilter("all")}>
+                Show all headlines
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         <ul className="world-news-list">
           {articles.map((article) => (
-            <li key={article.id} className="world-news-item">
-              <div className="world-news-meta">
-                {article.themes.map((id) => (
-                  <span key={id} className={`world-theme theme-${id}`}>
-                    {themes[id] || id}
-                  </span>
-                ))}
-                <span className="fine">
-                  {article.publisher} ·{" "}
-                  {formatTimestamp(article.published_at)}
-                </span>
-              </div>
-              <h3>
-                <a href={article.url} target="_blank" rel="noopener noreferrer">
-                  {article.headline}
-                  <span className="sr-only"> (opens the original article)</span>
-                </a>
-              </h3>
-              {article.summary && (
-                <p className="world-news-summary">{article.summary}</p>
-              )}
-              {article.mentions.length > 0 && (
-                <p className="world-news-mentions">
-                  Names{" "}
-                  {article.mentions.map((id) => (
-                    <button
-                      key={id}
-                      type="button"
-                      className="text-button"
-                      onClick={() => onOpenCompany?.(id)}
+            <li key={article.id}>
+              <StoryCard
+                className="world-news-item"
+                title={article.headline}
+                href={article.url}
+                tags={
+                  article.themes.length > 0 &&
+                  article.themes.map((id) => (
+                    <Badge key={id}>{themes[id] || id}</Badge>
+                  ))
+                }
+                meta={
+                  <>
+                    <span>{article.publisher}</span>
+                    <time dateTime={article.published_at}>
+                      {formatTimestamp(article.published_at)}
+                    </time>
+                  </>
+                }
+              >
+                {article.summary && (
+                  <p className="world-news-summary">{article.summary}</p>
+                )}
+                {article.mentions.length > 0 && (
+                  <div className="world-news-mentions">
+                    <span>Mentions</span>
+                    {article.mentions.map((id) => (
+                      <Button
+                        key={id}
+                        variant="tertiary"
+                        size="sm"
+                        onClick={() => onOpenCompany?.(id)}
+                      >
+                        {companies[id]?.symbol || "a watchlist company"}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+                {article.links.length > 0 && (
+                  <div className="world-news-effects">
+                    <span className="reading-page-note">
+                      Possible effects · AI interpretation
+                    </span>
+                    <ul
+                      className="world-news-links"
+                      aria-label="Possible effects"
                     >
-                      {companies[id]?.symbol || "a watchlist company"}
-                    </button>
-                  ))}
-                </p>
-              )}
-              {article.links.length > 0 && (
-                <ul className="world-news-links" aria-label="Possible effects">
-                  {article.links.map((link) => (
-                    <li key={link.company_id} className={`effect-${link.effect}`}>
-                      <strong>
-                        {link.symbol} · {EFFECT_LABELS[link.effect]}
-                      </strong>{" "}
-                      {link.reason}
-                    </li>
-                  ))}
-                  <li className="world-news-caveat">
-                    A possibility to think about, not a prediction or a tip.
-                  </li>
-                </ul>
-              )}
+                      {article.links.map((link) => (
+                        <Card as="li" variant="inset" key={link.company_id}>
+                          <MetaRow>
+                            <strong>{link.symbol}</strong>
+                            <Badge
+                              shape={false}
+                              tone={
+                                {
+                                  could_help: "positive",
+                                  could_hurt: "negative",
+                                  mixed_or_unclear: "mixed",
+                                }[link.effect]
+                              }
+                            >
+                              {EFFECT_LABELS[link.effect]}
+                            </Badge>
+                          </MetaRow>
+                          <p>{link.reason}</p>
+                        </Card>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </StoryCard>
             </li>
           ))}
         </ul>
       )}
-      <p className="fine world-news-note">
-        Topic tags come from keywords in the headline. “Could help / could
-        hurt” notes are written by AI from the headline: possibilities to read
-        and check, not predictions or advice to buy or sell.
-      </p>
+      <Disclosure
+        variant="flush"
+        title="About these headlines"
+        className="world-news-note"
+      >
+        <p>
+          Topic tags use headline keywords. Possible effects are AI
+          interpretations of the headline, not predictions or advice.
+        </p>
+      </Disclosure>
     </section>
   );
 }

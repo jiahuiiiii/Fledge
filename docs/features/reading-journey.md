@@ -10,6 +10,13 @@ Overview follows the owner’s five-section reference: **1 How the company makes
 
 Outlook opens with company guidance: larger figure cards, the release’s stated date and forecast-period end, plus an Evidence dialog containing the exact original passage, raw value, SEC acceptance, first saved time and release link. Historical releases, result comparisons and their missing-input reasons remain available. Context, release metadata and coverage rules start collapsed. Analyst forecasts follow in separate FMP and Stock Analysis/S&P Global sections; revenue and earnings cards show low/average/high values on an independently scaled range. Negative and zero forecasts remain valid, and missing endpoints have no plotted range. Currency and earnings conventions stay explicit; exact values, immutable observations and source limitations are expandable. The public source’s next permitted check is visible beside its disabled button. Expectations reported in the news start collapsed, retain their saved reading and expansion on tab navigation, and keep extraction as an explicit AI action. Compare & value presents the existing private peer editor/charts and valuation scenarios. FMP views read existing saved context; navigation does not refresh providers. The peer editor remains one retained component, with explicit Save/Discard and protection against late reads overwriting unsaved or newly saved choices.
 
+News and Pro navigation use the shared Overview/Summary design language: neutral
+filled cards, compact headings and consistent buttons and tone badges. Company
+view tabs use a horizontal line style at every width. The selected tab stays
+visible when the strip scrolls or the window narrows; arrow keys, Home/End and
+Tab support keyboard reading. News source filters and pagination remain saved
+while switching company views. See [25 October verification](../reviews/2026-10-25/news-redesign.md).
+
 ## Evidence and coverage
 
 News & discussion starts with **What’s developing**, then **What’s the tone?**. The first section previews up to three latest saved company headlines, independently of a saved AI reading or summary. It uses only the backend’s permitted current seven-day news IDs, excludes superseded and undated records, requires an explicit company name/ticker mention, sorts by publication date and suppresses exact supplied-text duplicates. The established short names Micron and Marvell are accepted as in source collection; lowercase measurement-unit “micron” is not. A short ticker requires explicit financial context. This is a browsing filter, not an AI relevance verdict. Each card opens its original source; supplied titles, dates and snippets remain exact. The caption separates the newest headline date from the latest source-check time, which does not assert that every provider succeeded or returned a new article. **Update data** opens the existing source-only update dialog. Opening a company makes no new provider or AI request.
@@ -79,7 +86,7 @@ The competitor scatter uses a measured viewport width and a fixed320px SVG heigh
 
 Compare’s scenario builder receives `data.performance`, as Financials already does. It continues to use the immutable `recorded_basis` where present, preserves changed-source/withdrawal guards and never uses a projection identity in saved valuations. The form starts behind **Build a scenario**; **Try illustrative assumptions** opens the form explicitly. Drafts survive closing and tab navigation. Saved comparisons stay accessible, with copy/edit and exact calculation semantics unchanged. If compatible annual revenue really is missing, the builder is disabled with a reason and points to Data & sources; it does not substitute quarterly revenue or fetch a provider automatically.
 
-Outlook’s missing FMP forecasts take one expandable line, including subscription-denial details and the existing explicit check/history controls. Guidance comparison gaps are consolidated beneath each forecast period, with each figure’s reasons retained. Header actions have visible phone labels (**Ask a question**, **Data & sources**, **Status**). The growth help remains inline, activity uses **Feed status →**, and Updates combines filtered count/status/order in its filter summary rather than repeating three counters. No sidebar is introduced.
+Outlook’s missing FMP forecasts take one expandable line, including subscription-denial details and the existing explicit check/history controls. Guidance comparison gaps are consolidated beneath each forecast period, with each figure’s reasons retained. Header actions have visible phone labels (**Ask a question**, **Data & sources**, **Status**). The growth help remains inline, activity uses **Feed status →**, and Updates shows the current company/status in its filter disclosure and one quiet count/order/cutoff row. No sidebar is introduced.
 
 ## Progressive company loading — 12 October 2026
 
@@ -115,3 +122,14 @@ All app-generated timestamp displays use explicit `Asia/Singapore`, English day/
 This is presentation only. Stored timestamps, source quotes, generated findings, financial inputs and calculations remain unchanged. Reporting period ends/starts, filed-on dates, publisher date-only updates, release datelines, fiscal horizons, market-session dates and valuation dates retain their original calendar dates. Inclusive UTC publication/expectation windows, reporting-age boundaries, market calendars, ordering, freshness, cooldowns and schedule rules keep their existing meaning. An age-limit boundary is displayed as the equivalent Singapore instant; only an exact match to the app's saved age explanation gets that presentation substitution. Unknown/source-authored wording is preserved.
 
 Weekly schedules retain the saved weekday, time and chosen schedule zone; settings label the time as belonging to that zone. The next actual delivery and saved review timestamps display in Singapore time. Calendar-only or ambiguous offset-free values never acquire invented timestamp precision. Missing/invalid instants retain the relevant unavailable label. Earlier saved provider-error text remains exact, including any embedded historical time wording; structured source-check/next-allowed timestamps beside it use Singapore time. No source refresh, AI call, watch enrolment, retry or historical record rewrite is part of this change.
+
+
+## Shared reading UI — 25 October 2026
+
+News, World news and Updates compose the shared UI cards, headings, actions,
+badges, story cards, metadata, disclosures, filters, pagination and empty states.
+Source evidence, interpretation, availability and explicit actions retain their
+existing contracts. Supporting details stay expandable, and controls remain
+usable at 320 px. Actions align left, without ornamental left-edge highlights.
+The component gallery is available at `/?ui-preview`; reusable APIs are documented
+in `frontend/src/components/ui/README.md`. See [verification](../reviews/2026-10-25/shared-reading-pages.md).

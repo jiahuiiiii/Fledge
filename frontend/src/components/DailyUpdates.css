@@ -1,41 +1,42 @@
-.daily-updates {
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-xl);
-  margin-block: var(--space-4);
-  overflow: hidden;
-}
-.daily-updates > summary,
-.daily-updates > [role="alert"],
-.daily-updates > [role="status"] {
-  padding: var(--space-4);
+/* Saved recaps use the same disclosure/card hierarchy as the inbox. */
+.app-shell .daily-updates.ui-disclosure {
+  margin: 0;
+  border: 0;
+  border-radius: var(--radius-md);
 }
 .daily-updates-body {
   display: grid;
-  gap: var(--space-5);
-  padding: 0 var(--space-4) var(--space-4);
+  gap: var(--space-4);
+  min-width: 0;
+  padding: 0;
 }
-.daily-updates h3 {
-  margin: 0 0 var(--space-3);
-}
-.daily-updates p {
+.app-shell .daily-updates p {
+  margin: 0;
   overflow-wrap: anywhere;
 }
-.daily-spend-history,
-.daily-recap {
-  border-top: 1px solid var(--color-line);
+.app-shell .daily-updates .daily-spend {
+  gap: var(--space-3);
+}
+.daily-spend-history {
   padding-top: var(--space-3);
+  border-top: 1px solid var(--ui-line);
   margin-top: var(--space-3);
+}
+.app-shell .daily-updates .daily-recap {
+  margin-top: var(--space-3);
+  padding: 0;
+  border: 0;
 }
 .daily-recap-contents {
   display: grid;
   gap: var(--space-4);
-  margin-top: var(--space-4);
-}
-.daily-recap-record {
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
+  margin: 0;
   min-width: 0;
+}
+.app-shell .daily-updates .daily-recap-record {
+  border: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-sm);
 }
 .daily-recap-record .row {
   flex-wrap: wrap;
@@ -48,6 +49,7 @@
 }
 .daily-cost-notice {
   padding: var(--space-3);
-  border: 1px solid var(--color-line-strong);
-  border-radius: var(--radius-md);
+  background: var(--ui-surface-2);
+  border: 0;
+  border-radius: var(--radius-sm);
 }

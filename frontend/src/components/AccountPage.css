@@ -1,0 +1,75 @@
+.app-shell.account-settings-shell {
+  min-height: 100vh;
+  display: block;
+}
+.app-shell.account-settings-shell > .account-settings-main {
+  width: 100%;
+  padding: var(--space-6) var(--workspace-gutter, 24px);
+  min-width: 0;
+}
+.account-settings-page {
+  display: grid;
+  gap: var(--space-4);
+  max-width: 860px;
+  margin-inline: auto;
+}
+.account-settings-page > .ui-card {
+  padding: var(--space-5);
+}
+.app-shell .account-settings-page .pro-mode-switch {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+}
+.app-shell .account-settings-page .pro-mode-switch label {
+  align-items: center;
+}
+.app-shell .account-settings-page .pro-mode-switch small {
+  font-size: var(--text-sm);
+}
+.account-settings-footer,
+.account-settings-legal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.account-settings-footer {
+  padding-top: var(--space-2);
+}
+.account-settings-legal {
+  margin-left: auto;
+}
+.account-settings-page .reading-page-actions > .ui-button {
+  margin-left: calc(-1 * var(--space-4));
+}
+@media (max-width: 600px) {
+  .app-shell.account-settings-shell > .account-settings-main {
+    padding: var(--space-5) var(--space-4);
+  }
+  .account-settings-page > .ui-card {
+    padding: var(--space-4);
+  }
+  .account-settings-legal {
+    margin-left: 0;
+  }
+}
+@media (min-width: 741px) {
+  .app-shell.account-settings-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .app-shell.account-settings-shell > .account-settings-main {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+/* Programmatic page-heading focus announces navigation without a control ring. */
+#account-settings-title:focus {
+  outline: none;
+}

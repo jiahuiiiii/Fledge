@@ -134,12 +134,6 @@ export default function BeginnerSummary({
     : newsGroups.bad.length > newsGroups.good.length
       ? "There has been more bad news than good recently. Read both sides below."
       : null;
-  const rated =
-    newsGroups.good.length + newsGroups.bad.length + newsGroups.mixed.length +
-      newsGroups.neutral.length + postGroups.good.length + postGroups.bad.length +
-      postGroups.mixed.length > 0;
-  const SHAPE = { good: "▲", bad: "▼", mixed: "◆", none: "●" };
-  const MOOD_WORD = { good: "mostly good", bad: "mostly bad", mixed: "mixed", none: "no clear lean" };
   const headline = (item) => (
     <li key={item.id}>
       <button type="button" className="bs-link" onClick={() => onSource?.(item)}>
@@ -157,7 +151,6 @@ export default function BeginnerSummary({
     list.length > 0 && (
       <div className={`bs-group tone-${mood}`}>
         <h5>
-          <span className={`bs-dot mood-${mood}`} aria-hidden="true"></span>
           {label} <Badge>{list.length}</Badge>
         </h5>
         <ul className="bs-headlines">{list.slice(0, limit).map(headline)}</ul>
@@ -172,52 +165,21 @@ export default function BeginnerSummary({
           that show how Fledge works.
         </p>
       )}
-      <section className="bs-price-row" aria-label="Share price">
-        {price ? (
-          <>
-            {price.move && (
-              <span className={`mood-${price.mood}`}>
-                <span aria-hidden="true">
-                  {price.mood === "bad" ? "▼ " : price.mood === "good" ? "▲ " : ""}
-                </span>
-                {price.move}
-              </span>
-            )}
-          </>
-        ) : null}
-        {price?.move && (
-          <p className="bs-price-note">
-            Prices move for many reasons. The news below may not explain
-            today’s move.
-          </p>
-        )}
-      </section>
-
-      <section aria-labelledby="bs-lights-title">
-        <h4 id="bs-lights-title" className="sr-only">
-          {name} at a glance
-        </h4>
-        <ul className="bs-lights">
-          {lights.map((light) => (
-            <li key={light.key}>
-              <a
-                className={`bs-light mood-${light.mood}`}
-                href={`#bs-${light.key}`}
-                aria-label={`${light.title}: ${light.status} (${MOOD_WORD[light.mood]}). Show details.`}
-              >
-                <span className="bs-shape" aria-hidden="true">
-                  {SHAPE[light.mood]}
-                </span>
-                <span className="bs-light-title">{light.title}</span>
-                <strong>{light.status}</strong>
-              </a>
-            </li>
-          ))}
+      {price?.move && <section className="bs-price-row" aria-label="Share price">
+        <Badge tone={price.mood} shape={false}>{price.move}</Badge>
+        <span className="bs-price-note">Price moves may have other causes.</span>
+      </section>}
+      <section aria-label={`${name} at a glance`}>
+        <ul className="bs-summary-cards">
+          {lights.map(light=><li key={light.key}>
+            <Card as="a" interactive href={`#bs-${light.key}`} className="bs-summary-card"
+              aria-label={`${light.title}: ${light.status}. Show details.`}>
+              <SectionHeader level="card" as="span" title={light.title}
+                actions={<span className="bs-summary-arrow" aria-hidden="true"><ChevronRightIcon /></span>} />
+              <span className="bs-summary-status">{light.status}</span>
+            </Card>
+          </li>)}
         </ul>
-        <p className="bs-key">
-          {rated && "▲ mostly good · ▼ mostly bad · ◆ mixed. "}
-          This shows what’s being said, not whether to buy or sell.
-        </p>
         {pointer && <p className="bs-pointer">{pointer}</p>}
       </section>
 

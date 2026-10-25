@@ -38,9 +38,7 @@ function focusMainHeading() {
     document
       .querySelectorAll(".main-workspace, .workspace-grid")
       .forEach((el) => el.scrollTo?.(0, 0));
-    const heading = document.querySelector(
-      ".main-workspace h1, .main-workspace h2",
-    );
+    const heading = [...document.querySelectorAll(".main-workspace h1, .main-workspace h2")].find(element => element.getClientRects().length);
     if (!heading) return;
     heading.setAttribute("tabindex", "-1");
     heading.focus({ preventScroll: true });
@@ -67,7 +65,6 @@ import ResearchNavigation, {
 import BeginnerSummary from "./components/BeginnerSummary";
 import SocialConversation from "./components/SocialConversation";
 import UpdateInbox from "./components/UpdateInbox";
-import TelegramSettings from "./components/TelegramSettings";
 import IdeasAndChanges from "./components/IdeasAndChanges";
 import FilingDetails from "./components/FilingDetails";
 import FinancialPerformance from "./components/FinancialPerformance";
@@ -102,7 +99,9 @@ import IdeaEvidenceReview from "./components/IdeaEvidenceReview";
 import Onboarding from "./components/Onboarding";
 import PortfolioRead from "./components/PortfolioRead";
 import PersonalHome from "./components/PersonalHome";
-import { SettingsMenu } from "./components/DetailModeToggle";
+import AccountPage from "./components/AccountPage";
+import WorkspaceHeader from "./components/WorkspaceHeader";
+import { Button, UserIcon } from "./components/ui";
 import {
   ProfileContext,
   readLocalMode,
@@ -285,6 +284,7 @@ function readDestination() {
       "world",
       "history",
       "review",
+      "account",
     ].includes(view)
       ? view === "history"
         ? params.get("company")
@@ -299,19 +299,25 @@ function readDestination() {
 export default function App() {
   return (
     <AccountGate>
-      {(session, signOut) => (
+      {(session, accountControls) => (
         <ResearchApp
           key={session.account_id}
           session={session}
-          signOut={signOut}
+          accountControls={accountControls}
         />
       )}
     </AccountGate>
   );
 }
-function ResearchApp({ signOut, session }) {
+function ResearchApp({ accountControls, session }) {
   const companyVisibilityKey = `${hiddenCompaniesKey}:${session.account_id || "local"}`;
   const [destination, setDestination] = useState(readDestination);
+  const lastResearch = useRef(
+    destination.view === "account"
+      ? { ...destination, view: "workspace", evaluation: null }
+      : destination,
+  );
+  if (destination.view !== "account") lastResearch.current = destination;
   const [inboxState, setInboxState] = useState({
     review: "pending",
     page: 0,
@@ -321,9 +327,9 @@ function ResearchApp({ signOut, session }) {
     try {
       return parseHiddenCompanies(
         localStorage.getItem(companyVisibilityKey) ??
-        (session.is_installation_owner
-          ? localStorage.getItem(hiddenCompaniesKey)
-          : null),
+          (session.is_installation_owner
+            ? localStorage.getItem(hiddenCompaniesKey)
+            : null),
       );
     } catch {
       return [];
@@ -347,14 +353,19 @@ function ResearchApp({ signOut, session }) {
     addEventListener("popstate", restore);
     return () => removeEventListener("popstate", restore);
   }, []);
-  function choose(id, view = "workspace", evaluation = null) {
+  function choose(
+    id,
+    view = "workspace",
+    evaluation = null,
+    { push = false } = {},
+  ) {
     if (view === "history") {
       view = id ? "idea" : "ideas";
       evaluation ||= "history";
     }
     const params = new URLSearchParams({ company: id, view });
     if (evaluation) params.set("evaluation", evaluation);
-    history.replaceState(null, "", `?${params}`);
+    history[push ? "pushState" : "replaceState"](null, "", `?${params}`);
     if (id !== destination.id) {
       setInboxState((state) => ({ ...state, page: 0, cutoff: "" }));
       // A different company or page starts at the top, not the old scroll spot.
@@ -368,7 +379,7 @@ function ResearchApp({ signOut, session }) {
     setDestination({ id, view, evaluation });
   }
   const [home, setHome] = useState(null);
-  // "Retake the quiz" in the Account menu reopens the five questions.
+  // Account settings reopen the existing profile questions.
   const [retakeQuiz, setRetakeQuiz] = useState(false);
   useEffect(() => {
     const open = () => {
@@ -440,18 +451,44 @@ function ResearchApp({ signOut, session }) {
             detail_mode: profile.detail_mode,
           })),
         )
-        .catch(() => { });
+        .catch(() => {});
     },
   };
+  const accountNavigation = (
+    <Button
+      variant="plain"
+      href={`?${new URLSearchParams({ company: destination.id, view: "account" })}`}
+      icon={<UserIcon />}
+      aria-current={destination.view === "account" ? "page" : undefined}
+      onClick={(event) => {
+        if (
+          event.button !== 0 ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey
+        )
+          return;
+        event.preventDefault();
+        if (destination.view !== "account")
+          choose(destination.id, "account", null, { push: true });
+      }}
+    >
+      Account
+    </Button>
+  );
   return (
     <ProfileContext.Provider value={profileValue}>
       {home?.profile &&
-        (retakeQuiz || (!home.profile.completed && !onboardingSkipped)) ? (
+      (retakeQuiz ||
+        (destination.view !== "account" &&
+          !home.profile.completed &&
+          !onboardingSkipped)) ? (
         <Onboarding
           stage={retakeQuiz ? "type" : "start"}
           profile={home.profile}
           onSkip={retakeQuiz ? () => setRetakeQuiz(false) : skipOnboarding}
-          onTurnOnPro={() => api.saveDetailMode("data").catch(() => { })}
+          onTurnOnPro={() => api.saveDetailMode("data").catch(() => {})}
           onDone={(profile) => {
             setRetakeQuiz(false);
             focusMainHeading();
@@ -464,45 +501,94 @@ function ResearchApp({ signOut, session }) {
           }}
         />
       ) : (
-        <CompanyWorkspace
-          signOut={signOut}
-          sharedCatalogue={
-            session.mode !== "password" || !!session.is_installation_owner
-          }
-          instrumentId={destination.id || defaultCompany}
-          selectedCompanyId={destination.id}
-          onWorkspaceReset={(resetSelection) => {
-            setHiddenCompanies([]);
-            if (resetSelection) choose("");
-          }}
-          inboxFilters={{ ...inboxState, company: destination.id }}
-          onInboxFiltersChange={(change) => {
-            const current = { ...inboxState, company: destination.id };
-            const next =
-              typeof change === "function" ? change(current) : change;
-            const { company, ...filters } = next;
-            setInboxState(filters);
-            if (company !== destination.id) choose(company, destination.view);
-          }}
-          initialView={destination.view}
-          initialEvaluation={destination.evaluation}
-          onChoose={choose}
-          hiddenCompanies={hiddenCompanies}
-          onHideCompany={(id) =>
-            setHiddenCompanies((ids) => [...new Set([...ids, id])])
-          }
-          onRestoreCompany={(id) =>
-            setHiddenCompanies((ids) => ids.filter((value) => value !== id))
-          }
-        />
+        <>
+          <RetainedView active={destination.view !== "account"}>
+            <CompanyWorkspace
+              accountNavigation={accountNavigation}
+              mainId={
+                destination.view === "account"
+                  ? "research-workspace"
+                  : "workspace"
+              }
+              sharedCatalogue={
+                session.mode !== "password" || !!session.is_installation_owner
+              }
+              instrumentId={destination.id || defaultCompany}
+              selectedCompanyId={destination.id}
+              onWorkspaceReset={(resetSelection) => {
+                setHiddenCompanies([]);
+                if (resetSelection) choose("");
+              }}
+              inboxFilters={{ ...inboxState, company: destination.id }}
+              onInboxFiltersChange={(change) => {
+                const current = { ...inboxState, company: destination.id };
+                const next =
+                  typeof change === "function" ? change(current) : change;
+                const { company, ...filters } = next;
+                setInboxState(filters);
+                if (company !== destination.id)
+                  choose(company, destination.view);
+              }}
+              initialView={
+                destination.view === "account"
+                  ? lastResearch.current.view
+                  : destination.view
+              }
+              initialEvaluation={
+                destination.view === "account"
+                  ? lastResearch.current.evaluation
+                  : destination.evaluation
+              }
+              onChoose={choose}
+              hiddenCompanies={hiddenCompanies}
+              onHideCompany={(id) =>
+                setHiddenCompanies((ids) => [...new Set([...ids, id])])
+              }
+              onRestoreCompany={(id) =>
+                setHiddenCompanies((ids) => ids.filter((value) => value !== id))
+              }
+            />
+          </RetainedView>
+          {destination.view === "account" && (
+            <div
+              className="app-shell account-settings-shell"
+              data-view="account"
+            >
+              <WorkspaceHeader
+                beginner={detailMode === "explain"}
+                view="account"
+                onNavigate={(view) => choose(destination.id, view)}
+                onHome={() => choose("", "workspace")}
+                account={accountNavigation}
+              />
+              <main
+                className="main-workspace account-settings-main"
+                id="workspace"
+                aria-label="Account settings"
+              >
+                <AccountPage
+                  session={session}
+                  controls={accountControls}
+                  onBack={() => {
+                    const previous = lastResearch.current;
+                    choose(previous.id, previous.view, previous.evaluation);
+                    focusMainHeading();
+                  }}
+                />
+              </main>
+            </div>
+          )}
+        </>
       )}
     </ProfileContext.Provider>
   );
 }
+
 const pendingPriceRead = { data: null, error: "" };
 
 function CompanyWorkspace({
-  signOut,
+  accountNavigation,
+  mainId = "workspace",
   sharedCatalogue = true,
   instrumentId,
   selectedCompanyId,
@@ -954,58 +1040,20 @@ function CompanyWorkspace({
         data-idea-hidden={ideaSidebarHidden}
         className={`app-shell${view === "updates" ? " inbox-view" : ""}${view === "ideas" ? " ideas-view" : ""}${!selectedCompanyId ? " all-companies-view" : ""}`}
       >
-        <header className="topbar">
-          <a className="skip-link" href="#workspace">
-            Skip to content
-          </a>
-          <a className="brand" href="#workspace">
-            fledge<span>↗</span>
-          </a>
-          <nav aria-label="Workspace navigation">
-            {(beginner
-              ? [
-                ["workspace", "Home"],
-                ["world", "World"],
-                ["ideas", "My views"],
-              ]
-              : [
-                ["workspace", "Home"],
-                ["ideas", "My views"],
-                ["updates", "Updates"],
-                ["world", "World"],
-              ]
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                className={view === key ? "active" : ""}
-                aria-current={
-                  view === key || (view === "idea" && key === "ideas")
-                    ? "page"
-                    : undefined
-                }
-                onClick={() =>
-                  // Beginner "Home" always goes back to the list of companies.
-                  beginner && key === "workspace"
-                    ? onChoose("", "workspace")
-                    : setView(key)
-                }
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
-          <div className="topbar-tools">
-            <TelegramSettings />
-            {signOut}
-          </div>
-        </header>
+        <WorkspaceHeader
+          beginner={beginner}
+          view={view}
+          onNavigate={setView}
+          onHome={() => onChoose("", "workspace")}
+          account={accountNavigation}
+        />
         <div className="workspace-grid">
           <CompanySidebar
             loading
             collapsed={!!layout.companiesHidden}
             onToggle={() => toggleLayout("companiesHidden")}
           />
-          <main className="main-workspace" id="workspace">
+          <main className="main-workspace" id={mainId}>
             {loadError ? (
               <div className="workspace-load-error" role="alert">
                 <h2>Research could not be loaded</h2>
@@ -1699,66 +1747,14 @@ function CompanyWorkspace({
       data-idea-hidden={ideaSidebarHidden}
       className={`app-shell${view === "updates" ? " inbox-view" : ""}${view === "ideas" ? " ideas-view" : ""}${!selectedCompanyId ? " all-companies-view" : ""}`}
     >
-      <header className="topbar">
-        <a className="skip-link" href="#workspace">
-          Skip to content
-        </a>
-        <a
-          href="#workspace"
-          className="brand"
-          onClick={(e) => {
-            e.preventDefault();
-            setView("workspace");
-          }}
-        >
-          fledge<span>↗</span>
-        </a>
-        <nav aria-label="Workspace navigation">
-          {(beginner
-            ? [
-              ["workspace", "Home"],
-              ["world", "World"],
-              ["ideas", "My views"],
-              ...(updatesWaiting ? [["updates", "Updates"]] : []),
-            ]
-            : [
-              ["workspace", "Home"],
-              ["ideas", "My views"],
-              ["updates", "Updates"],
-              ["world", "World"],
-            ]
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              className={
-                view === key ||
-                  (view === "idea" && key === "ideas") ||
-                  (view === "review" && key === "updates")
-                  ? "active"
-                  : ""
-              }
-              aria-current={
-                view === key || (view === "idea" && key === "ideas")
-                  ? "page"
-                  : undefined
-              }
-              onClick={() =>
-                // Beginner "Home" always goes back to the list of companies.
-                beginner && key === "workspace"
-                  ? onChoose("", "workspace")
-                  : setView(key)
-              }
-            >
-              {label}
-              {key === "updates" && updatesWaiting && <i className="dot" />}
-            </button>
-          ))}
-        </nav>
-        <div className="topbar-tools">
-          {!beginner && <TelegramSettings />}
-          {signOut || <SettingsMenu />}
-        </div>
-      </header>
+      <WorkspaceHeader
+        beginner={beginner}
+        view={view}
+        updatesWaiting={updatesWaiting}
+        onNavigate={setView}
+        onHome={() => onChoose("", "workspace")}
+        account={accountNavigation}
+      />
       {watchlistMessage && (
         <p className="watchlist-notice" role="alert">
           {watchlistMessage}{" "}
@@ -1855,7 +1851,7 @@ function CompanyWorkspace({
         />
         <main
           className="main-workspace"
-          id="workspace"
+          id={mainId}
           ref={mainPane}
           aria-label="Company research"
           aria-busy={companyLoading && !loadError}
@@ -1966,6 +1962,7 @@ function CompanyWorkspace({
                       className="research-content"
                       role="tabpanel"
                       id="research-panel"
+                      tabIndex={0}
                       aria-labelledby={`research-tab-${tab}`}
                     >
                       <ResearchSectionHeader
@@ -2654,7 +2651,6 @@ function CompanyWorkspace({
                     <PortfolioRead onOpenCompany={(id) => onChoose(id)} />
                     <CompanyOverview
                       catalogue={visibleCompanies}
-                      initialWorkspace={data}
                       onOpen={onChoose}
                     />
                   </Suspense>

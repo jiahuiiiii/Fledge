@@ -1,3 +1,4 @@
+import { Button } from "./ui";
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import Select from "./Select";
@@ -70,9 +71,9 @@ function SectorChoice({ member }) {
                 ))}
               </Select>
             </label>
-            <button onClick={save} disabled={busy}>
+            <Button variant="plain" onClick={save} disabled={busy}>
               Save sector comparison
-            </button>
+            </Button>
             <p className="fine">
               Only your future comparisons use this choice.
             </p>
@@ -292,13 +293,14 @@ export default function MoveAlertCard({
             <tr key={member.symbol}>
               <th scope="row">
                 {onOpen ? (
-                  <button
+                  <Button
+                    variant="plain"
                     className="text-button"
                     onClick={() => onOpen(member.instrument_id, "workspace")}
                     aria-label={`Open ${member.symbol} research`}
                   >
                     {member.symbol}
-                  </button>
+                  </Button>
                 ) : (
                   member.symbol
                 )}
@@ -336,18 +338,20 @@ export default function MoveAlertCard({
       {!readOnly && <ComparisonSettings members={alert.members} />}
       {!readOnly && !alert.review_action && (
         <div className="move-review-controls">
-          <button
+          <Button
+            variant="plain"
             disabled={busy}
             onClick={() => onReview(alert.id, "reviewed")}
           >
             Mark reviewed
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="plain"
             disabled={busy}
             onClick={() => onReview(alert.id, "unresolved")}
           >
             Leave unresolved
-          </button>
+          </Button>
         </div>
       )}
     </section>

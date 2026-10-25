@@ -232,6 +232,28 @@ def groups_by_sector(listed):
     return result
 
 
+def session_day(quoted_at):
+    from thesis.research import price_history
+    return datetime.fromisoformat(quoted_at).astimezone(price_history.NY).date().isoformat()
+
+
+def price_snapshot(listed):
+    """The moves the explanation was written from, so its bars match its words."""
+    return {c["id"]: dict(change_percent=c["quote"]["change_percent"], quoted_at=c["quote"]["quoted_at"])
+            for c in listed if c["quote"] and c["quote"].get("quoted_at")}
+
+
+def same_sessions(saved, listed):
+    """A saved explanation describes one trading session. Once any company's newest
+    price is from another session (or the answer predates saved prices), it no
+    longer describes today and is hidden rather than shown beside newer bars."""
+    if not saved:
+        return False
+    now = price_snapshot(listed)
+    return saved.keys() == now.keys() and all(
+        session_day(saved[i]["quoted_at"]) == session_day(now[i]["quoted_at"]) for i in now)
+
+
 def build(owner, *, now=None):
     now = now or datetime.now(timezone.utc)
     with transaction(owner, consistent=True) as conn:
@@ -252,7 +274,8 @@ def build(owner, *, now=None):
     from thesis.research.world_news import ai_available
     available, reason = ai_available()
     explanation = None
-    if saved and sorted(map(str, saved["company_ids"])) == sorted(c["id"] for c in listed):
+    if (saved and sorted(map(str, saved["company_ids"])) == sorted(c["id"] for c in listed)
+            and same_sessions(saved["result"].get("prices"), listed)):
         explanation = dict(saved["result"], created_at=saved["created_at"].isoformat())
     return dict(
         companies=listed,
@@ -407,7 +430,7 @@ def explain(owner, *, transport=None, now=None):
     # The same list and saved material reuse the earlier answer instead of paying again.
     call = ledger.execute(f"portfolio:{owner}:{identity}", PROMPT_VERSION, body,
                           transport=transport, owner=owner)
-    result = parse(call, listed, sources)
+    result = dict(parse(call, listed, sources), prices=price_snapshot(listed))
     with transaction(owner) as conn:
         conn.execute(
             """INSERT INTO portfolio_reads(id,owner_id,call_id,created_at,company_ids,result)

@@ -272,7 +272,6 @@
 .flow-gap {
   padding: 20px;
   background: color-mix(in srgb, var(--color-gold) 4%, transparent);
-  border-left: 2px solid var(--color-gold);
   font-size: var(--text-base);
 }
 .flow-exact {

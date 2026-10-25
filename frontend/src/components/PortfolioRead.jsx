@@ -111,20 +111,41 @@ export default function PortfolioRead({ onOpenCompany }) {
         {page.prices_stale && " · these prices are a few days old"}
       </p>
 
-      <ul className="bs-lights pr-lights">
-        {lights.map(([title, light]) => (
-          <li key={title}>
-            <div className={`bs-light mood-${light.mood}`}>
-              <span className="bs-shape" aria-hidden="true">
-                {SHAPE[light.mood]}
-              </span>
-              <span className="bs-light-title">{title}</span>
-              <strong>{light.text}</strong>
-            </div>
-          </li>
-        ))}
-      </ul>
+      {/* Wide screens: chart in the main column, lights in a right rail.
+          The rail comes first in reading order so phones show it on top. */}
+      <div className="pr-layout">
+        <aside className="pr-rail" aria-label="Your list at a glance">
+          <ul className="bs-lights pr-lights">
+            {lights.map(([title, light]) => (
+              <li key={title}>
+                <div className={`bs-light mood-${light.mood}`}>
+                  <span className="bs-shape" aria-hidden="true">
+                    {SHAPE[light.mood]}
+                  </span>
+                  <span className="bs-light-title">{title}</span>
+                  <strong>{light.text}</strong>
+                  {title === "WORLD" && page.world.events?.length > 0 && (
+                    <ul className="pr-world">
+                      {page.world.events.map((ev) => (
+                        <li key={ev.article_id}>
+                          <a href={ev.url} target="_blank" rel="noreferrer">
+                            {ev.headline}
+                          </a>
+                          <small className="bs-meta">
+                            {ev.publisher} · {ev.companies.length} of your
+                            companies
+                          </small>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </aside>
 
+        <div className="pr-main">
       {e ? (
         <>
           {(e.headline || e.drivers.length > 0) && (
@@ -196,23 +217,6 @@ export default function PortfolioRead({ onOpenCompany }) {
               </div>
             ))}
           </section>
-          {page.world.events?.length > 0 && (
-            <section className="bs-card">
-              <h4>World news touching your list</h4>
-              <ul className="pr-drivers">
-                {page.world.events.map((ev) => (
-                  <li key={ev.article_id}>
-                    <a href={ev.url} target="_blank" rel="noreferrer">
-                      {ev.headline}
-                    </a>
-                    <small className="bs-meta">
-                      {ev.publisher} · {ev.companies.length} of your companies
-                    </small>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
           <div className="pr-explain">
             {page.ai.available ? (
               <button
@@ -237,6 +241,8 @@ export default function PortfolioRead({ onOpenCompany }) {
           </div>
         </>
       )}
+        </div>
+      </div>
       <p className="bs-note">
         This shows what moved and what’s being said, not whether to buy or sell.
       </p>
