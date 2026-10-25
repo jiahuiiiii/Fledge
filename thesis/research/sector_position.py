@@ -23,7 +23,7 @@ def vendor_status(suggestions):
         checked_at=suggestions.get('checked_at'),
         last_attempt_at=attempt,
         error=state.get('error'),
-        next_attempt_at=(attempt + timedelta(hours=1)) if attempt else None,
+        next_attempt_at=(attempt + (timedelta(minutes=5) if state.get('error') and not (state.get('last_success_at') and state['last_success_at'] >= attempt) else timedelta(hours=1))) if attempt else None,
         count=len((suggestions.get('data') or {}).get('candidates') or []),
     )
 

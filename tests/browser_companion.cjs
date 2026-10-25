@@ -164,11 +164,11 @@ let browser, page;
   await page.keyboard.press("Escape");
   await choose("What could go wrong");
   await page.waitForFunction(
-    () => document.activeElement?.textContent === "Key risks",
+    () => document.activeElement?.textContent === "Understand the business",
   );
   assert.match(
-    await business.locator('[data-topic="risks"]').innerText(),
-    /Not covered/,
+    await business.locator('.brief-missing').innerText(),
+    /Not covered by the passages we read:.*key risks/,
   );
   // A starter is a reading prompt; it never silently replaces a library selection.
   await prompt

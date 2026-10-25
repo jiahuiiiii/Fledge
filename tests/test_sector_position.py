@@ -34,7 +34,7 @@ def test_other_companies_default_to_vendor_similar_companies_without_same_issuer
     directory();iid=add_company('NVDA')['instrument_id']
     first=sector_position.context(owner,iid)
     assert first['basis']=='unselected' and first['vendor_status']['status']=='empty' and first['vendor_status']['last_attempt_at'] is None
-    rows=[dict(symbol=s,companyName=s+' authored',mktCap=cap) for s,cap in [('AMD',300),('GOOG',900),('MU',200),('QCOM',250),('MRVL',100),('AVGO',800),('GOOGL',950)]]
+    rows=[dict(symbol=s,companyName=s+' authored',mktCap=cap) for s,cap in [('005930.KS',999),('AMD',300),('GOOG',900),('MU',200),('QCOM',250),('MRVL',100),('AVGO',800),('GOOGL',950)]]
     outcome=fmp.refresh_company(owner,iid,fetcher=lambda *_:rows,only='peers')
     assert [o['dataset'] for o in outcome['outcomes']]==['peers']
     result=sector_position.context(owner,iid)
@@ -45,6 +45,18 @@ def test_other_companies_default_to_vendor_similar_companies_without_same_issuer
     assert result['peers']==result['vendor_suggestions']==['GOOGL','AVGO','AMD','QCOM','MU']
     with transaction(owner) as conn:
         assert one(conn,'SELECT count(*) n FROM peer_selections')['n']==0
+
+
+def test_failed_peers_check_is_explained_and_retries_sooner_than_a_completed_one(owner):
+    directory();iid=add_company('MU')['instrument_id']
+    def refuse(*_):raise fmp.ProviderFailure('FMP endpoint requires a supported subscription or key.')
+    first=fmp.refresh_company(owner,iid,fetcher=refuse,only='peers')['outcomes'][0]
+    assert first['status']=='unavailable',first
+    status=sector_position.context(owner,iid)['vendor_status']
+    assert status['error'] and 'supported subscription' in status['error'] and status['status']=='empty',(first,status)
+    assert (status['next_attempt_at']-status['last_attempt_at']).total_seconds()==300
+    again=fmp.refresh_company(owner,iid,fetcher=refuse,only='peers')['outcomes'][0]
+    assert 'failed' in again['message']
 
 
 def test_saved_peers_override_default_and_are_private(owner):

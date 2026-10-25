@@ -41,7 +41,10 @@ def normalize(dataset,payload,symbol):
     if dataset=='peers':
         result=[];seen={symbol}
         for row in payload:
-            peer=symbol_value(row.get('symbol'))
+            # FMP lists foreign tickers such as 005930.KS; skip what we cannot use
+            # instead of rejecting the whole list.
+            try:peer=symbol_value(row.get('symbol') if isinstance(row,dict) else None)
+            except ValueError:continue
             if peer in seen:continue
             seen.add(peer)
             result.append(dict(symbol=peer,name=str(row.get('companyName',''))[:200],market_cap=number(row.get('mktCap'),positive=True),currency=None))
@@ -138,7 +141,11 @@ def refresh(dataset,symbol,*,fetcher=None):
         conn.execute('INSERT INTO fmp_refresh_state(dataset,symbol) VALUES(%s,%s) ON CONFLICT DO NOTHING',(dataset,symbol))
         state=one(conn,'SELECT * FROM fmp_refresh_state WHERE dataset=%s AND symbol=%s FOR UPDATE',(dataset,symbol))
         if state['lease_until'] and state['lease_until']>now:raise Conflict('This FMP dataset is being checked.')
-        if state['last_attempt_at'] and now-state['last_attempt_at']<timedelta(hours=1):raise Conflict('FMP checks for this company/dataset are one hour apart.')
+        # A check that failed (nothing was saved from it) may be retried after five
+        # minutes; a check that completed is one hour apart.
+        failed=bool(state['error']) and not (state['last_success_at'] and state['last_attempt_at'] and state['last_success_at']>=state['last_attempt_at'])
+        gap=timedelta(minutes=5) if failed else timedelta(hours=1)
+        if state['last_attempt_at'] and now-state['last_attempt_at']<gap:raise Conflict('FMP checks for this company/dataset are one hour apart.' if not failed else 'The last FMP check failed; try again in a few minutes.')
         conn.execute('UPDATE fmp_refresh_state SET attempt_id=%s,last_attempt_at=%s,lease_until=%s WHERE dataset=%s AND symbol=%s',(attempt,now,now+timedelta(minutes=2),dataset,symbol))
     try:
         payload=(fetcher or fetch)(dataset,symbol)

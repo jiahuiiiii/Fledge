@@ -26,9 +26,14 @@ let browser;
     const req = route.request(), url = new URL(req.url());
     if (!req.url().startsWith(base)) return route.abort();
     if (url.pathname.endsWith('/price-history/refresh')) {
-      writes.push(url.pathname); refreshes++;
-      if (fail) return route.fulfill({ status: 429, json: { result: { errors: [{ error_message: 'Yahoo price check unavailable.' }] } } });
+      writes.push(url.pathname);
       const now = await page.evaluate(() => Date.now());
+      // Model the server's shared cooldown: simultaneous header/chart reads
+      // reuse the completed snapshot instead of manufacturing a second check.
+      if (Date.parse(fixture.next_refresh_at) > now)
+        return route.fulfill({json:{result:{id:fixture.snapshot.id,sessions:fixture.snapshot.series.bars.length}}});
+      refreshes++;
+      if (fail) return route.fulfill({ status: 429, json: { result: { errors: [{ error_message: 'Yahoo price check unavailable.' }] } } });
       fixture.snapshot.id = `authored-price-${refreshes}`;
       fixture.snapshot.retrieved_at = new Date(now).toISOString();
       fixture.next_refresh_at = new Date(now + 60000).toISOString();
@@ -65,6 +70,7 @@ let browser;
   await panel.getByRole('button',{name:'Refresh prices',exact:true}).click();
   assert.equal(refreshes,1,'a fresh shared snapshot is reused');
   await page.clock.runFor(61000);
+  await page.mouse.move(1,1);
   await panel.locator('.price').getByText('113.00',{exact:true}).waitFor();
   assert.equal(refreshes,2);
   assert.equal(await panel.getByRole('button',{name:'1M',exact:true}).getAttribute('aria-pressed'),'true');

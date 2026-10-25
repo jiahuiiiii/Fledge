@@ -36,7 +36,7 @@ const assert=require('node:assert/strict');
   const advance=async(stage)=>{const response=await page.request.post(url+'/api/v1/demo/advance',{headers:{'x-thesis-request':'local-ui'},data:{expected_stage:stage}});assert.equal(response.status(),200);};
   await advance(0);await waitState('overdue');
   await page.getByRole('button',{name:'Updates',exact:true}).click();
-  const update=page.locator('.change-summary').filter({hasText:'Expected reporting evidence changed'});await update.waitFor();assert.match(await update.innerText(),/does not prove a late company filing/);
+  const update=page.locator('.change-summary').filter({hasText:'Expected reporting evidence changed'}).filter({hasText:'Expected figures missing'});await update.waitFor();assert.match(await update.innerText(),/does not prove a late company filing/);
   // The current idea page exposes its latest assessment through Download.
   await page.goto(url+`/?company=${iid}&view=idea`);
   const download=page.waitForEvent('download');
