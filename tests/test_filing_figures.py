@@ -6,6 +6,7 @@ import pytest
 
 from thesis.db import one, transaction
 from thesis.research.sec import disclosures, filing_figures as FF, financial_depth as D, financial_recovery as R
+from thesis.research.sec import income_flow as IF, segment_revenue as SR
 from thesis.research.sec.service import add_company
 from test_disclosures import disclosure_scope, metadata, reset_attempt  # noqa: F401  (fixture)
 from test_financial_recovery import response, setup, source
@@ -135,3 +136,68 @@ def test_dates_and_decimals_anywhere_read_back_equal():
                  note=None, flag=True)
     import json
     assert FF.decode(json.loads(json.dumps(FF.encode(value)))) == value
+
+
+KINDS = {"income_flow": (IF, lambda c, i: IF.present(c, i)), "segment_revenue": (SR, lambda c, i: SR.present(c, i))}
+
+
+@pytest.fixture(params=sorted(KINDS))
+def kind(request, monkeypatch):
+    module, present = KINDS[request.param]
+    calls, real = [], module.build
+    monkeypatch.setattr(module, "build", lambda c, i, *a: calls.append(i) or real(c, i, *a))
+    return request.param, module, present, calls
+
+
+def read_kind(owner, iid, present):
+    with transaction(owner, consistent=True) as c:
+        return present(c, iid)
+
+
+def test_income_flow_and_segments_are_saved_and_reused(owner, disclosure_scope, kind):
+    name, module, present, calls = kind
+    iid, _ = setup(owner)
+    first = read_kind(owner, iid, present)
+    assert calls == [iid]
+    again = read_kind(owner, iid, present)
+    assert calls == [iid] and again == first
+    with transaction(owner, consistent=True) as c:
+        assert module.build(c, iid) == again
+
+
+@pytest.mark.parametrize("change", [change_payload, change_document, change_access, change_reading,
+                                    change_review, change_version])
+def test_income_flow_and_segments_rebuild_on_every_input_change(owner, disclosure_scope, clean_model_ledger,
+                                                                 kind, monkeypatch, change):
+    name, module, present, calls = kind
+    iid, _ = setup(owner)
+    read_kind(owner, iid, present)
+    change(owner, iid, monkeypatch)
+    calls.clear()
+    after = read_kind(owner, iid, present)
+    if not calls:
+        # Withdrawn access answers before the saved table: nothing reused.
+        assert change is change_access and after["status"] == "unavailable"
+        return
+    assert calls == [iid], f"{name}: a changed input reused a saved result"
+    with transaction(owner, consistent=True) as c:
+        assert after == module.build(c, iid)
+
+
+def test_each_kind_has_its_own_saved_row(owner, disclosure_scope):
+    iid, _ = setup(owner)
+    read(owner, iid)
+    for _, present in KINDS.values():
+        read_kind(owner, iid, present)
+    with transaction(owner) as c:
+        assert one(c, "SELECT count(DISTINCT basis) n FROM filing_figures WHERE instrument_id=%s", (iid,))["n"] >= 2
+
+
+def test_recovery_basis_does_not_depend_on_fact_order(owner, disclosure_scope):
+    iid, _ = setup(owner)
+    facts = [dict(concept="SellingGeneralAndAdministrativeExpense", value=str(n), start="2024-01-01", end=f"2024-0{n}-28")
+             for n in range(1, 6)]
+    with transaction(owner) as c:
+        one_way = R.apply_reviewed(c, iid, {"_original_facts": {"X": facts}, "_recovery_basis": "b"}, [])
+        other_way = R.apply_reviewed(c, iid, {"_original_facts": {"X": facts[::-1]}, "_recovery_basis": "b"}, [])
+    assert one_way["_recovery_basis"] == other_way["_recovery_basis"]

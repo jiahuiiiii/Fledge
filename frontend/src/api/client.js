@@ -350,6 +350,9 @@ export const api = {
   // Light reads for the home cards: every saved quote, then per-company
   // news tone and (Pro) the two trailing filing figures.
   homeCards: ({ signal } = {}) => request("/home-cards", { signal }),
+  // This company's alerts with details; the company read has status only.
+  companyAlerts: (id, { signal } = {}) =>
+    request(`/companies/${id}/alerts`, { signal }),
   homeCard: (id, { figures = true, signal } = {}) =>
     request(`/companies/${id}/home-card?figures=${figures}`, { signal }),
   workspace: (instrument_id, { includeFinancials = true, signal } = {}) =>

@@ -272,3 +272,80 @@ Applies automatically at the next deliberate restart. After the restart the
 warm-up builds and saves each company's figures once (about 20 s in the
 background); from then on figures come from the saved table until an input
 changes. Nothing committed, installed or restarted.
+
+## Switching companies
+
+The owner reported more than 7 s per company switch. Earlier numbers here
+covered the home page only; the switch had not been measured.
+
+A switch reads the company (`/workspace`, without financials) and then its
+financials (`/companies/{id}/workspace-financials`); the automatic update run
+then re-read the whole company after every step. Profiling NVDA (read-only)
+showed 3.2 of 3.8 s in one section: `news_watch.list_alerts` building full
+details for up to 50 alerts, loading 44 saved readings of several MB each.
+The company page only counts unreviewed alerts for a badge; the Updates
+inbox loads its own copy.
+
+Changes:
+
+- The company read sends alert review status only (`list_alerts(...,
+  details=False)` never loads a reading). `GET /api/v1/companies/{id}/alerts`
+  returns this company's details; `App` fetches them after the company shows
+  and merges them for the company summary, whose unread count waits for them.
+- During an update run the company is re-read when the run finishes and at
+  most every 20 s while it runs, instead of after every step.
+- Income flow and revenue by segment are saved in the 072 table like the
+  trailing figures (per account, per kind, per exact inputs). The basis now
+  also covers the current-filing pointers (`disclosure_current`) and both
+  modules' calculation versions. Segment results are saved when `empty` too,
+  since finding that out also parses every filing.
+
+### A bug found and fixed on the way
+
+`recovery_basis` hashed the recovered facts in list order, and parsing can
+list the same facts in a different order in another process (GOOGL and META:
+33 SG&A facts, Python hash-seed dependent). Before 072 the trailing figures
+and the financial story were always computed in one process, so they agreed.
+With saved figures from an earlier process, the Financials page's
+consistency check (`depth.recovery_basis !== story.recovery_basis`) would
+hide the story after a restart. The hash now sorts each list first
+(`financial_recovery.apply_reviewed`), and `filing_figures.VERSION` moved to
+2 so no row with an order-dependent hash is reused. The running app was not
+yet affected: its saved rows came from its own process.
+
+### Before and after (server time per switch: company read + financials read)
+
+Before: the owner's live data, read-only. After: a disposable copy of it,
+first a process that builds and saves, then fresh processes (like restarts)
+with different hash seeds.
+
+| Company | Before, fresh process | Before, warm | After, first run | After, later fresh processes |
+| --- | --- | --- | --- | --- |
+| META | 3.8+1.0 = 4.8 s | 4.1 s | 1.4 s | 0.4–0.6 s |
+| NVDA | 3.7+2.0 = 5.7 s | 4.2 s | 2.5 s | 0.4–0.5 s |
+| GOOGL | 2.2+1.7 = 3.8 s | 2.7 s | 2.3 s | 0.4–0.5 s |
+| MSFT | 0.1+5.7 = 5.8 s | 0.4 s | 5.6 s | 0.1 s |
+| TSLA | 0.3+4.5 = 4.8 s | 0.9 s | 6.0 s | 0.2 s |
+| AAPL | 0.1+1.8 = 1.9 s | 0.3 s | 1.9 s | 0.1 s |
+
+Alert details for the badge then load in the background (about 1.5–3 s for
+the news-heavy companies) without holding the page. Not measured: network
+transfer and browser rendering; the company read still sends about 5 MB for
+news-heavy companies (the latest reading and saved documents).
+
+On the copy, all 45 saved results (15 companies × trailing figures, income
+flow, segments) equal a fresh build made in a different process, and the
+Financials consistency check agrees for all 15 companies.
+
+### Verification
+
+- `tests/test_filing_figures.py`: income flow and segments are saved and
+  reused; each rebuilds after every input change (withdrawn access answers
+  "unavailable" before the saved table); each kind has its own row; the
+  recovery basis does not depend on fact order.
+- `tests/test_alert_split.py` (new): the status-only list never loads a
+  reading; the company read asks for status only; the alerts request returns
+  this company's details. `test_alert_payload.py` updated for the split.
+- Frontend: 214 passed; build succeeds.
+
+Applies at the next restart (backend) and the next frontend install.

@@ -90,7 +90,12 @@ function Activity({ data, instrumentId, onUpdates, onView, onSource }) {
     ...(data?.research_alerts || []),
     ...(data?.idea_alerts || []),
   ].filter(
-    (a) => a.instrument_id === instrumentId && !a.review_action && !a.withheld,
+    // Status-only alerts wait for their details before counting.
+    (a) =>
+      a.instrument_id === instrumentId &&
+      !a.review_action &&
+      !a.status_only &&
+      !a.withheld,
   ).length;
   const items = [];
   if (quote?.change_percent != null && quote?.quoted_at) {

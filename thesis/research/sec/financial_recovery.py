@@ -318,5 +318,9 @@ def apply_reviewed(conn,iid,bundle,documents):
                 recovery=dict(target=target,value=item['value'],start=item['start'],end=item['end'],inputs=inputs,formula=item['formula'],explanation='AI-assisted mapping reviewed by you. '+item['explanation'])))
             count+=1
     result['_original_facts']=facts;result['_ai_recovery_count']=count
-    result['_recovery_basis']=hashlib.sha256((bundle.get('_recovery_basis','')+ledger.canonical(facts)).encode()).hexdigest()
+    # Hash the facts in a fixed order: parsing can list the same facts in a
+    # different order in another process, and saved figures (migration 072)
+    # must agree with a fresh financial story's basis.
+    ordered={k:sorted(v,key=ledger.canonical) for k,v in facts.items()}
+    result['_recovery_basis']=hashlib.sha256((bundle.get('_recovery_basis','')+ledger.canonical(ordered)).encode()).hexdigest()
     return result

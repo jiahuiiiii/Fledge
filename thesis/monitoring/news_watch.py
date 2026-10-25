@@ -456,7 +456,7 @@ def visible_payload(payload, current, previous):
     return dict(payload, items=kept, withheld_items=len(items) - len(kept))
 
 
-def list_alerts(conn, owner, ids=None, *, previous=True, detail_instrument=None):
+def list_alerts(conn, owner, ids=None, *, previous=True, detail_instrument=None, details=True):
     data = rows(
         conn,
         "SELECT a.*,i.symbol,i.name,r.action review_action FROM research_alerts a JOIN instruments i ON i.id=a.instrument_id LEFT JOIN research_alert_reviews r ON r.owner_id=a.owner_id AND r.alert_id=a.id WHERE a.owner_id=%s AND (%s::uuid[] IS NULL OR a.id=ANY(%s::uuid[])) ORDER BY a.created_at DESC,a.id DESC LIMIT 100",
@@ -465,7 +465,11 @@ def list_alerts(conn, owner, ids=None, *, previous=True, detail_instrument=None)
     result = []
     # A company page details only its own alerts. Others need only their
     # review status for the updates badge; no evidence is sent for them.
-    detailed = [a for a in data if detail_instrument is None or str(a["instrument_id"]) == str(detail_instrument)]
+    # details=False sends review status only, for every alert (no readings load).
+    def status_only(a):
+        return not details or (detail_instrument is not None and str(a["instrument_id"]) != str(detail_instrument))
+
+    detailed = [a for a in data if not status_only(a)]
     # Consecutive alerts share readings; build each one once for this request.
     wanted = list({str(a[k]) for a in detailed for k in ("current_id", "previous_id")})
     records = {str(r["id"]): r for r in rows(conn, "SELECT * FROM sentiment_analyses WHERE id=ANY(%s::uuid[])", (wanted,))} if wanted else {}
@@ -478,7 +482,7 @@ def list_alerts(conn, owner, ids=None, *, previous=True, detail_instrument=None)
         return presented[identity]
 
     for a in data:
-        if detail_instrument is not None and str(a["instrument_id"]) != str(detail_instrument):
+        if status_only(a):
             result.append(dict(id=str(a["id"]), instrument_id=str(a["instrument_id"]), symbol=a["symbol"], name=a["name"],
                                created_at=a["created_at"].isoformat(), review_action=a["review_action"],
                                preview=a.get("preview", False), status_only=True))

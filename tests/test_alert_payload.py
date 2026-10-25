@@ -74,8 +74,12 @@ def test_lists_omit_the_earlier_sample_and_the_request_returns_it_unchanged(owne
     sample = N.previous_sample(owner, full["id"])
     assert sample == dict(id=full["id"], withheld=False, previous_items=full["previous_items"],
                           previous_sources=full["previous_sources"])
+    # The company read carries status only; details come from the alerts request.
     workspace = service.state(owner, iid)["research_alerts"][0]
-    assert workspace["previous_items"] is None and workspace["sources"] == full["sources"]
+    assert workspace["status_only"] and "sources" not in workspace
+    with transaction(owner) as c:
+        detail = N.list_alerts(c, owner, previous=False, detail_instrument=str(iid))[0]
+    assert detail["previous_items"] is None and detail["sources"] == full["sources"]
 
 
 def test_earlier_sample_keeps_account_and_withdrawal_checks(owner):

@@ -712,6 +712,19 @@ def home_card(instrument_id: UUID, figures: bool = True):
     return {"result": card(auth.current_owner(), str(instrument_id), figures=figures)}
 
 
+@app.get("/api/v1/companies/{instrument_id}/alerts")
+def company_alerts(instrument_id: UUID):
+    """This company's news alerts with details. The company read carries only
+    their review status, so the page shows first and these follow."""
+    from .db import transaction
+    from .monitoring import news_watch
+
+    iid = str(instrument_id)
+    with transaction(auth.current_owner(), consistent=True) as conn:
+        alerts = news_watch.list_alerts(conn, auth.current_owner(), previous=False, detail_instrument=iid)
+    return {"result": [a for a in alerts if a["instrument_id"] == iid]}
+
+
 @app.get("/api/v1/companies/{instrument_id}/workspace-financials")
 def workspace_financials(instrument_id: UUID):
     return {"result": service.financial_workspace(auth.current_owner(), str(instrument_id))}

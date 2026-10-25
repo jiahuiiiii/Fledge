@@ -219,14 +219,8 @@ def present(conn,iid):
     if not one(conn,"SELECT 1 FROM sources WHERE id='sec-companyfacts' AND entitlement='sec-public'"):
         return dict(status='unavailable',reason='Structured filing source access is unavailable.')
     # Reuse this account's saved result for the exact same inputs (migration 072).
-    from .filing_figures import basis,load,owner_of,save
-    owner=owner_of(conn);key=basis(conn,iid) if owner else None
-    if key:
-        saved=load(conn,iid,key)
-        if saved is not None:return saved
-    result=build(conn,iid)
-    if key and result['status']=='available':save(owner,iid,key,result)
-    return result
+    from .filing_figures import cached
+    return cached(conn,iid,'depth',lambda c,i:build(c,i))
 
 
 def build(conn,iid):

@@ -606,6 +606,7 @@ function CompanyWorkspace({
   const [loadingRun, setLoadingRun] = useState(null);
   const [loadingError, setLoadingError] = useState("");
   const lastLoadingRevision = useRef(null);
+  const lastLoadingRead = useRef(0);
   useEffect(() => {
     const open = () => setUpdatesOpen(true);
     window.addEventListener(UPDATE_EVENT, open);
@@ -664,7 +665,12 @@ function CompanyWorkspace({
         ]);
         if (revision !== lastLoadingRevision.current) {
           lastLoadingRevision.current = revision;
-          await refresh();
+          // Re-read the company when the run finishes, and at most every 20 s
+          // while it runs, instead of after every step (each was a full read).
+          if (!run?.active || Date.now() - lastLoadingRead.current > 20000) {
+            lastLoadingRead.current = Date.now();
+            await refresh();
+          }
         }
       } catch (e) {
         if (!stopped && activeScope.current === scope)
@@ -913,6 +919,33 @@ function CompanyWorkspace({
         .catch(() => setModelStatus(null));
     }
   }
+  // Alert details load after the company shows: the company read carries only
+  // each alert's review status, and building details took about 3 s.
+  const [alertDetail, setAlertDetail] = useState(null);
+  const alertKey = (data?.research_alerts || [])
+    .filter((a) => a.instrument_id === data?.instrument?.id)
+    .map((a) => `${a.id}:${a.review_action || ""}`)
+    .join(",");
+  useEffect(() => {
+    const id = data?.instrument?.id;
+    if (!id || !alertKey) return;
+    const controller = new AbortController();
+    api
+      .companyAlerts(id, { signal: controller.signal })
+      .then((list) => setAlertDetail({ id, list }))
+      .catch(() => {});
+    return () => controller.abort();
+  }, [data?.instrument?.id, alertKey]);
+  const snapshotData = useMemo(() => {
+    if (!data || alertDetail?.id !== data.instrument?.id) return data;
+    const detail = new Map(alertDetail.list.map((a) => [a.id, a]));
+    return {
+      ...data,
+      research_alerts: (data.research_alerts || []).map(
+        (a) => detail.get(a.id) || a,
+      ),
+    };
+  }, [data, alertDetail]);
   if (!data)
     return (
       <div
@@ -2399,7 +2432,7 @@ function CompanyWorkspace({
                                   }}
                                 />
                               }
-                              data={data}
+                              data={snapshotData}
                               financialError={financialError}
                               onRetryFinancials={retryFinancials}
                               instrumentId={instrumentId}
