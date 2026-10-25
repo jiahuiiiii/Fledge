@@ -157,6 +157,7 @@ export default function WeeklyReview({ open, onClose, onOpen, onChanged }) {
   const groups = reviewGroups(review?.records);
   return (
     <Modal open={open} onClose={onClose} title="Weekly review" className="weekly-review-modal">
+      <div className="weekly-body">
       <form className="weekly-settings" onSubmit={save}>
         <label className="weekly-toggle">
           <Checkbox
@@ -227,7 +228,7 @@ export default function WeeklyReview({ open, onClose, onOpen, onChanged }) {
         )}
         {current && (
           <p className="fine">
-            {current.total} updates · {current.seen_at ? "Seen" : "Ready to review"}
+            {current.total} updates · {current.seen_at ? "Seen" : "Ready to review"}{" "}
             {!current.seen_at && (
               <Button variant="tertiary" size="inline" disabled={busy} onClick={markSeen}>
                 Mark seen
@@ -259,6 +260,7 @@ export default function WeeklyReview({ open, onClose, onOpen, onChanged }) {
           </>
         )}
       </section>
+      </div>
     </Modal>
   );
 }

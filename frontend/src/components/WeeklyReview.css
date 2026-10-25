@@ -9,3 +9,6 @@
 .weekly-latest-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .weekly-latest-head h3 { margin: 0; font-size: var(--text-md); }
 .weekly-why { display: block; color: var(--color-muted); }
+.weekly-body { display: grid; gap: var(--space-4); padding: var(--space-4) var(--space-5) var(--space-5); max-height: min(78vh, 760px); overflow-y: auto; }
+.weekly-latest .bs-group { margin: 0; }
+.weekly-latest .bs-headlines { margin: var(--space-2) 0 0; padding: 0; list-style: none; display: grid; gap: var(--space-3); }

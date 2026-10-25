@@ -17,4 +17,15 @@ Provenance kept in a closed Details line; unstated-currency estimates plotted as
 
 ## Verification
 
-See the end of this file (filled in when the checks finished).
+- Frontend unit checks: 220+ pass (new: `alertEvidence`, `financialTrends`, dialog rows). Production build clean (built to a scratch folder; the live `frontend/dist` was not touched and the app was not restarted).
+- New offline journey `tests/run_browser.py --pro-cleanup` passes: Updates evidence dialog (source link, quote, Useful / Not useful, closed Details, no nested collapses), weekly review modal (settings + tone-grouped latest review, no collapses), four Pro tabs, Overview without "What's being said"/"View evidence", News without Expectations/"More headlines", Financials trend tiles and evidence dialog, Compare combobox that never resizes its card, no external calls and no writes. The inbox and weekly-review endpoints are authored mocks.
+- Looked at in the browser pane on the fictional seed: Overview, Financials (tiles, breakdown, chart with USD-assumed estimate, closed sections) and the shared parts at `/?ui-preview`.
+
+## Not verified / outstanding
+
+- The older journeys still assert the previous DOM and fail: `--company-overview`, `--business`, `--expectations`, `--news-discussion`, plus (not run) `--topic-homes`, `--reading-flow`, `--companion`, `--research-design`, `--financials`, `--sector-position`, `--valuation`. Each needs its selectors moved to the new layout (Outlook tab, expectations disclosure, "Read analysed sources", More detail, Weekly review page, per-row Inspect figure).
+- `--inbox`, `--scheduled-review`, `--digest` and `--idea-alert` cannot seed: `seed_sentiment_browser.py` fails on `assert news_watch.publish(...) == 2`, independent of this work.
+- Real seeded data was not used for the News story list, the analyst-target chart or the Latest activity list; check them on a real company after the owner installs the build.
+- Dead CSS from removed blocks remains in `styles/app.css` (periodic review, saved weekly list, inbox detail) and `UpdateInbox.css`.
+- Compare & value's layout (`SectorPosition`, `ValuationPanel`) kept its own card styling; only the peer picker, target chart and ratios panel changed.
+
