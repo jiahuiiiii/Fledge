@@ -1,5 +1,10 @@
 import { useState } from "react";
 import {
+  Combobox,
+  DisclosureGroup,
+  EvidenceDialog,
+  SourceChip,
+  TrendTile,
   Disclosure,
   EmptyState,
   FilterGroup,
@@ -313,6 +318,41 @@ function ReadingParts() {
   );
 }
 
+function SharedPickers() {
+  const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState("");
+  return (
+    <div className="ui-preview__grid">
+      <div className="ui-preview__section">
+        <Combobox
+          label="Example peer search"
+          placeholder="Search companies"
+          options={[
+            { value: "EXA", label: "Example Co", hint: "EXA" },
+            { value: "SMP", label: "Sample Corp", hint: "SMP" },
+          ]}
+          onSelect={setPicked}
+        />
+        <p className="fine">Picked: {picked || "nothing yet"}</p>
+        <TrendTile title="Revenue growth" value="12.0%" caption="Sample period" points={[1, 3, 2, 5, null, 6]} onOpen={() => setOpen(true)} />
+        <SourceChip label="Example Wire" date="25 Oct 2026" href="https://example.com/" />
+      </div>
+      <div className="ui-preview__section">
+        <DisclosureGroup>
+          <Disclosure title="First detail"><p>Authored example.</p></Disclosure>
+          <Disclosure title="Second detail"><p>Authored example.</p></Disclosure>
+        </DisclosureGroup>
+      </div>
+      <EvidenceDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Example evidence"
+        rows={[{ id: 1, label: "Revenue", value: "US$1.0bn", meta: "Year to 30 Jun 2026", href: "https://example.com/", sourceLabel: "Annual report" }]}
+      />
+    </div>
+  );
+}
+
 const SECTIONS = [
   ["Buttons", ButtonBoard],
   ["Badges", Badges],
@@ -320,6 +360,7 @@ const SECTIONS = [
   ["Cards", Cards],
   ["Put together", Example],
   ["Reading and evidence", ReadingParts],
+  ["Pickers, trends and evidence", SharedPickers],
 ];
 
 export default function UiPreview() {

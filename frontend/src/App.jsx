@@ -85,7 +85,6 @@ import AccountGate from "./components/AccountGate";
 import FilingWatch from "./components/FilingWatch";
 import ValuationPanel from "./components/ValuationPanel";
 import IdeaAlertChecks from "./components/IdeaAlertChecks";
-const ReviewDigest = lazy(() => import("./components/ReviewDigest"));
 import HistoryPanel from "./components/HistoryPanel";
 import EventAssessment, {
   EventEditor,
@@ -286,7 +285,9 @@ function readDestination() {
       "review",
       "account",
     ].includes(view)
-      ? view === "history"
+      ? view === "review"
+        ? "updates"
+        : view === "history"
         ? params.get("company")
           ? "idea"
           : "ideas"
@@ -2597,7 +2598,7 @@ function CompanyWorkspace({
                     )}
                     <RetainedView active={view === "updates"}>
                       <UpdateInbox
-                        onWeeklyReview={() => setView("review")}
+                        onReviewsChanged={refresh}
                         unseenReviews={data.review_schedule?.unseen_count || 0}
                         active={view === "updates"}
                         filters={inboxFilters}
@@ -2668,21 +2669,7 @@ function CompanyWorkspace({
                     />
                   </Suspense>
                 ) : !selectedCompanyId && view === "history" ? null : view ===
-                  "workspace" ? null : view === "review" ? (
-                    <Suspense
-                      fallback={
-                        <LoadingSkeleton label="Reading weekly review…" />
-                      }
-                    >
-                      {" "}
-                      <ReviewDigest
-                        onOpen={onChoose}
-                        onSource={setSource}
-                        selectedCompanyId={selectedCompanyId}
-                        onCompanyChange={chooseCompany}
-                      />
-                    </Suspense>
-                  ) : ["ideas", "updates", "world"].includes(
+                  "workspace" ? null : ["ideas", "updates", "world"].includes(
                     view,
                   ) ? null : view === "idea" ? (
                     <section className="focus-page reasoning-page idea-page">

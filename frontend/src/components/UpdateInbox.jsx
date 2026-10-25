@@ -4,12 +4,11 @@ import Select from "./Select";
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { stamp } from "./MarketResearch";
-import IdeaAlertChecks from "./IdeaAlertChecks";
-import { ResearchAlerts } from "./SentimentPanel";
-import MoveAlertCard from "./MoveAlertCard";
 import AlertRating from "./AlertRating";
 import AlertRoutingPreview from "./AlertRoutingPreview";
 import DailyUpdates from "./DailyUpdates";
+import InboxRecord from "./InboxRecord";
+import WeeklyReview from "./WeeklyReview";
 import { ConditionChange } from "./IdeasAndChanges";
 import { inboxSummary, recordKey } from "../lib/inbox";
 import "./UpdateInbox.css";
@@ -44,7 +43,7 @@ export default function UpdateInbox({
   onOpen,
   onSource,
   onReviewed,
-  onWeeklyReview,
+  onReviewsChanged,
   unseenReviews = 0,
 }) {
   const { company, review, page, cutoff } = filters;
@@ -54,6 +53,7 @@ export default function UpdateInbox({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [weeklyOpen, setWeeklyOpen] = useState(false);
   const [emptyCompany, setEmptyCompany] = useState("");
   const isEmptyCompany = !!company && emptyCompany === company;
   // A sidebar filter changes outside this component. Withhold the earlier
@@ -177,8 +177,8 @@ export default function UpdateInbox({
         description="Price moves, company reporting and changes to your saved research."
       />
       <div className="reading-page-actions inbox-heading-actions">
-        {onWeeklyReview && (
-          <Button onClick={onWeeklyReview}>
+        {(
+          <Button onClick={() => setWeeklyOpen(true)}>
             Weekly review
             {unseenReviews > 0 && (
               <Badge status="accent">{unseenReviews} new</Badge>
@@ -194,6 +194,12 @@ export default function UpdateInbox({
           Refresh inbox
         </Button>
       </div>
+      <WeeklyReview
+        open={weeklyOpen}
+        onClose={() => setWeeklyOpen(false)}
+        onOpen={onOpen}
+        onChanged={onReviewsChanged}
+      />
       {!company && data?.daily_reports_enabled && (
         <DailyUpdates refresh={refresh} onOpen={onOpen} onSource={onSource} />
       )}
@@ -321,120 +327,14 @@ export default function UpdateInbox({
                   </Card>
                 );
               return (
-                <Disclosure
-                  className="inbox-record"
-                  indicator={false}
-                  data-kind={record.kind}
-                  data-record-id={record.id}
+                <InboxRecord
                   key={recordKey(record)}
-                  summary={
-                    <>
-                      <MetaRow className="inbox-record-head">
-                        <Badge>{d.symbol}</Badge>
-                        <span className="inbox-kind">
-                          {kindName[record.kind]}
-                        </span>
-                        <time dateTime={record.created_at}>
-                          {stamp(record.created_at)}
-                        </time>
-                      </MetaRow>
-                      <h3>{summary.title}</h3>
-                      <p className="inbox-preview">{summary.text}</p>
-                      {record.kind === "company" && d.preview && (
-                        <p className="fine">Preview · not sent to Telegram</p>
-                      )}
-                      {summary.source && (
-                        <p className="inbox-source-caption">
-                          {summary.source}
-                          {summary.publishedAt
-                            ? ` · Source dated ${stamp(summary.publishedAt)}`
-                            : ""}
-                          {summary.more > 0
-                            ? ` · +${summary.more} more saved sources`
-                            : ""}
-                        </p>
-                      )}
-                      {summary.alert && (
-                        <p className="inbox-alert-caption">
-                          {record.kind === "move"
-                            ? summary.alert
-                            : `Flagged for review: ${summary.alert}`}
-                        </p>
-                      )}
-                      {summary.question && (
-                        <p className="fine inbox-preview">
-                          Your question: {summary.question}
-                        </p>
-                      )}
-                      <div className="inbox-record-footer">
-                        <Badge
-                          className="inbox-review-status"
-                          status={record.review_action ? "neutral" : "accent"}
-                        >
-                          {reviewName(record.review_action)}
-                        </Badge>
-                        <span className="inbox-evidence-control">
-                          <span className="inbox-inspect-label">
-                            Inspect evidence
-                          </span>
-                          <span className="inbox-hide-label">
-                            Hide evidence
-                          </span>
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.7"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <path d="m9 5 7 7-7 7" />
-                          </svg>
-                        </span>
-                      </div>
-                    </>
-                  }
-                >
-                  <div className="inbox-detail">
-                    {record.kind === "move" ? (
-                      <MoveAlertCard
-                        alert={d}
-                        busy={busy}
-                        onOpen={onOpen}
-                        onReview={(id, action) =>
-                          acknowledge("move", id, action)
-                        }
-                      />
-                    ) : record.kind === "idea" ? (
-                      <IdeaAlertChecks
-                        checks={[d]}
-                        embedded
-                        busy={busy}
-                        onSource={onSource}
-                        onOpen={onOpen}
-                        onReview={(id, action) =>
-                          acknowledge("idea", id, action)
-                        }
-                      />
-                    ) : (
-                      <ResearchAlerts
-                        alerts={[d]}
-                        embedded
-                        busy={busy}
-                        onSource={onSource}
-                        onOpen={onOpen}
-                        onReview={(id, action) =>
-                          acknowledge("company", id, action)
-                        }
-                      />
-                    )}
-                    <AlertRoutingPreview record={record} />
-                    <AlertRating record={record} />
-                  </div>
-                </Disclosure>
+                  record={record}
+                  busy={busy}
+                  onOpen={onOpen}
+                  onSource={onSource}
+                  onReview={acknowledge}
+                />
               );
             })}
           </div>

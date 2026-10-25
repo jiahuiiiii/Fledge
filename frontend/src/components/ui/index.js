@@ -10,3 +10,8 @@ export { default as FilterGroup } from "./FilterGroup";
 export { default as MetaRow } from "./MetaRow";
 export { default as Pagination } from "./Pagination";
 export { default as StoryCard } from "./StoryCard";
+export { default as SourceChip } from "./SourceChip";
+export { default as EvidenceDialog } from "./EvidenceDialog";
+export { default as DisclosureGroup } from "./DisclosureGroup";
+export { default as TrendTile } from "./TrendTile";
+export { default as Combobox } from "./Combobox";

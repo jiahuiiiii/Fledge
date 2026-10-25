@@ -41,8 +41,7 @@ export default function WorkspaceHeader({
         {items.map(([key, label]) => {
           const active =
             view === key ||
-            (view === "idea" && key === "ideas") ||
-            (view === "review" && key === "updates");
+            (view === "idea" && key === "ideas");
           return (
             <button
               key={key}
