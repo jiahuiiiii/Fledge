@@ -220,7 +220,7 @@ let browser;
       animations: "disabled",
     });
     const reportEdges = await page.locator(".research-content").boundingBox();
-    for (const view of ["My views", "History", "Updates"]) {
+    for (const view of ["My views", "Updates"]) {
       if (view === "History") await page.goto(base + `/?company=${iid}&view=history`);
       else await top.getByRole("button", { name: view, exact: true }).click();
       assert.equal(await page.locator(".periodic-review-entry").count(), 0);
@@ -248,16 +248,8 @@ let browser;
         Math.abs(frame.rect.width - frame.padding * 2 - reportEdges.width) < 2,
         `${view} reading width ${width}`,
       );
-      if (view === "History") {
-        await page.getByText("No saved history yet", { exact: true }).waitFor();
-        assert.equal(await page.locator(".history-empty").count(), 1);
-        assert.equal(
-          await page.locator(".idea-alert-checks:visible").count(),
-          0,
-        );
-      }
       if (view === "Updates") {
-        const card = page.locator(".inbox-record > summary");
+        const card = page.locator(".inbox-record");
         await card.waitFor();
         assert.equal(await card.locator("h3").innerText(), source.title);
         assert.equal(
@@ -286,21 +278,27 @@ let browser;
     }
   }
   // Opening evidence retains the old classification and the exact source.
-  const card = page.locator(".inbox-record > summary");
-  await card.focus();
-  await page.keyboard.press("Enter");
-  assert.match(await page.locator(".inbox-detail").innerText(), /AI reading:/);
+  const card = page.locator(".inbox-record");
+  await card.getByRole('button',{name:'Inspect evidence',exact:true}).focus();
+  await page.keyboard.press('Enter');
+  assert.match(await page.locator('dialog[open]').innerText(), /construction delay/);
+  assert.equal(await page.locator('dialog[open]').getByRole('link',{name:/Read original/}).getAttribute('href'),source.url);
+  await page.keyboard.press('Escape');
   withheld = true;
   await page
     .getByRole("button", { name: "Refresh inbox", exact: true })
     .click();
-  await page
-    .getByRole("heading", { name: "Source access changed", exact: true })
-    .waitFor();
+  await card.getByRole('button',{name:'Inspect evidence',exact:true}).click();
+  await page.locator('dialog[open]').getByText(/Source access changed/).waitFor();
+  assert.doesNotMatch(await page.locator('dialog[open]').innerText(),/Factory opening|construction delay/);
+  await page.keyboard.press('Escape');
   assert.doesNotMatch(
     await page.locator(".inbox-record").innerText(),
     /Factory opening|construction delay/,
   );
+  // Legacy history links must still expose the saved-history empty state.
+  await page.goto(base + `/?company=${iid}&view=history`);
+  await page.getByText('No saved history yet',{exact:true}).waitFor();
   assert.deepEqual(errors, []);
   assert.deepEqual(writes, []);
   assert.deepEqual(external, []);

@@ -682,3 +682,11 @@
 .sector-position .position-scale { height: 22px; }
 @media (max-width: 560px) { .sector-position .position-row-period { display: none; } }
 .sector-position .position-suggest { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+
+/* Looser than the first compact pass, tighter than the original tall rows. */
+.sector-position .position-comparison-row { min-height: 56px; padding: var(--space-3) var(--space-4); }
+.sector-position .position-average-slot { height: 44px; }
+.sector-position .position-row-label { gap: var(--space-3); }
+.sector-position .position-row-label > strong { font-size: var(--text-base); }
+.sector-position .position-row-end { top: var(--space-2); bottom: var(--space-2); }
+.sector-position .position-scale { height: 26px; }

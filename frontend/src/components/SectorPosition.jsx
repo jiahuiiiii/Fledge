@@ -700,13 +700,20 @@ export default function SectorPosition({
     setError("");
     setNotice("");
     try {
-      await api.refreshFmp(instrumentId);
+      const result = await api.refreshFmp(instrumentId);
       const next = await load(true);
-      setNotice(
-        next?.vendor_suggestions?.length
-          ? "Similar companies loaded. Save & compare to keep them, or change the list."
-          : "FMP returned no similar companies for this company. Add your own below.",
-      );
+      // Say what actually happened: the peers check can be refused (plan or
+      // key), paused, or rate-limited, which is different from "none found".
+      const outcome = (result?.outcomes || []).find((o) => o.dataset === "peers");
+      if (next?.vendor_suggestions?.length)
+        setNotice("Similar companies loaded. Save & compare to keep them, or change the list.");
+      else if (!outcome || outcome.status !== "ready") {
+        const refused = (result?.outcomes || []).find((o) => o.status !== "ready" && o.message);
+        setError(
+          `FMP did not provide similar companies: ${outcome?.message || refused?.message || "the check did not run"}`,
+        );
+      } else
+        setNotice("FMP answered but listed no similar companies for this company. Add your own below.");
     } catch (failure) {
       setError(failure.message);
     } finally {

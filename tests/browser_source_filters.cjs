@@ -262,7 +262,8 @@ let browser;
     assert.deepEqual(await panel.locator('.sentiment-items article h3').allTextContents(), sorted(relevant).map(sourceHeadline).filter(Boolean));
   }
   await filters.getByRole('button',{name:'All sources',exact:true}).click();
-  assert.equal(await panel.locator('.sentiment-counts').count(),0,'All does not invent a pooled tone count');
+  assert.equal(await panel.getByLabel('Saved tone by source',{exact:true}).locator(':scope > div').count(),4,'All keeps source tone summaries separate');
+  assert.doesNotMatch(await panel.getByRole('group',{name:'Filter analysed sources by tone'}).innerText(),/[0-9]/,'All tone filters do not invent pooled counts');
   assert.doesNotMatch(await panel.locator('.sentiment-items').innerText(),/Comparison-only report excluded|Authored hackernews selected title/);
   await require('./browser_helpers.cjs').disclosure(page,'Source coverage');
   assert.equal(await panel.locator('.all-source-summary .source-summary-list > div').count(),4);
@@ -292,7 +293,7 @@ let browser;
     assert.deepEqual(await preview.locator('.original-source-text').allTextContents(), expected.filter(source=>scope==='all'||scopeOf(source)===scope).map(source=>source.body));
   }
   await previewFilters.getByRole('button',{name:'All sources',exact:true}).click();
-  assert.match(await preview.innerText(),/4 selected from 12 available/);
+  assert.match(await preview.innerText(),/4 eligible from 12 available/);
   for (const width of [1920,1440,1024,768,390,320]) {
     await page.setViewportSize({width,height:1100});
     for (const reading of [false,true]) {

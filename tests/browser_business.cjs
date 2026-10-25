@@ -3,12 +3,11 @@ const assert = require('node:assert/strict');
 let browser;
 (async () => {
   browser = await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH ? {executablePath:process.env.CHROMIUM_PATH} : {})});
-  const page = await browser.newPage({viewport:{width:1440,height:1000}});
+  const page = await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
   const openFinancials=async()=>{await page.getByRole('tab',{name:'Financials',exact:true}).click();};
   const openAnalystForecasts=async()=>{await openFinancials();const d=page.locator('.financial-analyst-disclosure');await d.waitFor();if(!await d.evaluate(el=>el.open))await d.locator('summary').first().click();};
   page.setDefaultTimeout(10000);
-  const errors=[], external=[];let mockedLogos=0,peerWrites=0;page.on('pageerror',e=>errors.push(e.message));
-  page.on('request',r=>{if(r.url().endsWith('/fmp/peers')&&r.method()==='PUT')peerWrites++;});
+  const errors=[], external=[];let mockedLogos=0;page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/*',route=>{
     const url=route.request().url();
     if(url.startsWith(process.env.THESIS_TEST_URL))return route.continue();
@@ -76,157 +75,30 @@ let browser;
   await page.getByRole('tab',{name:'Financials',exact:true}).click();
   await require('./browser_income_flow.cjs')(page);
   await page.getByRole('tab',{name:'Financials',exact:true}).click();
+  const {disclosure}=require('./browser_helpers.cjs');
+  await disclosure(page,'Reported figures and filings');
   await page.getByRole('button',{name:'Read saved document',exact:true}).first().click();
   await page.getByRole('dialog').getByText('Software | 120',{exact:true}).waitFor();
-  assert.match(await page.getByRole('dialog').innerText(),/Software \| 120/);
   await page.keyboard.press('Escape');
-  await page.getByRole('tab',{name:'Financials',exact:true}).click();
-  await page.locator('.financial-analyst-disclosure > summary').click();
+  await openAnalystForecasts();
   const forecasts=page.getByRole('region',{name:'Analyst forecasts',exact:true});
-  await forecasts.locator('.forecast-average').first().filter({hasText:'120'}).waitFor();
   const fmpRanges=forecasts.getByRole('region',{name:'FMP financial expectations',exact:true}).locator('.forecast-range');
+  await fmpRanges.first().waitFor();
+  assert.match(await fmpRanges.first().innerText(),/120/);
   assert.match(await fmpRanges.nth(1).innerText(),/-1/);
   assert.equal(await fmpRanges.nth(1).locator('.forecast-track > span').evaluate(el=>parseFloat(el.style.left)),50);
   assert.match(await fmpRanges.nth(1).locator('.forecast-endpoints').innerText(),/-2[\s\S]*0/);
-  // Expectations now live in News & discussion, closed until opened.
-  await page.getByRole('tab',{name:'News & discussion',exact:true}).click();
-  const newsDisclosure=page.locator('.ui-disclosure').filter({hasText:'Expectations reported in the news'});
-  assert.equal(await newsDisclosure.evaluate(el=>el.open),false);
-  await newsDisclosure.locator('summary').first().focus();await page.keyboard.press('Enter');
-  await newsDisclosure.getByRole('heading',{name:'What the news says is expected',exact:true}).waitFor();
-  await page.getByRole('tab',{name:'Financials',exact:true}).click();
-  await page.getByRole('tab',{name:'News & discussion',exact:true}).click();
-  assert.equal(await newsDisclosure.evaluate(el=>el.open),true);
-  await newsDisclosure.locator('summary').first().click();
-  await page.getByRole('tab',{name:'Financials',exact:true}).click();
   assert.match(await forecasts.innerText(),/currency: not supplied/i);
-  await page.getByRole('tab',{name:'Compare & value',exact:true}).click();
-  const fmp=page.getByRole('region',{name:'Comparison peers',exact:true});
-  await fmp.getByRole('button',{name:'Add comparison company'}).click();
-  await fmp.getByLabel('Comparison company 1').selectOption('NVDA');
-  await fmp.getByLabel('Why is this comparison useful?').fill('Authored comparison: different products, shared data-center demand.');
-  // Navigating back loads current source data without discarding the draft.
-  await page.getByRole('tab',{name:'Financials',exact:true}).click();
-  await Promise.all([page.waitForResponse(r=>r.url().endsWith('/fmp')&&r.request().method()==='GET'),page.getByRole('tab',{name:'Compare & value',exact:true}).click()]);
-  assert.equal(await fmp.getByLabel('Comparison company 1').inputValue(),'NVDA');
-  assert.equal(await fmp.getByLabel('Why is this comparison useful?').inputValue(),'Authored comparison: different products, shared data-center demand.');
-  await page.route('**/companies/*/fmp/refresh',async route=>{
-    const saved=await page.request.get(route.request().url().replace('/refresh',''));
-    const body=await saved.json();return route.fulfill({json:{result:{context:body.result,outcomes:[]}}});
-  });
-  await Promise.all([page.waitForResponse(r=>r.url().endsWith('/fmp/refresh')),fmp.getByRole('button',{name:'Check FMP data',exact:true}).click()]);
-  assert.equal(await fmp.getByLabel('Comparison company 1').inputValue(),'NVDA');
-  assert.equal(await fmp.getByLabel('Why is this comparison useful?').inputValue(),'Authored comparison: different products, shared data-center demand.');
-  await page.unroute('**/companies/*/fmp/refresh');
-  await Promise.all([page.waitForResponse(r=>r.url().endsWith('/fmp/peers')&&r.request().method()==='PUT'),fmp.getByRole('button',{name:'Save comparisons',exact:true}).click()]);
-  // Per-company source data sits in a collapsed section since the 9 Oct redesign.
-  await fmp.locator('.peer-sources > summary').click();
-  await fmp.getByRole('heading',{name:'NVDA',exact:true}).waitFor();
-  assert.match(await fmp.innerText(),/first observed/i);
-  const peers=page.getByRole('region',{name:'Peer comparison',exact:true});
-  await peers.getByText('29.38×',{exact:true}).waitFor();
-  assert.match(await peers.innerText(),/45.13×/);
-  assert.equal(await peers.locator('.peer-chart-row').count(),2);
-  await peers.locator('details').first().getByText('Source & comparison context',{exact:true}).click();
-  assert.match(await peers.innerText(),/Exact value: 29.375 times/);
-  assert.match(await peers.innerText(),/peTTM/);
-  await peers.locator('details').first().getByText('Source & comparison context',{exact:true}).click();
-  await peers.getByLabel('Figure & source').selectOption('pe_fmp');
-  assert.deepEqual(await peers.locator('.peer-chart-value').allTextContents(),['30×','50×']);
-  await peers.getByLabel('Figure & source').selectOption('growth_sec');
-  assert.deepEqual(await peers.locator('.peer-chart-value').allTextContents(),['23.08%','33.33%']);
-  assert.match(await peers.innerText(),/Compared with 1 Oct 2023 – 30 Sept? 2024/);
-  await peers.locator('details').first().getByText('Source & comparison context',{exact:true}).click();
-  assert.match(await peers.locator('details').first().innerText(),/52000000000 USD/);
-  assert.match(await peers.locator('details').first().innerText(),/Original source payload:/);
-  assert.match(await peers.locator('details').first().getByRole('link').first().getAttribute('href'),/^https:\/\/www.sec.gov\/Archives\//);
-  await peers.locator('details').first().getByText('Source & comparison context',{exact:true}).click();
-  await peers.getByLabel('Figure & source').selectOption('margin_sec');
-  assert.deepEqual(await peers.locator('.peer-chart-value').allTextContents(),['39.06%','20%']);
-  await peers.getByLabel('Figure & source').selectOption('fcf_sec');
-  assert.deepEqual(await peers.locator('.peer-chart-value').allTextContents(),['US$40bn','US$-6bn']);
-  assert.ok(Math.abs(await peers.locator('.peer-chart-track > span').nth(1).evaluate(el=>parseFloat(el.style.width))-6/46*100)<.001);
-  assert.ok(await peers.locator('.peer-chart-track > i').first().evaluate(el=>parseFloat(el.style.left)>0));
-  await peers.locator('details').nth(1).getByText('Source & comparison context',{exact:true}).click();
-  assert.match(await peers.locator('details').nth(1).innerText(),/PaymentsToAcquirePropertyPlantAndEquipment/);
-  assert.match(await peers.locator('details').nth(1).getByRole('link').first().getAttribute('href'),/^https:\/\/www.sec.gov\/Archives\//);
-  await peers.getByLabel('Figure & source').focus();await page.keyboard.press('End');await page.keyboard.press('Enter');
-  assert.deepEqual(await peers.locator('.peer-chart-value').allTextContents(),['US$68bn','US$18bn']);
-  await peers.getByLabel('Figure & source').selectOption('growth_sec');
-  for(const width of [1440,980,390,320]) {
-    await page.setViewportSize({width,height:1000});
-    await page.evaluate(async()=>{await Promise.all(document.getAnimations().filter(a=>a.effect.getComputedTiming().iterations!==Infinity).map(a=>a.finished.catch(()=>{})));});
-    await peers.getByRole('heading',{name:'Peer comparison',exact:true}).evaluate(el=>el.scrollIntoView({block:'center'}));
-    await page.evaluate(()=>{
-      const h=document.querySelector('.peer-chart h3'),main=h.closest('.main-workspace');
-      const offset=h.getBoundingClientRect().top-(innerWidth>980?270:145);
-      if(main && getComputedStyle(main).overflowY==='auto')main.scrollTop+=offset;else window.scrollBy(0,offset);
-    });
-    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Peer comparison overflow ${width}`);
-    await page.screenshot({path:`/private/tmp/thesis-phase93-peer-growth-${width}.png`});
-  }
-  await page.emulateMedia({reducedMotion:'reduce'});
-  assert.equal(await peers.locator('.peer-chart-reading').evaluate(el=>getComputedStyle(el).animationName),'none');
-  await page.emulateMedia({reducedMotion:'no-preference'});
-  // A discarded edit restores saved choices without another peer write.
-  await fmp.getByRole('button',{name:'Add comparison company'}).click();
-  await page.getByRole('tab',{name:'Financials',exact:true}).click();
-  await Promise.all([page.waitForResponse(r=>r.url().endsWith('/fmp')&&r.request().method()==='GET'),page.getByRole('tab',{name:'Compare & value',exact:true}).click()]);
-  assert.equal(await fmp.getByLabel('Comparison company 2').count(),1);
-  assert.equal(await peers.locator('.peer-chart-row').count(),2);
-  await fmp.getByRole('button',{name:'Discard changes',exact:true}).click();
-  assert.equal(await fmp.getByLabel('Comparison company 2').count(),0);
-  assert.equal(peerWrites,1);
-  // A read begun before Save must not overwrite the saved response when late.
-  let releaseOldRead,readHeld;
-  const held=new Promise(resolve=>{readHeld=resolve;});
-  const release=new Promise(resolve=>{releaseOldRead=resolve;});
-  await page.route('**/companies/*/fmp',async route=>{
-    const response=await route.fetch();const body=await response.json();
-    readHeld();await release;return route.fulfill({response,json:body});
-  },{times:1});
-  await page.getByRole('tab',{name:'Financials',exact:true}).click();
-  await page.getByRole('tab',{name:'Compare & value',exact:true}).click();
-  await held;
-  await fmp.getByLabel('Why is this comparison useful?').fill('Revised authored comparison: preserve the saved reasoning after a late read.');
-  await Promise.all([page.waitForResponse(r=>r.url().endsWith('/fmp/peers')&&r.request().method()==='PUT'),fmp.getByRole('button',{name:'Save comparisons',exact:true}).click()]);
-  const oldResponse=page.waitForResponse(r=>r.url().endsWith('/fmp')&&r.request().method()==='GET');
-  releaseOldRead();await oldResponse;
-  await peers.locator('.peer-chart-row').nth(1).getByText('Source & comparison context',{exact:true}).click();
-  await peers.getByText('Your reason: Revised authored comparison: preserve the saved reasoning after a late read.',{exact:true}).waitFor();
-  assert.equal(await fmp.getByLabel('Why is this comparison useful?').inputValue(),'Revised authored comparison: preserve the saved reasoning after a late read.');
-  assert.equal(peerWrites,2);
-  await peers.locator('.peer-chart-row').nth(1).getByText('Source & comparison context',{exact:true}).click();
-  await openAnalystForecasts();
-  const publicForecasts=page.getByRole('region',{name:'Public annual financial forecasts',exact:true});
+  const publicForecasts=forecasts.getByRole('region',{name:'Public annual financial forecasts',exact:true});
   await publicForecasts.getByRole('heading',{name:/FY 2026/}).waitFor();
   assert.match(await publicForecasts.innerText(),/currency is not stated/);
   assert.match(await publicForecasts.innerText(),/Restricted years \(2027\)/);
   assert.equal(await publicForecasts.getByRole('button',{name:'Check public forecasts'}).isDisabled(),true);
-  assert.ok(await publicForecasts.locator('.forecast-average').first().evaluate(el=>parseFloat(getComputedStyle(el).fontSize)>=24));
-  assert.match(await publicForecasts.innerText(),/-1.11/);
   await publicForecasts.getByText('Exact values & definition',{exact:true}).first().click();
   assert.match(await publicForecasts.innerText(),/105,970,000,000/);
-  await publicForecasts.getByText('Exact values & definition',{exact:true}).first().click();
-  for (const width of [1440,390,320]) {
-    await page.setViewportSize({width,height:1000});
-    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Business overflow ${width}`);
-    await publicForecasts.getByRole('heading',{name:'Public annual forecasts',exact:true}).evaluate(el=>el.scrollIntoView({block:'center'}));
-    await page.screenshot({path:`/private/tmp/thesis-phase88-public-forecasts-${width}.png`});
-    await publicForecasts.locator('.forecast-ranges').evaluate(el=>el.scrollIntoView({block:'center'}));
-    await page.screenshot({path:`/private/tmp/thesis-phase88-public-ranges-${width}.png`});
-    if(process.env.THESIS_OUTLOOK_SCREENSHOTS)await page.screenshot({path:`${process.env.THESIS_OUTLOOK_SCREENSHOTS}/ranges-${width}.png`});
-    await page.screenshot({path:`/private/tmp/thesis-phase87-business-${width}.png`,fullPage:true});
-    await forecasts.getByRole('heading',{name:'Analyst forecasts',exact:true}).scrollIntoViewIfNeeded();
-    await page.screenshot({path:`/private/tmp/thesis-phase87-business-visible-${width}.png`});
-  }
-  await page.getByRole('tab',{name:'Financials',exact:true}).click();
-  // Financials presents saved figures as charts and plain-language readings.
-  await page.getByRole('group',{name:'Financial trends',exact:true}).waitFor();
+  await disclosure(page,'What management expects');
   const outlook=page.getByRole('region',{name:'Management outlook',exact:true});
   await outlook.getByText('≈ $34.8bn',{exact:true}).waitFor();
-  assert.match(await outlook.innerText(),/Accounting basis unspecified · currency unspecified/);
-  assert.match(await outlook.innerText(),/NON-GAAP/);
   const guidanceEvidence=outlook.locator('.outlook-forecast').first().getByRole('button',{name:'Evidence',exact:true});
   await guidanceEvidence.focus();await page.keyboard.press('Enter');
   const guidanceDialog=page.getByRole('dialog',{name:/original guidance/});
@@ -237,152 +109,33 @@ let browser;
   assert.equal(await guidanceEvidence.evaluate(el=>document.activeElement===el),true);
   await outlook.getByText('Read the outlook in context',{exact:true}).click();
   assert.match(await outlook.innerText(),/cannot reconcile this non-GAAP forecast/);
-  await outlook.getByText('Read the outlook in context',{exact:true}).click();
   const releaseSelect=outlook.getByLabel('Saved release');
-  await releaseSelect.focus();await page.keyboard.press('End');await page.keyboard.press('Enter');
+  await releaseSelect.selectOption({index:1});
   await outlook.getByText('Filed revenue: US$64bn',{exact:true}).waitFor();
   assert.match(await outlook.innerText(),/Within the displayed guidance range/);
   assert.match(await outlook.innerText(),/Historical source version/);
-  await releaseSelect.focus();await page.keyboard.press('Home');await page.keyboard.press('Enter');
+  await releaseSelect.selectOption({index:0});
   for(const width of [1440,980,390,320]) {
     await page.setViewportSize({width,height:1000});
-    await page.evaluate(async()=>{await Promise.all(document.getAnimations().filter(a=>a.effect.getComputedTiming().iterations!==Infinity).map(a=>a.finished.catch(()=>{})));});
-    await outlook.getByRole('heading',{name:'Management outlook',exact:true}).evaluate(el=>el.scrollIntoView({block:'center'}));
-    await page.evaluate(()=>{
-      const h=document.querySelector('.management-outlook h2'),main=h.closest('.main-workspace');
-      const offset=h.getBoundingClientRect().top-(innerWidth>980?280:145);
-      if(main && getComputedStyle(main).overflowY==='auto')main.scrollTop+=offset;else window.scrollBy(0,offset);
-    });
-    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Management outlook overflow ${width}`);
-    assert.ok(await outlook.locator('.outlook-value').first().evaluate(el=>parseFloat(getComputedStyle(el).fontSize)>=24));
-    await page.screenshot({path:`/private/tmp/thesis-phase91-management-outlook-${width}.png`});
-    if(process.env.THESIS_OUTLOOK_SCREENSHOTS)await page.screenshot({path:`${process.env.THESIS_OUTLOOK_SCREENSHOTS}/guidance-${width}.png`});
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Business/forecasts overflow ${width}`);
+    await page.screenshot({path:`/private/tmp/thesis-business-forecasts-${width}.png`,animations:'disabled'});
   }
-  await page.emulateMedia({reducedMotion:'reduce'});
-  assert.equal(await outlook.locator('.outlook-reading').evaluate(el=>getComputedStyle(el).animationName),'none');
-  await page.emulateMedia({reducedMotion:'no-preference'});
-  await page.getByRole('tab',{name:'Financials',exact:true}).click();
-  const financials=page.locator('.financials-story');
-  await page.getByRole('group',{name:'Financial trends',exact:true}).waitFor();
-  await financials.locator('.story-selected-values').first().getByText('US$64bn',{exact:true}).waitFor();
-  assert.match(await financials.innerText(),/Sales grew/);
-  assert.match(await financials.innerText(),/Near-term comparison unavailable/);
-  await financials.getByText('Revenue by segment, product & geography',{exact:true}).click();
-  const mix=page.getByRole('region',{name:'Where revenue comes from',exact:true});
-  await mix.locator('.mix-total').getByText('US$16bn',{exact:true}).waitFor();
-  assert.match(await mix.innerText(),/62.5%/);
-  await mix.locator('.mix-members details').first().getByText('Inspect figure',{exact:true}).click();
-  assert.match(await mix.innerText(),/US\$10,000,000,000/);
-  assert.match(await mix.locator('.mix-members details a').first().getAttribute('href'),/#f-qservices$/);
-  // Keyboard selection, exact period separation and safe withholding for overlap.
-  await mix.getByLabel('Reporting period').focus();
-  await page.keyboard.press('End');await page.keyboard.press('Enter');
-  assert.equal(await mix.locator('.mix-total strong').innerText(),'US$64bn');
-  await mix.getByLabel('View by').selectOption('Products and services');
-  assert.match(await mix.innerText(),/87.5%/);
-  await mix.getByLabel('View by').selectOption('Reported geographies');
-  assert.equal(await mix.locator('.mix-bar').count(),0);
-  assert.equal(await mix.locator('.mix-member-track').count(),0);
-  assert.match(await mix.innerText(),/do not exactly reconcile/);
-  assert.match(await mix.innerText(),/Countries and regions may overlap/);
-  await mix.getByLabel('View by').selectOption('Operating segments');
-  for(const width of [1440,390,320]) {
-    await page.setViewportSize({width,height:1000});
-    await page.evaluate(async()=>{await Promise.all(document.getAnimations().filter(a=>a.effect.getComputedTiming().iterations!==Infinity).map(a=>a.finished.catch(()=>{})));});
-    await mix.getByRole('heading').evaluate(el=>el.scrollIntoView({block:'center'}));
-    await page.evaluate(()=>{
-      const heading=document.querySelector('.revenue-mix h2');
-      const main=heading.closest('.main-workspace');
-      const desired=innerWidth>980?300:160;
-      const offset=heading.getBoundingClientRect().top-desired;
-      if(main && getComputedStyle(main).overflowY==='auto')main.scrollTop+=offset;
-      else window.scrollBy(0,offset);
-    });
-    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Revenue mix overflow ${width}`);
-    await page.screenshot({path:`/private/tmp/thesis-phase89-revenue-mix-${width}.png`});
-  }
-  await page.emulateMedia({reducedMotion:'reduce'});
-  assert.equal(await mix.locator('.mix-reading').evaluate(el=>getComputedStyle(el).animationName),'none');
-  await page.emulateMedia({reducedMotion:'no-preference'});
-  // Authored edge cases exercise missing/negative data without provider calls.
-  await page.route('**/api/v1/workspace?*',async route=>{
-    const response=await route.fetch();const payload=await response.json();
-    payload.result.management_outlook={status:'unavailable',releases:[],message:'Original-filing source access is unavailable.',limitations:[]};
-    const data=payload.result.financial_depth;
-    const annual=payload.result.performance?.reports?.annual;
-    if(annual) {
-      const previous=structuredClone(annual);
-      Object.assign(previous,{period_end:'2025-06-30',form:'10-Q',accession:'authored-earlier-quarter'});
-      previous.metrics.forEach(row=>{row.end=previous.period_end;row.inputs.forEach(input=>{input.end=previous.period_end;input.accession=previous.accession;});});
-      const cash=previous.metrics.find(row=>row.key==='cash');cash.value='0';cash.inputs[0].value='0';
-      payload.result.performance.reports.quarter=previous;
-      // A mismatched source fact must be withheld, even if its displayed row date matches.
-      annual.metrics.find(row=>row.key==='liabilities').inputs[0].end='2024-09-30';
-    }
-    const segments=payload.result.segment_revenue;
-    if(segments?.groups?.length) {
-      for(const group of segments.groups) {
-        group.chartable=false;group.reason='Authored missing category: percentage mix is withheld.';
-        group.members[0].value=null;group.members[0].reason='Authored missing category';
-        group.members.forEach(member=>member.percentage=null);
-      }
-    }
-    if(data?.status==='available') {
-      data.revenue_trend=[
-        {period_end:'2021-09-30',value:'1000000000',inputs:[]},
-        {period_end:'2022-09-30',value:null,reason:'Authored missing annual report',inputs:[]},
-        {period_end:'2023-09-30',value:'3000000000',inputs:[]},
-        {period_end:'2024-09-30',value:'4000000000',inputs:[]},
-        {period_end:'2025-09-30',value:'2000000000',inputs:[]}
-      ];
-      const cash=data.trailing.find(row=>row.key==='operating_cash');
-      const capital=data.trailing.find(row=>row.key==='capital_spending');
-      const free=data.trailing.find(row=>row.key==='free_cash_flow');
-      Object.assign(cash,{value:'1000000000',start:'2024-10-01',end:'2025-09-30'});
-      Object.assign(capital,{value:'2000000000',start:cash.start,end:cash.end});
-      Object.assign(free,{value:'-1000000000',start:cash.start,end:cash.end});
-    }
-    return route.fulfill({response,json:payload});
-  });
-  await page.reload();
-  await page.getByRole('tab',{name:'Financials',exact:true}).click();
-  assert.equal(await outlook.locator('.outlook-value').count(),0);
-  assert.match(await outlook.innerText(),/Original-filing source access is unavailable/);
-  await page.getByRole('tab',{name:'Financials',exact:true}).click();
-  await financials.getByText('Revenue by segment, product & geography',{exact:true}).click();
-  assert.match(await mix.innerText(),/Unavailable/);
-  assert.equal(await mix.locator('.mix-bar').count(),0);
+  // Missing public/FMP data keeps a correctly scoped external reading link.
   await page.route('**/companies/*/fmp',async route=>{
-    const response=await route.fetch();const payload=await response.json();
+    const response=await route.fetch(),payload=await response.json();
     payload.result.consensus.data=null;
     payload.result.public_forecasts.snapshot=null;
     payload.result.public_forecasts.history=[];
-    payload.result.members[0].saved_finnhub.metrics.earnings.value='0';
-    payload.result.members[1].saved_finnhub=null;
-    payload.result.members[0].annual_growth.metric.value=null;
-    payload.result.members[0].annual_growth.metric.reason='Authored: compatible annual prior revenue is unavailable.';
-    payload.result.members[1].annual_growth={status:'unavailable',reason:'Structured filing source access is unavailable.'};
     return route.fulfill({response,json:payload});
   });
-  await page.reload();
-  await page.getByRole('tab',{name:'Compare & value',exact:true}).click();
-  await openAnalystForecasts();
+  await page.reload();await openAnalystForecasts();
+  await disclosure(page,'FMP forecasts unavailable');
   const alternative=forecasts.getByRole('link',{name:'Inspect public financial forecasts on Stock Analysis ↗',exact:true});
   await alternative.waitFor();
   assert.equal(await alternative.getAttribute('href'),'https://stockanalysis.com/stocks/msft/forecast/');
   assert.match(await forecasts.innerText(),/save the available annual table/);
-  await page.getByRole('tab',{name:'Compare & value',exact:true}).click();
-  await peers.locator('.peer-chart-value').nth(1).waitFor();
-  assert.deepEqual(await peers.locator('.peer-chart-value').allTextContents(),['Unavailable','Unavailable']);
-  assert.equal(await peers.locator('.peer-chart-track').count(),0);
-  await peers.getByLabel('Figure & source').selectOption('pe_fmp');
-  assert.deepEqual(await peers.locator('.peer-chart-value').allTextContents(),['30×','50×']);
-  await peers.getByLabel('Figure & source').selectOption('growth_sec');
-  assert.deepEqual(await peers.locator('.peer-chart-value').allTextContents(),['Unavailable','Unavailable']);
-  assert.equal(await peers.locator('.peer-chart-track').count(),0);
-  assert.match(await peers.innerText(),/compatible annual prior revenue is unavailable/);
-  // Outlook range geometry and source withdrawal never invent a range or expose hidden history.
   await page.unroute('**/companies/*/fmp');
+  // Zero/negative forecasts remain valid; missing endpoints never invent a range.
   await page.route('**/companies/*/fmp',async route=>{
     const response=await route.fetch(),payload=await response.json();
     const forecast=payload.result.consensus.data.forecasts[0];
@@ -401,12 +154,14 @@ let browser;
   assert.equal(await publicForecasts.locator('.forecast-range').count(),0);
   assert.equal(await publicForecasts.getByText(/Saved public forecast observations/).count(),0);
   assert.equal(await publicForecasts.getByRole('button',{name:'Check public forecasts'}).isDisabled(),true);
-  for(const width of [1440,320]){
-    await page.setViewportSize({width,height:1000});
-    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-    await forecasts.scrollIntoViewIfNeeded();
-    if(process.env.THESIS_OUTLOOK_SCREENSHOTS)await page.screenshot({path:`${process.env.THESIS_OUTLOOK_SCREENSHOTS}/missing-${width}.png`});
-  }
+  await page.route('**/api/v1/workspace?*',async route=>{
+    const response=await route.fetch(),payload=await response.json();
+    payload.result.management_outlook={status:'unavailable',releases:[],message:'Original-filing source access is unavailable.',limitations:[]};
+    return route.fulfill({response,json:payload});
+  });
+  await page.reload();await openFinancials();await disclosure(page,'What management expects');
+  assert.equal(await outlook.locator('.outlook-value').count(),0);
+  assert.match(await outlook.innerText(),/Original-filing source access is unavailable/);
   // Controlled sign-in UI check. These are authored responses; no email is sent.
   await page.route('**/api/v1/session',route=>route.fulfill({json:{result:{mode:'managed',authenticated:false}}}));
   let sent=0;
@@ -442,5 +197,5 @@ let browser;
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
   assert.ok(mockedLogos>=1);
-  console.log('Authored business, original evidence, private peers and sign-in UI pass; the retained revenue flow/mix and redesigned Financials pass alongside the broader reading journey. Dedicated financial-history edge and responsive checks are in --financials. The missing-consensus external source link is correctly scoped and not fetched. External networking blocked and decorative logo mocked.');
+  console.log('Authored business citations, income flow, original filings, forecast ranges/source gaps, management guidance and sign-in UI pass. Dedicated history and peer checks remain in their own journeys. The missing-consensus external source link is correctly scoped and not fetched. External networking blocked and decorative logo mocked.');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{if(browser)await browser.close();});

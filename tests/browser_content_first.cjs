@@ -57,9 +57,9 @@ let browser;
     route.fulfill({
       json: {
         result: {
-          enabled: true,
-          briefing_enabled: true,
-          comparison_enabled: true,
+          enabled: false,
+          briefing_enabled: false,
+          comparison_enabled: false,
           budget: {
             remaining_usd: 4,
             running: 0,
@@ -191,7 +191,7 @@ let browser;
     .click();
   assert.match(await dialog.innerText(), /Authored saved sources checked/);
   await dialog.getByText("New AI analysis is paused", { exact: true }).click();
-  assert.match(await dialog.innerText(), /without a confirmed charge/);
+  assert.match(await dialog.innerText(), /AI analysis is switched off/);
   await page.keyboard.press("Escape");
   assert.equal(
     await tools.evaluate((el) => el === document.activeElement),
@@ -215,7 +215,7 @@ let browser;
       .isDisabled(),
     true,
   );
-  assert.match(await news.innerText(), /New AI analysis is paused/);
+  assert.match(await news.innerText(), /AI analysis is switched off/);
   assert.doesNotMatch(
     await news.innerText(),
     /confirmed charge|no automatic confirmation/,
@@ -255,7 +255,7 @@ let browser;
     positions,
     noPersistentStatusStrips: true,
     onDemandRefreshProgressAndBillingDetail: true,
-    chargeBlockStillEnforced: true,
+    disabledAIControls: true,
     keyboardFocus: true,
     annualTrailingPeriodDates: true,
     unchangedEvidence: true,

@@ -1,5 +1,6 @@
 import { formatTimestamp } from "../lib/dateTime";
 import Checkbox from "./Checkbox";
+import { Button } from "./ui";
 import { roleLabel, comparisonMeaning } from "../lib/conditionRoles";
 import { useState } from "react";
 import { EventSchedule } from "./EventConditions";
@@ -64,6 +65,7 @@ export default function ProposalPanel({
   unavailableReason,
   onGenerate,
   onReview,
+  onWatch,
   onReject,
   onSource,
   onOpen,
@@ -147,6 +149,17 @@ export default function ProposalPanel({
             </button>
           </details>
         ))}
+        {p.status === "pending" && onWatch && !p.source_unavailable && p.operation === "add" && (
+          <div className="proposal-watch">
+            <Button variant="primary" size="sm" disabled={busy} onClick={() => onWatch(p)}>
+              Watch this
+            </Button>
+            <small>
+              Saves it to your idea and starts watching, using the standard dates
+              (past week to 90 days ahead). Change anything later with Edit.
+            </small>
+          </div>
+        )}
         {p.status === "pending" || p.status === "stale" ? (
           <button
             className="text-button proposal-reject"
@@ -218,8 +231,8 @@ export default function ProposalPanel({
           disabled={busy}
           onClick={() => onReview(chosen)}
         >
-          Review {chosen.length} selected suggestion
-          {chosen.length === 1 ? "" : "s"}
+          Edit {chosen.length} selected suggestion
+          {chosen.length === 1 ? "" : "s"} first
         </button>
       )}
       {old.length > 0 && (

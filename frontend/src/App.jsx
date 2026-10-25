@@ -92,6 +92,7 @@ import EventAssessment, {
 import ProposalPanel from "./components/ProposalPanel";
 import { statusLine, watchItems } from "./lib/ideaWatch";
 import { combineSuggestions } from "./lib/proposals";
+import { needsThreshold, withDefaultWindows } from "./lib/watchDefaults";
 import ReviewDownload from "./components/ReviewDownload";
 import ReportingAge, { ageLabel } from "./components/ReportingAge";
 import IdeaEvidenceReview from "./components/IdeaEvidenceReview";
@@ -1251,6 +1252,62 @@ function CompanyWorkspace({
     setFormError("");
     setConflict(null);
   };
+  // One click: apply a single suggestion with the standard date window, save it
+  // and start watching, then show the watching list. Anything that needs the
+  // user's own input (a threshold, or no written reasoning yet) opens the editor.
+  async function watchNow(p) {
+    let candidate;
+    try {
+      candidate = combineSuggestions([p]);
+    } catch (e) {
+      setError(e.message);
+      return;
+    }
+    const base = formFor(
+      { ...candidate, revision: candidate.expected_revision },
+      candidate.question,
+    );
+    const { form, applied } = withDefaultWindows(base);
+    if (needsThreshold(form) || !form.reasoning.trim() || !form.question.trim()) {
+      setEditor(form);
+      setProposalIds([p.id]);
+      setProposalStale(false);
+      setApproved(false);
+      setConflict(null);
+      setFormError(
+        needsThreshold(form)
+          ? "Choose your own threshold for this check, then save."
+          : "Write a sentence of reasoning first, then start watching.",
+      );
+      return;
+    }
+    const scope = activeScope.current;
+    setBusy(true);
+    setError("");
+    try {
+      await api.approveSuggestions([p.id], {
+        ...revisionPayload(form, "monitoring"),
+        instrument_id: instrumentId,
+      });
+      if (activeScope.current !== scope) return;
+      await refresh();
+      setNotice(
+        applied
+          ? `Now watching. Reports from ${date(applied.window_start)} to ${date(applied.deadline)} count; change the dates under Edit › More options.`
+          : "Now watching. You'll get an update when it matches.",
+      );
+      requestAnimationFrame(() => {
+        window.scrollTo(0, 0);
+        document
+          .querySelectorAll(".main-workspace, .workspace-grid")
+          .forEach((el) => el.scrollTo?.(0, 0));
+      });
+    } catch (e) {
+      if (activeScope.current === scope) setError(e.message);
+    } finally {
+      if (activeScope.current === scope) setBusy(false);
+    }
+  }
   async function save(status) {
     if (conflict) {
       setFormError("Resolve the saved-versus-draft comparison before saving.");
@@ -1299,7 +1356,7 @@ function CompanyWorkspace({
               ? isRecorded
                 ? "Your view is saved."
                 : "Your view is saved."
-              : "Draft saved. Monitoring is off.",
+              : "Draft saved. Nothing is being watched yet; use “Watch news for this idea” on this page, or add a check below.",
       );
       // Show the confirmation instead of leaving it above the scrolled view.
       requestAnimationFrame(() => {
@@ -2661,6 +2718,36 @@ function CompanyWorkspace({
                             ? "Checking recorded evidence…"
                             : statusLine(current, evaluation)}
                         </p>
+                        {current && !isRecorded && !data.news_watch?.enabled && (
+                          <div className="idea-watch-prompt">
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              disabled={busy}
+                              onClick={() =>
+                                act(
+                                  () =>
+                                    api.newsWatch(
+                                      instrumentId,
+                                      true,
+                                      240,
+                                      true,
+                                      false,
+                                      current.reasoning?.trim() ? "reasoning" : "question",
+                                    ),
+                                  "Watching news for this idea. Matches appear in Updates.",
+                                )
+                              }
+                            >
+                              Watch news for this idea
+                            </Button>
+                            <small>
+                              Checks new news and posts against what you wrote about every four
+                              hours while the app runs. Each check can use your AI allowance;
+                              turn it off any time under News &amp; discussion › Watch.
+                            </small>
+                          </div>
+                        )}
                         <div className="idea-actions">
                           <button
                             className="primary"
@@ -2759,6 +2846,7 @@ function CompanyWorkspace({
                                 setError(e.message);
                               }
                             }}
+                            onWatch={watchNow}
                             onReject={(id) =>
                               act(
                                 () => api.rejectSuggestion(id),

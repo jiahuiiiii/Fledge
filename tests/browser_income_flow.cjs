@@ -29,6 +29,8 @@ module.exports = async function checkIncomeFlow(page) {
   await flow.locator('.flow-expense-list button').last().click();
   await page.getByRole('dialog').waitFor();
   assert.match(await page.getByRole('dialog').innerText(), /US\$2 bil/);
+  await page.getByRole('dialog').getByText('How this is calculated',{exact:true}).focus();
+  await page.keyboard.press('Enter');
   assert.match(await page.getByRole('dialog').innerText(), /Operating expenses − Research & development \+ selling, general & administrative/);
   await page.keyboard.press('Escape');
   await flow.locator('.flow-expenses summary').click();
