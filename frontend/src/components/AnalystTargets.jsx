@@ -1,5 +1,6 @@
 import { formatTimestamp } from "../lib/dateTime";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { api } from "../api/client";
 import { targetRange } from "../lib/targetRange";
 import TargetChart from "./TargetChart";
 import { Button, Card, Disclosure, SectionHeader } from "./ui";
@@ -7,7 +8,22 @@ import "./AnalystTargets.css";
 
 const date = (value) => formatTimestamp(value, { fallback: "Not recorded" });
 
-export default function AnalystTargets({ value, quote, bars = [], onRefresh }) {
+export default function AnalystTargets({ value, quote, bars = [], instrumentId, onRefresh }) {
+  // The chart reads saved daily prices only (no provider check). Use the
+  // Overview's read when it has one; otherwise read the saved history here.
+  const [saved, setSaved] = useState(null);
+  useEffect(() => {
+    if (bars?.length || !instrumentId) return;
+    let active = true;
+    api
+      .priceHistory(instrumentId)
+      .then((result) => active && setSaved(result?.snapshot?.series?.bars || null))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [instrumentId, bars?.length]);
+  const history = bars?.length ? bars : saved || [];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const record = value?.snapshot;
@@ -40,7 +56,7 @@ export default function AnalystTargets({ value, quote, bars = [], onRefresh }) {
       {data ? (
         <>
           {range ? (
-            <TargetChart bars={bars} range={range} />
+            <TargetChart bars={history} range={range} />
           ) : (
             <p className="financial-note">
               The saved target range is incomplete or inconsistent. Refresh to check the source.

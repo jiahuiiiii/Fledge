@@ -102,37 +102,6 @@
   padding-top: var(--space-3);
   border-top: 1px solid var(--ui-line);
 }
-.inbox-evidence-control {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 36px;
-  color: var(--ui-accent);
-  font-size: var(--text-xs);
-  font-weight: 500;
-}
-.inbox-evidence-control svg {
-  flex-shrink: 0;
-  transition: transform 0.15s;
-}
-.inbox-hide-label {
-  display: none;
-}
-.inbox-record[open] > summary .inbox-inspect-label {
-  display: none;
-}
-.inbox-record[open] > summary .inbox-hide-label {
-  display: inline;
-}
-.inbox-record[open] > summary .inbox-evidence-control svg {
-  transform: rotate(90deg);
-}
-.app-shell .update-inbox .inbox-detail {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
 .app-shell
   .update-inbox
   .inbox-detail
@@ -141,9 +110,6 @@
   margin: 0;
   border: 0;
   background: none;
-}
-.app-shell .update-inbox .inbox-detail .row {
-  flex-wrap: wrap;
 }
 .app-shell .update-inbox .inbox-coverage {
   margin: 0;
@@ -175,11 +141,6 @@
   .app-shell .update-inbox .inbox-record-head time {
     margin-left: 0;
     flex-basis: 100%;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .inbox-evidence-control svg {
-    transition: none;
   }
 }
 

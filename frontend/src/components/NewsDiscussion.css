@@ -276,3 +276,12 @@
 .app-shell .sentiment-panel .source-story h3 a { color: inherit; text-decoration: none; }
 .app-shell .sentiment-panel .source-story h3 a:hover { color: var(--color-accent); }
 .app-shell .sentiment-panel .coverage-notes { display: grid; gap: var(--space-1); }
+
+/* Saved AI summary: small flat cards in the shared design language. */
+.app-shell .news-developments .brief-points { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-3); margin: var(--space-3) 0; }
+.app-shell .news-developments .brief-point { gap: var(--space-2); padding: var(--space-3) var(--space-4); }
+.app-shell .news-developments .brief-point h4 { margin: 0; color: var(--color-text); font-size: var(--text-base); font-weight: 600; line-height: 1.35; }
+.app-shell .news-developments .brief-point p { margin: 0; color: var(--color-text-2); font-size: var(--text-sm); line-height: 1.5; }
+.app-shell .news-developments .brief-point .brief-citations { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-1); }
+.app-shell .news-developments .current-news-summary .ui-filter-group { margin: var(--space-2) 0; }
+.app-shell .news-developments .news-more { align-self: flex-start; }

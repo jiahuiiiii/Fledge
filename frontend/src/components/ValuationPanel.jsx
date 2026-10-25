@@ -450,6 +450,7 @@ export default function ValuationPanel({
         value={context?.analyst_targets}
         quote={quote}
         bars={priceBars}
+        instrumentId={instrument?.id}
         onRefresh={requestUpdate}
       />
       <span className="section-label">WHAT WOULD HAVE TO BE TRUE?</span>

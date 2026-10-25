@@ -1,4 +1,4 @@
-import { Combobox } from "./ui";
+import { Combobox, FilterGroup, SectionHeader } from "./ui";
 import { formatTimestamp } from "../lib/dateTime";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
@@ -878,10 +878,12 @@ export default function SectorPosition({
       Object.values(fetchStates).some((s) => s.status === "loading") || waiting;
   return (
     <section className="sector-position" aria-label="Competitor position">
-      <header className="outlook-section-heading">
-        <h2>Where {data?.symbol || "the company"} stands among competitors</h2>
-        <p>Compare saved growth, profitability and scale.</p>
-      </header>
+      <SectionHeader
+        level="section"
+        as="h2"
+        title={`Where ${data?.symbol || "the company"} stands among competitors`}
+        description="Compare saved growth, profitability and scale."
+      />
       {error && (
         <p role="alert" className="warning">
           {error}
@@ -993,24 +995,16 @@ export default function SectorPosition({
             )}
           </div>
           {!financials && (
-            <div
+            <FilterGroup
               className="position-view"
-              role="group"
-              aria-label="Comparison time"
-            >
-              <button
-                aria-pressed={!expected}
-                onClick={() => setView("reported")}
-              >
-                Reported position
-              </button>
-              <button
-                aria-pressed={expected}
-                onClick={() => setView("expected")}
-              >
-                Expected growth
-              </button>
-            </div>
+              label="Comparison time"
+              value={expected ? "expected" : "reported"}
+              onValueChange={setView}
+              options={[
+                { value: "reported", label: "Reported position" },
+                { value: "expected", label: "Expected growth" },
+              ]}
+            />
           )}
           {!expected && measure !== "pe" && (
             <Map members={data.members} symbol={data.symbol} />

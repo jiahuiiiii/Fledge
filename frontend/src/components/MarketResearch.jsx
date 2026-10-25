@@ -2,11 +2,13 @@ import { formatTimestamp } from "../lib/dateTime";
 import { modelAvailability } from "../lib/modelAvailability";
 import { currentCompanyHeadlines } from "../lib/companyHeadlines";
 import { newsSourceStatus } from "../lib/newsPresentation";
-import Select from "./Select";
 import {
   Badge,
   Button,
+  Card,
   Disclosure,
+  FilterGroup,
+  SourceChip,
   EmptyState,
   NewsIcon,
   MetaRow,
@@ -348,62 +350,55 @@ export default function MarketResearch({
               headlines/snippets · latest news {stamp(brief.latest_news_at)}.
               Interpretation may omit context.
             </p>
-            <label className="field" htmlFor={viewId}>
-              Briefing view
-              <Select
-                id={viewId}
-                aria-label="Briefing view"
-                value={pointKind}
-                onChange={(e) => setPointKind(e.target.value)}
-                aria-controls={`${viewId}-points`}
-              >
-                <option value="all">All points ({points.length})</option>
-                {Object.entries(kinds).map(([kind, label]) => (
-                  <option key={kind} value={kind}>
-                    {label} ({points.filter((p) => p.kind === kind).length})
-                  </option>
-                ))}
-              </Select>
-            </label>
+            <FilterGroup
+              label="Briefing view"
+              value={pointKind}
+              controls={`${viewId}-points`}
+              onValueChange={setPointKind}
+              options={[
+                { value: "all", label: "All", count: points.length },
+                ...Object.entries(kinds).map(([kind, label]) => ({
+                  value: kind,
+                  label,
+                  count: points.filter((p) => p.kind === kind).length,
+                })),
+              ]}
+            />
             <p className="fine" role="status">
               {visiblePoints.length
                 ? `Showing ${visiblePoints.length} of ${matchingPoints.length} developments. Labels describe the kind of statement, not whether it is favourable.`
                 : `No points in this briefing are labelled ${kinds[pointKind]?.toLowerCase()}. This does not establish that no risks or uncertainty exist; inspect All points and the original sources.`}
             </p>
-            <div className="market-brief-points" id={`${viewId}-points`}>
+            <div className="brief-points" id={`${viewId}-points`}>
               {visiblePoints.map((p, i) => (
-                <article key={i} className={`market-point ${p.kind}`}>
-                  <span className="section-label">
+                <Card as="article" variant="inset" key={i} className={`brief-point ${p.kind}`}>
+                  <Badge>
                     {p.kind === "reported"
-                      ? "REPORTED"
+                      ? "Reported"
                       : p.kind === "interpretation"
-                        ? "AI INTERPRETATION"
-                        : "UNCERTAINTY"}
-                  </span>
-                  <h3>{p.title}</h3>
+                        ? "AI interpretation"
+                        : "Uncertainty"}
+                  </Badge>
+                  <h4>{p.title}</h4>
                   <p>{p.text}</p>
                   <div className="brief-citations">
                     {p.citations.map((c, j) => (
-                      <Button
-                        variant="plain"
+                      <SourceChip
                         key={j}
-                        className="source-link"
-                        onClick={() => onSource(c.source_id)}
+                        label={`${data.documents.find((d) => d.id === c.source_id)?.source || "Source"} ${j + 1}`}
+                        onOpen={() => onSource(c.source_id)}
                         title={c.quote}
                         aria-label={`Inspect source ${j + 1}: ${data.documents.find((d) => d.id === c.source_id)?.title || "Source unavailable"}`}
-                      >
-                        {data.documents.find((d) => d.id === c.source_id)
-                          ?.source || "Source"}{" "}
-                        {j + 1} ↗
-                      </Button>
+                      />
                     ))}
                   </div>
-                </article>
+                </Card>
               ))}
             </div>
             {matchingPoints.length > 3 && (
               <Button
-                variant="plain"
+                variant="tertiary"
+                size="sm"
                 type="button"
                 className="news-more"
                 onClick={() => setExpanded(!expanded)}
