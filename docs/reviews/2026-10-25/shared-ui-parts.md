@@ -219,3 +219,55 @@ sentence layout does not move.
   above and below its text.
 - Not exercised: world-news effect badges and tone groups (the seed has no
   linked world headlines or rated stories), and the Playwright journeys.
+
+## Summary tab polish and logo centring
+
+The owner found the Summary tab odd with rated news and posts. With rated
+sample items injected into the workspace response in headless Chrome (browser
+side only, isolated offline test server), the issues reproduced and were fixed
+in `BeginnerSummary.css`:
+
+- Tone group boxes no longer use full tinted fills (mixed read as muddy
+  brown). They share the neutral `--color-surface-2` box; tone shows in a 3 px
+  left edge, the dot and the heading colour.
+- The closed "Neutral, neither good nor bad" box is a single 36 px row (44 px
+  on touch screens); its heading now matches the other group headings
+  (`.app-shell summary` had made it 15 px).
+- Card paragraphs use 1.55 line height instead of the app's long-form 1.75.
+- On screens of 1180 px and wider, paired cards stretch to the same height, so
+  the grid has no ragged gaps.
+
+Signal lights, wording and the rules `PortfolioRead` uses are unchanged.
+
+Logos on the My views page sat towards the top-left of their tile: a page rule
+fixed the absolutely positioned image at 32 x 32 inside a 40 px tile.
+`IdeasAndChanges.css` now gives it 4 px padding so it fills and centres.
+
+### Verification
+
+- `npm test`: 214 passed, 0 failed; build succeeds.
+- Beginner at 1280 and 390 px with all four tone groups rendered, no console
+  errors, no horizontal overflow; closed neutral row measured 36 px.
+- Logo check with the same markup as a saved-idea header: image and tile
+  centres match. The My views page itself was not opened (the offline fixture
+  has no saved views).
+- Images are kept locally in
+  `docs/reviews/2026-10-25/summary-screenshots/summary-rated-*.png`.
+
+## "How each moved" chart: diverging bars
+
+The home "Your list today" chart drew every bar from the left edge, so a
+−1.2% fall looked like a long bar in the same direction as a +1.8% gain; only
+colour told them apart. `PortfolioRead` now draws diverging bars: each row's
+track has two halves around a 1 px zero line, falls grow left and gains grow
+right, with the square end on the line and the rounded end pointing the way
+the price moved. Bar length keeps the existing `barWidth` scale. An exactly
+flat move draws no bar instead of the old 4% minimum sliver. Sector grouping,
+values and wording are unchanged; the owner's staged "moves when this was
+written" change is included because the chart sits on it.
+
+Verification: `npm test` 214 passed; at 1280 and 390 px with a browser-side
+sample matching the owner's screenshot (GOOGL −1.2%, META −1.0%, NVDA −0.6%,
+QCOM +1.8%, AVGO −0.5%), one bar to the right and four to the left, no
+horizontal overflow. Installed with the logo fix and Summary polish (no
+restart); fast-loading work was deliberately left out of that build.

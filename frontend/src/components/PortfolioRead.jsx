@@ -11,24 +11,30 @@ import "./PortfolioRead.css";
 // every sentence cites the saved headline it relies on.
 const SHAPE = { good: "▲", bad: "▼", mixed: "◆", none: "●" };
 
-function Bars({ ids, byId, scale, onOpen }) {
+function Bars({ ids, byId, moves, scale, onOpen }) {
   return (
     <ul className="pr-bars">
       {ids.map((id) => {
         const c = byId[id];
         if (!c) return null;
-        const move = c.quote?.change_percent;
+        const move = moves ? moves[id]?.change_percent : c.quote?.change_percent;
         return (
           <li key={id}>
             <button type="button" onClick={() => onOpen?.(id)}>
               <strong>{c.symbol}</strong>
+              {/* Diverging bars: falls grow left of the zero line, gains right. */}
               <span className="pr-track" aria-hidden="true">
-                {move != null && (
-                  <span
-                    className={`pr-bar ${move < 0 ? "down" : "up"}`}
-                    style={{ width: barWidth(move, scale) }}
-                  />
-                )}
+                <span className="pr-half down">
+                  {move < 0 && (
+                    <span className="pr-bar down" style={{ width: barWidth(move, scale) }} />
+                  )}
+                </span>
+                <span className="pr-zero" />
+                <span className="pr-half up">
+                  {move > 0 && (
+                    <span className="pr-bar up" style={{ width: barWidth(move, scale) }} />
+                  )}
+                </span>
               </span>
               <span className={`pr-pct ${move < 0 ? "down" : move > 0 ? "up" : ""}`}>
                 {pctText(move)}
@@ -71,6 +77,12 @@ export default function PortfolioRead({ onOpenCompany }) {
     ...page.companies.map((c) => Math.abs(c.quote?.change_percent || 0)),
   );
   const e = page.explanation;
+  // Under the written explanation the bars show the moves it was written from,
+  // so its words and bars always agree even if prices refreshed since.
+  const written = e?.prices;
+  const writtenScale = written
+    ? Math.max(1, ...Object.values(written).map((p) => Math.abs(p.change_percent || 0)))
+    : scale;
   const lights = [
     ["TODAY", page.move],
     ["HOW SPREAD OUT", page.spread],
@@ -145,11 +157,18 @@ export default function PortfolioRead({ onOpenCompany }) {
           {e.groups.length > 0 && (
             <section className="bs-card">
               <h4>Why some moved more</h4>
+              <p className="bs-note">Moves when this was written</p>
               {e.groups.map((g) => (
                 <div className="pr-group" key={g.label}>
                   <span className="pr-group-label">{g.label}</span>
                   <p className="pr-note">{g.note}</p>
-                  <Bars ids={g.company_ids} byId={byId} scale={scale} onOpen={onOpenCompany} />
+                  <Bars
+                    ids={g.company_ids}
+                    byId={byId}
+                    moves={written}
+                    scale={writtenScale}
+                    onOpen={onOpenCompany}
+                  />
                 </div>
               ))}
             </section>

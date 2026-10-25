@@ -75,6 +75,10 @@
 .beginner-summary .ui-card .bs-meaning {
   font-size: var(--text-base);
 }
+/* Card text reads tighter than the app's long-form paragraph default. */
+.app-shell .beginner-summary .ui-card p {
+  line-height: 1.55;
+}
 .bs-caveat {
   margin: 0;
   font-size: var(--text-sm);
@@ -188,7 +192,7 @@
   gap: var(--space-2);
 }
 .bs-group h5,
-.bs-group summary {
+.beginner-summary .bs-group summary {
   margin: 0;
   display: flex;
   align-items: center;
@@ -199,7 +203,12 @@
 }
 .bs-group summary {
   cursor: pointer;
-  min-height: 44px;
+  min-height: 36px;
+}
+@media (pointer: coarse) {
+  .bs-group summary {
+    min-height: 44px;
+  }
 }
 .bs-group h5 .bs-dot {
   width: 10px;
@@ -308,7 +317,8 @@
   .beginner-summary.signals {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
+    /* Paired cards share a height, so the grid has no ragged gaps. */
+    align-items: stretch;
     max-width: 1180px;
   }
   .beginner-summary.signals > :not(.ui-card) {
@@ -346,19 +356,24 @@
   font-size: var(--text-sm);
 }
 
-/* Good, bad, mixed and neutral each get their own tinted box. */
+/* Good, bad, mixed and neutral each get a quiet box: the tone shows in the
+   left edge, dot and heading colour rather than a full tinted fill. */
 .bs-group.tone-good,
 .bs-group.tone-bad,
 .bs-group.tone-mixed,
 .bs-group.tone-neutral {
   padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
-  border-left: 4px solid transparent;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--color-line-strong);
+  background: var(--color-surface-2);
 }
-.bs-group.tone-good { background: var(--color-positive-soft); border-left-color: var(--color-positive); }
+/* Closed, the neutral box is a single row. */
+.bs-group.tone-neutral:not([open]) {
+  padding-block: var(--space-1);
+}
+.bs-group.tone-good { border-left-color: var(--color-positive); }
 .bs-group.tone-good h5 { color: var(--color-positive-light); }
-.bs-group.tone-bad { background: var(--color-negative-soft); border-left-color: var(--color-negative); }
+.bs-group.tone-bad { border-left-color: var(--color-negative); }
 .bs-group.tone-bad h5 { color: var(--color-negative-light); }
-.bs-group.tone-mixed { background: var(--color-gold-soft); border-left-color: var(--color-gold); }
+.bs-group.tone-mixed { border-left-color: var(--color-gold); }
 .bs-group.tone-mixed h5 { color: var(--color-gold); }
-.bs-group.tone-neutral { background: var(--color-surface-2); border-left-color: var(--color-line-strong); }

@@ -133,9 +133,9 @@
   height: 40px;
   border-radius: var(--radius-md);
 }
+/* The logo fills the tile (see app.css); padding keeps it centred. */
 .app-shell .ideas-page .saved-idea-head .company-avatar > img {
-  width: 32px;
-  height: 32px;
+  padding: 4px;
 }
 .app-shell .ideas-page .saved-idea-company {
   flex: 1;

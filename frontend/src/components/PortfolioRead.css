@@ -75,19 +75,36 @@
 .pr-bars button:focus-visible strong {
   text-decoration: underline;
 }
+/* Two halves around a zero line; each bar's square end sits on the line and
+   its rounded end points the way the price moved. */
 .pr-track {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+  align-items: center;
+  height: 24px;
+}
+.pr-half {
+  display: flex;
   height: 10px;
+}
+.pr-half.down {
+  justify-content: flex-end;
+}
+.pr-zero {
+  align-self: stretch;
+  background: var(--color-line-strong);
 }
 .pr-bar {
   display: block;
   height: 10px;
-  border-radius: 5px;
 }
 .pr-bar.down {
   background: var(--color-negative, #f08a96);
+  border-radius: 4px 0 0 4px;
 }
 .pr-bar.up {
   background: var(--color-positive, #5fd3a6);
+  border-radius: 0 4px 4px 0;
 }
 .pr-pct {
   text-align: right;
