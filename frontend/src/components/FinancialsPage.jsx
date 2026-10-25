@@ -12,6 +12,7 @@ import PeerContext from "./PeerContext";
 import { Disclosure, DisclosureGroup, EvidenceDialog, SectionHeader, TrendTile } from "./ui";
 import { evidenceDialogRows } from "../lib/financialEvidence";
 import { trendPoints } from "../lib/financialTrends";
+import { unfixableGaps } from "../lib/financialGaps";
 import TermHelp from "./TermHelp";
 import LoadingSkeleton from "./LoadingSkeleton";
 import {
@@ -327,6 +328,7 @@ export default function FinancialsPage({
       rows: [coverage].filter(Boolean),
     });
   const basisLabel = mode === "annual" ? "Fiscal year" : "Past 12 months";
+  const gaps = safe?.status === "available" ? unfixableGaps({ rows: incomeRows, active, balance, mode, day }) : [];
   const growth = readings[0];
   const summary = [
     {
@@ -374,6 +376,24 @@ export default function FinancialsPage({
           inspect its original cells, or change your choices under Fill in
           missing figures with AI.
         </p>
+      )}
+      {gaps.length > 0 && (
+        <Disclosure
+          className="financial-gaps"
+          title={`Figures that stay unavailable (${gaps.length})`}
+          description="Why each one is missing, and what would help. Fill missing figures can’t fix these."
+        >
+          <ul className="financial-gap-list">
+            {gaps.map((gap) => (
+              <li key={gap.key}>
+                <strong>{gap.title}</strong>
+                <small>{gap.period}</small>
+                <p>{gap.reason}</p>
+                {gap.help && <p className="fine">{gap.help}</p>}
+              </li>
+            ))}
+          </ul>
+        </Disclosure>
       )}
       <PeerContext
         instrumentId={instrumentId}

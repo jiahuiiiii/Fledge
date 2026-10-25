@@ -51,3 +51,7 @@ See [implementation review](../reviews/2026-10-11/financial-recovery.md) for tes
 ## Use all suggestions at once — 25 October 2026
 
 Above the report selector, **Use all suggestions from all N reports** saves every suggested figure from every reviewed report as that report's choices in one step (reads and saves reviews only; no AI call). Each report keeps its calculation, original rows and its own untick-and-save revocation, and a line says how many figures from how many reports are now used. If one report fails, those saved before it stay saved.
+
+## Figures that stay unavailable — 25 October 2026
+
+Under the Fill missing figures bar, **Figures that stay unavailable (n)** appears only when the latest period still lacks a figure that the recovery tool cannot fix. Each entry gives the exact saved reason and what would help. Revenue growth is explained when no saved report covers the same period a year earlier (Fill missing figures only reads reports that are already saved; Update data collects earlier filings), or when either period's revenue is unavailable for a source reason. Facts missing from one saved filing stay with the recovery tool and are not listed here. The list is computed from the saved financial story; it makes no request.
