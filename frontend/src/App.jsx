@@ -787,6 +787,7 @@ function CompanyWorkspace({
     const timer = setTimeout(() => {
       const heading = document.getElementById("management-expects");
       if (!heading) return;
+      if (heading.tagName === "DETAILS") heading.open = true;
       heading.focus({ preventScroll: true });
       heading.scrollIntoView({ block: "start", behavior: "instant" });
       setFocusManagement(false);

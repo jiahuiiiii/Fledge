@@ -4,7 +4,6 @@ import { api } from "../api/client";
 import EvidenceButton from "./EvidenceButton";
 import FinancialEvidence from "./FinancialEvidence";
 import RevenueFlow from "./RevenueFlow";
-import RevenueBreakdown from "./RevenueBreakdown";
 import FinancialRecovery from "./FinancialRecovery";
 import Select from "./Select";
 import ManagementOutlook from "./ManagementOutlook";
@@ -67,7 +66,6 @@ function Insights({ readings }) {
                   : "i"}
           </span>
           <div>
-            {reading.basis && <p className="insight-basis">{reading.basis}</p>}
             <h3>
               <Evidence
                 rows={reading.rows}
@@ -76,6 +74,7 @@ function Insights({ readings }) {
               />
             </h3>
             <p>{reading.text}</p>
+            {reading.basis && <p className="insight-basis">{reading.basis}</p>}
             {reading.period && (
               <p className="insight-period">{reading.period}</p>
             )}
@@ -433,7 +432,6 @@ export default function FinancialsPage({
               />
             ))}
           </div>
-          <RevenueBreakdown data={workspace.segment_revenue} />
           <section
             className="financial-story-section"
             aria-label="Revenue and expense story"
@@ -465,22 +463,6 @@ export default function FinancialsPage({
             intro={figure?.detail ? `${figure.detail.title}. ${figure.detail.detail}` : null}
             rows={figure ? evidenceDialogRows(figure.rows) : []}
           />
-          <section className="financial-story-section" aria-labelledby="management-expects">
-            <SectionHeader level="section" as="h2" id="management-expects" title="What management expects" tabIndex={-1} />
-            <ManagementOutlook data={management} />
-          </section>
-          <Disclosure
-            className="financial-analyst-disclosure"
-            title="Analyst forecasts table"
-            description="Numbers behind the forecast points"
-            open={analystOpen}
-            onToggle={(event) => {
-              if (event.target === event.currentTarget)
-                setAnalystOpen(event.currentTarget.open);
-            }}
-          >
-            {analystOpen && <FmpPanel instrumentId={instrumentId} visible={visible} revision={revision} />}
-          </Disclosure>
           <section
             className="financial-story-section"
             aria-label="What it owns and owes"
@@ -537,6 +519,28 @@ export default function FinancialsPage({
         </>
       )}
       <DisclosureGroup>
+        <Disclosure
+          id="management-expects"
+          tabIndex={-1}
+          title="What management expects"
+          description="The company’s own guidance, quoted from its earnings release (revenue guidance is also plotted above)"
+          variant="inset"
+        >
+          <ManagementOutlook data={management} />
+        </Disclosure>
+        <Disclosure
+          className="financial-analyst-disclosure"
+          title="Analyst forecasts table"
+          description="Numbers behind the forecast points"
+          variant="inset"
+          open={analystOpen}
+          onToggle={(event) => {
+            if (event.target === event.currentTarget)
+              setAnalystOpen(event.currentTarget.open);
+          }}
+        >
+          {analystOpen && <FmpPanel instrumentId={instrumentId} visible={visible} revision={revision} />}
+        </Disclosure>
         {children && (
           <Disclosure title="Reported figures and filings" variant="inset">
             {children}

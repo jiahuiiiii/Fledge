@@ -670,3 +670,14 @@
 .sector-position .position-view { margin: 0; }
 .sector-position { grid-template-columns: minmax(0, 1fr); }
 .sector-position > * { min-width: 0; }
+
+/* Compact comparison rows: one line each, so eight peers fit on a screen. */
+.sector-position .position-comparison-row { min-height: 40px; padding: var(--space-2) var(--space-3); }
+.sector-position .position-average-slot { height: 36px; }
+.sector-position .position-row-label { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: nowrap; padding: 0 var(--space-2); }
+.sector-position .position-row-label > strong { font-size: var(--text-sm); flex: 0 0 auto; }
+.sector-position .position-row-label > span { font-size: var(--text-sm); min-width: 0; }
+.sector-position .position-row-period, .sector-position .position-period-badge { flex: 0 0 auto; font-size: var(--text-xs); }
+.sector-position .position-row-end { top: var(--space-1); bottom: var(--space-1); }
+.sector-position .position-scale { height: 22px; }
+@media (max-width: 560px) { .sector-position .position-row-period { display: none; } }

@@ -13,7 +13,7 @@ const dayMonth = (value) =>
 // Targets are opinions; the chart shows them, it does not forecast.
 export default function TargetChart({ bars = [], range }) {
   const closes = bars
-    .slice(-130)
+    .slice(-366)
     .filter((b) => Number.isFinite(Number(b.close)) && b.date);
   const current = range.current ?? (closes.length ? Number(closes.at(-1).close) : null);
   const w = 680,
@@ -34,7 +34,7 @@ export default function TargetChart({ bars = [], range }) {
   const x = (i) => (closes.length > 1 ? left + (i * (split - left)) / (closes.length - 1) : split);
   const path = closes.map((b, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(Number(b.close)).toFixed(1)}`).join("");
   const ticks = [0, 1, 2, 3].map((i) => min + ((max - min) * i) / 3);
-  const dates = closes.length > 1 ? [0, Math.floor((closes.length - 1) / 2)] : [];
+  const dates = closes.length > 1 ? [0, Math.floor((closes.length - 1) / 3), Math.floor(((closes.length - 1) * 2) / 3)] : [];
   const targets = [
     ["High", range.high],
     ["Mean", range.mean],
