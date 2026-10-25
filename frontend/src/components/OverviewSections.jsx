@@ -11,19 +11,22 @@ import {
   signedPercent,
   number,
 } from "../lib/overviewSections";
-import FinancialEvidence from "./FinancialEvidence";
-import Modal from "./Modal";
+import { evidenceDialogRows } from "../lib/financialEvidence";
 import { peTakeaway } from "../lib/overviewTakeaways";
 import "./OverviewSections.css";
 import OverviewReadCard from "./OverviewReadCard";
-import { SectionHeader } from "./ui";
+import { Disclosure, EvidenceDialog, FilterGroup, SectionHeader } from "./ui";
 
 export default function OverviewSections({
   data,
   instrumentId,
   visible,
   onView,
+  businessPanel,
+  briefOpen,
+  onBriefToggle,
 }) {
+  const [topic, setTopic] = useState("money");
   const [readState, setReadState] = useState({}),
     [evidence, setEvidence] = useState(null);
   // A new company or evidence version must never inherit another read's data
@@ -80,8 +83,8 @@ export default function OverviewSections({
     name = companyName(data.instrument),
     mix = m.mix[0],
     guidance = m.guidance;
-  const show = (title, rows, body = null) =>
-    setEvidence({ title, rows: rows.filter(Boolean), body });
+  const show = (title, rows, extra = []) =>
+    setEvidence({ title, rows: [...evidenceDialogRows(rows), ...extra.filter(Boolean)] });
   const annualPrior = m.revenue?.prior
     ? {
         ...m.revenue.prior,
@@ -100,120 +103,96 @@ export default function OverviewSections({
   const briefText = m.brief?.result?.findings?.find(
     (f) => f.category === "business",
   )?.text;
-  const guidanceBody = guidance && (
-    <>
-      <blockquote>{guidance.quote}</blockquote>
-      <p>
-        {guidance.unit || "Currency unspecified"} ·{" "}
-        {guidance.basis?.toUpperCase() || "Accounting basis unspecified"}.
-        Forecast for {guidancePeriod(guidance.section)}.
-        {!guidance.section.period_end && " Exact ending date not stated."}
-      </p>
-      <a href={guidance.release.url} target="_blank" rel="noreferrer">
-        Read original earnings release ↗
-      </a>
-    </>
-  );
+  const guidanceRow = guidance && {
+    id: "guidance",
+    label: "Management guidance",
+    meta: `${guidance.unit || "Currency unspecified"} · ${guidance.basis?.toUpperCase() || "Accounting basis unspecified"} · forecast for ${guidancePeriod(guidance.section)}${guidance.section.period_end ? "" : " · exact ending date not stated"}`,
+    quote: guidance.quote,
+    href: guidance.release.url,
+    sourceLabel: "Original earnings release",
+  };
   const { latestQuarter } = revenueComparisons(data, guidance);
+  const topics = {
+    money: {
+      label: "Makes money",
+      reading:
+        briefText ||
+        (mix
+          ? `${name} reports ${mix.members.length} business categories: ${mix.members.map((g) => g.label).join(", ")}.`
+          : "Read the company’s revenue, operating results and original business description together."),
+      figures: [
+        { label: "Revenue", value: money(m.revenue?.value), onOpen: () => show("Revenue", [m.revenue]) },
+        { label: "Reporting period", value: day(m.revenue?.end) },
+      ],
+      to: ["fundamentals", "Financials"],
+    },
+    growth: {
+      label: "Growth",
+      reading: latestQuarter
+        ? `Latest-quarter revenue was ${money(latestQuarter.current.value)}, ${latestQuarter.growth >= 0 ? "up" : "down"} ${Math.abs(latestQuarter.growth).toFixed(1)}% from a year earlier.`
+        : growthNumber != null
+          ? `Annual revenue ${growthNumber >= 0 ? "grew" : "fell"} ${Math.abs(growthNumber).toFixed(1)}%.`
+          : "Comparable revenue growth is unavailable.",
+      figures: [
+        { label: "Annual growth", value: signedPercent(growthNumber), onOpen: () => show("Revenue growth", [m.growth, m.revenue, annualPrior]) },
+        { label: "Management guidance", value: guidance ? guidanceAmount(guidance) : "Unavailable", onOpen: guidance ? () => show("Management guidance", [], [guidanceRow]) : undefined },
+      ],
+      to: ["fundamentals", "Financials · what management expects", "management"],
+    },
+    health: {
+      label: "Financial health",
+      reading:
+        m.assetsRatio != null
+          ? `Reported assets are ${multiple(m.assetsRatio)} liabilities. Read cash flow and borrowing alongside this snapshot.`
+          : "A matching assets-to-liabilities comparison is unavailable. Read the reported cash flow and borrowing.",
+      figures: [
+        { label: "Free cash flow", value: money(m.freeCash?.value), onOpen: () => show("Free cash flow", [m.freeCash]) },
+        { label: "Assets ÷ liabilities", value: multiple(m.assetsRatio), onOpen: () => show("Assets and liabilities", [m.assets, m.liabilities]) },
+      ],
+      to: ["fundamentals", "Financials"],
+    },
+    value: {
+      label: "Value",
+      reading: peVsPeers || "Whether a valuation looks high or low depends on growth, risks and the assumptions you compare it with.",
+      figures: [
+        { label: "Price to earnings", value: multiple(m.pe), onOpen: m.reference ? () => show("Valuation ratios", [m.reference]) : undefined },
+        { label: "Price to sales", value: multiple(m.ps) },
+      ],
+      to: ["valuation", "Compare & value"],
+    },
+  };
+  const current = topics[topic];
   return (
     <div className="overview-sections overview-sections-compact">
-      <SectionHeader
-        level="section"
-        as="h2"
-        title="The business in four reads"
+      <SectionHeader level="section" as="h2" title="The business" />
+      <FilterGroup
+        label="Business topic"
+        value={topic}
+        onValueChange={setTopic}
+        options={Object.entries(topics).map(([value, t]) => ({ value, label: t.label }))}
       />
-      <div className="overview-read-grid">
-        <OverviewReadCard
-          title={`How ${name} makes money`}
-          reading={
-            briefText ||
-            (mix
-              ? `${name} reports ${mix.members.length} business categories: ${mix.members.map((g) => g.label).join(", ")}.`
-              : "Read the company’s revenue, operating results and original business description together.")
-          }
-          figures={[
-            { label: "Revenue", value: money(m.revenue?.value) },
-            { label: "Reporting period", value: day(m.revenue?.end) },
-          ]}
-          onEvidence={() =>
-            show("Revenue and business · evidence", [m.revenue].filter(Boolean))
-          }
-          onView={() => onView("fundamentals")}
-          destination="Financials"
-        />
-        <OverviewReadCard
-          title="Growth and outlook"
-          reading={
-            latestQuarter
-              ? `Latest-quarter revenue was ${money(latestQuarter.current.value)}, ${latestQuarter.growth >= 0 ? "up" : "down"} ${Math.abs(latestQuarter.growth).toFixed(1)}% from a year earlier.`
-              : growthNumber != null
-                ? `Annual revenue ${growthNumber >= 0 ? "grew" : "fell"} ${Math.abs(growthNumber).toFixed(1)}%.`
-                : "Comparable revenue growth is unavailable."
-          }
-          figures={[
-            { label: "Annual growth", value: signedPercent(growthNumber) },
-            {
-              label: "Management guidance",
-              value: guidance ? guidanceAmount(guidance) : "Unavailable",
-            },
-          ]}
-          onEvidence={() =>
-            show(
-              "Growth and guidance · evidence",
-              [m.growth, m.revenue, annualPrior].filter(Boolean),
-              guidanceBody,
-            )
-          }
-          onView={() => onView("fundamentals", "management")}
-          destination="Financials · what management expects"
-        />
-        <OverviewReadCard
-          title="Financial health"
-          reading={
-            m.assetsRatio != null
-              ? `Reported assets are ${multiple(m.assetsRatio)} liabilities. Read cash flow and borrowing alongside this snapshot.`
-              : "A matching assets-to-liabilities comparison is unavailable. Read the reported cash flow and borrowing."
-          }
-          figures={[
-            { label: "Free cash flow", value: money(m.freeCash?.value) },
-            { label: "Assets / liabilities", value: multiple(m.assetsRatio) },
-          ]}
-          onEvidence={() =>
-            show(
-              "Financial health · evidence",
-              [m.freeCash, m.assets, m.liabilities].filter(Boolean),
-            )
-          }
-          onView={() => onView("fundamentals")}
-          destination="Financials"
-        />
-        <OverviewReadCard
-          title="Value"
-          reading={
-            peVsPeers ||
-            "Whether a valuation looks high or low depends on growth, risks and the assumptions you compare it with."
-          }
-          figures={[
-            { label: "Price to earnings", value: multiple(m.pe) },
-            { label: "Price to sales", value: multiple(m.ps) },
-          ]}
-          onEvidence={() =>
-            show("Valuation · evidence", [m.reference].filter(Boolean))
-          }
-          onView={() => onView("valuation")}
-          destination="Compare & value"
-        />
-      </div>
-      <Modal
+      <OverviewReadCard
+        reading={current.reading}
+        figures={current.figures}
+        onView={() => onView(current.to[0], current.to[2])}
+        destination={current.to[1]}
+      />
+      <Disclosure
+        title="Business brief and research questions"
+        description="Saved brief, original evidence and what to research next"
+        open={briefOpen}
+        onToggle={(event) => {
+          if (event.target === event.currentTarget) onBriefToggle(event.currentTarget.open);
+        }}
+      >
+        {briefOpen && (typeof businessPanel === "function" ? businessPanel() : businessPanel)}
+      </Disclosure>
+      <EvidenceDialog
         open={!!evidence}
         onClose={() => setEvidence(null)}
         title={evidence?.title || "Evidence"}
-        className="evidence-dialog"
-      >
-        <FinancialEvidence rows={evidence?.rows || []}>
-          {evidence?.body}
-        </FinancialEvidence>
-      </Modal>
+        rows={evidence?.rows || []}
+      />
     </div>
   );
 }

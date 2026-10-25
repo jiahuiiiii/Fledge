@@ -31,16 +31,18 @@ export function PriceMoveLine({ price, pro = false }) {
   );
 }
 
-export function SignalLights({ name, lights, pointer }) {
+export function SignalLights({ name, lights, pointer, onSelect }) {
   return (
     <section aria-label={`${name} at a glance`}>
       <ul className="bs-summary-cards">
         {lights.map((light) => (
           <li key={light.key}>
             <Card
-              as="a"
+              as={onSelect ? "button" : "a"}
               interactive
-              href={`#bs-${light.key}`}
+              {...(onSelect
+                ? { onClick: () => onSelect(light.key) }
+                : { href: `#bs-${light.key}` })}
               className="bs-summary-card"
               aria-label={`${light.title}: ${light.status}. Show details.`}
             >

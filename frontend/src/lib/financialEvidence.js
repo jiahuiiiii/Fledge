@@ -143,3 +143,33 @@ export function evidenceSources(row, fallbackUrl) {
     });
   return [...sources.values()];
 }
+
+// Flat rows for EvidenceDialog: one row per figure, then one per calculation
+// input. Missing figures stay "Unavailable", never zero.
+export function evidenceDialogRows(rows = []) {
+  const out = [];
+  for (const row of rows.filter(Boolean)) {
+    const source = evidenceSources(row)[0];
+    out.push({
+      id: `${row.key || row.label}-${out.length}`,
+      label: row.label || "Reported figure",
+      value: evidenceValue(row.value, row.unit),
+      meta: row.period_label || evidencePeriod(row),
+      note: row.formula ? evidenceFormula(row) : row.reason || row.explanation,
+      href: source?.url,
+      sourceLabel: source?.label,
+      date: source?.date && day(source.date),
+    });
+    const inputs = row.inputs || [];
+    if (inputs.length > 1 && row.formula)
+      inputs.forEach((input, index) =>
+        out.push({
+          id: `${row.key || row.label}-in-${index}`,
+          label: inputLabel(row, input, index),
+          value: evidenceValue(input.value, input.unit || row.unit),
+          meta: evidencePeriod(input),
+        }),
+      );
+  }
+  return out;
+}

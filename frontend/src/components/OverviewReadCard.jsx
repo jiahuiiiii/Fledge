@@ -1,29 +1,29 @@
-import { Button, Card, SectionHeader } from "./ui";
+import { Button, Card } from "./ui";
 
-export default function OverviewReadCard({
-  title,
-  reading,
-  figures,
-  onEvidence,
-  onView,
-  destination,
-}) {
+// One business topic: a reading sentence, up to two figures (each opens its
+// evidence) and a link to the tab that has the detail.
+export default function OverviewReadCard({ reading, figures, onView, destination }) {
   return (
     <Card as="article" className="overview-read-card">
-      <SectionHeader level="card" as="h3" title={title} />
       <p>{reading}</p>
       <div className="overview-read-figures">
-        {figures.map(({ label, value }) => (
-          <span key={label}>
-            <strong>{value ?? "Unknown"}</strong>
-            <small>{label}</small>
-          </span>
-        ))}
+        {figures.map(({ label, value, onOpen }) => {
+          const body = (
+            <>
+              <strong>{value ?? "Unknown"}</strong>
+              <small>{label}</small>
+            </>
+          );
+          return onOpen ? (
+            <button type="button" key={label} onClick={onOpen} aria-label={`${label}: ${value ?? "Unknown"}. Show evidence.`}>
+              {body}
+            </button>
+          ) : (
+            <span key={label}>{body}</span>
+          );
+        })}
       </div>
       <div className="overview-read-actions">
-        <Button variant="tertiary" size="sm" onClick={onEvidence}>
-          View evidence
-        </Button>
         <Button variant="tertiary" size="sm" onClick={onView}>
           {destination} →
         </Button>

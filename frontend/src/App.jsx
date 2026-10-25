@@ -79,7 +79,6 @@ const AllHistory = lazy(() =>
 );
 import BusinessPanel from "./components/BusinessPanel";
 import CompanySnapshot from "./components/CompanySnapshot";
-import ExpectationsPanel from "./components/ExpectationsPanel";
 import CompanionGuide, { ExplorationPrompt } from "./components/CompanionGuide";
 import AccountGate from "./components/AccountGate";
 import FilingWatch from "./components/FilingWatch";
@@ -101,7 +100,7 @@ import PortfolioRead from "./components/PortfolioRead";
 import PersonalHome from "./components/PersonalHome";
 import AccountPage from "./components/AccountPage";
 import WorkspaceHeader from "./components/WorkspaceHeader";
-import { Button, Disclosure, UserIcon } from "./components/ui";
+import { Button, UserIcon } from "./components/ui";
 import {
   ProfileContext,
   readLocalMode,
@@ -648,7 +647,6 @@ function CompanyWorkspace({
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [updatesOpen, setUpdatesOpen] = useState(false);
   const [updatePressed, setUpdatePressed] = useState(false);
-  const [newsExpectationsOpen, setNewsExpectationsOpen] = useState(false);
   useEffect(() => {
     mainPane.current?.scrollTo(0, 0);
   }, [view, initialEvaluation, scope]);
@@ -2195,33 +2193,7 @@ function CompanyWorkspace({
                               }
                             />
                           )}
-                          {!isRecorded && !beginner && (
-                            <Disclosure
-                              title="Expectations reported in the news"
-                              description="Optional AI reading from saved stories"
-                              open={newsExpectationsOpen}
-                              onToggle={(event) => {
-                                if (event.target === event.currentTarget)
-                                  setNewsExpectationsOpen(event.currentTarget.open);
-                              }}
-                            >
-                              {newsExpectationsOpen && (
-                                <ExpectationsPanel
-                                  key={instrumentId}
-                                  visible={view === "workspace" && tab === "evidence"}
-                                  instrumentId={instrumentId}
-                                  enabled={modelStatus?.briefing_enabled}
-                                  onSource={setSource}
-                                  onView={setTab}
-                                  onDraft={(q) => {
-                                    openEditor();
-                                    setEditor({ ...formFor(current, q), question: q });
-                                  }}
-                                />
-                              )}
-                            </Disclosure>
-                          )}
-                          {!isRecorded && (
+                          {!isRecorded && beginner && (
                             <MarketResearch
                               headlinesOnly
                               data={data}

@@ -31,29 +31,25 @@ function groupFailures(rows) {
             .join("this feed"),
   }));
 }
-export default function NewsStatus({ data, availability, onCoverage }) {
+// One line: when news was fetched and when the tone was analysed.
+export function NewsFreshness({ data }) {
   const status = newsSourceStatus(data),
     analysis = data.sentiment;
   return (
-    <Disclosure
-      variant="inset"
-      className="news-section-status"
-      title="Data freshness"
-      description={
-        <>
-          {status.latest
-            ? `News checked ${stamp(status.latest)}`
-            : "No saved news check"}
-          {status.failed.length > 0 && " · some news sources unavailable"}
-          {status.waiting.length > 0 &&
-            " · some sources waiting until their next allowed check"}
-          {status.unchecked.length > 0 && " · some sources not checked yet"}
-          {status.social.length > 0 && " · some discussion sources unavailable"}
-          {data.news_watch?.error && " · last watch update could not finish"}
-        </>
-      }
-    >
-      <div className="news-status-details">
+    <p className="fine news-freshness">
+      {status.latest ? `News checked ${stamp(status.latest)}` : "No saved news check"}
+      {analysis && !analysis.withheld && ` · tone analysed ${stamp(analysis.created_at)}`}
+      {(status.failed.length > 0 || status.social.length > 0) && " · some sources unavailable (see Source coverage)"}
+    </p>
+  );
+}
+
+// The detailed per-source checks, shown under Source coverage.
+export function NewsStatusDetails({ data, availability, onCoverage }) {
+  const status = newsSourceStatus(data),
+    analysis = data.sentiment;
+  return (
+    <div className="news-status-details">
         {analysis && !analysis.withheld && (
           <p>Saved tone reading {stamp(analysis.created_at)}.</p>
         )}
@@ -152,6 +148,32 @@ export default function NewsStatus({ data, availability, onCoverage }) {
           their wait has ended.
         </p>
       </div>
+  );
+}
+
+export default function NewsStatus({ data, availability, onCoverage }) {
+  const status = newsSourceStatus(data),
+    analysis = data.sentiment;
+  return (
+    <Disclosure
+      variant="inset"
+      className="news-section-status"
+      title="Data freshness"
+      description={
+        <>
+          {status.latest
+            ? `News checked ${stamp(status.latest)}`
+            : "No saved news check"}
+          {status.failed.length > 0 && " · some news sources unavailable"}
+          {status.waiting.length > 0 &&
+            " · some sources waiting until their next allowed check"}
+          {status.unchecked.length > 0 && " · some sources not checked yet"}
+          {status.social.length > 0 && " · some discussion sources unavailable"}
+          {data.news_watch?.error && " · last watch update could not finish"}
+        </>
+      }
+    >
+      <NewsStatusDetails data={data} availability={availability} onCoverage={onCoverage} />
     </Disclosure>
   );
 }

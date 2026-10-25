@@ -1,4 +1,4 @@
-import NewsStatus from "./NewsStatus";
+import { NewsFreshness, NewsStatusDetails } from "./NewsStatus";
 import {
   Badge,
   Button,
@@ -8,6 +8,7 @@ import {
   MetaRow,
   Pagination,
   SectionHeader,
+  SourceChip,
 } from "./ui";
 import { countedTone } from "../lib/newsPresentation";
 import { modelAvailability } from "../lib/modelAvailability";
@@ -30,7 +31,7 @@ import CurrentSentimentSources from "./CurrentSentimentSources";
 import WatchCheckHistory from "./WatchCheckHistory";
 import { watchFrequencyLabel } from "../lib/watchLanes";
 import SentimentHistory from "./SentimentHistory";
-import SourceFilters, { SourceLabel, sourceScope } from "./SourceFilters";
+import SourceFilters from "./SourceFilters";
 import AllSourceSummary, {
   SourceCountingDetails,
   SourceToneSummary,
@@ -67,9 +68,8 @@ export default function SentimentPanel({
   const analysisStep = loadingRun?.steps.find((s) => s.key === "analysis");
   const batchProgress = analysisStep?.batches;
   const [tab, setTab] = useState("all");
-  const [relevanceFilter, setRelevanceFilter] = useState("relevant");
+  const relevanceFilter = "relevant";
   const [toneFilter, setToneFilter] = useState("all");
-  const [sourcesOpen, setSourcesOpen] = useState(false);
   const sourceListId = useId();
   const [page, setPage] = useState(1);
   const [checkPurpose, setCheckPurpose] = useState("reasoning");
@@ -126,9 +126,7 @@ export default function SentimentPanel({
   useEffect(() => setPage(1), [a?.id, tab, relevanceFilter, toneFilter]);
   function filterTone(value) {
     setToneFilter(value);
-    if (value !== "all") setRelevanceFilter("relevant");
     setPage(1);
-    setSourcesOpen(true);
   }
   const filteredItems = items.filter(
     (item) =>
@@ -247,35 +245,10 @@ export default function SentimentPanel({
           )}
         </div>
       )}
-      {watch?.enabled && (
-        <p className="fine sentiment-meta" role="status">
-          Watch on · next check {stamp(watch.next_check_at)}
-        </p>
-      )}
-      {a && !a.withheld && a.repairs?.repaired > 0 && (
-        <p className="fine sentiment-repairs" role="status">
-          {`${a.repairs.repaired} of ${a.repairs.total} labels needed repair: the AI's label and its evidence disagreed.`}
-        </p>
-      )}
-      {a && !a.withheld && (
-        <p className="fine sentiment-reading-limit">
-          {a.stale &&
-            "This AI reading uses a source sample captured over 24 hours ago; newer headlines may not be included. "}
-          {a.earlier_method && "It was saved with an earlier analysis method. "}
-          {coverage &&
-            !coverage.complete &&
-            (coverage.unanalysed > 0
-              ? "Some saved sources are outside this reading. "
-              : "Complete coverage of the saved sources is not established. ")}
-          News tone and social opinions describe their own samples, not investor
-          consensus or future returns.
-        </p>
-      )}
-      <NewsStatus
-        data={data}
-        availability={availability}
-        onCoverage={onCoverage}
-      />
+      <NewsFreshness data={data} />
+      <p className="fine sentiment-reading-limit">
+        Tone describes what people and publishers said, not facts, investor consensus or future returns.
+      </p>
       <div className="sample-browse-controls">
         <SourceFilters selected={tab} onChange={setTab} showLabels />
         <Button
@@ -304,29 +277,29 @@ export default function SentimentPanel({
         </>
       ) : sample || (tab === "all" && a) ? (
         <>
-          <p className="tone-reading-time">
-            Tone reading made {stamp(a.created_at)}
-            {a.cutoff && ` · covers sources saved up to ${stamp(a.cutoff)}`}
-          </p>
-          {a.coverage?.input_limits?.notice && (
-            <p className="fine">
-              Some sources were omitted. Open Evidence to inspect the limits.
-            </p>
-          )}
-          {withheldSourcesNote(a) && (
-            <p className="fine">{withheldSourcesNote(a)}</p>
-          )}
           {tab === "all" ? (
             <>
               <SourceToneSummary analysis={a} />
-              <details className="secondary-details">
-                <summary>Source coverage</summary>
+              <Disclosure variant="flush" className="secondary-details" title="Source coverage" description="How sources are counted, what was unavailable and reading limits">
                 <AllSourceSummary
                   analysis={a}
                   providerStatus={data.provider_status}
                   showDetails={false}
                 />
-              </details>
+                <SourceCountingDetails analysis={a} />
+                <div className="coverage-notes">
+                  {a.repairs?.repaired > 0 && <p className="fine">{`${a.repairs.repaired} of ${a.repairs.total} labels needed repair: the AI's label and its evidence disagreed.`}</p>}
+                  {a.stale && <p className="fine">This reading uses a source sample captured over 24 hours ago; newer headlines may not be included.</p>}
+                  {a.earlier_method && <p className="fine">Saved with an earlier analysis method.</p>}
+                  {coverage && !coverage.complete && <p className="fine">{coverage.unanalysed > 0 ? "Some saved sources are outside this reading." : "Complete coverage of the saved sources is not established."}</p>}
+                  {a.coverage?.input_limits?.notice && <p className="fine">Some sources were omitted from the reading.</p>}
+                  {withheldSourcesNote(a) && <p className="fine">{withheldSourcesNote(a)}</p>}
+                  {watch?.enabled && <p className="fine">Watch on · next check {stamp(watch.next_check_at)}</p>}
+                </div>
+                <NewsStatusDetails data={data} availability={availability} onCoverage={onCoverage} />
+                <p className="fine">Re-reading every saved source with the current model is a new paid reading; earlier readings stay in History.</p>
+                <Button variant="plain" size="sm" disabled={!!loadingRun?.active || availability.blocked} onClick={() => onAnalyze(days, { reread: true })}>Re-read everything · paid AI</Button>
+              </Disclosure>
               <ToneFilters
                 selected={toneFilter}
                 onChange={filterTone}
@@ -363,43 +336,7 @@ export default function SentimentPanel({
               />
             </>
           )}
-          <Disclosure
-            variant="flush"
-            className="sentiment-source-list"
-            id={sourceListId}
-            open={sourcesOpen}
-            onToggle={(event) => {
-              if (event.target === event.currentTarget)
-                setSourcesOpen(event.currentTarget.open);
-            }}
-            title="Read analysed sources"
-            description={`${filteredItems.length} in this view${toneFilter !== "all" ? ` · ${names[toneFilter]}` : ""}`}
-          >
-            <div className="sentiment-result-controls">
-              <label>
-                Show{" "}
-                <Select
-                  aria-label="Source relevance"
-                  value={relevanceFilter}
-                  onChange={(event) => {
-                    setRelevanceFilter(event.target.value);
-                    if (event.target.value !== "relevant") setToneFilter("all");
-                    setPage(1);
-                  }}
-                >
-                  <option value="all">All analysed texts</option>
-                  <option value="relevant">Relevant to company</option>
-                  <option value="unrelated">Unrelated</option>
-                  <option value="unclear">Relevance unclear</option>
-                </Select>
-              </label>
-              <span className="fine">
-                {filteredItems.length
-                  ? `${(currentPage - 1) * 6 + 1}–${Math.min(currentPage * 6, filteredItems.length)} of ${filteredItems.length}`
-                  : "0 matching texts"}{" "}
-                · newest first in All
-              </span>
-            </div>
+          <div className="sentiment-source-list" id={sourceListId}>
             {toneFilter !== "all" && (
               <p className="fine" role="status">
                 Showing {names[toneFilter].toLowerCase()} source labels. Tone
@@ -428,17 +365,25 @@ export default function SentimentPanel({
                     >
                       {s && (
                         <MetaRow className="sentiment-source-meta fine">
-                          <SourceLabel scope={sourceScope(s)}>
-                            {s.source}
-                          </SourceLabel>
-                          <time>
-                            {s.timestamp_basis === "feed_updated" &&
-                              "Feed updated · "}
-                            {stamp(s.published_at)}
-                          </time>
+                          <SourceChip
+                            label={s.source}
+                            date={`${s.timestamp_basis === "feed_updated" ? "Feed updated · " : ""}${stamp(s.published_at)}`}
+                            href={s.url}
+                            onOpen={() => onSource(i.source_id)}
+                          />
                         </MetaRow>
                       )}
-                      {sourceHeadline(s) && <h3>{sourceHeadline(s)}</h3>}
+                      {sourceHeadline(s) && (
+                        <h3>
+                          {s?.url ? (
+                            <a href={s.url} target="_blank" rel="noopener noreferrer">
+                              {sourceHeadline(s)}
+                            </a>
+                          ) : (
+                            sourceHeadline(s)
+                          )}
+                        </h3>
+                      )}
                       {s?.body ? (
                         <p
                           className={`story-source-text${s.kind === "social" ? " discussion-text" : ""}`}
@@ -487,22 +432,9 @@ export default function SentimentPanel({
                         </div>
                         <EvidenceButton
                           key={`${a.id}:${i.id}`}
-                          label="Inspect evidence"
-                          title="Story evidence"
+                          label="Why this label"
+                          title={sourceHeadline(s) || "Why this label"}
                         >
-                          {sourceHeadline(s) && <h3>{sourceHeadline(s)}</h3>}
-                          {s && (
-                            <p className="fine">
-                              <SourceLabel scope={sourceScope(s)}>
-                                {s.source}
-                              </SourceLabel>{" "}
-                              · {stamp(s.published_at)}
-                            </p>
-                          )}
-                          <div className="story-full-text">
-                            <h3>Original text</h3>
-                            <p>{s?.body || "Original text unavailable."}</p>
-                          </div>
                           <h3>
                             {i.prefilter ? "Quick check" : "AI classification"}
                           </h3>
@@ -560,22 +492,19 @@ export default function SentimentPanel({
                               </Button>
                             </details>
                           )}
-                          <details>
-                            <summary>Why this label · inspect evidence</summary>
-                            {!i.evidence_policy &&
-                              i.citations.map((c, j) => (
-                                <blockquote key={j}>{c.quote}</blockquote>
-                              ))}
-                            <SentimentContext value={i.conversation} />
-                            <RedditThreadContext value={i.thread_context} />
-                            <Button
-                              variant="plain"
-                              className="source-link"
-                              onClick={() => onSource(i.source_id)}
-                            >
-                              Open original source ↗
-                            </Button>
-                          </details>
+                          {!i.evidence_policy &&
+                            i.citations.map((c, j) => (
+                              <blockquote key={j}>{c.quote}</blockquote>
+                            ))}
+                          <SentimentContext value={i.conversation} />
+                          <RedditThreadContext value={i.thread_context} />
+                          {s && (
+                            <SourceChip
+                              label="Open original source"
+                              href={s.url}
+                              onOpen={() => onSource(i.source_id)}
+                            />
+                          )}
                         </EvidenceButton>
                       </div>
                       <SentimentPriceContext
@@ -605,10 +534,8 @@ export default function SentimentPanel({
                 onNext={() => setPage(currentPage + 1)}
               />
             )}
-          </Disclosure>
-          {tab === "all" ? (
-            <SourceCountingDetails analysis={a} />
-          ) : (
+          </div>
+          {tab === "all" ? null : (
             <details className="secondary-details sample-method">
               <summary>Sample details &amp; method</summary>
               {Number.isInteger(pool) && (
@@ -724,23 +651,6 @@ export default function SentimentPanel({
           </Button>
         </div>
       )}
-      <Disclosure
-        variant="flush"
-        className="secondary-details"
-        title="Read saved sources again"
-      >
-        <p className="fine">
-          Re-read every saved source with the current model. This is a new paid
-          reading; previous readings stay in History.
-        </p>
-        <Button
-          variant="plain"
-          disabled={!!loadingRun?.active || availability.blocked}
-          onClick={() => onAnalyze(days, { reread: true })}
-        >
-          Re-read everything · paid AI
-        </Button>
-      </Disclosure>
       <Modal
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}

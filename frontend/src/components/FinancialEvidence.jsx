@@ -1,4 +1,5 @@
 import FilingResolution from "./FilingResolution";
+import { SourceChip } from "./ui";
 import { day } from "../lib/financialStory";
 import {
   evidenceValue,
@@ -80,15 +81,12 @@ export function FinancialEvidenceRow({ row, fallbackUrl, caption }) {
           aria-label="Original reports"
         >
           {sources.map((source) => (
-            <a
+            <SourceChip
               key={source.url}
               href={source.url}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <span>{source.label} ↗</span>
-              {source.date && <small>{day(source.date)}</small>}
-            </a>
+              label={source.label}
+              date={source.date && day(source.date)}
+            />
           ))}
         </div>
       )}
@@ -143,8 +141,7 @@ export default function FinancialEvidence({ rows = [], children }) {
       </div>
       {unique.length > 0 && (
         <p className="financial-evidence-rounding">
-          Figures are rounded for readability. Open a report for the original
-          figures.
+          Rounded for readability; the report has the original figures.
         </p>
       )}
     </div>
