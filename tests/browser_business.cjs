@@ -17,6 +17,8 @@ let browser;
   await page.goto(process.env.THESIS_TEST_URL);
   await page.locator('.watch-item').filter({hasText:'MSFT'}).click();
   await page.getByRole('tab',{name:'Overview',exact:true}).click();
+  // The brief sits in a closed disclosure under "The business".
+  await page.getByText('Business brief and research questions',{exact:true}).click();
   const panel=page.getByRole('region',{name:'Understand the business',exact:true});
   await panel.getByText('The company says it sells subscription software to business customers.',{exact:true}).waitFor();
   await panel.getByRole('button',{name:'View source',exact:true}).click();

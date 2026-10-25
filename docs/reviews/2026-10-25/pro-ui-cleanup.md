@@ -29,3 +29,14 @@ Provenance kept in a closed Details line; unstated-currency estimates plotted as
 - Dead CSS from removed blocks remains in `styles/app.css` (periodic review, saved weekly list, inbox detail) and `UpdateInbox.css`.
 - Compare & value's layout (`SectorPosition`, `ValuationPanel`) kept its own card styling; only the peer picker, target chart and ratios panel changed.
 
+
+## Installed — 25 October 2026, 20:45 SGT
+
+Built to a scratch folder and copied into `frontend/dist` (assets copied without overwriting, `index.html` swapped last, old assets kept). The running app was not restarted; reload the page to load the new build. Previous `index.html` kept in the session scratchpad.
+
+## Test follow-up (same evening)
+
+- Every older browser journey already failed before this work: accounts now start in Beginner with the first-login questions showing. `run_browser.py` now gives the disposable test owner a completed Pro profile.
+- With that fix, `--company-overview`, `--sector-position`, `--news-discussion` and `--financial-recovery` pass on the new build. `--expectations` was retired with the news-expectations panel; `ExpectationsPanel.jsx` and its seed were deleted.
+- `seed_sentiment_browser.py` now asserts one grouped alert (the backend tests assert 1), which unblocks the inbox, scheduled-review, digest and idea-alert seeds (their journeys were not re-run).
+- Still failing and not yet re-pointed: `--business`, `--topic-homes`, `--reading-flow`, `--companion`, `--research-design`, `--financials`, `--valuation`, `--content-first`, `--source-filters`, `--ideas`, `--prices`, `--report-expectations`. Some fail on this work's layout changes (business brief now in a disclosure, price chart collapsed, analyst targets now a chart); others on earlier redesigns (button names such as "Ask a question", "My ideas", "Notebook").

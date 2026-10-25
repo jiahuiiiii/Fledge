@@ -34,7 +34,6 @@ journeys = {
     "--recurring-events",
     "--report-expectations",
     "--event-watch",
-    "--expectations",
     "--filing-watch",
     "--idea",
     "--ideas",
@@ -93,6 +92,21 @@ try:
             time.sleep(0.2)
     else:
         raise RuntimeError("Browser test server did not start")
+    # Accounts start in Beginner with the first-login questions showing. The
+    # journeys exercise the Pro workspace, so give the test owner a completed
+    # profile in Pro mode (disposable database only).
+    subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from thesis import profile; from thesis.config import OWNER, DATA; "
+            "assert str(DATA).startswith('/private/tmp/thesis-browser-'); "
+            "profile.save(OWNER, 'stocks', goal='check', detail_mode='data')",
+        ],
+        cwd=root,
+        env=env,
+        check=True,
+    )
     if any(flag in sys.argv for flag in ["--financials", "--financial-recovery", "--content-first", "--reading-flow", "--companion", "--topic-homes", "--pro-cleanup"]):
         subprocess.run([sys.executable, "tests/seed_financials_browser.py"], cwd=root, env=env, check=True)
     elif "--business" in sys.argv or "--sector-position" in sys.argv or "--company-overview" in sys.argv:
@@ -167,13 +181,6 @@ try:
     elif "--social-platforms" in sys.argv:
         subprocess.run(
             [sys.executable, "tests/seed_social_platforms_browser.py"],
-            cwd=root,
-            env=env,
-            check=True,
-        )
-    elif "--expectations" in sys.argv:
-        subprocess.run(
-            [sys.executable, "tests/seed_expectation_browser.py"],
             cwd=root,
             env=env,
             check=True,
@@ -347,9 +354,6 @@ try:
                                                     "tests/browser_roles.cjs"
                                                     if "--roles" in sys.argv
                                                     else (
-                                                        "tests/browser_expectations.cjs"
-                                                        if "--expectations" in sys.argv
-                                                        else (
                                                             "tests/browser_inbox.cjs"
                                                             if "--inbox" in sys.argv
                                                             else (
@@ -425,7 +429,6 @@ try:
                                                                                                                                     if "--age"
                                                                                                                                     in sys.argv
                                                                                                                                     else "tests/browser.cjs"
-                                                                                                                                )
                                                                                                                             )
                                                                                                                         )
                                                                                                                     )

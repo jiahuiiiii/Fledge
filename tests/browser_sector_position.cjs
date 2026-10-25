@@ -64,7 +64,7 @@ let browser;
     .waitFor();
   const peer = panel.getByLabel("Peer ticker or company");
   await peer.fill("NVDA");
-  await panel.getByRole("button", {name:/NVDA · NVIDIA/}).waitFor();
+  await panel.getByRole("option", {name:/NVDA · NVIDIA/}).waitFor();
   await panel
     .getByRole("button", { name: "Save & compare", exact: true })
     .click();

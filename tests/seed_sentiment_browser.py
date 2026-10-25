@@ -104,8 +104,10 @@ def grouped_provider(body):
 
 
 current = sentiment.generate(iid, transport=grouped_provider)
-assert news_watch.publish(OWNER, iid, current["id"]) == 2
+published = news_watch.publish(OWNER, iid, current["id"])
+# One grouped alert per changed reading (the backend tests assert 1).
+assert published == 1, published
 news_watch.configure(OWNER, iid, False)
 print(
-    "Sentiment browser fixture: two grouped alerts, watch stopped, no external requests."
+    "Sentiment browser fixture: one grouped alert, watch stopped, no external requests."
 )

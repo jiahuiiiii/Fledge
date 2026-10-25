@@ -61,8 +61,9 @@ let browser;
   await open();
   assert.equal(await filters.getByRole("button", {name:"All sources",exact:true}).getAttribute("aria-pressed"), "true");
   await filters.getByRole("button", {name:"Company news",exact:true}).click();
-  assert.equal(await panel.locator('.sentiment-source-list').getAttribute('open'), null);
-  await panel.locator('.sentiment-source-list > summary').click();
+  // Stories are open by default: a plain list, not a collapsed disclosure.
+  assert.equal(await panel.locator('.sentiment-source-list').count(), 1);
+  assert.equal(await panel.locator('.sentiment-source-list > summary').count(), 0);
   const saved = (
     await (
       await page.request.get(base + `/api/v1/workspace?instrument_id=${iid}`)
@@ -190,15 +191,16 @@ let browser;
     await route.fulfill({ response, json: body });
   });
   await open();
-  await panel.locator('.sentiment-source-list > summary').click();
-  await panel.getByLabel('Source relevance', {exact:true}).selectOption('all');
+  // Only sources relevant to the company are listed (no relevance selector).
+  assert.equal(await panel.getByLabel('Source relevance', {exact:true}).count(), 0);
   for (const scope of ["all", "news", "reddit", "hackernews", "x"]) {
     await filters
       .getByRole("button", { name: names[scope], exact: true })
       .click();
     const selected = sources.filter(
       (s) =>
-        scope === "all" || (s.kind === "news" ? "news" : s.platform) === scope,
+        s.id !== "source-4" &&
+        (scope === "all" || (s.kind === "news" ? "news" : s.platform) === scope),
     );
     assert.deepEqual(
       await panel.locator(".story-source-text").allTextContents(),
@@ -209,7 +211,7 @@ let browser;
       selected.map(sourceHeadline).filter(Boolean),
     );
     assert.ok(
-      !(await panel.locator(".sentiment-items").innerText()).includes(
+      !(await panel.locator(".sentiment-items").allInnerTexts()).join("").includes(
         "Generic authored AI explanation",
       ),
     );
@@ -220,16 +222,16 @@ let browser;
   assert.equal(await panel.locator(".source-story > h3").count(), 0);
   const comment = panel.locator('.source-story[data-source-id="source-3"]');
   await comment
-    .getByRole("button", { name: "Inspect evidence", exact: true })
+    .getByRole("button", { name: "Why this label", exact: true })
     .focus();
   await page.keyboard.press("Enter");
   const story = page.getByRole("dialog", {
-    name: "Story evidence",
+    name: "Why this label",
     exact: true,
   });
   await story.waitFor();
   assert.equal(
-    await story.locator(".story-full-text p").textContent(),
+    await comment.locator(".story-source-text").textContent(),
     sources[3].body,
   );
   assert.match(await story.innerText(), /Generic authored AI explanation 3/);
@@ -237,7 +239,7 @@ let browser;
   await story.waitFor({ state: "hidden" });
   assert.equal(
     await comment
-      .getByRole("button", { name: "Inspect evidence", exact: true })
+      .getByRole("button", { name: "Why this label", exact: true })
       .evaluate((el) => el === document.activeElement),
     true,
   );
@@ -285,7 +287,7 @@ let browser;
     );
     assert.ok(
       await comment
-        .getByRole("button", { name: "Inspect evidence", exact: true })
+        .getByRole("button", { name: "Why this label", exact: true })
         .evaluate((el) => el.getBoundingClientRect().height >= 44),
     );
     await snapshot(`comments-${width}`);
@@ -293,16 +295,8 @@ let browser;
   await filters
     .getByRole("button", { name: "All sources", exact: true })
     .click();
-  assert.equal(
-    await panel
-      .locator('.source-story[data-source-id="source-4"] .story-source-text b')
-      .count(),
-    0,
-  );
-  assert.match(
-    await panel.locator('.source-story[data-source-id="source-4"]').innerText(),
-    /Not about this company/,
-  );
+  // The unrelated source is not listed here; it stays readable in Evidence.
+  assert.equal(await panel.locator('.source-story[data-source-id="source-4"]').count(), 0);
   await panel.getByRole("button", { name: "Evidence", exact: true }).click();
   const evidence = page.getByRole("dialog", {
     name: "News & discussion · evidence",
@@ -321,6 +315,8 @@ let browser;
     sources.map(sourceHeadline).filter(Boolean),
   );
   assert.equal(await original.locator(".sentiment-tag").count(), 0);
+  // Literal angle-bracket text stays text, never formatting.
+  assert.equal(await original.locator(".original-source-text b").count(), 0);
   await evidence
     .getByRole("button", { name: "Current sources", exact: true })
     .click();
