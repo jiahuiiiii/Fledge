@@ -4215,13 +4215,14 @@ input[type="checkbox"] {
 :root {
   font-size: var(--text-base);
 }
-.app-shell button,
+/* Shared UI parts (components/ui) size themselves; keep them out of these. */
+.app-shell button:not(.ui-button, .ui-card),
 .app-shell input,
 .app-shell select,
 .app-shell textarea {
   font-size: var(--text-base);
 }
-.app-shell button,
+.app-shell button:not(.ui-button, .ui-card),
 .app-shell select {
   min-height: 38px;
 }
@@ -4276,7 +4277,7 @@ input[type="checkbox"] {
 .app-shell .idea-panel h2 {
   font-size: var(--text-lg);
 }
-.app-shell h3,
+.app-shell h3:not(.ui-section-header__title),
 .app-shell .evidence-card h3 {
   font-size: var(--text-md);
 }

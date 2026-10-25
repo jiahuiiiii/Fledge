@@ -21,6 +21,14 @@ import {
 } from "../lib/priceRefresh";
 import ExtendedPrice from "./ExtendedPrice";
 import { freshPrice, LIVE_PRICE_MS } from "../lib/livePrice";
+import {
+  Badge,
+  Button,
+  Card,
+  ChevronRightIcon,
+  GridIcon,
+  SectionHeader,
+} from "./ui";
 import "./CompanyOverview.css";
 const stamp = (value) =>
   formatTimestamp(value, { fallback: "Date unavailable" });
@@ -116,7 +124,10 @@ export default function CompanyOverview({
           if (stopped || history?.symbol !== company.symbol) continue;
           setReadings((previous) =>
             previous[company.id]
-              ? { ...previous, [company.id]: { ...previous[company.id], history } }
+              ? {
+                  ...previous,
+                  [company.id]: { ...previous[company.id], history },
+                }
               : previous,
           );
         } catch {
@@ -135,7 +146,11 @@ export default function CompanyOverview({
   // Your own companies first, then practice companies (the worked example,
   // Northstar, before the others), so newcomers see one that has data.
   const rank = (c) =>
-    c.mode !== "recorded" ? 0 : c.id === "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" ? 1 : 2;
+    c.mode !== "recorded"
+      ? 0
+      : c.id === "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        ? 1
+        : 2;
   const companies = catalogue
     .filter((company) => companyMatches(company, query))
     .map((company, index) => [company, index])
@@ -146,28 +161,35 @@ export default function CompanyOverview({
       className="collection-page company-overview"
       aria-label="All company workspaces"
     >
-      <div className="company-overview-heading">
-        <div>
-          <span className="section-label">
-            {beginner ? "YOUR COMPANIES" : "YOUR RESEARCH"}
-          </span>
-          <h1>
+      <SectionHeader
+        level="page"
+        className="company-overview-heading"
+        icon={<GridIcon />}
+        eyebrow={beginner ? "Your companies" : "Your research"}
+        title={
+          <>
             {beginner ? "My companies" : "All companies"}{" "}
-            <span>{catalogue.length}</span>
-          </h1>
-          <p className="muted">
-            {beginner
-              ? practiceNote(catalogue)
-              : "Saved prices and financials, together. Open a company to explore its evidence."}
-          </p>
-        </div>
-        <button
-          onClick={() => setRefresh((value) => value + 1)}
-          disabled={loading}
-        >
-          Reload saved data
-        </button>
-      </div>
+            <Badge>{catalogue.length}</Badge>
+          </>
+        }
+        description={
+          beginner
+            ? practiceNote(catalogue)
+            : "Saved prices and financials, together. Open a company to explore its evidence."
+        }
+        actions={
+          // Beginner mode keeps the home to the cards themselves.
+          !beginner && (
+            <Button
+              size="sm"
+              onClick={() => setRefresh((value) => value + 1)}
+              disabled={loading}
+            >
+              Reload saved data
+            </Button>
+          )
+        }
+      />
       <label className="company-overview-search">
         <span>Find a company</span>
         <input
@@ -193,7 +215,9 @@ export default function CompanyOverview({
           const margin = trailing(data?.financial_depth, "operating_margin");
           const tone = newsTone(data?.sentiment);
           return (
-            <button
+            <Card
+              as="button"
+              interactive
               className="company-overview-card"
               key={company.id}
               data-company={company.id}
@@ -206,11 +230,13 @@ export default function CompanyOverview({
                   <strong title={company.name}>{companyName(company)}</strong>
                   <span className="company-overview-symbol">
                     {company.symbol}
-                    {company.mode === "recorded" && " · Fictional sample"}
+                    {company.mode === "recorded" && (
+                      <Badge>Fictional sample</Badge>
+                    )}
                   </span>
                 </span>
                 <span className="company-overview-arrow" aria-hidden="true">
-                  ↗
+                  <ChevronRightIcon />
                 </span>
               </span>
               {!reading ? (
@@ -268,7 +294,9 @@ export default function CompanyOverview({
                           : "Analyse news in the company workspace"}
                     </small>
                   </span>
-                  <span
+                  <Card
+                    as="span"
+                    variant="inset"
                     className="company-overview-figures"
                     hidden={beginner}
                   >
@@ -294,19 +322,25 @@ export default function CompanyOverview({
                           : "No compatible saved figure"}
                       </small>
                     </span>
-                  </span>
+                  </Card>
                 </>
               )}
               <span className="company-overview-footer">
                 <span>
                   {company.status
-                    ? beginner ? "View saved" : "Idea saved"
-                    : beginner ? "No view saved yet" : "No saved idea"}
-                  {company.unread > 0 && ` · ${company.unread} to review`}
+                    ? beginner
+                      ? "View saved"
+                      : "Idea saved"
+                    : beginner
+                      ? "No view saved yet"
+                      : "No saved idea"}
+                  {company.unread > 0 && (
+                    <Badge status="info">{company.unread} to review</Badge>
+                  )}
                 </span>
-                <span>{beginner ? "See summary →" : "Open workspace →"}</span>
+                <span>{beginner ? "See summary" : "Open workspace"}</span>
               </span>
-            </button>
+            </Card>
           );
         })}
       </div>

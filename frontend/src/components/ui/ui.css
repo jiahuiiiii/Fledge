@@ -1,0 +1,356 @@
+/* Shared UI parts: Card, SectionHeader, Badge and Button.
+   The structure learns from LifeForge UI's design language (no LifeForge
+   code is used): neutral surfaces separated by fill rather than lines,
+   matching corners on cards and controls, tinted icon tiles on page and
+   section titles, and four button levels. The finish is deliberately calm
+   for a research tool: small corners, compact controls, medium weights and
+   muted destructive fills. Text keeps at least 4.5:1 contrast on every
+   surface. The --ui-* names point at the app-wide tokens in tokens.css, so the
+   shared parts and older pages use one palette. */
+:root {
+  --ui-bg: var(--color-bg);
+  --ui-surface: var(--color-surface);
+  --ui-surface-2: var(--color-surface-2);
+  --ui-surface-3: var(--color-surface-3);
+  --ui-line: var(--color-line);
+  --ui-line-strong: var(--color-line-strong);
+  --ui-text: var(--color-text);
+  --ui-text-2: var(--color-text-2);
+  --ui-muted: var(--color-muted);
+  --ui-accent: var(--color-accent);
+  --ui-accent-hover: var(--color-accent-light);
+  --ui-on-accent: var(--color-on-accent);
+  --ui-danger: var(--color-negative);
+  --ui-danger-hover: var(--color-negative-light);
+}
+
+/* ---- Card ---- */
+.ui-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui-text-2);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.55;
+}
+.ui-card--panel {
+  padding: var(--space-4);
+  background: var(--ui-surface);
+  border-radius: var(--radius-md);
+}
+.ui-card--inset {
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--ui-surface-2);
+  border-radius: var(--radius-sm);
+}
+.ui-card--flush {
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--ui-line);
+  border-radius: 0;
+}
+.ui-card--flush:last-child {
+  border-bottom: 0;
+}
+.ui-card:is(button, a) {
+  width: 100%;
+  align-items: stretch;
+  justify-content: flex-start;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.ui-card--interactive {
+  transition: background-color 0.15s;
+}
+.ui-card--panel.ui-card--interactive:hover:not(:disabled) {
+  background: var(--ui-surface-2);
+}
+.ui-card--inset.ui-card--interactive:hover:not(:disabled) {
+  background: var(--ui-surface-3);
+}
+.ui-card--flush.ui-card--interactive:hover:not(:disabled) {
+  background: none;
+}
+.ui-card--flush.ui-card--interactive:hover:not(:disabled)
+  .ui-section-header__title {
+  color: var(--ui-accent);
+}
+.ui-card > p {
+  margin: 0;
+}
+
+/* ---- SectionHeader ---- */
+.ui-section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.ui-section-header__icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ui-accent) 14%, transparent);
+  color: var(--ui-accent);
+}
+.ui-section-header__icon svg {
+  width: 18px;
+  height: 18px;
+}
+.ui-section-header__text {
+  display: grid;
+  flex: 1 1 200px;
+  gap: 2px;
+  min-width: 0;
+}
+.ui-section-header__eyebrow {
+  display: block;
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.ui-section-header__title {
+  display: block;
+  margin: 0;
+  color: var(--ui-text);
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.ui-section-header__description {
+  display: block;
+  max-width: 68ch;
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.ui-section-header__actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+.ui-section-header--section .ui-section-header__title {
+  font-size: var(--text-md);
+  letter-spacing: -0.01em;
+}
+.ui-section-header--page {
+  gap: var(--space-4);
+}
+.ui-section-header--page .ui-section-header__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+}
+.ui-section-header--page .ui-section-header__icon svg {
+  width: 24px;
+  height: 24px;
+}
+.ui-section-header--page .ui-section-header__title {
+  font-size: var(--text-xl);
+  letter-spacing: -0.02em;
+}
+.ui-section-header--page .ui-section-header__description {
+  font-size: var(--text-base);
+}
+
+/* ---- Badge ---- */
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 20px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.ui-badge__shape {
+  font-size: 9px;
+}
+.ui-badge--neutral,
+.ui-badge--tone-neutral {
+  background: var(--ui-surface-3);
+  color: var(--ui-text-2);
+}
+.ui-badge--info {
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  color: var(--color-info-light);
+}
+.ui-badge--accent {
+  background: color-mix(in srgb, var(--ui-accent) 12%, transparent);
+  color: var(--ui-accent);
+}
+.ui-badge--new {
+  background: var(--ui-accent);
+  color: var(--ui-on-accent);
+}
+.ui-badge--tone-positive {
+  background: color-mix(in srgb, var(--color-positive) 12%, transparent);
+  color: var(--color-positive-light);
+}
+.ui-badge--tone-negative {
+  background: color-mix(in srgb, var(--color-negative) 12%, transparent);
+  color: var(--color-negative-light);
+}
+.ui-badge--tone-mixed {
+  background: color-mix(in srgb, var(--color-gold) 12%, transparent);
+  color: var(--color-gold);
+}
+/* Unknown is deliberately not a colour: missing data must not look like an
+   assessed tone. */
+.ui-badge--tone-unknown {
+  border: 1px dashed var(--ui-line-strong);
+  background: transparent;
+  color: var(--ui-muted);
+}
+
+/* ---- Button ---- */
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ui-text-2);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.ui-button__icon {
+  display: inline-flex;
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+.ui-button__icon svg {
+  width: 100%;
+  height: 100%;
+}
+.ui-button--sm {
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-xs);
+}
+.ui-button--sm .ui-button__icon {
+  width: 16px;
+  height: 16px;
+}
+.ui-button--icon-only {
+  width: 36px;
+  padding: 0;
+}
+.ui-button--sm.ui-button--icon-only {
+  width: 28px;
+}
+/* Toggle buttons (aria-pressed) show their on state with a fill. */
+.ui-button[aria-pressed="true"] {
+  background: var(--ui-surface-3);
+  color: var(--ui-text);
+}
+
+.ui-button--primary {
+  background: var(--ui-accent);
+  color: var(--ui-on-accent);
+}
+.ui-button--primary:hover:not(:disabled) {
+  background: var(--ui-accent-hover);
+}
+.ui-button--secondary {
+  border-color: color-mix(in srgb, var(--ui-accent) 55%, transparent);
+  color: var(--ui-accent);
+}
+.ui-button--secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ui-accent) 10%, transparent);
+}
+.ui-button--tertiary {
+  color: var(--ui-accent);
+}
+.ui-button--tertiary:hover:not(:disabled) {
+  background: var(--ui-surface-2);
+}
+.ui-button--plain {
+  color: var(--ui-text-2);
+}
+.ui-button--plain:hover:not(:disabled) {
+  background: var(--ui-surface-2);
+  color: var(--ui-text);
+}
+
+/* A destructive main action is a muted tint, not a bright block. */
+.ui-button--danger.ui-button--primary {
+  background: color-mix(in srgb, var(--ui-danger) 18%, transparent);
+  color: var(--ui-danger-hover);
+}
+.ui-button--danger.ui-button--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ui-danger) 26%, transparent);
+}
+.ui-button--danger.ui-button--secondary {
+  border-color: color-mix(in srgb, var(--ui-danger) 55%, transparent);
+  color: var(--ui-danger);
+}
+.ui-button--danger.ui-button--secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ui-danger) 10%, transparent);
+}
+.ui-button--danger:is(.ui-button--tertiary, .ui-button--plain) {
+  color: var(--ui-danger);
+}
+
+/* Inline buttons sit inside a sentence, such as "Show the evidence". */
+.ui-button--inline {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  font-size: inherit;
+  vertical-align: baseline;
+}
+.ui-button--inline:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 600px) {
+  .ui-section-header {
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-card--interactive,
+  .ui-button {
+    transition: none;
+  }
+}

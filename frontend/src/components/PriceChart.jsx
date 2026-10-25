@@ -129,14 +129,14 @@ export default function PriceChart({ prices, fictional = true }) {
                 x2={w - 53}
                 y1={y(value)}
                 y2={y(value)}
-                stroke="#242a2e"
+                stroke="#27272a"
                 strokeDasharray="3 5"
               />
               <text
                 x={w - 4}
                 textAnchor="end"
                 y={y(value) + 4}
-                fill="#88959c"
+                fill="#8f8f99"
                 fontSize="12"
               >
                 {value.toFixed(2)}
@@ -197,7 +197,7 @@ export default function PriceChart({ prices, fictional = true }) {
           x2={x(index)}
           y1="0"
           y2={h}
-          stroke="#78838a"
+          stroke="#80808a"
           strokeDasharray="3 3"
           pointerEvents="none"
         />

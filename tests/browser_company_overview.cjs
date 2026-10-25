@@ -205,7 +205,7 @@ let browser;
     await mrvl
       .locator(".company-avatar")
       .evaluate((el) => getComputedStyle(el).backgroundColor),
-    "rgb(38, 48, 67)",
+    "rgb(43, 43, 49)",
   );
   assert.match(
     await all.locator('[data-company="authored-LONG"]').innerText(),

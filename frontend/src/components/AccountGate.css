@@ -211,7 +211,7 @@
   color: var(--color-text-2);
 }
 .account-card input::placeholder {
-  color: var(--color-faint, #7c889b);
+  color: var(--color-faint, #8a8a94);
 }
 .account-card .consent-check {
   min-height: 0;

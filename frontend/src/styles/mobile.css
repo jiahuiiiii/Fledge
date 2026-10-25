@@ -91,8 +91,7 @@
 [data-detail-mode="explain"] .app-shell .research-navigation,
 [data-detail-mode="explain"] .app-shell .research-section-heading,
 [data-detail-mode="explain"] .app-shell .demo-bar,
-[data-detail-mode="explain"] .company-overview-search,
-[data-detail-mode="explain"] .company-overview-heading > button {
+[data-detail-mode="explain"] .company-overview-search {
   display: none !important;
 }
 .beginner-back {
