@@ -74,10 +74,10 @@ def card(owner, instrument_id, *, figures=True):
         )
 
 
-def warm_figures(stop=None, owners=(None,)):
-    """Build every SEC company's filing figures once per account, so parsed
-    filings are in memory and saved figures exist before anyone asks.
-    Reads saved data only (and saves finished figures); returns how many."""
+def warm_figures(stop=None, pause=0.5):
+    """Parse every SEC company's filings once, so the cache is warm before
+    anyone asks. Without an account nothing is saved; each account saves its
+    own figures on its first read. Reads saved data only; returns how many."""
     from .research.sec import financial_depth
 
     with transaction(consistent=True) as conn:
@@ -86,11 +86,10 @@ def warm_figures(stop=None, owners=(None,)):
             for row in rows(conn, "SELECT instrument_id FROM instrument_state WHERE mode='sec' ORDER BY instrument_id")
         ]
     done = 0
-    for owner in owners:
-        for instrument_id in ids:
-            if stop is not None and stop.is_set():
-                return done
-            with transaction(owner, consistent=True) as conn:
-                financial_depth.present(conn, instrument_id)
-            done += 1
+    for instrument_id in ids:
+        if stop is not None and (stop.is_set() or (done and stop.wait(pause))):
+            break
+        with transaction(consistent=True) as conn:
+            financial_depth.present(conn, instrument_id)
+        done += 1
     return done

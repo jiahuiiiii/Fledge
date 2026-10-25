@@ -59,14 +59,15 @@ async def lifespan(app):
     def warm_loop():
         # A restart empties the parsed-filing cache, so the first Pro home page
         # rebuilt every company's figures (about 21 s of work on 25 Oct data,
-        # 3.5 s warm). Build them once per account in the background, a few
-        # seconds in; finished figures are also saved (migration 072).
+        # 3.5 s warm). Parse them once in the background, a few seconds in,
+        # pausing between companies. Not per account: 21 accounts made this
+        # 21 times the work and slowed every page after a restart.
         if stop.wait(3):
             return
         from .home_cards import warm_figures
 
         try:
-            warm_figures(stop, auth.background_owners())
+            warm_figures(stop)
         except Exception:
             logging.getLogger("thesis").exception("Filing figure warm-up failed")
 
