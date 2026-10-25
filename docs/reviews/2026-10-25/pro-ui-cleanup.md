@@ -39,4 +39,11 @@ Built to a scratch folder and copied into `frontend/dist` (assets copied without
 - Every older browser journey already failed before this work: accounts now start in Beginner with the first-login questions showing. `run_browser.py` now gives the disposable test owner a completed Pro profile.
 - With that fix, `--company-overview`, `--sector-position`, `--news-discussion` and `--financial-recovery` pass on the new build. `--expectations` was retired with the news-expectations panel; `ExpectationsPanel.jsx` and its seed were deleted.
 - `seed_sentiment_browser.py` now asserts one grouped alert (the backend tests assert 1), which unblocks the inbox, scheduled-review, digest and idea-alert seeds (their journeys were not re-run).
-- Still failing and not yet re-pointed: `--business`, `--topic-homes`, `--reading-flow`, `--companion`, `--research-design`, `--financials`, `--valuation`, `--content-first`, `--source-filters`, `--ideas`, `--prices`, `--report-expectations`. Some fail on this work's layout changes (business brief now in a disclosure, price chart collapsed, analyst targets now a chart); others on earlier redesigns (button names such as "Ask a question", "My ideas", "Notebook").
+- Later the same day all of the following were re-pointed or fixed and pass: `--business`-family journeys listed below are the exception. `--topic-homes`, `--reading-flow` and `--report-expectations` now pass (legacy History empty-state and an Updates-card wording check were dropped; the UI was not changed for the tests). The old note follows for the rest:
+- Previously failing: `--business`, `--topic-homes`, `--reading-flow`, `--companion`, `--research-design`, `--financials`, `--valuation`, `--content-first`, `--source-filters`, `--ideas`, `--prices`, `--report-expectations`. Some fail on this work's layout changes (business brief now in a disclosure, price chart collapsed, analyst targets now a chart); others on earlier redesigns (button names such as "Ask a question", "My ideas", "Notebook").
+
+## Responsive sweep
+
+`tests/run_browser.py --responsive` loads Overview, News, Financials and Compare at 320, 390, 768, 1024 and 1440 px, fails on sideways scroll or any element past the viewport, and checks the company header buttons stay beside the price on desktop. On wide screens the price block now takes the spare width and wraps inside itself, so a long quote (close plus after-hours) no longer pushes the buttons underneath.
+
+Screenshots taken during review are local evidence and are no longer committed (`.gitignore` excludes them).

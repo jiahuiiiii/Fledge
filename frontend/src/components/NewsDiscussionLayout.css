@@ -197,6 +197,7 @@
   display: flex;
   flex-direction: column;
   gap: 0;
+  border-top: 0;
 }
 .app-shell .sentiment-panel .sentiment-items > .source-story.ui-card {
   padding: var(--space-5) 0;

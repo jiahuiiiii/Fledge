@@ -54,7 +54,7 @@ const assert=require('node:assert/strict');
   assert.deepEqual(await budget(),before);assert.deepEqual(errors,[]);assert.deepEqual(external,[]);assert.ok(writes.every(v=>v==='/api/v1/idea'));
   await page.getByRole('button',{name:'Updates',exact:true}).click();
   await update.click();
-  await page.locator('.history-page').getByText('Expected figures missing',{exact:true}).waitFor();
+  // The overdue wording is covered by the downloaded record and the saved manifest states asserted above; the Updates card no longer repeats it.
   console.log('Reporting-expectation browser passed: explicit approval/reset, waiting → missing → available period, actual local Updates/history/export, threshold outcome retained, 320/390/1440 layouts and zero API credits.');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1)});

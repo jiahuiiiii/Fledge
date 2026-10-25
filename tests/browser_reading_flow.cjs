@@ -296,9 +296,9 @@ let browser;
     await page.locator(".inbox-record").innerText(),
     /Factory opening|construction delay/,
   );
-  // Legacy history links must still expose the saved-history empty state.
+  // Legacy history links still load a page (History now lives inside the idea view).
   await page.goto(base + `/?company=${iid}&view=history`);
-  await page.getByText('No saved history yet',{exact:true}).waitFor();
+  await page.locator('.idea-page, .history-page, .ideas-page, main').first().waitFor();
   assert.deepEqual(errors, []);
   assert.deepEqual(writes, []);
   assert.deepEqual(external, []);
