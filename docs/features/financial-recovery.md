@@ -47,3 +47,7 @@ Saved public-source replay, without new collection or AI calls:
 QCOM’s narrower cash-PPE-purchases target remains eligible for an optional interpretation; the existing broader cash-capital-spending reading remains distinct. No missing figure is filled merely to remove an “Unavailable” label.
 
 See [implementation review](../reviews/2026-10-11/financial-recovery.md) for tests, deployment evidence and limitations.
+
+## Use all suggestions at once — 25 October 2026
+
+Above the report selector, **Use all suggestions from all N reports** saves every suggested figure from every reviewed report as that report's choices in one step (reads and saves reviews only; no AI call). Each report keeps its calculation, original rows and its own untick-and-save revocation, and a line says how many figures from how many reports are now used. If one report fails, those saved before it stay saved.

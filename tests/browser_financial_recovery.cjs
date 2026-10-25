@@ -258,6 +258,13 @@ module.exports = async function checkFinancialRecovery(page, folder) {
     .waitFor();
   assert.deepEqual(saved.get("report-a").accepted, ["debt"]);
   assert.equal(calls.length, 2);
+  // One button applies every saved suggestion from every reviewed report (no AI call).
+  await panel
+    .getByRole("button", { name: /^Use all suggestions from all 2 reports/ })
+    .click();
+  await panel.getByText(/Now using \d+ suggested/).waitFor();
+  assert.ok(saved.get("report-c").accepted.length > 0);
+  assert.equal(calls.length, 2);
   // Batch stops at the first failure; successful suggestions survive. No retry.
   saved = new Map();
   calls = [];

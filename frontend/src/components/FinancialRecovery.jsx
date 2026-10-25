@@ -18,6 +18,7 @@ export default function FinancialRecovery({ instrumentId, onApplied }) {
   const [firstLoad, setFirstLoad] = useState("loading");
   // Free previews of every report still waiting for an AI reading.
   const [batch, setBatch] = useState(null);
+  const [applyNote, setApplyNote] = useState("");
   const generation = useRef(0);
   // Read on mount (saved data only, no AI) so the panel can stay hidden when
   // the charts have no gaps it could help with.
@@ -96,6 +97,48 @@ export default function FinancialRecovery({ instrumentId, onApplied }) {
         setBusy("");
         // Show the first report's suggestions; the list marks the others.
         if (done) setDocumentId(runnable[0].document.id);
+        setRevision((n) => n + 1);
+      }
+    }
+  }
+  // Use every saved suggestion from every reviewed report in one step. Reading
+  // and saving reviews makes no AI call; each report keeps its own saved review
+  // (and can be unticked later), and the original rows stay one click away.
+  async function applyAllReports() {
+    const token = generation.current;
+    setBusy("Applying suggestions from all reports…");
+    setError("");
+    setApplyNote("");
+    let figures = 0,
+      reports = 0;
+    try {
+      for (const doc of reviewed) {
+        const next = await api.financialRecovery(instrumentId, doc.id);
+        if (token !== generation.current) return;
+        const r = next.reading;
+        const ids = (r?.result?.items || []).map((item) => item.id);
+        if (!ids.length || r.withheld) continue;
+        if ([...ids].sort().join() === [...(r.accepted || [])].sort().join()) continue;
+        await api.reviewFinancialRecovery(instrumentId, r.id, {
+          accepted: ids,
+          expected_review: r.review_id,
+        });
+        figures += ids.length;
+        reports += 1;
+      }
+      if (token !== generation.current) return;
+      setApplyNote(
+        figures
+          ? `Now using ${figures} suggested ${figures === 1 ? "figure" : "figures"} from ${reports} ${reports === 1 ? "report" : "reports"} in your charts.`
+          : "Every saved suggestion was already in use.",
+      );
+      await onApplied?.();
+    } catch (failure) {
+      if (token === generation.current)
+        setError(`${failure.message} Suggestions applied before this are saved.`);
+    } finally {
+      if (token === generation.current) {
+        setBusy("");
         setRevision((n) => n + 1);
       }
     }
@@ -309,6 +352,24 @@ export default function FinancialRecovery({ instrumentId, onApplied }) {
                       </p>
                     )}
                   </>
+                )}
+                {reviewed.length > 0 && (
+                  <div className="recovery-apply-all">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={Boolean(busy)}
+                      onClick={applyAllReports}
+                    >
+                      Use all suggestions from {reviewed.length === 1 ? "this report" : `all ${reviewed.length} reports`}
+                    </Button>
+                    <small>
+                      Puts every suggested figure into your charts. Each one keeps its
+                      calculation and original rows below, and you can untick and save
+                      any report&apos;s choices later. No AI is used.
+                    </small>
+                    {applyNote && <small role="status">{applyNote}</small>}
+                  </div>
                 )}
                 {reviewed.length > 0 && (
                   <label className="recovery-report">
