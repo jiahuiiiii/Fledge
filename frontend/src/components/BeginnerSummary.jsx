@@ -25,6 +25,13 @@ const EFFECT_WORDS = {
   could_hurt: "Could hurt",
   mixed_or_unclear: "Could go either way",
 };
+// The saved world-link effect, shown with the matching tone badge.
+const EFFECT_TONE = {
+  could_help: "positive",
+  could_hurt: "negative",
+  mixed_or_unclear: "mixed",
+};
+import { Badge, Button, Card, ChevronRightIcon, SectionHeader } from "./ui";
 import "./BeginnerSummary.css";
 
 // Beginner summary, "Signals" layout: the price, three lights (News, People
@@ -151,7 +158,7 @@ export default function BeginnerSummary({
       <div className={`bs-group tone-${mood}`}>
         <h5>
           <span className={`bs-dot mood-${mood}`} aria-hidden="true"></span>
-          {label} <span className="bs-count">{list.length}</span>
+          {label} <Badge>{list.length}</Badge>
         </h5>
         <ul className="bs-headlines">{list.slice(0, limit).map(headline)}</ul>
       </div>
@@ -214,18 +221,18 @@ export default function BeginnerSummary({
         {pointer && <p className="bs-pointer">{pointer}</p>}
       </section>
 
-      <section className="bs-card" id="bs-news" tabIndex={-1} aria-labelledby="bs-news-title">
-        <h4 id="bs-news-title">News: what happened</h4>
+      <Card id="bs-news" tabIndex={-1} aria-labelledby="bs-news-title">
+        <SectionHeader level="card" as="h4" id="bs-news-title" title="News: what happened" />
         <p className="bs-meaning">{newsMeaning(newsGroups)}</p>
         {onRate && !reading && (newsGroups.unrated.length > 0 || postGroups.unrated.length > 0) && (
           <div className="bs-rate">
-            <button type="button" className="primary" onClick={onRate} disabled={!!rating}>
+            <Button variant="primary" onClick={onRate} disabled={!!rating}>
               {rating === "running"
                 ? "Rating… about a minute"
                 : rating
                   ? "Getting the latest posts first…"
                   : "Rate with AI"}
-            </button>
+            </Button>
             <small>Fledge reads the news and posts and marks each good, bad or mixed.</small>
           </div>
         )}
@@ -236,29 +243,48 @@ export default function BeginnerSummary({
           <details className="bs-group tone-neutral">
             <summary>
               Neutral, neither good nor bad{" "}
-              <span className="bs-count">{newsGroups.neutral.length}</span>
+              <Badge>{newsGroups.neutral.length}</Badge>
             </summary>
             <ul className="bs-headlines">{newsGroups.neutral.slice(0, 5).map(headline)}</ul>
           </details>
         )}
         {!reading && group("Not rated yet", "none", newsGroups.unrated, 5)}
         {!news.length && onUpdate && (
-          <button type="button" className="bs-link inline" onClick={onUpdate}>
-            Get the latest news
-          </button>
+          <p>
+            <Button variant="tertiary" size="inline" onClick={onUpdate}>
+              Get the latest news
+            </Button>
+          </p>
         )}
-        <button type="button" className="bs-more" onClick={() => onView?.("evidence")}>
-          All news & posts →
-        </button>
-        {!practice && onRate && (
-          <button type="button" className="bs-more" onClick={() => onView?.("evidence")}>
-            Turn on news alerts →
-          </button>
-        )}
-      </section>
+        <div className="bs-actions">
+          <Button
+            variant="tertiary"
+            size="sm"
+            iconEnd={<ChevronRightIcon />}
+            onClick={() => onView?.("evidence")}
+          >
+            All news & posts
+          </Button>
+          {!practice && onRate && (
+            <Button
+              variant="tertiary"
+              size="sm"
+              iconEnd={<ChevronRightIcon />}
+              onClick={() => onView?.("evidence")}
+            >
+              Turn on news alerts
+            </Button>
+          )}
+        </div>
+      </Card>
 
-      <section className="bs-card" id="bs-people" tabIndex={-1} aria-labelledby="bs-people-title">
-        <h4 id="bs-people-title">What people online are saying</h4>
+      <Card id="bs-people" tabIndex={-1} aria-labelledby="bs-people-title">
+        <SectionHeader
+          level="card"
+          as="h4"
+          id="bs-people-title"
+          title="What people online are saying"
+        />
         <p className="bs-meaning">{peopleMeaning(postGroups)}</p>
         {social.length > 0 && (
           <p className="bs-muted bs-platforms">
@@ -271,17 +297,22 @@ export default function BeginnerSummary({
         {group("Worried posts (opinions)", "bad", postGroups.bad)}
         {group("Mixed posts: good and bad", "mixed", postGroups.mixed)}
         {!reading && group("Not rated yet", "none", postGroups.unrated)}
-      </section>
+      </Card>
 
-      <section className="bs-card" id="bs-world" tabIndex={-1} aria-labelledby="bs-world-title">
-        <h4 id="bs-world-title">World news that may matter</h4>
+      <Card id="bs-world" tabIndex={-1} aria-labelledby="bs-world-title">
+        <SectionHeader
+          level="card"
+          as="h4"
+          id="bs-world-title"
+          title="World news that may matter"
+        />
         {links.length ? (
           <ul className="bs-world">
             {links.map(({ article, link }) => (
               <li key={article.id}>
-                <span className={`bs-effect-tag effect-${link.effect}`}>
+                <Badge tone={EFFECT_TONE[link.effect]}>
                   {EFFECT_WORDS[link.effect]}
-                </span>
+                </Badge>
                 <a href={article.url} target="_blank" rel="noopener noreferrer">
                   {article.headline}
                 </a>
@@ -300,13 +331,20 @@ export default function BeginnerSummary({
             These are possibilities to think about, not predictions or tips.
           </p>
         )}
-        <button type="button" className="bs-more" onClick={onWorld}>
-          World news →
-        </button>
-      </section>
+        <div className="bs-actions">
+          <Button
+            variant="tertiary"
+            size="sm"
+            iconEnd={<ChevronRightIcon />}
+            onClick={onWorld}
+          >
+            World news
+          </Button>
+        </div>
+      </Card>
 
-      <section className="bs-card bs-view" aria-labelledby="bs-yourview">
-        <h4 id="bs-yourview">Your view</h4>
+      <Card aria-labelledby="bs-yourview">
+        <SectionHeader level="card" as="h4" id="bs-yourview" title="Your view" />
         {savedView?.question ? (
           <>
             <p>{savedView.question}</p>
@@ -320,22 +358,24 @@ export default function BeginnerSummary({
           </p>
         )}
         {onSaveView && (
-          <button type="button" className="primary" onClick={onSaveView}>
-            {savedView ? "Edit my view" : "Write my view"}
-          </button>
+          <div className="bs-actions">
+            <Button variant="primary" onClick={onSaveView}>
+              {savedView ? "Edit my view" : "Write my view"}
+            </Button>
+          </div>
         )}
-      </section>
+      </Card>
 
       {mode === "explain" ? (
         <p className="bs-note">
           Want financials, charts and comparisons?{" "}
-          <button
-            type="button"
-            className="bs-link inline"
+          <Button
+            variant="tertiary"
+            size="inline"
             onClick={() => setDetailMode?.("data")}
           >
             Turn on Pro tools
-          </button>{" "}
+          </Button>{" "}
           (you can switch back in Account).
         </p>
       ) : (

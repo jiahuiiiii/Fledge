@@ -348,6 +348,25 @@
   }
 }
 
+/* Touch screens get 44 px targets, as elsewhere in the app. */
+@media (pointer: coarse) {
+  .ui-button:not(.ui-button--inline) {
+    min-height: 44px;
+  }
+  .ui-button--icon-only {
+    width: 44px;
+  }
+  /* Inline buttons keep the sentence layout; an invisible area widens the tap. */
+  .ui-button--inline {
+    position: relative;
+  }
+  .ui-button--inline::after {
+    content: "";
+    position: absolute;
+    inset: -13px -4px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ui-card--interactive,
   .ui-button {

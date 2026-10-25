@@ -171,3 +171,51 @@ background, `rgb(43, 43, 49)`.
 
 No live app restart was performed. The running app keeps its current look
 until the frontend is rebuilt and installed.
+
+## Installed into the running app
+
+At the owner's request, commit `53a6f01` (without the uncommitted portfolio
+edits) was installed into the running app with no restart: built from
+`git archive HEAD` in a scratch folder, new assets copied into `frontend/dist`
+with `cp -n` (151 old files kept, 19 added), and `index.html` replaced last by
+an atomic rename. Port 8841 then served the new bundle; the previous bundle
+still answered 200 for tabs already open.
+
+## Second migrated page: Summary tab
+
+`BeginnerSummary` (the Summary tab) now uses the shared parts for its four
+section cards and titles, "Rate with AI" and "Write my view", the "All news &
+posts", "Turn on news alerts" and "World news" links (chevron instead of →),
+the inline "Get the latest news" and "Turn on Pro tools" buttons, count
+numbers, and world-news effect tags. The effect tags map the saved
+`could_help` / `could_hurt` / `mixed_or_unclear` values directly to positive /
+negative / mixed tone badges; the wording is unchanged.
+
+Kept as they were: the coloured signal lights and the tinted good/bad/mixed
+group boxes (a recent teammate design), headline rows, and `.bs-card`,
+`.bs-meaning`, `.bs-meta`, `.bs-note` and light rules, which `PortfolioRead`
+still uses. The plain-language reading uses body size under card titles on
+this page only.
+
+`BeginnerSummary.css` went from 532 to about 365 lines: rules for 11 class
+groups no component uses (`bs-hero`, `bs-oneline`, `bs-price`, `bs-list`,
+`bs-head`, `bs-tone(s)`, `bs-chip`, `bs-effect`, `bs-why`, `bs-timeline`,
+`bs-day`, `bs-more-row`) and the replaced `bs-more`, `bs-view`, `bs-count`,
+`bs-effect-tag`, `.bs-link.inline` and `.bs-rate .primary` rules.
+
+Shared `Button`s now measure 44 px on touch screens, matching the app's
+existing touch rule; inline buttons get an invisible 44 px tap area so the
+sentence layout does not move.
+
+### Verification
+
+- `npm test`: 214 passed, 0 failed; build succeeds. `BeginnerSummary.jsx` and
+  `.css` already failed Prettier before this change and were not reformatted.
+- Screenshots of Beginner at 1280 and 390 px and Pro at 1280 px from the
+  isolated offline test server; no horizontal overflow. Images are kept
+  locally in `docs/reviews/2026-10-25/summary-screenshots/`, not committed.
+- Touch: in the browser pane's mobile mode (coarse pointer) every Summary
+  button measured 44 px, and the inline "Turn on Pro tools" responds 18 px
+  above and below its text.
+- Not exercised: world-news effect badges and tone groups (the seed has no
+  linked world headlines or rated stories), and the Playwright journeys.
