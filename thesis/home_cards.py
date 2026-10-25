@@ -7,7 +7,7 @@ filing figures never hold back the prices. Readings pass through the same
 presenters as the workspace, so withheld sources stay withheld.
 """
 from . import service
-from .db import transaction
+from .db import rows, transaction
 
 FIGURES = ("revenue", "operating_margin")
 
@@ -72,3 +72,25 @@ def card(owner, instrument_id, *, figures=True):
             financial_depth=trailing_figures(depth),
             figures=bool(figures and mode == "sec"),
         )
+
+
+def warm_figures(stop=None, owners=(None,)):
+    """Build every SEC company's filing figures once per account, so parsed
+    filings are in memory and saved figures exist before anyone asks.
+    Reads saved data only (and saves finished figures); returns how many."""
+    from .research.sec import financial_depth
+
+    with transaction(consistent=True) as conn:
+        ids = [
+            str(row["instrument_id"])
+            for row in rows(conn, "SELECT instrument_id FROM instrument_state WHERE mode='sec' ORDER BY instrument_id")
+        ]
+    done = 0
+    for owner in owners:
+        for instrument_id in ids:
+            if stop is not None and stop.is_set():
+                return done
+            with transaction(owner, consistent=True) as conn:
+                financial_depth.present(conn, instrument_id)
+            done += 1
+    return done

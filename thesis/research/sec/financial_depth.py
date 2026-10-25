@@ -218,6 +218,18 @@ def normalize_depth(bundle,cik,now,resolver=None):
 def present(conn,iid):
     if not one(conn,"SELECT 1 FROM sources WHERE id='sec-companyfacts' AND entitlement='sec-public'"):
         return dict(status='unavailable',reason='Structured filing source access is unavailable.')
+    # Reuse this account's saved result for the exact same inputs (migration 072).
+    from .filing_figures import basis,load,owner_of,save
+    owner=owner_of(conn);key=basis(conn,iid) if owner else None
+    if key:
+        saved=load(conn,iid,key)
+        if saved is not None:return saved
+    result=build(conn,iid)
+    if key and result['status']=='available':save(owner,iid,key,result)
+    return result
+
+
+def build(conn,iid):
     saved=one(conn,'SELECT p.id,p.payload,p.retrieved_at,c.cik,k.checked_at FROM sec_payload_current k JOIN source_payloads p ON p.id=k.payload_id AND p.instrument_id=k.instrument_id JOIN sec_companies c ON c.instrument_id=k.instrument_id WHERE k.instrument_id=%s',(iid,))
     if not saved:return dict(status='empty',reason='Refresh filings to prepare trailing results and borrowing information.')
     from .amendments import retained_resolver

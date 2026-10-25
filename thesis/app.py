@@ -56,6 +56,22 @@ async def lifespan(app):
     thread = threading.Thread(target=loop, daemon=True)
     thread.start()
 
+    def warm_loop():
+        # A restart empties the parsed-filing cache, so the first Pro home page
+        # rebuilt every company's figures (about 21 s of work on 25 Oct data,
+        # 3.5 s warm). Build them once per account in the background, a few
+        # seconds in; finished figures are also saved (migration 072).
+        if stop.wait(3):
+            return
+        from .home_cards import warm_figures
+
+        try:
+            warm_figures(stop, auth.background_owners())
+        except Exception:
+            logging.getLogger("thesis").exception("Filing figure warm-up failed")
+
+    threading.Thread(target=warm_loop, daemon=True).start()
+
     def watch_loop(lane=None):
         from .monitoring.news_watch import run_once
 

@@ -11,6 +11,7 @@ from thesis import home_cards, service
 from thesis.db import transaction
 from thesis.research.sec.service import add_company
 from test_sec_fundamentals import apply, bundle
+from test_disclosures import disclosure_scope  # noqa: F401  (fixture)
 
 NOW = datetime(2025, 7, 24, 15, 0, tzinfo=timezone.utc)
 
@@ -137,3 +138,29 @@ def test_built_files_are_compressed_and_cached_for_good(client):
     assert response.status_code == 200
     assert response.headers["content-encoding"] == "gzip"
     assert response.headers["cache-control"] == "public, max-age=31536000, immutable"
+
+
+def test_warm_up_builds_each_filing_company_once_and_stops_when_asked(owner, monkeypatch):
+    import threading
+    from thesis.research.sec import financial_depth
+
+    first = add_company("MSFT")["instrument_id"]
+    calls = []
+    monkeypatch.setattr(financial_depth, "present", lambda conn, iid: calls.append(iid))
+    assert home_cards.warm_figures() == len(calls) and first in calls
+    assert len(calls) == len(set(calls))
+    stop = threading.Event(); stop.set()
+    calls.clear()
+    assert home_cards.warm_figures(stop) == 0 and calls == []
+
+
+def test_warm_up_makes_the_next_card_reuse_parsed_filings(owner, disclosure_scope, monkeypatch):
+    from test_financial_recovery import setup
+    from thesis.research.sec import filing_facts as F
+
+    iid, _ = setup(owner)
+    with F._overlay_lock:
+        F._overlays.clear(); F._overlay_bytes = 0
+    assert home_cards.warm_figures() >= 1 and F._overlays
+    monkeypatch.setattr(F, "attach", lambda *a: pytest.fail("parsed the filings again after warm-up"))
+    assert home_cards.card(owner, iid)["financial_depth"]["status"] == "available"

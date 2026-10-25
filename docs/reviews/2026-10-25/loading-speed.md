@@ -189,3 +189,86 @@ usual idle check), taking a few seconds on this data. The code that uses the
 new column must only run against a database that has 071, so the backend
 code and migration go live together at that restart. Nothing is committed,
 installed or restarted.
+
+## Figures after a restart: background warm-up
+
+After the 071 restart the home still felt slow. The remaining cost was the
+Pro card figures: `financial_depth.present()` parses the original SEC filings,
+and the in-memory overlay cache is empty after every restart. Measured on
+the owner's data, read-only: all 15 Pro cards 20.7 s of work cold, 3.5 s warm.
+
+`home_cards.warm_figures()` builds every SEC company's figures once, and the
+app starts it in a background thread 3 seconds after startup (`warm_loop` in
+`lifespan`). It reads saved data only and stops with the app.
+
+| Fresh process (like a restart) | Server work |
+| --- | --- |
+| Warm-up, 15 companies | 22.2 s, in the background |
+| All 15 Pro cards after the warm-up | 4.4 s (slowest 1.0 s) |
+| All 15 Pro cards with no warm-up (before) | 20.7 s (slowest 3.6 s) |
+
+Someone opening the home page in the first ~25 s after a restart still meets
+part of the cold cost. A permanent fix (saving figures per exact input) is
+proposed in `saved-filing-figures-design.md` and awaits approval.
+
+Tests: `test_home_cards.py` 18 passed, including that the warm-up visits each
+SEC company once, stops when asked, and that the next card read reuses the
+parsed filings instead of parsing again. Takes effect at the next restart.
+
+## Saved filing figures: migration 072
+
+Approved by the owner on 25 October (`saved-filing-figures-design.md`), built
+with one stricter change: rows are per account (see the design note).
+
+- `filing_figures(owner_id, instrument_id, basis, depth)`, append-only,
+  row-level security per account.
+- `financial_depth.present()` computes a `basis` hash from small indexed
+  columns (source access, SEC payload id/check time/CIK, every saved
+  disclosure document's id/url/form/source/accession/hash/dates, this
+  account's recovery readings and newest reviews, and the calculation
+  versions). A matching saved row is returned; otherwise it builds as before
+  and saves the finished result in its own short transaction. Only
+  `available` results are saved; reads without an account never save.
+- Dates and decimals anywhere in the result are tagged so a saved result
+  reads back equal. A first version only handled the two top-level dates;
+  on the owner's data some results have nested dates, so their saves failed
+  safely (rebuilt every time, nothing wrong shown). Fixed before release.
+- The startup warm-up now runs per background account, so saved figures
+  exist soon after a restart or an input change.
+
+### Before and after (copy of the owner's data, fresh process each run)
+
+Each run is a new process, like a restart. "Without saving" disables the
+saved table, which is exactly the previous behaviour. The Financials tab is
+timed first so the card loop cannot warm it.
+
+| Fresh process | 15 Pro cards | Slowest card | Financials tab NVDA / GOOGL / MSFT |
+| --- | --- | --- | --- |
+| Without saving, run 1 | 18.05 s | 4.32 s | 2.06 / 1.59 / 4.86 s |
+| Without saving, run 2 | 15.98 s | 3.53 s | 2.32 / 1.86 / 6.17 s |
+| With saving, first run (builds, saves) | 14.31 s | 3.39 s | 1.95 / 1.62 / 4.66 s |
+| With saving, run 2 | **0.43 s** | 0.12 s | 1.66 / 1.36 / 4.43 s |
+| With saving, run 3 | **0.52 s** | 0.15 s | 1.74 / 1.38 / 5.52 s |
+
+All 15 companies' saved-then-reloaded figures equal a fresh build exactly
+(checked on the copy after the encoding fix). Migration 072 applied in
+0.02 s. The Financials tab barely changes: most of its time is income flow
+and segment revenue, which still parse the filings (not part of 072).
+
+### Verification
+
+- `tests/test_filing_figures.py` (new, 12 passed): saved equals a fresh build
+  and is reused; each input change rebuilds — new SEC payload, new saved
+  filing, source access change, new recovery reading, new review, version
+  bump, calculation method change; another account never sees or reuses
+  this account's row; reads without an account are never saved; unfinished
+  results are not saved; rows are immutable; dates and decimals round-trip.
+- All test files touching SEC figures, recovery, valuation, the workspace or
+  migrations: see the final count in the session report.
+
+### Deploying 072
+
+Applies automatically at the next deliberate restart. After the restart the
+warm-up builds and saves each company's figures once (about 20 s in the
+background); from then on figures come from the saved table until an input
+changes. Nothing committed, installed or restarted.
