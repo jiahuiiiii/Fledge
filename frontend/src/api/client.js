@@ -347,6 +347,11 @@ export const api = {
       method: "POST",
       body: { expected_stage, instrument_id },
     }),
+  // Light reads for the home cards: every saved quote, then per-company
+  // news tone and (Pro) the two trailing filing figures.
+  homeCards: ({ signal } = {}) => request("/home-cards", { signal }),
+  homeCard: (id, { figures = true, signal } = {}) =>
+    request(`/companies/${id}/home-card?figures=${figures}`, { signal }),
   workspace: (instrument_id, { includeFinancials = true, signal } = {}) =>
     request(
       `/workspace?include_financials=${includeFinancials}${instrument_id ? `&instrument_id=${encodeURIComponent(instrument_id)}` : ""}`,

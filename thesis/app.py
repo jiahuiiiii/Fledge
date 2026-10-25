@@ -13,6 +13,7 @@ from starlette.concurrency import run_in_threadpool
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from . import service
 from . import auth
 from . import wake
@@ -312,10 +313,26 @@ async def local_session(request: Request, call_next):
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data: https://financialmodelingprep.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"
     )
-    response.headers["Cache-Control"] = (
-        "no-store" if request.url.path.startswith(("/api/", "/auth/")) else "no-cache"
-    )
+    response.headers["Cache-Control"] = cache_policy(request.url.path, response.status_code)
     return response
+
+
+def cache_policy(path, status):
+    """API answers are private and never stored. Built files under /assets
+    have content hashes in their names, so a browser may keep them for good;
+    fonts keep for a week; pages and anything else revalidate every time."""
+    if path.startswith(("/api/", "/auth/")):
+        return "no-store"
+    if status in (200, 304) and path.startswith("/assets/"):
+        return "public, max-age=31536000, immutable"
+    if status in (200, 304) and path.startswith("/fonts/"):
+        return "public, max-age=604800"
+    return "no-cache"
+
+
+# Outermost, so pages, built files and JSON answers over 1 KB are compressed
+# with the headers above already set. Event streams are left uncompressed.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
 @app.exception_handler(service.Conflict)
@@ -662,6 +679,20 @@ def workspace(instrument_id: UUID = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
     with transaction() as conn:
         result["workspace_reset_at"] = one(conn, "SELECT reset_at FROM workspace_settings WHERE singleton")["reset_at"]
     return {"result": result}
+
+
+@app.get("/api/v1/home-cards")
+def home_cards():
+    from .home_cards import quotes
+
+    return {"result": quotes(auth.current_owner())}
+
+
+@app.get("/api/v1/companies/{instrument_id}/home-card")
+def home_card(instrument_id: UUID, figures: bool = True):
+    from .home_cards import card
+
+    return {"result": card(auth.current_owner(), str(instrument_id), figures=figures)}
 
 
 @app.get("/api/v1/companies/{instrument_id}/workspace-financials")
