@@ -55,3 +55,7 @@ Compare & value keeps expected growth separate from reported position. Supported
 Current original management operating-margin targets retain their own quarterly end and basis. Expired, historical, withdrawn or truncated sections cannot populate current targets. Adjusted targets do not create a peer margin ranking, because company exclusions differ. Original guidance and analyst forecasts are expanded in Financials; result comparisons, release history, evidence and provider controls remain available there. Existing paid news-expectation reading remains separate and explicit in News & discussion.
 
 Phone charts scroll within their own frame; the page does not overflow. Native text labels, keyboard peer/measure selection, Evidence Escape/focus return and the application's reduced-motion policy remain supported.
+
+## Peer search and analyst targets — 25 October 2026
+
+The peer search is a floating combobox: the list opens over the page, so typing never resizes the card. "Other comparison measures" was removed. Analyst price targets are drawn as saved daily closes with the low, mean and high targets projected to the right, each labelled with its distance from the last price; one line gives the source, analyst count, fetch time and a stale note, and the rest sits under **Source details and limits**.

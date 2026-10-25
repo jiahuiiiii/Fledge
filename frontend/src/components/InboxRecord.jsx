@@ -83,7 +83,7 @@ export default function InboxRecord({ record, busy, onOpen, onSource, onReview }
       <EvidenceDialog
         open={open}
         onClose={() => setOpen(false)}
-        title={summary.title}
+        title={`Evidence · ${d.symbol || kindName[record.kind]}`}
         intro={
           d.withheld
             ? "Source access changed. The evidence is withheld; your review history is kept."

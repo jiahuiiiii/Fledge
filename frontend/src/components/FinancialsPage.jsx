@@ -338,6 +338,7 @@ export default function FinancialsPage({
           : `${((number(growth.rows[0].value) / number(growth.rows[1].value) - 1) * 100).toFixed(1)}%`,
       rows: growth.rows,
       detail: growth,
+      short: "Revenue growth",
       trend: "revenue_growth",
       tone: "info",
     },
@@ -345,6 +346,7 @@ export default function FinancialsPage({
       label: `Operating margin · ${basisLabel.toLowerCase()}`,
       value: percent(metric(active, "operating_margin")?.value),
       rows: [metric(active, "operating_margin")],
+      short: "Operating margin",
       trend: "operating_margin",
       tone: "caution",
     },
@@ -352,6 +354,7 @@ export default function FinancialsPage({
       label: `Free cash flow · ${basisLabel.toLowerCase()}`,
       value: money(metric(active, "free_cash_flow")?.value),
       rows: [metric(active, "free_cash_flow")],
+      short: "Free cash flow",
       trend: "free_cash_flow",
       tone: "cashflow",
     },
@@ -417,11 +420,11 @@ export default function FinancialsPage({
       {safe && safe.status !== "available" && <p>{safe.reason}</p>}
       {safe && (
         <>
-          <div className="financial-summary-row" aria-label="Financial trends">
+          <div className="financial-summary-row" role="group" aria-label="Financial trends">
             {summary.map((item) => (
               <TrendTile
                 key={item.label}
-                title={item.label}
+                title={item.short}
                 value={item.value}
                 caption={active ? `${day(active.start)} – ${day(active.end)}` : "No compatible saved period"}
                 points={trendPoints(incomeRows, item.trend)}

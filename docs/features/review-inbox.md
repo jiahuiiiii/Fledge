@@ -40,3 +40,7 @@ shared surfaces and still read records lazily. The closed recap heading no
 longer repeats its spending total; owner-only exact and unresolved spending
 remains available inside. Older layout rules were removed to keep phone
 chevrons aligned. See [UI verification](../reviews/2026-10-25/shared-reading-pages.md).
+
+## Flat evidence — 25 October 2026
+
+Each saved update is one compact card: company, kind, time, review status, headline, preview and source line. **Inspect evidence** opens one flat dialog listing only the saved sources (publisher, date, a short quote and a link to the original, or the saved source when no link exists) with **Useful / Not useful** at the bottom. Model, prompt, cutoff and save time stay in a closed **Details** line. **Mark reviewed** and **Leave unresolved** sit on the card; marking records attention only. A withheld update shows the source-access notice instead of evidence. Per-check downloads and the "open current idea" shortcut were removed from the card; **Open company** remains.

@@ -938,7 +938,6 @@ function CompanyWorkspace({
     setResearchOpen(false);
     setSourcesOpen(false);
     setUpdatesOpen(false);
-    setNewsExpectationsOpen(false);
     setFocusManagement(false);
     setEditor(null);
     setApproved(false);

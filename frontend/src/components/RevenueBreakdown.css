@@ -173,3 +173,6 @@
 }
 .revenue-mix .mix-figure { padding: 0; border: 0; background: none; color: var(--color-text); font: inherit; cursor: pointer; text-decoration: underline dotted var(--color-line-strong); text-underline-offset: 3px; }
 .revenue-mix .mix-figure:hover { text-decoration-color: var(--color-accent); }
+.revenue-mix .mix-total .mix-figure { display: block; text-align: left; text-decoration: none; }
+.revenue-mix .mix-member-line .mix-figure { text-decoration: none; }
+.revenue-mix .mix-member-line .mix-figure:hover { color: var(--color-accent); }

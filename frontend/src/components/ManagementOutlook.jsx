@@ -137,13 +137,12 @@ export default function ManagementOutlook({ data }) {
     releases.find((item) => item.current) ||
     releases[0];
   return (
-    <section className="management-outlook" aria-labelledby={id + "-title"}>
+    <section className="management-outlook" aria-label="Management outlook">
       <div className="outlook-heading">
         <div>
-          <span className="outlook-source-badge">Company guidance</span>
-          <TermHelp term="guidance" />
-          <h2 id={id + "-title"}>Management outlook</h2>
-          <p>What the company expects, from its original earnings release.</p>
+          <p className="fine">
+            From the company’s own earnings release. <TermHelp term="guidance" />
+          </p>
         </div>
         {release && (
           <label htmlFor={id + "-release"}>
