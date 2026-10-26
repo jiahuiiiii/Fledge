@@ -9,7 +9,12 @@ import {
   Pagination,
   SectionHeader,
   SourceChip,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  ToneCard,
 } from "./ui";
+import { toneOf } from "../lib/tone";
 import { countedTone } from "../lib/newsPresentation";
 import { modelAvailability } from "../lib/modelAvailability";
 import {
@@ -256,11 +261,18 @@ export default function SentimentPanel({
           size="sm"
           className="evidence-button"
           onClick={() =>
-            setEvidenceView(a && !a.withheld ? "saved" : "current")
+            setEvidenceView(
+              a && !a.withheld && data.sentiment_inputs?.status !== "changed"
+                ? "saved"
+                : "current",
+            )
           }
           aria-haspopup="dialog"
         >
           Evidence
+          {data.sentiment_inputs?.status === "changed" && (
+            <Badge title="Saved sources have changed since this reading">Sources changed</Badge>
+          )}
         </Button>
       </div>
       {a?.withheld ? (
@@ -308,8 +320,8 @@ export default function SentimentPanel({
             </>
           ) : (
             <>
-              <Card variant="inset" as="div" className="sentiment-summary">
-                <strong>{sentimentSummaryParts(sample).label}</strong>
+              <ToneCard as="div" tone={toneOf(sample.tone)} className="sentiment-summary">
+                <strong className="ui-tone-card__status"><span className="ui-tone-card__dot" aria-hidden="true" />{sentimentSummaryParts(sample).label}</strong>
                 <small className="tone-detail">
                   {sentimentSummaryParts(sample).detail}
                 </small>
@@ -318,7 +330,7 @@ export default function SentimentPanel({
                     ? `${sample.selected} stories → ${sample.relevant} relevant → ${counts.total} ${a.summary_policy?.startsWith("sentiment-coverage-") ? "distinct developments" : "text groups"}`
                     : `${sample.selected} texts → ${sample.relevant} relevant → ${counts.total} counted groups`}
                 </span>
-              </Card>
+              </ToneCard>
               <p className="fine sample-count-explanation">
                 {channel === "news"
                   ? "Repeated coverage counts once in these tone totals. "
@@ -636,21 +648,6 @@ export default function SentimentPanel({
           onSource={onThemeSource}
         />
       )}
-      {data.sentiment_inputs?.status === "changed" && (
-        <div className="evidence-summary-bar">
-          <p>
-            The saved sources have changed. This AI reading still describes its
-            earlier sample; new or changed sources have not been included in it.
-          </p>
-          <Button
-            variant="plain"
-            className="source-link"
-            onClick={() => setEvidenceView("current")}
-          >
-            Compare current sources
-          </Button>
-        </div>
-      )}
       <Modal
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
@@ -944,30 +941,25 @@ export default function SentimentPanel({
         title="News & discussion · evidence"
         className="evidence-dialog"
       >
-        <div
-          className="dialog-view-switch"
-          role="group"
-          aria-label="Evidence view"
-        >
-          {[
-            ["saved", "Analysed sample"],
-            ["current", "Current sources"],
-            ["history", "History"],
-          ].map(([key, label]) => (
-            <Button
-              variant="plain"
-              key={key}
-              aria-pressed={evidenceView === key}
-              onClick={() => setEvidenceView(key)}
-            >
-              {label}
-            </Button>
-          ))}
-        </div>
-        <details className="secondary-details sentiment-window-info">
-          <summary>Source window &amp; limits</summary>
+        <Tabs value={evidenceView} onValueChange={setEvidenceView}>
+          <TabsList variant="line" aria-label="Evidence view">
+            <TabsTrigger value="saved">Analysed sample</TabsTrigger>
+            <TabsTrigger value="current">Current sources</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <p className="evidence-view-note">
+          {evidenceView === "saved"
+            ? "The exact sources the AI read for this tone reading."
+            : evidenceView === "current"
+              ? data.sentiment_inputs?.status === "changed"
+                ? "What is saved now. Sources added or changed since the reading are not in its tone yet."
+                : "What is saved now, which matches the reading."
+              : "Earlier readings and watch checks."}
+        </p>
+        <Disclosure variant="flush" title="Source window and limits" className="sentiment-window-info">
           <p className="fine">
-            Refresh & analyse checks news and discussions, then analyses the
+            Refresh &amp; analyse checks news and discussions, then analyses the
             available passages. News covers 7 days. Discussion searches use your
             selected window. Reddit searches for the company and ticker, with up
             to 50 posts and replies from three threads, so a wider window does
@@ -975,7 +967,7 @@ export default function SentimentPanel({
             original posts and only covers the last 7 days, including when you
             select 30 days. Automatic watches keep their 7-day window.
           </p>
-        </details>
+        </Disclosure>
         {evidenceView === "saved" &&
           (a && !a.withheld ? (
             <>
@@ -983,6 +975,7 @@ export default function SentimentPanel({
                 selected={tab}
                 onChange={setTab}
                 label="Evidence source type"
+                showLabels
               />
               <OriginalSample
                 analysis={a}

@@ -1,4 +1,5 @@
 import { formatTimestamp } from "../lib/dateTime";
+import { uniqueCitations } from "../lib/briefCitations";
 import { modelAvailability } from "../lib/modelAvailability";
 import { currentCompanyHeadlines } from "../lib/companyHeadlines";
 import { newsSourceStatus } from "../lib/newsPresentation";
@@ -323,26 +324,35 @@ export default function MarketResearch({
       )}
       <Disclosure
         className="current-news-summary"
-        title={brief ? "Saved AI summary" : "Optional AI summary"}
+        indicator={!!brief}
+        summary={
+          <span className="ai-summary-head">
+            <span className="ai-summary-title">
+              {brief ? "Saved AI summary" : "Optional AI summary"}
+              {!brief && <small>Reads the saved headlines and snippets above</small>}
+            </span>
+            {!brief && (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy || !(data.market_news_ids || []).length || availability.blocked}
+                aria-describedby={
+                  availability.blocked && availability.state !== "running"
+                    ? "sentiment-disabled-reason"
+                    : undefined
+                }
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onGenerate();
+                }}
+              >
+                {busy ? "Reading sources…" : "Summarise sources"}
+              </Button>
+            )}
+          </span>
+        }
       >
-        {!brief && (
-          <Button
-            size="sm"
-            disabled={
-              busy ||
-              !(data.market_news_ids || []).length ||
-              availability.blocked
-            }
-            onClick={onGenerate}
-            aria-describedby={
-              availability.blocked && availability.state !== "running"
-                ? "sentiment-disabled-reason"
-                : undefined
-            }
-          >
-            {busy ? "Reading sources…" : "Summarise sources"}
-          </Button>
-        )}
         {brief ? (
           <>
             <p className="fine">
@@ -382,13 +392,13 @@ export default function MarketResearch({
                   <h4>{p.title}</h4>
                   <p>{p.text}</p>
                   <div className="brief-citations">
-                    {p.citations.map((c, j) => (
+                    {uniqueCitations(p.citations, data.documents).map((c, j) => (
                       <SourceChip
-                        key={j}
-                        label={`${data.documents.find((d) => d.id === c.source_id)?.source || "Source"} ${j + 1}`}
+                        key={c.source_id}
+                        label={`${c.doc?.source || "Source"} ${j + 1}`}
                         onOpen={() => onSource(c.source_id)}
                         title={c.quote}
-                        aria-label={`Inspect source ${j + 1}: ${data.documents.find((d) => d.id === c.source_id)?.title || "Source unavailable"}`}
+                        aria-label={`Inspect source ${j + 1}: ${c.doc?.title || "Source unavailable"}`}
                       />
                     ))}
                   </div>

@@ -1,5 +1,6 @@
 import { SourceLabel } from "./SourceFilters";
-import { Card } from "./ui";
+import { ToneCard } from "./ui";
+import { toneOf } from "../lib/tone";
 import { sourceCoverage, sourceExclusionLabels } from "../lib/sourceCoverage";
 import "./AllSourceSummary.css";
 import { sentimentSummaryParts } from "../lib/sentimentSummary";
@@ -11,9 +12,9 @@ export function SourceToneSummary({ analysis }) {
   return (
     <div className="source-summary-list" aria-label="Saved tone by source">
       {samples.map((sample) => (
-        <Card as="div" variant="inset" key={sample.scope}>
+        <ToneCard as="div" key={sample.scope} tone={sample.withheld != null ? "unknown" : toneOf(sample.sentimentSummary?.tone)}>
           <SourceLabel scope={sample.scope} />
-          <strong>
+          <strong className="ui-tone-card__status">
             {sample.withheld != null
               ? "Tone totals withheld"
               : sentimentSummaryParts(sample.sentimentSummary).label}
@@ -23,7 +24,7 @@ export function SourceToneSummary({ analysis }) {
               ? "They counted a source that is no longer available."
               : sentimentSummaryParts(sample.sentimentSummary).detail}
           </small>
-        </Card>
+        </ToneCard>
       ))}
     </div>
   );

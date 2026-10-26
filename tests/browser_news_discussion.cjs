@@ -318,7 +318,7 @@ let browser;
   // Literal angle-bracket text stays text, never formatting.
   assert.equal(await original.locator(".original-source-text b").count(), 0);
   await evidence
-    .getByRole("button", { name: "Current sources", exact: true })
+    .getByRole("tab", { name: "Current sources", exact: true })
     .click();
   const current = evidence.getByRole("region", {
     name: "Current sentiment inputs",

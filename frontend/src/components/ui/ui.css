@@ -727,3 +727,13 @@ button.ui-trend-tile:hover { background: var(--ui-surface-2); }
 .ui-evidence__details summary { cursor: pointer; }
 .ui-evidence__details p { margin: var(--space-2) 0 0; }
 .ui-evidence__footer .alert-rating { padding: 0; border: 0; }
+
+/* ---- ToneCard: sentiment colour from the shared tone tokens ---- */
+.ui-tone-card { --tone: var(--ui-muted); --tone-soft: var(--ui-surface-2); background: var(--tone-soft); }
+.ui-tone-card[data-tone="positive"] { --tone: var(--color-positive); --tone-soft: var(--color-positive-soft); }
+.ui-tone-card[data-tone="negative"] { --tone: var(--color-negative); --tone-soft: var(--color-negative-soft); }
+.ui-tone-card[data-tone="mixed"] { --tone: var(--color-caution); --tone-soft: var(--color-caution-soft); }
+.ui-tone-card[data-tone="neutral"] { --tone: var(--color-info-light); --tone-soft: var(--color-info-soft); }
+.ui-tone-card.ui-card--interactive:hover:not(:disabled) { background: color-mix(in srgb, var(--tone) 14%, var(--tone-soft)); }
+.ui-tone-card .ui-tone-card__status { color: var(--tone); font-weight: 600; }
+.ui-tone-card .ui-tone-card__dot { display: inline-block; width: 8px; height: 8px; margin-right: var(--space-2); border-radius: 50%; background: var(--tone); }

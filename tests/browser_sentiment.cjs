@@ -115,7 +115,7 @@ let browser;
  await panel.getByLabel('Source relevance',{exact:true}).selectOption('all');
  await panel.getByRole('button',{name:'Evidence',exact:true}).click();
  const allEvidence=page.getByRole('dialog',{name:'News & discussion · evidence',exact:true});
- await allEvidence.getByRole('button',{name:'Current sources',exact:true}).click();
+ await allEvidence.getByRole('tab', { name: 'Current sources',exact:true}).click();
  const currentInputs=allEvidence.getByRole('region',{name:'Current sentiment inputs',exact:true});
  await currentInputs.getByText('Excluded before analysis',{exact:true}).click();
  assert.match(await currentInputs.innerText(),/No complete comment body to read: 2/);

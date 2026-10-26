@@ -1,4 +1,5 @@
-import { Badge, Button, Card, ChevronRightIcon, SectionHeader } from "./ui";
+import { Badge, Button, Card, ChevronRightIcon, SectionHeader, ToneCard } from "./ui";
+import { toneOf } from "../lib/tone";
 import { dayLabel, platformName } from "../lib/beginnerSummary";
 
 const EFFECT_WORDS = {
@@ -37,8 +38,9 @@ export function SignalLights({ name, lights, pointer, onSelect, pointerLink }) {
       <ul className="bs-summary-cards">
         {lights.map((light) => (
           <li key={light.key}>
-            <Card
+            <ToneCard
               as={onSelect ? "button" : "a"}
+              tone={toneOf(light.mood)}
               interactive
               {...(onSelect
                 ? { onClick: () => onSelect(light.key) }
@@ -56,8 +58,8 @@ export function SignalLights({ name, lights, pointer, onSelect, pointerLink }) {
                   </span>
                 }
               />
-              <span className="bs-summary-status">{light.status}</span>
-            </Card>
+              <span className="bs-summary-status ui-tone-card__status">{light.status}</span>
+            </ToneCard>
           </li>
         ))}
       </ul>

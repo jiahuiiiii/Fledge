@@ -285,7 +285,7 @@ let browser;
   assert.equal(await original.locator('.sentiment-tag,.sentiment-counts').count(),0);
   assert.match(await original.innerText(),/Feed updated/);
   assert.doesNotMatch(await original.innerText(),/Comparison-only report excluded/);
-  await evidenceDialog.getByRole('button',{name:'Current sources',exact:true}).click();
+  await evidenceDialog.getByRole('tab', { name: 'Current sources',exact:true}).click();
   const preview = evidenceDialog.getByRole('region',{name:'Current sentiment inputs',exact:true});
   const previewFilters = preview.getByRole('group',{name:'Current source type',exact:true});
   for (const [scope,label] of Object.entries(labels)) {
@@ -311,7 +311,7 @@ let browser;
   await panel.getByText('This analysis is withheld because source access changed.',{exact:true}).waitFor();
   assert.equal(await panel.locator('.sentiment-items,.all-source-summary').count(),0);
   await openEvidence();
-  await evidenceDialog.getByRole('button',{name:'Analysed sample',exact:true}).click();
+  await evidenceDialog.getByRole('tab', { name: 'Analysed sample',exact:true}).click();
   assert.equal(await original.count(),0);
   assert.doesNotMatch(await evidenceDialog.innerText(),/Original authored .* body/);
   await page.keyboard.press('Escape');

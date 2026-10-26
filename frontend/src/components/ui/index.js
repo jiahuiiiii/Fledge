@@ -15,3 +15,4 @@ export { default as EvidenceDialog } from "./EvidenceDialog";
 export { default as DisclosureGroup } from "./DisclosureGroup";
 export { default as TrendTile } from "./TrendTile";
 export { default as Combobox } from "./Combobox";
+export { default as ToneCard } from "./ToneCard";
