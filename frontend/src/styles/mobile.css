@@ -222,3 +222,22 @@
   color: var(--color-text-2);
   font-weight: 500;
 }
+
+/* Update data: the refresh icon turns while an update runs. */
+.research-updates-trigger svg.spin {
+  animation: fledge-spin 1.1s linear infinite;
+}
+.research-updates-trigger:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+@keyframes fledge-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .research-updates-trigger svg.spin {
+    animation: none;
+  }
+}
