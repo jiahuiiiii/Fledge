@@ -346,6 +346,12 @@ def outcome(key, result):
     return 'ready', result.get('message') if isinstance(result,dict) and result.get('message') else 'Analysis saved' if key=='analysis' else 'Source check complete'
 
 
+def owners_with_work():
+    """Accounts that have a research load in progress (one cheap query)."""
+    with transaction(admin=True) as conn:
+        return {str(r['owner_id']) for r in rows(conn, 'SELECT DISTINCT owner_id FROM research_loads WHERE active')}
+
+
 def work_once(owner, executor=None):
     task=claim(owner)
     if not task:

@@ -76,6 +76,12 @@ FINNHUB_API_KEY=...
 SEC_USER_AGENT=Fledge test you@example.com
 ```
 
+For Telegram alerts, add a bot token too (see "Telegram alerts" below):
+
+```ini
+TELEGRAM_BOT_TOKEN=...
+```
+
 Leave the Supabase lines empty. `THESIS_PUBLIC_ORIGIN` must be exactly the address people type, with `https://` and no trailing slash: it lets the browser's requests through and marks the sign-in cookie HTTPS-only.
 
 ## 4. First start (by hand)
@@ -161,6 +167,31 @@ systemctl restart fledge
 ```
 
 New migrations apply automatically at start. Take a backup first.
+
+## Telegram alerts
+
+Without `TELEGRAM_BOT_TOKEN` the Telegram card on the Account page is hidden and
+"Watch for changes" never asks people to connect Telegram, because there is
+nothing to connect to.
+
+1. In Telegram, open a chat with **@BotFather**, send `/newbot`, pick a name and a
+   username ending in `bot`. It replies with a token.
+2. Put it in `.env` as `TELEGRAM_BOT_TOKEN=...` (on the server, never in chat or git).
+3. `sudo systemctl restart fledge`. The Account page now shows Telegram alerts → Manage.
+
+## Finding slow pages
+
+Every API answer has a `Server-Timing` header (browser dev tools → Network → a
+request → Timing): total time, time in the database and how many transactions it
+used. Requests over 1.5 s are also logged:
+
+```sh
+journalctl -u fledge --since "1 hour ago" | grep "Slow request"
+```
+
+If everything is slow at once, check the CPU first: `top` (press `1`). A small
+Lightsail plan has a burstable CPU; when its credits run out the whole server runs at
+a fraction of one core (Lightsail console → the instance → Metrics → CPU).
 
 ## Before you invite people
 
