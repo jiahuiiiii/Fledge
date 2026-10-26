@@ -103,7 +103,7 @@ import PortfolioRead from "./components/PortfolioRead";
 import PersonalHome from "./components/PersonalHome";
 import AccountPage from "./components/AccountPage";
 import WorkspaceHeader from "./components/WorkspaceHeader";
-import { Button, UserIcon } from "./components/ui";
+import { Button, Toast, UserIcon } from "./components/ui";
 import {
   ProfileContext,
   readLocalMode,
@@ -1190,6 +1190,7 @@ function CompanyWorkspace({
   }
   function confirmRemoveCompany(company) {
     setConfirmRemoval(null);
+    setNotice("");
     onHideCompany(company.id);
     setRemovedCompany(company);
     api
@@ -1919,6 +1920,9 @@ function CompanyWorkspace({
           </div>
         </div>
       </Modal>
+      {!removedCompany && !companyLoading && (
+        <Toast message={notice} onDismiss={() => setNotice("")} />
+      )}
       <RemovalNotice
         company={removedCompany}
         onUndo={() => {
@@ -1956,14 +1960,6 @@ function CompanyWorkspace({
           {error}
           <button onClick={() => act(refresh, "Workspace refreshed.")}>
             Refresh
-          </button>
-        </div>
-      )}
-      {notice && !companyLoading && (
-        <div className="global-message" role="status">
-          {notice}
-          <button aria-label="Dismiss update" onClick={() => setNotice("")}>
-            ×
           </button>
         </div>
       )}

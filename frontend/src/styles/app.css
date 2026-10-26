@@ -755,7 +755,7 @@ input[type="checkbox"] {
   gap: 10px;
   background: var(--color-line);
   padding: 9px 25px;
-  font-size: var(--text-xs);
+  font-size: var(--text-base);
   color: var(--color-text);
 }
 .global-message button {
@@ -4209,120 +4209,6 @@ input[type="checkbox"] {
 }
 .hidden-companies > p {
   margin-top: 10px;
-}
-.removal-notice {
-  display: grid;
-  grid-template-rows: 0fr;
-  flex-shrink: 0;
-  transition: grid-template-rows 320ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-.removal-notice.is-open {
-  grid-template-rows: 1fr;
-}
-.removal-notice-clip {
-  min-height: 0;
-  overflow: hidden;
-}
-.removal-notice-bar {
-  position: relative;
-  isolation: isolate;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 20px;
-  min-height: 52px;
-  padding: 8px 24px;
-  color: var(--color-text);
-}
-.removal-notice-sweep {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  background: var(--color-line);
-  border-bottom: 1px solid var(--color-line-strong);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 240ms ease;
-}
-.removal-notice.is-open .removal-notice-sweep {
-  transform: scaleX(1);
-  animation: removal-sweep 360ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-.removal-notice-message,
-.removal-notice-actions {
-  opacity: 0;
-  transform: translateX(-8px);
-  transition:
-    opacity 160ms ease,
-    transform 240ms ease;
-}
-.removal-notice.is-open .removal-notice-message,
-.removal-notice.is-open .removal-notice-actions {
-  opacity: 1;
-  transform: translateX(0);
-  transition-delay: 80ms;
-}
-.removal-notice-message {
-  min-width: 0;
-  font-size: var(--text-base);
-  line-height: 1.5;
-}
-.removal-notice-actions {
-  display: inline-flex;
-  width: max-content;
-  justify-self: end;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-.app-shell .removal-notice-actions button {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  min-height: 36px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: inherit;
-}
-.app-shell .removal-notice-actions button:hover {
-  background: #ffffff0d;
-}
-.app-shell .removal-notice-actions button:focus-visible {
-  outline: none;
-  border-color: var(--color-positive-light);
-  background: #ffffff0d;
-}
-@keyframes removal-sweep {
-  from {
-    transform: scaleX(0);
-  }
-  to {
-    transform: scaleX(1);
-  }
-}
-@media (max-width: 740px) {
-  .removal-notice-bar {
-    padding-inline: 18px;
-    gap: 12px;
-  }
-  .app-shell .removal-notice-actions button {
-    width: 40px;
-    min-height: 40px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .removal-notice,
-  .removal-notice-sweep,
-  .removal-notice-message,
-  .removal-notice-actions {
-    transition: none;
-  }
-  .removal-notice.is-open .removal-notice-sweep {
-    animation: none;
-  }
 }
 .sr-only {
   position: absolute;
