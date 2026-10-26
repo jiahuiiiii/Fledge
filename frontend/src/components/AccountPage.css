@@ -81,3 +81,5 @@
 .account-settings-page .account-explain ul { margin: 0; padding-left: var(--space-5); display: grid; gap: var(--space-1); line-height: 1.5; }
 .pro-mode-switch.compact { display: inline-flex; margin: 0; padding: 0; border: 0; }
 .pro-mode-switch.compact input { min-width: 44px; min-height: 24px; }
+.account-locked { display: inline-flex; cursor: not-allowed; }
+.account-locked > .ui-button { pointer-events: none; }

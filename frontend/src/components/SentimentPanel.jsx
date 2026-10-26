@@ -15,6 +15,7 @@ import {
   ToneCard,
 } from "./ui";
 import { toneOf } from "../lib/tone";
+import { useTelegramGuard } from "./TelegramPrompt";
 import { countedTone } from "../lib/newsPresentation";
 import { modelAvailability } from "../lib/modelAvailability";
 import {
@@ -65,6 +66,7 @@ export default function SentimentPanel({
   onThemeSource,
   onCoverage,
   onThemesChange,
+  onConnectTelegram,
 }) {
   const [days, setDays] = useState(
     data.sentiment?.social_lookback_days || loadingRun?.lookback_days || 7,
@@ -82,6 +84,7 @@ export default function SentimentPanel({
   const platform = tab === "all" || tab === "news" ? null : tab;
   const [evidenceView, setEvidenceView] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const telegramGuard = useTelegramGuard({ onConnect: onConnectTelegram, what: "this watch" });
   const a = data.sentiment,
     watch = data.news_watch;
   const activeQuestion =
@@ -660,9 +663,11 @@ export default function SentimentPanel({
             <Checkbox
               disabled={busy}
               checked={!!watch?.enabled}
-              onChange={(e) =>
-                onWatch(e.target.checked, watch?.interval_minutes || 240)
-              }
+              onChange={(e) => {
+                const enabled = e.target.checked;
+                if (enabled) telegramGuard.guard(() => onWatch(true, watch?.interval_minutes || 240));
+                else onWatch(false, watch?.interval_minutes || 240);
+              }}
             />{" "}
             Watch news + social changes
           </label>
@@ -1011,6 +1016,7 @@ export default function SentimentPanel({
           </>
         )}
       </Modal>
+      {telegramGuard.prompt}
     </Card>
   );
 }

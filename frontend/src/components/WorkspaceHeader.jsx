@@ -1,3 +1,6 @@
+import { useRef } from "react";
+import { useSlidingIndicator } from "../lib/useSlidingIndicator";
+
 // One header for the loading workspace, research pages and account settings.
 export default function WorkspaceHeader({
   beginner,
@@ -20,6 +23,8 @@ export default function WorkspaceHeader({
         ["updates", "Updates"],
         ["world", "World"],
       ];
+  const navRef = useRef(null);
+  const ready = useSlidingIndicator(navRef, "button.active", view, 5);
   return (
     <header className="topbar">
       <a className="skip-link" href="#workspace">
@@ -35,7 +40,7 @@ export default function WorkspaceHeader({
       >
         fledge<span>↗</span>
       </a>
-      <nav aria-label="Workspace navigation">
+      <nav aria-label="Workspace navigation" ref={navRef} className={`has-indicator${ready ? " is-ready" : ""}`}>
         {items.map(([key, label]) => {
           const active =
             view === key ||
@@ -54,6 +59,7 @@ export default function WorkspaceHeader({
             </button>
           );
         })}
+        <span className="topbar-indicator" aria-hidden="true" />
       </nav>
       <div className="topbar-tools">
         {account}

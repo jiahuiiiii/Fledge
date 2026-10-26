@@ -93,6 +93,8 @@ import ProposalPanel from "./components/ProposalPanel";
 import { statusLine, watchItems } from "./lib/ideaWatch";
 import { combineSuggestions } from "./lib/proposals";
 import { needsThreshold, withDefaultWindows } from "./lib/watchDefaults";
+import NewCompanySetup from "./components/NewCompanySetup";
+import { useTelegramGuard } from "./components/TelegramPrompt";
 import ReviewDownload from "./components/ReviewDownload";
 import ReportingAge, { ageLabel } from "./components/ReportingAge";
 import IdeaEvidenceReview from "./components/IdeaEvidenceReview";
@@ -699,6 +701,11 @@ function CompanyWorkspace({
   // Changes when an Update data run finishes, so open panels re-read saved data.
   const updatedAt =
     loadingRun && !loadingRun.active ? loadingRun.updated_at || null : null;
+  const [setupId, setSetupId] = useState(null);
+  const telegramGuard = useTelegramGuard({
+    onConnect: () => onChoose(selectedCompanyId, "account"),
+    what: "this watch",
+  });
   async function startLoading(options = {}) {
     const token = scope;
     setLoadingError("");
@@ -2186,6 +2193,7 @@ function CompanyWorkspace({
                             <SentimentPanel
                               key={instrumentId}
                               onThemeSource={setSource}
+                              onConnectTelegram={() => onChoose(instrumentId, "account")}
                               onThemesChange={async () => {
                                 const status = await api.modelStatus();
                                 if (activeScope.current === scope)
@@ -2724,17 +2732,19 @@ function CompanyWorkspace({
                               size="sm"
                               disabled={busy}
                               onClick={() =>
-                                act(
-                                  () =>
-                                    api.newsWatch(
-                                      instrumentId,
-                                      true,
-                                      240,
-                                      true,
-                                      false,
-                                      current.reasoning?.trim() ? "reasoning" : "question",
-                                    ),
-                                  "Watching news for this idea. Matches appear in Updates.",
+                                telegramGuard.guard(() =>
+                                  act(
+                                    () =>
+                                      api.newsWatch(
+                                        instrumentId,
+                                        true,
+                                        240,
+                                        true,
+                                        false,
+                                        current.reasoning?.trim() ? "reasoning" : "question",
+                                      ),
+                                    "Watching news for this idea. Matches appear in Updates.",
+                                  ),
                                 )
                               }
                             >
@@ -3523,6 +3533,26 @@ function CompanyWorkspace({
           </div>
         )}
       </Modal>
+      {telegramGuard.prompt}
+      <NewCompanySetup
+        open={!!setupId && setupId === selectedCompanyId && !companyLoading && !isRecorded}
+        name={data?.instrument ? companyName(data.instrument) : "this company"}
+        aiBlocked={modelAvailability(modelStatus, "briefing_enabled").blocked}
+        onSkip={() => setSetupId(null)}
+        onStart={async ({ analyse, watch }) => {
+          setSetupId(null);
+          if (analyse) startLoading({ analyze: true, lookback_days: 7 });
+          if (watch)
+            await telegramGuard.guard(() =>
+              act(() => api.newsWatch(instrumentId, true, 240), "Watching this company for changes."),
+            );
+        }}
+        onConnectTelegram={({ analyse }) => {
+          setSetupId(null);
+          if (analyse) startLoading({ analyze: true, lookback_days: 7 });
+          onChoose(selectedCompanyId, "account");
+        }}
+      />
       <CompanyDialog
         open={addingCompany}
         onClose={() => setAddingCompany(false)}
@@ -3541,6 +3571,7 @@ function CompanyWorkspace({
           onRestoreCompany(id);
           setAddingCompany(false);
           onChoose(id);
+          setSetupId(id);
         }}
       />
       <Modal

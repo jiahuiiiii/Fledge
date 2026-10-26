@@ -24,3 +24,10 @@ export function toneLine(tone = {}) {
     ? `News across your list: ${parts.join(", ")}.`
     : "No news reading saved for these companies yet.";
 }
+
+// Saved readings made before the server stripped them can still carry the
+// model's own citation IDs (n1_2, w3) inside a sentence; they mean nothing here.
+export const plainRead = (text) =>
+  String(text || "")
+    .replace(/\s*\(\s*[nw]\d+(?:_\d+)?(?:\s*,\s*[nw]\d+(?:_\d+)?)*\s*\)|\s*\b[nw]\d+_\d+\b/g, "")
+    .trim();

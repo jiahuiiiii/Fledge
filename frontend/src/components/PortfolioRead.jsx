@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { formatTimestamp } from "../lib/dateTime";
-import { pctText, barWidth, toneLine } from "../lib/portfolioRead";
+import { pctText, barWidth, toneLine, plainRead } from "../lib/portfolioRead";
 import "./BeginnerSummary.css";
 import "./PortfolioRead.css";
 
@@ -151,11 +151,11 @@ export default function PortfolioRead({ onOpenCompany }) {
           {(e.headline || e.drivers.length > 0) && (
             <section className="bs-card">
               <h4>What happened</h4>
-              {e.headline && <p className="bs-meaning">{e.headline}</p>}
+              {e.headline && <p className="bs-meaning">{plainRead(e.headline)}</p>}
               <ul className="pr-drivers">
                 {e.drivers.map((d, i) => (
                   <li key={i}>
-                    {d.text}
+                    {plainRead(d.text)}
                     <small className="bs-meta">
                       {d.sources.map((s, j) => (
                         <span key={s.id}>
@@ -182,7 +182,7 @@ export default function PortfolioRead({ onOpenCompany }) {
               {e.groups.map((g) => (
                 <div className="pr-group" key={g.label}>
                   <span className="pr-group-label">{g.label}</span>
-                  <p className="pr-note">{g.note}</p>
+                  <p className="pr-note">{plainRead(g.note)}</p>
                   <Bars
                     ids={g.company_ids}
                     byId={byId}
@@ -197,7 +197,7 @@ export default function PortfolioRead({ onOpenCompany }) {
           {e.takeaway && (
             <section className="bs-card pr-takeaway">
               <h4>For your list</h4>
-              <p>{e.takeaway}</p>
+              <p>{plainRead(e.takeaway)}</p>
             </section>
           )}
           <p className="bs-note">

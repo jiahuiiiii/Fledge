@@ -238,3 +238,10 @@ def test_list_uses_the_newest_price_from_the_refreshed_chart(owner, monkeypatch)
     finals = [b for b in series['bars'] if b['provisional'] is False and b['date'] < now.astimezone(ph.NY).date().isoformat()]
     previous = float(finals[-1]['close'])
     assert q['change_percent'] == round((110 - previous) / previous * 100, 2)
+
+
+def test_citation_ids_the_model_repeats_in_a_sentence_are_removed():
+    from thesis.portfolio import clean
+    assert clean("The AI trade looked softer. (w3)") == "The AI trade looked softer."
+    assert clean("Small declines are not explained by the news. (n1_1,n1_2,n3_4)") == "Small declines are not explained by the news."
+    assert clean("   ") is None

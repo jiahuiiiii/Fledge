@@ -737,3 +737,29 @@ button.ui-trend-tile:hover { background: var(--ui-surface-2); }
 .ui-tone-card.ui-card--interactive:hover:not(:disabled) { background: color-mix(in srgb, var(--tone) 14%, var(--tone-soft)); }
 .ui-tone-card .ui-tone-card__status { color: var(--tone); font-weight: 600; }
 .ui-tone-card .ui-tone-card__dot { display: inline-block; width: 8px; height: 8px; margin-right: var(--space-2); border-radius: 50%; background: var(--tone); }
+
+/* ---- Motion: short, transform/opacity only, never blocks content ---- */
+.ui-tabs-list--line { position: relative; }
+.ui-tabs-list--line.has-indicator .ui-tabs-trigger[aria-selected="true"]::after { display: none; }
+.ui-tabs-indicator {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: var(--indicator-w, 0px);
+  border-radius: 2px;
+  background: var(--ui-accent);
+  transform: translateX(var(--indicator-x, 0px));
+}
+.ui-tabs-list.is-ready .ui-tabs-indicator {
+  transition: transform 220ms cubic-bezier(0.2, 0, 0, 1), width 220ms cubic-bezier(0.2, 0, 0, 1);
+}
+@keyframes ui-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.retained-view:not([hidden]) { animation: ui-fade-in 160ms ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .ui-tabs-list.is-ready .ui-tabs-indicator { transition: none; }
+  .retained-view:not([hidden]) { animation: none; }
+}

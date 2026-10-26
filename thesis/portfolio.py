@@ -372,8 +372,17 @@ def request_for(content):
     )
 
 
+# The model sometimes repeats its citation IDs (n1_2, w3) inside the sentence;
+# they belong only in source_ids and mean nothing to a reader.
+CITATION_IDS = re.compile(r"\s*\(\s*[nw]\d+(?:_\d+)?(?:\s*,\s*[nw]\d+(?:_\d+)?)*\s*\)|\s*\b[nw]\d+_\d+\b")
+
+
+def strip_citation_ids(text):
+    return CITATION_IDS.sub("", text or "").strip()
+
+
 def clean(text):
-    text = text.strip()
+    text = strip_citation_ids(text)
     return None if not text or ADVICE.search(text) else text
 
 

@@ -342,12 +342,14 @@ let browser;
     })
     .waitFor();
   assert.equal(
-    await panel.locator(".story-source-text,.sentiment-items").count(),
+    await panel.locator(".sentiment-items:not(.collected-source-list)").count(),
     0,
   );
   mode = "none";
   await open();
-  assert.equal(await panel.locator(".sentiment-items").count(), 0);
+  // Collected, unanalysed sources use the same cards as analysed ones, just without labels.
+  assert.equal(await panel.locator(".sentiment-items:not(.collected-source-list)").count(), 0);
+  assert.equal(await panel.locator(".source-story .ui-badge").count(), 0);
   assert.deepEqual(errors, []);
   assert.deepEqual(writes, []);
   assert.deepEqual(external, []);

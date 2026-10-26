@@ -4,6 +4,7 @@ import { INVESTOR_TYPES, typeName } from "../lib/investorTypes";
 import { ProModeSwitch } from "./DetailModeToggle";
 import { AccountSecurityDialog } from "./AccountSecurity";
 import TelegramSettings from "./TelegramSettings";
+import { useTelegramLink } from "../lib/useTelegramLink";
 import { Badge, Button, Card, SectionHeader, UserIcon } from "./ui";
 import "./AccountPage.css";
 
@@ -12,6 +13,7 @@ import "./AccountPage.css";
 export default function AccountPage({ session, controls, onBack }) {
   const { profile, home, mode } = useProfile();
   const [securityOpen, setSecurityOpen] = useState(false);
+  const telegram = useTelegramLink();
   const type = profile?.completed ? INVESTOR_TYPES[profile.investor_type] : null;
   const canSignOut = ["managed", "password"].includes(session.mode);
   useEffect(() => {
@@ -91,7 +93,7 @@ export default function AccountPage({ session, controls, onBack }) {
           </div>
         </Card>
       )}
-      {mode === "data" && (
+      {mode === "data" ? (
         <TelegramSettings
           wrap={(trigger) => (
             <Card>
@@ -105,6 +107,25 @@ export default function AccountPage({ session, controls, onBack }) {
             </Card>
           )}
         />
+      ) : (
+        // Beginner mode still shows the feature, greyed out, so it is discoverable.
+        telegram.configured && (
+          <Card>
+            <SectionHeader
+              level="card"
+              as="h2"
+              title="Telegram alerts"
+              description="Urgent alerts, price moves and the daily summary, sent to your Telegram. Turn on Pro tools above to use them."
+              actions={
+                <span className="account-locked" title="Turn on Pro tools to use Telegram alerts">
+                  <Button variant="secondary" disabled aria-label="Telegram alerts (needs Pro tools)">
+                    Pro tools only
+                  </Button>
+                </span>
+              }
+            />
+          </Card>
+        )
       )}
       {session.mode === "password" && session.username && (
         <Card>

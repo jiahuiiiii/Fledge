@@ -41,6 +41,7 @@ let browser;
       if (request.method() === "POST" && path.endsWith("/rating")) { rated.push(request.postData()); return route.fulfill({ json: { result: { value: "useful" } } }); }
       if (path.endsWith("/loading")) return route.fulfill({ json: { result: null } });
       if (request.method() !== "GET") { writes.push(path); return route.fulfill({ status: 403, json: { result: { error: "blocked" } } }); }
+      if (path === "/api/v1/telegram") return route.fulfill({ json: { result: { configured: true, linked: false, enabled: false } } });
       if (path === "/api/v1/research-review") return route.fulfill({ json: review });
       if (path === "/api/v1/scheduled-reviews") return route.fulfill({ json: { result: { settings, items: weeklyItems, next_before: null } } });
       if (path === "/api/v1/scheduled-reviews/w1")
@@ -120,6 +121,15 @@ let browser;
   assert.equal(await news.getByText(/newest first in All/).count(), 0);
   await shot("news");
 
+  // Turning a watch on asks to connect Telegram first when no chat is linked.
+  await news.getByRole("button", { name: /^Watch/ }).first().click();
+  await page.getByRole("dialog", { name: "News & discussion · watch" }).getByLabel(/Watch news \+ social changes/).click();
+  const ask = page.getByRole("dialog", { name: "Connect Telegram first" });
+  await ask.waitFor();
+  assert.equal(await ask.getByRole("button", { name: "Connect Telegram", exact: true }).isVisible(), true);
+  assert.equal(await ask.getByRole("button", { name: "Turn on without Telegram" }).isVisible(), true);
+  await ask.getByRole("button", { name: "Cancel" }).click();
+  await page.keyboard.press("Escape");
   await page.getByRole("tab", { name: "Financials", exact: true }).click();
   const fin = page.getByRole("tabpanel");
   const tiles = fin.getByRole("group", { name: "Financial trends" }).locator(".ui-trend-tile");

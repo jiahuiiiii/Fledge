@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import "./ui.css";
+import { useSlidingIndicator } from "../../lib/useSlidingIndicator";
 
 const TabsContext = createContext(null);
 
@@ -26,14 +27,20 @@ export function TabsList({
   children,
   ...rest
 }) {
+  const tabs = useContext(TabsContext);
+  const ref = useRef(null);
+  const line = variant === "line";
+  const ready = useSlidingIndicator(ref, '[aria-selected="true"]', tabs?.value);
   return (
     <div
       {...rest}
+      ref={ref}
       role="tablist"
       aria-orientation="horizontal"
-      className={`ui-tabs-list ui-tabs-list--${variant} ${className}`}
+      className={`ui-tabs-list ui-tabs-list--${variant} ${line ? "has-indicator" : ""} ${ready ? "is-ready" : ""} ${className}`}
     >
       {children}
+      {line && <span className="ui-tabs-indicator" aria-hidden="true" />}
     </div>
   );
 }

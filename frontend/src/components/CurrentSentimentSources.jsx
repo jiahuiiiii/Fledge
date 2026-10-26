@@ -5,7 +5,7 @@ import SentimentLimits from "./SentimentLimits";
 import { useEffect, useState } from "react";
 import { stamp } from "./MarketResearch";
 import { sourceExclusionLabels } from "../lib/sourceCoverage";
-import { Button, Disclosure } from "./ui";
+import { Button, Card, Disclosure, MetaRow, SourceChip } from "./ui";
 
 const states = {
   changed: "The inputs selected now differ from the saved sentiment reading.",
@@ -166,31 +166,62 @@ export default function CurrentSentimentSources({
               neutral sentiment.
             </p>
           )}
-          {shown.map((s) => (
-            <article key={s.id}>
-              <div className="row">
-                <span className="fine">
-                  <SourceLabel scope={sourceScope(s)}>{s.source}</SourceLabel>
-                </span>
-                <time>
-                  {s.timestamp_basis === "feed_updated" && "Feed updated · "}
-                  {stamp(s.published_at)}
-                </time>
-              </div>
-              {sourceHeadline(s) && <h3>{sourceHeadline(s)}</h3>}
-              {!inline && (s.in_saved_sample === false || s.has_parent_context) && (
-                <p className="fine">
-                  {s.in_saved_sample === false ? "Not in the saved sample" : ""}
-                  {s.in_saved_sample === false && s.has_parent_context ? " · " : ""}
-                  {s.has_parent_context ? "Saved parent context available" : ""}
-                </p>
-              )}
-              <p className="original-source-text">{s.body}</p>
-              <Button variant="tertiary" size="sm" className="source-link" onClick={() => onSource(s.id)}>
-                Inspect current source ↗
-              </Button>
-            </article>
-          ))}
+          {inline ? (
+            // Collected but not yet analysed: the same cards as the analysed
+            // list, just without a tone label.
+            <div className="sentiment-items collected-source-list">
+              {shown.map((s) => (
+                <Card as="article" variant="flush" className="source-story" key={s.id} data-source-id={s.id}>
+                  <MetaRow className="sentiment-source-meta fine">
+                    <SourceChip
+                      label={s.source}
+                      date={`${s.timestamp_basis === "feed_updated" ? "Feed updated · " : ""}${stamp(s.published_at)}`}
+                      href={s.url}
+                      onOpen={() => onSource(s.id)}
+                    />
+                  </MetaRow>
+                  {sourceHeadline(s) && (
+                    <h3>
+                      {s.url ? (
+                        <a href={s.url} target="_blank" rel="noopener noreferrer">
+                          {sourceHeadline(s)}
+                        </a>
+                      ) : (
+                        sourceHeadline(s)
+                      )}
+                    </h3>
+                  )}
+                  <p className="story-source-text original-source-text">{s.body}</p>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            shown.map((s) => (
+              <article key={s.id}>
+                <div className="row">
+                  <span className="fine">
+                    <SourceLabel scope={sourceScope(s)}>{s.source}</SourceLabel>
+                  </span>
+                  <time>
+                    {s.timestamp_basis === "feed_updated" && "Feed updated · "}
+                    {stamp(s.published_at)}
+                  </time>
+                </div>
+                {sourceHeadline(s) && <h3>{sourceHeadline(s)}</h3>}
+                {(s.in_saved_sample === false || s.has_parent_context) && (
+                  <p className="fine">
+                    {s.in_saved_sample === false ? "Not in the saved sample" : ""}
+                    {s.in_saved_sample === false && s.has_parent_context ? " · " : ""}
+                    {s.has_parent_context ? "Saved parent context available" : ""}
+                  </p>
+                )}
+                <p className="original-source-text">{s.body}</p>
+                <Button variant="tertiary" size="sm" className="source-link" onClick={() => onSource(s.id)}>
+                  Inspect current source ↗
+                </Button>
+              </article>
+            ))
+          )}
           {inline && totalPages > 1 && (
             <nav
               className="sentiment-pagination"
