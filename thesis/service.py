@@ -1052,6 +1052,50 @@ def work_once(owner=OWNER):
     return True
 
 
+_last_ticks = {"at": 0.0, "queued": {}}
+
+
+def work_all(owners, *, tick_every=5.0, queue_every=5.0):
+    """One pass of the evaluation worker for every account.
+
+    Shared ticks run once per pass (not once per account), at most every few
+    seconds; only accounts with monitored ideas or waiting jobs are touched.
+    With many accounts the per-account version opened hundreds of database
+    connections a second while nothing was happening.
+    """
+    import time
+    from .research.market import tick as market_tick
+    from .research.sec.service import tick_coverage
+
+    clock = time.monotonic()
+    if clock - _last_ticks["at"] >= tick_every:
+        _last_ticks["at"] = clock
+        market_tick()
+        tick_coverage()
+    with transaction(admin=True) as conn:
+        monitoring = {str(r["owner_id"]) for r in rows(conn, "SELECT DISTINCT owner_id FROM theses WHERE status='monitoring'")}
+        waiting = {str(r["owner_id"]) for r in rows(conn, "SELECT DISTINCT owner_id FROM jobs WHERE status IN ('pending','running')")}
+    worked = False
+    for owner in owners:
+        owner = str(owner)
+        if owner in monitoring and clock - _last_ticks["queued"].get(owner, 0) >= queue_every:
+            _last_ticks["queued"][owner] = clock
+            queue_current(owner)
+            waiting.add(owner)
+        if owner not in waiting:
+            continue
+        job = claim_job(owner)
+        if not job:
+            continue
+        worked = True
+        try:
+            finish_job(owner, job)
+        except Exception:
+            fail_job(owner, job)
+            raise
+    return worked
+
+
 def fail_job(owner, job):
     with transaction(owner) as conn:
         return (

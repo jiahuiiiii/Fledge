@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 import secrets
 import threading
+import time
 import logging
 import os
 import re
@@ -48,8 +49,7 @@ async def lifespan(app):
     def loop():
         while not stop.wait(0.4):
             try:
-                for owner in auth.background_owners():
-                    service.work_once(owner)
+                service.work_all(auth.background_owners())
             except Exception:
                 logging.getLogger("thesis").exception("Recorded evaluation failed")
 
@@ -184,8 +184,10 @@ async def lifespan(app):
             try:
                 if not load_lease.held():
                     continue
+                busy = loading.owners_with_work()
                 for owner in auth.background_owners():
-                    loading.work_once(owner)
+                    if str(owner) in busy:
+                        loading.work_once(owner)
             except Exception:
                 logging.getLogger("thesis").warning("Research loading worker could not finish a step")
 
@@ -331,6 +333,37 @@ async def local_session(request: Request, call_next):
         "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data: https://financialmodelingprep.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"
     )
     response.headers["Cache-Control"] = cache_policy(request.url.path, response.status_code)
+    return response
+
+
+SLOW_REQUEST_MS = 1500
+
+
+@app.middleware("http")
+async def request_timing(request: Request, call_next):
+    """Server-Timing header on every API answer (visible in the browser's
+    Network tab) and a log line for slow ones: total time, time spent in the
+    database and how many transactions the request used."""
+    from .db import request_stats
+    if not request.url.path.startswith("/api/"):
+        return await call_next(request)
+    stats = dict(db_ms=0.0, db_open_ms=0.0, transactions=0, new_connections=0)
+    token = request_stats.set(stats)
+    started = time.perf_counter()
+    try:
+        response = await call_next(request)
+    finally:
+        request_stats.reset(token)
+    total = (time.perf_counter() - started) * 1000
+    response.headers["Server-Timing"] = (
+        f'total;dur={total:.0f}, db;dur={stats["db_ms"]:.0f};desc="{stats["transactions"]} transactions", '
+        f'connect;dur={stats["db_open_ms"]:.0f};desc="{stats["new_connections"]} new connections"'
+    )
+    if total >= SLOW_REQUEST_MS:
+        logging.getLogger("thesis.timing").warning(
+            "Slow request %s %s: %.0f ms total, %.0f ms in %d database transactions (%d new connections)",
+            request.method, request.url.path, total, stats["db_ms"], stats["transactions"], stats["new_connections"],
+        )
     return response
 
 

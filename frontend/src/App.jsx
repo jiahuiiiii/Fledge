@@ -1,7 +1,4 @@
 import { formatTimestamp, formatReportingAgeExplanation } from "./lib/dateTime";
-import ResearchLoading, {
-  ResearchProgressToggle,
-} from "./components/ResearchLoading";
 import {
   useWorkspaceLayout,
   WorkspaceSidebar,
@@ -104,7 +101,7 @@ import PortfolioRead from "./components/PortfolioRead";
 import PersonalHome from "./components/PersonalHome";
 import AccountPage from "./components/AccountPage";
 import WorkspaceHeader from "./components/WorkspaceHeader";
-import { Button, ToastHost, showToast, UserIcon } from "./components/ui";
+import { Button, ToastHost, showToast, hideToast, UserIcon } from "./components/ui";
 import {
   ProfileContext,
   readLocalMode,
@@ -189,6 +186,7 @@ function Icon({ name, ...props }) {
     check: "M5 12l4 4L19 6",
     plus: "M12 5v14 M5 12h14",
     pulse: "M2 12h5l3-7 4 14 3-7h5",
+    refresh: "M20 11a8 8 0 1 0-2.3 5.7 M20 4v7h-7",
   };
   return (
     <svg
@@ -647,7 +645,6 @@ function CompanyWorkspace({
     return () => cancelAnimationFrame(frame);
   }, [exploration]);
   const [sourcesOpen, setSourcesOpen] = useState(false);
-  const [updatesOpen, setUpdatesOpen] = useState(false);
   const [updatePressed, setUpdatePressed] = useState(false);
   useEffect(() => {
     mainPane.current?.scrollTo(0, 0);
@@ -698,7 +695,7 @@ function CompanyWorkspace({
   const lastLoadingRevision = useRef(null);
   const lastLoadingRead = useRef(0);
   useEffect(() => {
-    const open = () => setUpdatesOpen(true);
+    const open = () => updateNowRef.current?.();
     window.addEventListener(UPDATE_EVENT, open);
     return () => window.removeEventListener(UPDATE_EVENT, open);
   }, []);
@@ -710,6 +707,44 @@ function CompanyWorkspace({
     onConnect: () => onChoose(selectedCompanyId, "account"),
     what: "this watch",
   });
+  // Update data: no dialog. The button greys out while it runs and a toast
+  // says it started and when it finished.
+  function updateNow() {
+    if (!data?.instrument || data.instrument.mode === "recorded" || loadingRun?.active) return;
+    setUpdatePressed("starting");
+    showToast(
+      `Updating ${companyName(data.instrument)}. It takes a minute or two; you can keep using Fledge.`,
+      { id: `update-${instrumentId}` },
+    );
+    startLoading();
+  }
+  const updateNowRef = useRef(null);
+  updateNowRef.current = updateNow;
+  useEffect(() => {
+    if (!updatePressed || !loadingRun) return;
+    // Wait until this update's run has been seen running, so an older
+    // finished run does not count as done.
+    if (loadingRun.active) {
+      if (updatePressed !== "running") setUpdatePressed("running");
+      return;
+    }
+    if (updatePressed !== "running") return;
+    setUpdatePressed(false);
+    hideToast(`update-${instrumentId}`);
+    const failed = (loadingRun.steps || []).every((s) => s.status === "failed");
+    showToast(
+      failed
+        ? `Couldn’t update ${companyName(data?.instrument)} right now. Saved data is still shown; try again later.`
+        : `${companyName(data?.instrument)} is up to date. Anything new is on the Summary.`,
+      { id: `update-done-${instrumentId}` },
+    );
+  }, [loadingRun?.active, updatePressed]);
+  useEffect(() => {
+    if (updatePressed && loadingError) {
+      setUpdatePressed(false);
+      showToast(loadingError);
+    }
+  }, [loadingError, updatePressed]);
   async function startLoading(options = {}) {
     const token = scope;
     setLoadingError("");
@@ -829,10 +864,30 @@ function CompanyWorkspace({
       }),
     );
   }
-  async function refresh({ fresh = false } = {}) {
+  // After saving a view the filings have not changed, so skip the slow
+  // financial part of the read and keep the figures already on screen.
+  async function readWithoutFinancials() {
+    const kept = data;
+    const next = await workspaceLane.current.read(scope, (signal) =>
+      api.workspace(instrumentId, { signal, includeFinancials: false }),
+    );
+    if (kept && !kept.financials_pending && kept.instrument?.id === next?.instrument?.id)
+      return {
+        ...next,
+        financial_depth: kept.financial_depth,
+        income_flow: kept.income_flow,
+        segment_revenue: kept.segment_revenue,
+        financials_pending: false,
+      };
+    return next;
+  }
+  async function refresh({ fresh = false, light = false } = {}) {
     if (activeScope.current !== scope) return;
     if (fresh) workspaceLane.current.cancel();
-    const next = await readableLoad(readCompany(), companyLoading ? 280 : 0);
+    const next = await readableLoad(
+      light ? readWithoutFinancials() : readCompany(),
+      companyLoading ? 280 : 0,
+    );
     if (activeScope.current === scope) {
       setData(next);
       if (loadedScope !== scope)
@@ -949,7 +1004,6 @@ function CompanyWorkspace({
     setSource(null);
     setResearchOpen(false);
     setSourcesOpen(false);
-    setUpdatesOpen(false);
     setFocusManagement(false);
     setEditor(null);
     setApproved(false);
@@ -1097,7 +1151,7 @@ function CompanyWorkspace({
       }}
       onSource={setSource}
       onWorld={() => setView("world")}
-      onUpdate={isRecorded ? undefined : () => setUpdatesOpen(true)}
+      onUpdate={isRecorded ? undefined : updateNow}
       onRate={
         isRecorded
           ? undefined
@@ -1310,7 +1364,7 @@ function CompanyWorkspace({
         instrument_id: instrumentId,
       });
       if (activeScope.current !== scope) return;
-      await refresh();
+      await refresh({ light: true });
       setNotice(
         applied
           ? `Now watching. Reports from ${date(applied.window_start)} to ${date(applied.deadline)} count; change the dates under Edit › More options.`
@@ -1362,7 +1416,7 @@ function CompanyWorkspace({
         await api.approveSuggestions(proposalIds, definition);
       else await api.save(definition, instrumentId);
       if (activeScope.current !== scope) return;
-      await refresh();
+      await refresh({ light: true });
       if (activeScope.current !== scope) return;
       setEditor(null);
       setNotice(
@@ -2069,19 +2123,18 @@ function CompanyWorkspace({
               {!isRecorded && (
                 <button
                   className="research-updates-trigger"
-                  disabled={companyLoading}
-                  onClick={() => setUpdatesOpen(true)}
-                  aria-label="Update data"
+                  disabled={companyLoading || !!loadingRun?.active}
+                  onClick={updateNow}
+                  aria-label={loadingRun?.active ? "Updating data" : "Update data"}
                   title={
-                    loadingRun?.active ? "Update data · working" : "Update data"
+                    loadingRun?.active ? "Updating… you can keep using Fledge" : "Get the latest news, posts and price"
                   }
-                  aria-haspopup="dialog"
                 >
-                  <Icon name="pulse" />
+                  <Icon name="refresh" className={loadingRun?.active ? "spin" : undefined} />
                   <span className="company-action-label company-action-full">
-                    Update data
+                    {loadingRun?.active ? "Updating…" : "Update data"}
                   </span>
-                  <span className="company-action-short">Update</span>
+                  <span className="company-action-short">{loadingRun?.active ? "Updating…" : "Update"}</span>
                   {loadingRun?.active && (
                     <span className="research-updates-dot" aria-hidden="true" />
                   )}
@@ -2558,7 +2611,7 @@ function CompanyWorkspace({
                               savedView={current}
                               onSaveView={openEditor}
                               onAsk={() => setResearchOpen(true)}
-                              onUpdate={() => setUpdatesOpen(true)}
+                              onUpdate={updateNow}
                               chart={
                                 <HistoricalPrices
                                   key={`prices-${instrumentId}`}
@@ -3322,103 +3375,6 @@ function CompanyWorkspace({
               </div>
             </div>
           )}
-        </Modal>
-        <Modal
-          open={updatesOpen && !companyLoading}
-          onClose={() => {
-            setUpdatesOpen(false);
-            setUpdatePressed(false);
-          }}
-          title={
-            isRecorded
-              ? "Research updates"
-              : `Update ${companyName(data.instrument)}`
-          }
-          className="research-updates-dialog"
-        >
-          <div className="research-updates-content">
-            {isRecorded ? (
-              <p className="fine">
-                {data.demo.label} · {date(data.demo.as_of)}
-              </p>
-            ) : (
-              <>
-                <p>
-                  {beginner
-                    ? `Gets the latest news, posts and price for ${data.instrument.symbol}. Takes a minute or two.`
-                    : `Checks news, discussions, filings, prices, analyst targets and forecasts for ${data.instrument.symbol} in one go. It usually takes a minute or two and uses no AI credit. Sources checked recently are skipped until they are due again.`}
-                </p>
-                {!beginner && lastSourceCheck(data) && (
-                  <p className="fine">
-                    Sources last checked {dateTime(lastSourceCheck(data))}.
-                  </p>
-                )}
-                {!beginner && data.source_checks
-                  .filter((c) => ["failed", "denied"].includes(c.state))
-                  .map((c) => (
-                    <p className="fine" key={c.source_id}>
-                      <strong>{c.name}:</strong> {sourceCheckProblem(c)}
-                    </p>
-                  ))}
-              </>
-            )}
-            <div className="research-updates-actions">
-              <button
-                className="primary"
-                disabled={!!loadingRun?.active}
-                onClick={() => {
-                  setUpdatePressed(true);
-                  startLoading();
-                }}
-              >
-                {loadingRun?.active ? "Updating…" : "Update now"}
-              </button>
-              {!beginner && layout.progressHidden && (
-                <ResearchProgressToggle
-                  run={loadingRun}
-                  error={loadingError}
-                  onExpand={toggleProgress}
-                />
-              )}
-            </div>
-            {beginner ? (
-              loadingRun && (updatePressed || loadingRun.active) && (
-                <p className="fine" role="status">
-                  {loadingRun.active
-                    ? "Updating… you can close this, it keeps going."
-                    : "Done. Anything new is on the Summary."}
-                </p>
-              )
-            ) : (
-              <ResearchLoading
-                run={loadingRun}
-                error={loadingError}
-                onCollapse={toggleProgress}
-                hidden={!!layout.progressHidden}
-              />
-            )}
-            {!isRecorded && !beginner && (
-              <p className="fine">
-                The AI tone reading is separate: use Refresh &amp; analyse in
-                News &amp; discussion when you want a new one.
-              </p>
-            )}
-            {!beginner && modelAvailability(modelStatus).blocked && (
-              <details className="research-ai-status">
-                <summary>
-                  {modelAvailability(modelStatus).state === "running"
-                    ? "AI is busy"
-                    : "New AI analysis is paused"}
-                </summary>
-                <p className="fine">{modelAvailability(modelStatus).message}</p>
-                {modelAvailability(modelStatus).detail && (
-                  <p className="fine">
-                    {modelAvailability(modelStatus).detail}
-                  </p>
-                )}
-              </details>
-            )}
-          </div>
         </Modal>
         <Modal
           open={sourcesOpen && !companyLoading}
