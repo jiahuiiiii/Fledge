@@ -56,7 +56,7 @@ def test_ratings_append_without_changing_research_and_same_app_vote_is_idempoten
     with transaction(owner,consistent=True) as c:
         assert len(rows(c,'SELECT * FROM alert_feedback'))==2
         assert len(rows(c,'SELECT * FROM move_events'))==1
-        record=review_digest.prepare(owner)['records'][0]
+        record=review_digest.prepare(owner,days=0)['records'][0]
         assert record['feedback_enabled'] and record['feedback']['value']=='not_useful'
     assert ledger.snapshot()==before
     with pytest.raises(psycopg.errors.RaiseException):
