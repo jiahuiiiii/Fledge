@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import Modal from "./Modal";
 import LoadingSkeleton from "./LoadingSkeleton";
 import Checkbox from "./Checkbox";
+import { Button } from "./ui";
 import "./TelegramSettings.css";
 
 const labels = {
@@ -45,7 +46,7 @@ function TelegramIcon() {
   );
 }
 
-export default function TelegramSettings() {
+export default function TelegramSettings({ wrap }) {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState(null);
   const [link, setLink] = useState(null);
@@ -118,16 +119,19 @@ export default function TelegramSettings() {
   }
 
   if (!configured) return null;
-  return (
-    <>
-      <button
-        className="telegram-launch"
+  const trigger = (
+    <Button
+        variant="secondary"
         aria-label="Telegram alerts"
+        icon={<TelegramIcon />}
         onClick={() => setOpen(true)}
       >
-        <TelegramIcon />
-        <span>Telegram</span>
-      </button>
+        Manage
+    </Button>
+  );
+  return (
+    <>
+      {wrap ? wrap(trigger) : trigger}
       <Modal
         open={open}
         onClose={() => !busy && setOpen(false)}

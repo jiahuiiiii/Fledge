@@ -452,3 +452,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* The three signal cards take their tint from the shared tone tokens. */
+.app-shell .ui-tone-card.bs-summary-card { background: var(--tone-soft); }
+.app-shell .ui-tone-card.bs-summary-card:hover { background: color-mix(in srgb, var(--tone) 14%, var(--tone-soft)); }

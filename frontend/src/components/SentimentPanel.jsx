@@ -321,7 +321,7 @@ export default function SentimentPanel({
           ) : (
             <>
               <ToneCard as="div" tone={toneOf(sample.tone)} className="sentiment-summary">
-                <strong className="ui-tone-card__status"><span className="ui-tone-card__dot" aria-hidden="true" />{sentimentSummaryParts(sample).label}</strong>
+                <strong className="ui-tone-card__status"><span className="ui-tone-card__dot" aria-hidden="true" />{sentimentSummaryParts(sample).label.replace(/^./, (c) => c.toUpperCase())}</strong>
                 <small className="tone-detail">
                   {sentimentSummaryParts(sample).detail}
                 </small>

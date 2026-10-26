@@ -73,9 +73,9 @@ const assert = require("node:assert/strict");
     });
     await page.goto(
       process.env.THESIS_TEST_URL +
-        "/?company=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa&view=workspace",
+        "/?company=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa&view=account",
     );
-    await page.locator(".company-header").waitFor();
+    await page.getByRole("heading", { name: "Account", exact: true }).waitFor();
     await page
       .getByRole("button", { name: "Telegram alerts", exact: true })
       .click();
@@ -158,6 +158,8 @@ const assert = require("node:assert/strict");
       .getByRole("button", { name: "Connect Telegram", exact: true })
       .waitFor();
     await dialog.getByRole("button", { name: "Close dialog" }).click();
+    await page.goto(process.env.THESIS_TEST_URL + "/?view=account");
+    await page.getByRole("heading", { name: "Account", exact: true }).waitFor();
     await page
       .getByRole("button", { name: "Telegram alerts", exact: true })
       .focus();
@@ -177,6 +179,8 @@ const assert = require("node:assert/strict");
     await page
       .getByRole("button", { name: /Add your first company/ })
       .waitFor();
+    await page.goto(process.env.THESIS_TEST_URL + "/?view=account");
+    await page.getByRole("heading", { name: "Account", exact: true }).waitFor();
     await page
       .getByRole("button", { name: "Telegram alerts", exact: true })
       .click();

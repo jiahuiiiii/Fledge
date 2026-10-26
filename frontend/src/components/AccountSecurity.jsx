@@ -1,3 +1,4 @@
+import { Button } from "./ui";
 import { useState } from "react";
 import Modal from "./Modal";
 import { api } from "../api/client";
@@ -280,12 +281,12 @@ export function AccountSecurityDialog({ open, onClose, hasRecoveryCode, onCodeCh
                 onChange={(event) => setNext(event.target.value)}
               />
             </div>
-            <button type="submit" className="primary account-submit" disabled={!!busy}>
+            <Button type="submit" variant="primary" className="account-submit" disabled={!!busy}>
               {busy === "password" ? "Please wait…" : "Change password"}
-            </button>
-            <button
-              type="button"
-              className="security-secondary"
+            </Button>
+            <Button
+              variant="secondary"
+              className="account-submit"
               disabled={!!busy}
               onClick={() => run("recovery")}
             >
@@ -294,7 +295,7 @@ export function AccountSecurityDialog({ open, onClose, hasRecoveryCode, onCodeCh
                 : hasRecoveryCode
                   ? "Make a new recovery code"
                   : "Create a recovery code"}
-            </button>
+            </Button>
             <small className="recovery-tip">
               Both need your current password.
             </small>

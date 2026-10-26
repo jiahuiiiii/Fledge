@@ -288,7 +288,7 @@
 
 /* Tone summary: left-aligned like every other card, tone first, counts quieter. */
 .app-shell .sentiment-panel .sentiment-summary.ui-card { align-items: flex-start; text-align: left; gap: var(--space-1); }
-.app-shell .sentiment-panel .sentiment-summary > strong { font-size: var(--text-md); color: var(--color-text); font-weight: 600; text-transform: capitalize; }
+.app-shell .sentiment-panel .sentiment-summary > strong { font-size: var(--text-md); color: var(--color-text); font-weight: 600; text-transform: none; }
 .app-shell .sentiment-panel .sentiment-summary .tone-detail { font-size: var(--text-sm); color: var(--color-text-2); }
 .app-shell .sentiment-panel .sentiment-summary .sample-reconciliation { font-size: var(--text-sm); color: var(--color-muted); }
 .app-shell .sentiment-panel .evidence-button { display: inline-flex; align-items: center; gap: var(--space-2); }

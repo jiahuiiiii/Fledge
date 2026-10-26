@@ -60,6 +60,18 @@ let browser;
       if (width === 390 || width === 1440) await shot(`${name}-${width}`);
     }
   }
+  // Account page: Account is a header tab (underlined), Telegram lives here, no sideways scroll.
+  await page.goto(`${process.env.THESIS_TEST_URL}/?view=account`);
+  await page.getByRole("heading", { name: "Account", exact: true }).waitFor();
+  assert.equal(await page.locator(".topbar-tab[aria-current='page']").count(), 1);
+  assert.equal(await page.locator(".topbar-tools").getByRole("button", { name: "Telegram alerts" }).count(), 0);
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.waitForTimeout(250);
+    const scroll = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+    if (scroll > 0) problems.push(`account@${width}: scroll +${scroll}`);
+    if (width === 390 || width === 1440) await shot(`account-${width}`);
+  }
   console.log(JSON.stringify({ problems }, null, 1));
   assert.deepEqual(problems, []);
   assert.deepEqual(errors, []);

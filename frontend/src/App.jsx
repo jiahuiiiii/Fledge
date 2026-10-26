@@ -455,10 +455,9 @@ function ResearchApp({ accountControls, session }) {
     },
   };
   const accountNavigation = (
-    <Button
-      variant="plain"
+    <a
+      className="topbar-tab"
       href={`?${new URLSearchParams({ company: destination.id, view: "account" })}`}
-      icon={<UserIcon />}
       aria-current={destination.view === "account" ? "page" : undefined}
       onClick={(event) => {
         if (
@@ -475,7 +474,7 @@ function ResearchApp({ accountControls, session }) {
       }}
     >
       Account
-    </Button>
+    </a>
   );
   return (
     <ProfileContext.Provider value={profileValue}>

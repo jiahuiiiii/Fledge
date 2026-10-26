@@ -73,3 +73,11 @@
 #account-settings-title:focus {
   outline: none;
 }
+
+/* One scale for the page: card titles from SectionHeader, 13px+ body text. */
+.account-settings-page .account-note { margin: 0; color: var(--color-text-2); font-size: var(--text-sm); line-height: 1.55; }
+.account-settings-page .account-explain { display: grid; gap: var(--space-2); color: var(--color-text-2); font-size: var(--text-sm); }
+.account-settings-page .account-explain strong { color: var(--color-text); font-weight: 600; }
+.account-settings-page .account-explain ul { margin: 0; padding-left: var(--space-5); display: grid; gap: var(--space-1); line-height: 1.5; }
+.pro-mode-switch.compact { display: inline-flex; margin: 0; padding: 0; border: 0; }
+.pro-mode-switch.compact input { min-width: 44px; min-height: 24px; }

@@ -1,5 +1,3 @@
-import TelegramSettings from "./TelegramSettings";
-
 // One header for the loading workspace, research pages and account settings.
 export default function WorkspaceHeader({
   beginner,
@@ -58,7 +56,6 @@ export default function WorkspaceHeader({
         })}
       </nav>
       <div className="topbar-tools">
-        {!beginner && <TelegramSettings />}
         {account}
       </div>
     </header>
