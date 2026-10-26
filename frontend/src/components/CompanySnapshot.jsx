@@ -58,6 +58,7 @@ export default function CompanySnapshot({
   onRetryFinancials,
   priceHistory,
   onWorld,
+  detailsOnly = false,
 }) {
   const { sentences, growth } = snapshot(data);
   const { latestQuarter } = revenueComparisons(
@@ -94,13 +95,14 @@ export default function CompanySnapshot({
   const pointer = worldState.hurt ? worldState.reason : newsGroups.bad.length > newsGroups.good.length ? "There has been more bad news than good recently. Read both sides below." : null;
   return (
     <section className="glance pro-overview" aria-label="Company overview">
-      <PriceMoveLine price={price} pro />
+      {!detailsOnly && <PriceMoveLine price={price} pro />}
       <SectionHeader level="section" as="h2" title="At a glance" />
       {data.financials_pending ? <p className="glance-summary muted" role="status">{financialError || "Loading saved financials…"}{financialError && <Button variant="tertiary" onClick={onRetryFinancials}>Try again</Button>}</p> : sentences.length ?
         <p className="glance-summary">{latestQuarter ? <span className="glance-growth"><span className="glance-growth-title"><strong>Revenue {latestQuarter.growth >= 0 ? "up" : "down"} {Math.abs(latestQuarter.growth).toFixed(1)}% · latest quarter vs a year earlier</strong><TermHelp term="revenue_growth" /></span><small>Quarter to {day(latestQuarter.current.end)} vs quarter to {day(latestQuarter.previous.end)}{growth && ` · fiscal year to ${day(growth.periodEnd)}: ${growth.growth >= 0 ? "+" : "−"}${Math.abs(growth.growth).toFixed(1)}%`}</small></span> : growth && <span className="glance-growth"><span className="glance-growth-title"><strong>Revenue {growth.growth >= 0 ? "grew" : "fell"} {Math.abs(growth.growth).toFixed(1)}% · last fiscal year</strong><TermHelp term="revenue_growth" /></span><small>Year ended {day(growth.periodEnd)} vs year ended {day(growth.previousEnd)}</small></span>}{sentences.slice(growth ? 1 : 0).join(" ")}</p> :
         <p className="glance-summary muted">A short summary appears once filings and news are loaded. Use Update to load them.</p>}
       <Freshness data={data} />
-      <SignalLights name={name} lights={lights} pointer={pointer?.replace(/\s*Read (?:why|both sides) below\.?$/, "")} pointerLink={pointer ? { target: worldState.hurt ? "bs-world" : "bs-news", label: worldState.hurt ? "Read why" : "Read both sides" } : null} />
+      {!detailsOnly && <SignalLights name={name} lights={lights} pointer={pointer?.replace(/\s*Read (?:why|both sides) below\.?$/, "")} pointerLink={pointer ? { target: worldState.hurt ? "bs-world" : "bs-news", label: worldState.hurt ? "Read why" : "Read both sides" } : null} />}
+      {!detailsOnly && <>
       <SectionHeader level="section" as="h2" title="What's being said" actions={<Button variant="tertiary" size="sm" onClick={() => onView("evidence")}>All news and posts →</Button>} />
       <div className="pro-overview-headlines">
         <Card id="bs-news" tabIndex={-1} aria-labelledby="bs-news-title"><SectionHeader level="card" as="h3" id="bs-news-title" title="News" /><p className="bs-meaning">{newsMeaning(newsGroups)}</p><ToneHeadlineGroups groups={newsGroups} onSource={onSource} reading={reading} includeUnrated /></Card>
@@ -108,6 +110,7 @@ export default function CompanySnapshot({
       </div>
       <WorldSignalCard links={links} worldState={worldState} onWorld={onWorld} limit={2} />
       <YourViewCard savedView={savedView} name={name} onSaveView={onSaveView} />
+      </>}
       <LatestActivity data={data} instrumentId={instrumentId} onUpdates={onUpdates} onView={onView} onSource={onSource} />
       {!data.financials_pending && <OverviewSections data={data} instrumentId={instrumentId} visible={visible} onView={onView} businessPanel={businessPanel} briefOpen={briefOpen} onBriefToggle={setBriefOpen} />}
       <Disclosure title="Price chart · past year" description="Saved prices; choose Refresh prices inside for a newer check">

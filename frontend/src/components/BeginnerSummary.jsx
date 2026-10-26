@@ -205,23 +205,9 @@ export default function BeginnerSummary({
       <WorldSignalCard links={links} worldState={worldState} onWorld={onWorld} />
       <YourViewCard savedView={savedView} name={name} onSaveView={onSaveView} />
 
-      {mode === "explain" ? (
-        <p className="bs-note">
-          Want financials, charts and comparisons?{" "}
-          <Button
-            variant="tertiary"
-            size="inline"
-            onClick={() => setDetailMode?.("data")}
-          >
-            Turn on Pro tools
-          </Button>{" "}
-          (you can switch back in Account).
-        </p>
-      ) : (
-        <p className="bs-note">
-          The other tabs have the financials, charts and comparisons.
-        </p>
-      )}
+      <p className="bs-note">
+        The News, Financials and Compare tabs go deeper.
+      </p>
     </div>
   );
 }

@@ -8,7 +8,7 @@ const sections = {
     icon: "M5 4h14v16H5zM8 8h8M8 12h8M8 16h5",
   },
   evidence: {
-    label: "News & discussion",
+    label: "News",
     description:
       "Explore the news, discussion and evidence behind the company story.",
     icon: "M3 12h4l3-7 4 14 3-7h4",
@@ -26,7 +26,7 @@ const sections = {
     icon: "M4 21V7h10v14M14 11h6v10M8 11h2m-2 4h2m-2 4h2M2 21h20",
   },
   valuation: {
-    label: "Compare & value",
+    label: "Compare",
     description:
       "Compare useful peers, then explore your valuation assumptions.",
     icon: "M12 3v18M17 7H9a3 3 0 0 0 0 6h6a3 3 0 0 1 0 6H7",
@@ -35,10 +35,10 @@ const sections = {
 
 // Beginner mode keeps two plain views; Pro adds the detailed research tabs.
 export function researchTabs({ recorded, beginner }) {
-  if (beginner) return ["summary", "evidence"];
+  // One set of tabs for everyone; the Summary holds the overview.
   return recorded
-    ? ["business", "evidence", "fundamentals"]
-    : ["business", "evidence", "fundamentals", "valuation"];
+    ? ["summary", "evidence", "fundamentals"]
+    : ["summary", "evidence", "fundamentals", "valuation"];
 }
 
 export default function ResearchNavigation({
