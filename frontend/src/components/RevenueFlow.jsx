@@ -2,7 +2,8 @@ import { readableNote } from "../lib/readingNotes";
 import { useEffect, useId, useRef, useState } from "react";
 import Modal from "./Modal";
 import FinancialEvidence from "./FinancialEvidence";
-import Select from "./Select";
+import { FilterGroup, Tabs, TabsList, TabsTrigger } from "./ui";
+import { activeSourceTab, availableSourceTabs } from "../lib/revenueSourceTabs";
 import { amount, day } from "./FinancialOverview";
 import { flowLayout, matchingBreakdowns, shortLabel } from "../lib/incomeFlow";
 import "./RevenueFlow.css";
@@ -56,11 +57,8 @@ export default function RevenueFlow({
     ...(segments?.groups || []),
     ...(segments?.trailing_groups || []),
   ]);
-  const activeCategory =
-    category ||
-    mixes.find((row) => row.kind === "Operating segments")?.kind ||
-    mixes[0]?.kind ||
-    "Total revenue";
+  const availableTabs = availableSourceTabs(mixes);
+  const activeCategory = activeSourceTab(availableTabs, category);
   const revenueInputs =
     selected?.metrics.find((row) => row.key === "revenue")?.inputs || [];
   const hasFiling =
@@ -201,54 +199,36 @@ export default function RevenueFlow({
               <br />
               <small>US dollars · reported income, not cash flow</small>
             </p>
-            <div className="flow-source-controls">
-              <label htmlFor={`${id}-mix`}>
-                Revenue sources
-                <Select
-                  id={`${id}-mix`}
-                  value={activeCategory}
-                  onChange={(e) => {
-                    setCategory(e.target.value);
-                    setEvidence(null);
-                  }}
-                >
-                  {[
-                    "Total revenue",
-                    "Operating segments",
-                    "Products and services",
-                    "Reported geographies",
-                  ].map((name) => (
-                    <option key={name} value={name}>
-                      {name === "Reported geographies"
-                        ? "Countries & regions"
-                        : name === "Operating segments"
-                          ? "Business segments"
-                          : name}
-                    </option>
-                  ))}
-                </Select>
-              </label>
-              {categoryMixes.length > 1 && (
-                <label htmlFor={`${id}-geography`}>
-                  Geographic view
-                  <Select
-                    id={`${id}-geography`}
-                    value={mix.view_label}
-                    onChange={(e) => {
-                      setGeographyView(e.target.value);
-                      setEvidence(null);
-                    }}
-                  >
-                    {categoryMixes.map((row) => (
-                      <option key={row.view_id} value={row.view_label}>
-                        {row.view_label}
-                      </option>
-                    ))}
-                  </Select>
-                </label>
-              )}
-            </div>
           </div>
+          {availableTabs.length > 1 && (
+            <Tabs
+              value={activeCategory}
+              onValueChange={(key) => {
+                setCategory(key);
+                setEvidence(null);
+              }}
+            >
+              <TabsList variant="line" aria-label="Revenue sources" className="flow-source-tabs">
+                {availableTabs.map(([key, label]) => (
+                  <TabsTrigger key={key} value={key}>
+                    {label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          )}
+          {categoryMixes.length > 1 && (
+            <FilterGroup
+              label="Geographic view"
+              className="flow-geography-views"
+              value={mix.view_label}
+              onValueChange={(value) => {
+                setGeographyView(value);
+                setEvidence(null);
+              }}
+              options={categoryMixes.map((row) => ({ value: row.view_label, label: row.view_label }))}
+            />
+          )}
           {activeCategory !== "Total revenue" && (
             <div
               className="flow-source-detail"
