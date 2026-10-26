@@ -1,0 +1,129 @@
+.plain-tab {
+  display: grid;
+  gap: var(--space-2, 8px);
+  margin-bottom: var(--space-3, 12px);
+}
+.plain-intro {
+  margin: 0 0 var(--space-1, 4px);
+  padding: 10px 12px;
+  border-radius: var(--radius-md, 12px);
+  background: var(--color-surface-2);
+  color: var(--color-muted);
+}
+.plain-intro strong {
+  color: var(--color-text);
+}
+.plain-q {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 50%;
+  font-size: 11px;
+}
+.plain-figure {
+  padding: 12px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md, 12px);
+  background: var(--color-surface);
+}
+.plain-figure p {
+  margin: 0;
+}
+.plain-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+.plain-value {
+  margin: 2px 0 !important;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+.plain-value.small {
+  font-size: 1.05rem;
+}
+.plain-up {
+  color: var(--color-positive);
+  font-size: 0.95rem;
+}
+.plain-down {
+  color: var(--color-negative);
+  font-size: 0.95rem;
+}
+.plain-period {
+  color: var(--color-faint);
+  font-size: 0.8rem;
+}
+.plain-text {
+  margin-top: 4px !important;
+  color: var(--color-text-2);
+  font-size: 0.875rem;
+}
+.plain-note {
+  margin: 0;
+  color: var(--color-faint);
+  font-size: 0.8rem;
+}
+.plain-empty {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  color: var(--color-muted);
+}
+.plain-empty p {
+  margin: 0;
+}
+.plain-verdict {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 4px solid var(--color-gold);
+  border-radius: var(--radius-sm, 10px);
+  background: var(--color-gold-soft);
+  color: var(--color-text);
+}
+.plain-verdict.tone-good {
+  border-left-color: var(--color-positive);
+  background: var(--color-positive-soft);
+}
+.plain-verdict .term-help {
+  display: inline-flex;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.plain-table-wrap {
+  overflow-x: auto;
+}
+.plain-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.plain-table th,
+.plain-table td {
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--color-line);
+  text-align: right;
+  white-space: nowrap;
+}
+.plain-table th:first-child {
+  text-align: left;
+  white-space: normal;
+}
+.plain-table thead th {
+  color: var(--color-muted);
+  font-weight: 600;
+  white-space: normal;
+}
+.plain-table tr.me th,
+.plain-table tr.me td {
+  color: var(--color-accent);
+  font-weight: 700;
+}
+.plain-change {
+  justify-self: start;
+}

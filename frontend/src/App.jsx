@@ -83,6 +83,7 @@ import CompanionGuide, { ExplorationPrompt } from "./components/CompanionGuide";
 import AccountGate from "./components/AccountGate";
 import FilingWatch from "./components/FilingWatch";
 import ValuationPanel from "./components/ValuationPanel";
+import PlainCompare from "./components/PlainCompare";
 import IdeaAlertChecks from "./components/IdeaAlertChecks";
 import HistoryPanel from "./components/HistoryPanel";
 import EventAssessment, {
@@ -662,6 +663,7 @@ function CompanyWorkspace({
     beginner = viewMode === "explain",
     [tab, setTab] = useState(() => (beginner ? "summary" : "business")),
     [fullDetails, setFullDetails] = useState(false),
+    [compareAll, setCompareAll] = useState(false),
     [question, setQuestion] = useState(questionDefault);
   const [source, setSource] = useState(null),
     [editor, setEditor] = useState(null),
@@ -1062,6 +1064,8 @@ function CompanyWorkspace({
   }, [data, alertDetail]);
   // Beginner Summary content, reused by the merged Overview for fictional
   // sample companies so removing the Pro Summary tab did not hide their news.
+  // Each company starts on the plain Compare view.
+  useEffect(() => setCompareAll(false), [selectedCompanyId]);
   const showOverview =
     view === "workspace" && tab === "summary" && fullDetails;
   const summaryPanel = (active) => (
@@ -2572,20 +2576,48 @@ function CompanyWorkspace({
                       <RetainedView active={tab === "valuation"}>
                         <>
                           {!isRecorded && (
+                            <PlainCompare
+                              key={`compare-${instrumentId}`}
+                              instrumentId={instrumentId}
+                              name={companyName(data.instrument)}
+                              visible={
+                                view === "workspace" && tab === "valuation" && !compareAll
+                              }
+                              onChoosePeers={() => {
+                                setCompareAll(true);
+                                requestAnimationFrame(() =>
+                                  document
+                                    .querySelector(".sector-position")
+                                    ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+                                );
+                              }}
+                            />
+                          )}
+                          <button
+                            type="button"
+                            className="full-details-toggle"
+                            aria-expanded={compareAll}
+                            onClick={() => setCompareAll((open) => !open)}
+                          >
+                            {compareAll ? "Hide details ▴" : "Show full details ▾"}
+                            {!compareAll && <small>Pick companies, charts, analyst targets, your own scenario</small>}
+                          </button>
+                          <div hidden={!compareAll}>
+                          {!isRecorded && (
                             <Suspense
                               fallback={<p>Loading competitor comparison…</p>}
                             >
                               <SectorPosition
                                 instrumentId={instrumentId}
                                 visible={
-                                  view === "workspace" && tab === "valuation"
+                                  view === "workspace" && tab === "valuation" && compareAll
                                 }
                               />
                             </Suspense>
                           )}
                           <ValuationPanel
                             visible={
-                              view === "workspace" && tab === "valuation"
+                              view === "workspace" && tab === "valuation" && compareAll
                             }
                             key={data.instrument.id}
                             revision={updatedAt}
@@ -2594,6 +2626,7 @@ function CompanyWorkspace({
                             quote={data.market?.quote?.quote}
                             priceBars={priceRead?.data?.snapshot?.series?.bars}
                           />
+                          </div>
                         </>
                       </RetainedView>
                       <RetainedView active={tab === "fundamentals"}>

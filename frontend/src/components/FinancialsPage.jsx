@@ -29,6 +29,8 @@ import {
   blockLayout,
 } from "../lib/financialStory";
 import FinancialHistory from "./FinancialHistory";
+import PlainFinancials from "./PlainFinancials";
+import { companyName } from "../lib/companyIdentity";
 import RevenueHistory from "./RevenueHistory";
 import "./FinancialsPage.css";
 import "./ForecastPanels.css";
@@ -238,6 +240,7 @@ export default function FinancialsPage({
   management,
 }) {
   const [analystOpen, setAnalystOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const [figure, setFigure] = useState(null);
   const [attempt, setAttempt] = useState(0);
   const [story, setStory] = useState(null),
@@ -362,6 +365,40 @@ export default function FinancialsPage({
   ];
   return (
     <div className="financials-story financial-main-flow">
+      {!safe && !error && (
+        <LoadingSkeleton
+          variant="financials"
+          label="Reading saved financial history…"
+        />
+      )}
+      {error && (
+        <p role="alert">
+          {error}{" "}
+          <button onClick={() => setAttempt((old) => old + 1)}>
+            Read saved financials again
+          </button>
+        </p>
+      )}
+      {safe && safe.status !== "available" && <p>{safe.reason}</p>}
+      {safe?.status === "available" && (
+        <PlainFinancials
+          name={companyName(workspace.instrument)}
+          active={active}
+          previous={past}
+          management={management}
+          annual={mode === "annual"}
+        />
+      )}
+      <button
+        type="button"
+        className="full-details-toggle"
+        aria-expanded={showAll}
+        onClick={() => setShowAll((open) => !open)}
+      >
+        {showAll ? "Hide details ▴" : "Show full details ▾"}
+        {!showAll && <small>Charts, every year, cash and debt, filings</small>}
+      </button>
+      <div hidden={!showAll} className="financial-full-details">
       <FinancialRecovery
         key={instrumentId}
         instrumentId={instrumentId}
@@ -397,15 +434,9 @@ export default function FinancialsPage({
       )}
       <PeerContext
         instrumentId={instrumentId}
-        visible={visible}
+        visible={visible && showAll}
         onCompare={onCompare}
       />
-      {!safe && !error && (
-        <LoadingSkeleton
-          variant="financials"
-          label="Reading saved financial history…"
-        />
-      )}
       <div
         hidden={!safe}
         className="story-period-controls"
@@ -428,15 +459,6 @@ export default function FinancialsPage({
           </button>
         ))}
       </div>
-      {error && (
-        <p role="alert">
-          {error}{" "}
-          <button onClick={() => setAttempt((old) => old + 1)}>
-            Read saved financials again
-          </button>
-        </p>
-      )}
-      {safe && safe.status !== "available" && <p>{safe.reason}</p>}
       {safe && (
         <>
           <div className="financial-summary-row" role="group" aria-label="Financial trends">
@@ -580,6 +602,7 @@ export default function FinancialsPage({
           </Disclosure>
         )}
       </DisclosureGroup>
+      </div>
     </div>
   );
 }
