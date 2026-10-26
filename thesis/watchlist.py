@@ -47,4 +47,7 @@ def add(owner, instrument_id):
 def remove(owner, instrument_id):
     with transaction(owner) as conn:
         conn.execute('DELETE FROM watchlist_companies WHERE owner_id=%s AND instrument_id=%s', (owner, instrument_id))
+        # No longer followed: its news watch stops and frees a place in the watch limit.
+        conn.execute('UPDATE news_watches SET enabled=false WHERE owner_id=%s AND instrument_id=%s AND enabled',
+                     (owner, instrument_id))
     return summary(owner)

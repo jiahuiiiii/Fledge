@@ -630,6 +630,7 @@ function CompanyWorkspace({
   const [loadError, setLoadError] = useState("");
   const companyLoading = loadedScope !== scope;
   const [removedCompany, setRemovedCompany] = useState(null);
+  const [confirmRemoval, setConfirmRemoval] = useState(null);
   const view = initialView;
   const ideaSidebarAvailable = !!selectedCompanyId && view === "workspace";
   const ideaSidebarHidden = true;
@@ -1183,7 +1184,12 @@ function CompanyWorkspace({
   const hiddenCatalogue = data.catalogue.filter((company) =>
     hiddenCompanies.includes(company.id),
   );
+  // Removing a company also stops its watch, so ask before doing either.
   function removeCompany(company) {
+    setConfirmRemoval(company);
+  }
+  function confirmRemoveCompany(company) {
+    setConfirmRemoval(null);
     onHideCompany(company.id);
     setRemovedCompany(company);
     api
@@ -1890,6 +1896,29 @@ function CompanyWorkspace({
           </button>
         </p>
       )}
+      <Modal
+        open={!!confirmRemoval}
+        onClose={() => setConfirmRemoval(null)}
+        title={`Remove ${confirmRemoval?.symbol || "company"} from your sidebar?`}
+      >
+        <div className="telegram-prompt__body">
+          <p>
+            Any watch on {confirmRemoval?.name || "this company"} will be turned off too, so
+            Fledge stops checking it and sends no more alerts for it. Your saved research stays.
+          </p>
+          <p className="fine">
+            You can add it back later, but you will need to turn its watch on again.
+          </p>
+          <div className="telegram-prompt__actions">
+            <Button variant="primary" onClick={() => confirmRemoveCompany(confirmRemoval)}>
+              Remove and stop watching
+            </Button>
+            <Button variant="plain" onClick={() => setConfirmRemoval(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
       <RemovalNotice
         company={removedCompany}
         onUndo={() => {

@@ -144,3 +144,17 @@ def test_not_sure_what_to_look_at_gets_a_starting_point(owner):
     assert page['headline'].startswith('Not sure where to start')
     assert page['next_step']['action'] == 'add_company'
     assert 'product you use' in page['next_step']['label']
+
+
+def test_removing_a_company_turns_its_watch_off(owner, monkeypatch):
+    monkeypatch.setattr(news_watch.sentiment.market_brief, 'company_for', lambda iid: True)
+    ids = companies(6)
+    for iid in ids[:5]:
+        watchlist.add(owner, iid)
+        news_watch.configure(owner, iid, True)
+    watchlist.remove(owner, ids[0])
+    with transaction(owner) as conn:
+        assert one(conn, 'SELECT enabled FROM news_watches WHERE owner_id=%s AND instrument_id=%s', (owner, ids[0]))['enabled'] is False
+        assert one(conn, 'SELECT count(*) n FROM news_watches WHERE owner_id=%s AND enabled', (owner,))['n'] == 4
+    watchlist.add(owner, ids[5])
+    news_watch.configure(owner, ids[5], True)

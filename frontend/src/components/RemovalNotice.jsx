@@ -26,7 +26,7 @@ export default function RemovalNotice({ company, onUndo, onDismiss }) {
             aria-atomic="true"
           >
             {displayed &&
-              `${displayed.symbol} removed from sidebar. Saved research and monitoring are unchanged.`}
+              `${displayed.symbol} removed from sidebar. Its watch is off; saved research is kept.`}
           </span>
           <div
             className="removal-notice-actions"

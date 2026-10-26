@@ -108,17 +108,19 @@ let browser;
     initialReads,
     "tab navigation refetches the whole workspace",
   );
-  // Removal is reversible sidebar visibility; no API write or research deletion.
+  // Removal is reversible sidebar visibility, asks first and turns the watch off; research is never deleted.
   const company = () => page.locator(".watch-item").filter({ hasText: "MSFT" });
   await page
     .getByRole("button", { name: "Remove MSFT from sidebar", exact: true })
     .click();
+  await page.getByRole("button", { name: "Remove and stop watching", exact: true }).click();
   assert.equal(await company().count(), 0);
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   assert.equal(await company().count(), 1);
   await page
     .getByRole("button", { name: "Remove MSFT from sidebar", exact: true })
     .click();
+  await page.getByRole("button", { name: "Remove and stop watching", exact: true }).click();
   await page.reload();
   await page.locator(".company-header").waitFor();
   assert.equal(await company().count(), 0);
@@ -142,7 +144,10 @@ let browser;
   const removals = page.getByRole("button", {
     name: /^Remove .+ from sidebar$/,
   });
-  while (await removals.count()) await removals.first().click();
+  while (await removals.count()) {
+    await removals.first().click();
+    await page.getByRole("button", { name: "Remove and stop watching", exact: true }).click();
+  }
   await page
     .getByText("Your sidebar is empty. Add or restore a company below.", {
       exact: true,

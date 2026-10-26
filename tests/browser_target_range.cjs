@@ -15,7 +15,7 @@ const assert=require('node:assert/strict');let browser;
   await chart.screenshot({path:`/private/tmp/thesis-target-range-${width}.png`});
  }
  await page.setViewportSize({width:1440,height:1000});await page.evaluate(()=>scrollTo(0,0));
- await page.getByRole('button',{name:'Remove AAPL from sidebar',exact:true}).click();
+ await page.getByRole('button',{name:'Remove AAPL from sidebar',exact:true}).click();await page.getByRole('button',{name:'Remove and stop watching',exact:true}).click();
  const group=page.getByRole('group',{name:'Removal actions'});await group.waitFor();
  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.removal-notice-actions')).opacity==='1');
  const undo=group.getByRole('button',{name:'Undo',exact:true}),close=group.getByRole('button',{name:'Dismiss removal notice'});
@@ -29,6 +29,6 @@ const assert=require('node:assert/strict');let browser;
   await page.locator('.removal-notice').screenshot({path:`/private/tmp/thesis-removal-${width}.png`});
  }
  await page.setViewportSize({width:1440,height:1000});await undo.click();await page.locator('.watch-item').filter({hasText:'AAPL'}).waitFor();
- await page.getByRole('button',{name:'Remove AAPL from sidebar',exact:true}).click();await close.click();await group.waitFor({state:'hidden'});
+ await page.getByRole('button',{name:'Remove AAPL from sidebar',exact:true}).click();await page.getByRole('button',{name:'Remove and stop watching',exact:true}).click();await close.click();await group.waitFor({state:'hidden'});
  assert.deepEqual(errors,[]);console.log('Target range and icon banner passed at 320/390/1440/1920, including quote arithmetic, no overflow, adjacent icon-only controls, undo and dismiss.');
 })().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>browser?.close());
