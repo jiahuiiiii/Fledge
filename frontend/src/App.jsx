@@ -103,7 +103,7 @@ import PortfolioRead from "./components/PortfolioRead";
 import PersonalHome from "./components/PersonalHome";
 import AccountPage from "./components/AccountPage";
 import WorkspaceHeader from "./components/WorkspaceHeader";
-import { Button, Toast, UserIcon } from "./components/ui";
+import { Button, ToastHost, showToast, UserIcon } from "./components/ui";
 import {
   ProfileContext,
   readLocalMode,
@@ -656,7 +656,8 @@ function CompanyWorkspace({
   const [data, setData] = useState(null),
     [priceRead, setPriceRead] = useState(null),
     [error, setError] = useState(""),
-    [notice, setNotice] = useState(""),
+    // Notices are shared bottom toasts; an empty message is ignored.
+    setNotice = (message) => showToast(message),
     [busy, setBusy] = useState(false),
     { mode: viewMode } = useProfile(),
     beginner = viewMode === "explain",
@@ -1920,9 +1921,7 @@ function CompanyWorkspace({
           </div>
         </div>
       </Modal>
-      {!removedCompany && !companyLoading && (
-        <Toast message={notice} onDismiss={() => setNotice("")} />
-      )}
+      <ToastHost />
       <RemovalNotice
         company={removedCompany}
         onUndo={() => {

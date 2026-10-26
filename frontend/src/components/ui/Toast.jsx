@@ -1,29 +1,56 @@
-// A short message at the bottom of the screen. It counts down on a thin bar,
-// pauses while hovered or focused, and goes away by itself; Undo and close stay
-// available until then. The countdown is a CSS animation, so no timers leak.
-export default function Toast({ message, action, onDismiss, duration = 15000, id }) {
-  if (!message) return null;
+// Bottom-of-screen messages, built on react-toastify: a countdown bar, pause on
+// hover or focus, and automatic dismissal. Mount <ToastHost /> once; call
+// showToast(message, { action }) or hideToast(id) from anywhere.
+import { ToastContainer, toast, Slide } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import "./toast.css";
+
+export const TOAST_MS = 15000;
+
+function Body({ message, action, closeToast }) {
   return (
-    <div className="ui-toast-region">
-      <div className="ui-toast" role="status" aria-atomic="true" key={id ?? message}>
-        <p className="ui-toast__message">{message}</p>
-        {action && (
-          <button type="button" className="ui-toast__action" onClick={action.onClick}>
-            {action.label}
-          </button>
-        )}
-        <button type="button" className="ui-toast__close" aria-label="Dismiss" onClick={onDismiss}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
-            <path d="m6 6 12 12M18 6 6 18" />
-          </svg>
+    <div className="ui-toast__body">
+      <p className="ui-toast__message">{message}</p>
+      {action && (
+        <button
+          type="button"
+          className="ui-toast__action"
+          onClick={() => {
+            action.onClick();
+            closeToast?.();
+          }}
+        >
+          {action.label}
         </button>
-        <span
-          className="ui-toast__timer"
-          aria-hidden="true"
-          style={{ animationDuration: `${duration}ms` }}
-          onAnimationEnd={onDismiss}
-        />
-      </div>
+      )}
     </div>
+  );
+}
+
+export function showToast(message, { action, id, onClose } = {}) {
+  if (!message) return;
+  toast(<Body message={message} action={action} />, { toastId: id, onClose });
+}
+
+export function hideToast(id) {
+  toast.dismiss(id);
+}
+
+export default function ToastHost() {
+  return (
+    <ToastContainer
+      position="bottom-center"
+      autoClose={TOAST_MS}
+      transition={Slide}
+      limit={3}
+      closeOnClick={false}
+      pauseOnHover
+      pauseOnFocusLoss={false}
+      newestOnTop
+      theme="dark"
+      className="ui-toast-host"
+      toastClassName="ui-toast"
+      progressClassName="ui-toast__progress"
+    />
   );
 }

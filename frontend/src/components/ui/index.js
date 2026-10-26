@@ -16,4 +16,4 @@ export { default as DisclosureGroup } from "./DisclosureGroup";
 export { default as TrendTile } from "./TrendTile";
 export { default as Combobox } from "./Combobox";
 export { default as ToneCard } from "./ToneCard";
-export { default as Toast } from "./Toast";
+export { default as ToastHost, showToast, hideToast } from "./Toast";
