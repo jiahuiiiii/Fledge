@@ -5,7 +5,7 @@ import { ToastContainer, toast, Slide } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "./toast.css";
 
-export const TOAST_MS = 15000;
+export const TOAST_MS = 10000;
 
 function Body({ message, action, closeToast }) {
   return (
