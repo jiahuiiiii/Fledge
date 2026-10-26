@@ -149,6 +149,7 @@ let browser;
   const peer = compare.getByRole("combobox", { name: "Peer ticker or company" });
   await peer.waitFor();
   assert.equal(await compare.getByText("Other comparison measures").count(), 0);
+  await shot("compare");
   const before = await compare.locator(".position-group").boundingBox();
   await peer.fill("zzzz");
   await page.waitForTimeout(600);

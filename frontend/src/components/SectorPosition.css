@@ -690,3 +690,12 @@
 .sector-position .position-row-label > strong { font-size: var(--text-base); }
 .sector-position .position-row-end { top: var(--space-2); bottom: var(--space-2); }
 .sector-position .position-scale { height: 26px; }
+
+/* Peers card: title and Save share a row; search and suggestions sit together. */
+.sector-position .position-group-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.sector-position .position-save-row { margin-left: auto; justify-content: flex-end; }
+.sector-position .position-search { max-width: none; margin-top: var(--space-4); }
+.sector-position .position-search-row { display: flex; align-items: flex-start; gap: var(--space-3); flex-wrap: wrap; }
+.sector-position .position-search-row > :first-child { flex: 1 1 280px; min-width: 0; }
+.sector-position .position-search-row > .ui-button { flex: 0 0 auto; }
+.sector-position .position-empty { margin: var(--space-4) 0 0; padding: var(--space-4); border-radius: var(--radius-sm); background: var(--ui-surface-2); color: var(--color-muted); font-size: var(--text-sm); }

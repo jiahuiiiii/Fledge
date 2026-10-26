@@ -930,9 +930,25 @@ export default function SectorPosition({
       {data && (
         <>
           <div className="position-group">
-            <h3>Peers</h3>
+            <div className="position-group-head">
+              <h3>Peers</h3>
+              <div className="position-save-row">
+                <span role="status">
+                  {notice}
+                  {(draft || []).length >= 8 ? " · 8-peer limit" : ""}
+                </span>
+                <Button variant="primary" size="sm" disabled={busy} onClick={save}>
+                  {phase === "saving"
+                    ? "Saving…"
+                    : phase === "fetching"
+                      ? "Fetching data…"
+                      : "Save & compare"}
+                </Button>
+              </div>
+            </div>
             <div className="position-search">
               <span>Add a peer</span>
+              <div className="position-search-row">
               <Combobox
                 label="Peer ticker or company"
                 placeholder="Type a ticker or company name"
@@ -952,6 +968,19 @@ export default function SectorPosition({
                 }
                 onSelect={addPeer}
               />
+              {data.basis === "unselected" && !data.vendor_suggestions?.length && (
+                <Button variant="secondary" disabled={busy} onClick={suggestSimilar}>
+                  Suggest similar companies
+                </Button>
+              )}
+              </div>
+              {data.basis === "unselected" && !data.vendor_suggestions?.length && (
+                <span className="position-caption">
+                  {data.vendor_status?.last_attempt_at
+                    ? describeVendorCheck(data.vendor_status, (v) => formatTimestamp(v))
+                    : "Suggestions come from FMP and are a starting point, not a competitor list."}
+                </span>
+              )}
             </div>
             {data.suggestion_origin === "fmp" && (
               <p className="position-caption">
@@ -960,17 +989,10 @@ export default function SectorPosition({
                 competitors. Save &amp; compare keeps them; change the list any time.
               </p>
             )}
-            {data.basis === "unselected" && !data.vendor_suggestions?.length && (
-              <div className="position-suggest">
-                <Button variant="secondary" size="sm" disabled={busy} onClick={suggestSimilar}>
-                  Suggest similar companies
-                </Button>
-                <span className="position-caption">
-                  {data.vendor_status?.last_attempt_at
-                    ? describeVendorCheck(data.vendor_status, (v) => formatTimestamp(v))
-                    : "Or add your own below. Suggestions come from FMP and are not a competitor list."}
-                </span>
-              </div>
+            {!(draft || []).length && (
+              <p className="position-empty">
+                No peers yet. Search above, or use suggested companies, then save to compare.
+              </p>
             )}
             <ul
               className="position-peer-list"
@@ -1025,19 +1047,6 @@ export default function SectorPosition({
                 );
               })}
             </ul>
-            <div className="position-save-row">
-              <button disabled={busy} onClick={save}>
-                {phase === "saving"
-                  ? "Saving…"
-                  : phase === "fetching"
-                    ? "Fetching data…"
-                    : "Save & compare"}
-              </button>
-              <span role="status">
-                {notice}
-                {(draft || []).length >= 8 ? " · 8-peer limit" : ""}
-              </span>
-            </div>
             {!draft?.length && data.suggestion_source && (
               <p className="position-caption">
                 Saving with no peers restores the suggested group.
