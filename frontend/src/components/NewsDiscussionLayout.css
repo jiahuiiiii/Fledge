@@ -162,13 +162,16 @@
   gap: var(--space-2);
   padding: var(--space-4);
   border: 0;
-  background: var(--ui-surface-2);
+  background: var(--tone-soft, var(--ui-surface-2));
   border-radius: var(--radius-sm);
 }
 .app-shell .sentiment-panel .source-summary-list strong {
   font-size: var(--text-base);
   font-weight: 600;
   color: var(--ui-text);
+}
+.app-shell .sentiment-panel .source-summary-list .ui-tone-card__status {
+  color: var(--tone);
 }
 .app-shell .sentiment-panel .sentiment-summary.ui-card {
   margin: 0;

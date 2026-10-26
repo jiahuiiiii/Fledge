@@ -15,6 +15,7 @@ export function SourceToneSummary({ analysis }) {
         <ToneCard as="div" key={sample.scope} tone={sample.withheld != null ? "unknown" : toneOf(sample.sentimentSummary?.tone)}>
           <SourceLabel scope={sample.scope} />
           <strong className="ui-tone-card__status">
+            <span className="ui-tone-card__dot" aria-hidden="true" />
             {sample.withheld != null
               ? "Tone totals withheld"
               : sentimentSummaryParts(sample.sentimentSummary).label}
