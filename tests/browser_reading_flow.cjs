@@ -19,6 +19,7 @@ let browser;
     viewport: { width: 1440, height: 1050 },
     reducedMotion: "reduce",
   });
+  page.setDefaultTimeout(10000);
   const errors = [],
     writes = [],
     external = [],
@@ -152,91 +153,31 @@ let browser;
     0,
   );
   assert.equal(
-    await page.getByRole("button", { name: "Notebook", exact: true }).count(),
+    await page.getByRole("button", { name: "Research questions", exact: true }).count(),
     1,
   );
   await sections.getByRole("tab", { name: "Overview", exact: true }).focus();
   await page.keyboard.press("ArrowRight");
-  await page
-    .getByRole("region", {
-      name: "Earnings and cash-flow history",
-      exact: true,
-    })
-    .waitFor();
-  const performance = page.getByRole("region", {
-    name: "Earnings and cash-flow history",
-    exact: true,
-  });
-  const chapters = page.getByRole("tablist", {
-    name: "Financial sections",
-    exact: true,
-  });
-  assert.equal(
-    await page.locator(".financials-story .sector-position").count(),
-    0,
-  );
-  assert.equal(
-    await performance
-      .getByRole("button", { name: "Evidence", exact: true })
-      .count(),
-    0,
-  );
-  assert.equal(
-    await performance
-      .getByRole("button", { name: "Figures & calculations", exact: true })
-      .count(),
-    1,
-  );
-  assert.equal(
-    await page.locator("#financial-view-reports").isVisible(),
-    false,
-  );
-  assert.equal(
-    await page.locator("#financial-view-position").isVisible(),
-    false,
-  );
-  await performance
-    .getByRole("button", { name: "Annual reports", exact: true })
-    .click();
-  await performance
-    .getByRole("button", { name: "Figures & calculations", exact: true })
-    .click();
-  const evidence = page.getByRole("dialog", {
-    name: "Performance · figures & calculations",
-    exact: true,
-  });
+  assert.equal(await sections.getByRole("tab", {name:"News & discussion",exact:true}).getAttribute("aria-selected"), "true");
+  await page.keyboard.press("ArrowRight");
+  const performance = page.getByRole("region", {name:"Earnings and cash-flow history",exact:true});
+  await performance.waitFor();
+  assert.equal(await page.locator(".financials-story .sector-position").count(),0);
+  assert.equal(await page.locator(".financial-reports-panel").isVisible(),false);
+  const details = await require('./browser_helpers.cjs').financialDetails(page);
+  assert.equal(await page.locator(".financial-reports-panel").isVisible(),true);
+  assert.match(await details.debt.innerText(), /US\$38bn remains/);
+  await page.getByRole('group',{name:'Financial history period basis'}).getByRole('button',{name:'Fiscal year',exact:true}).click();
+  const growth = page.getByRole('group',{name:'Financial trends'}).getByRole('button').first();
+  await growth.click();
+  const evidence = page.getByRole('dialog',{name:'Revenue growth · fiscal year',exact:true});
   await evidence.waitFor();
-  assert.match(await evidence.innerText(), /64000000000 USD/);
-  assert.match(await evidence.innerText(), /52000000000 USD/);
-  await page.keyboard.press("Escape");
-  await chapters
-    .getByRole("tab", { name: "Financial position", exact: true })
-    .click();
-  await page
-    .getByRole("region", { name: "Borrowing and equity history", exact: true })
-    .waitFor();
-  assert.equal(
-    await page.locator("#financial-view-performance").isVisible(),
-    false,
-  );
-  await chapters
-    .getByRole("tab", { name: "Financial position", exact: true })
-    .press("ArrowRight");
-  assert.equal(await page.locator("#financial-view-reports").isVisible(), true);
-  await page.getByText("All reported figures", { exact: true }).click();
-  await page
-    .getByRole("region", { name: "Financial performance", exact: true })
-    .waitFor();
-  await chapters.getByRole("tab", { name: "Performance", exact: true }).click();
-  assert.equal(
-    await performance
-      .getByRole("button", { name: "Annual reports", exact: true })
-      .getAttribute("aria-pressed"),
-    "true",
-  );
+  assert.match(await evidence.innerText(), /US\$64 bil/);
+  assert.match(await evidence.innerText(), /US\$52 bil/);
+  await page.keyboard.press('Escape');
   // Only one entry point; opening and closing keeps the question draft intact.
-  await page.getByRole("button", { name: "Notebook", exact: true }).click();
-  const notebook = page.getByRole("dialog", { name: "Notebook", exact: true });
+  await page.getByRole("button", { name: "Research questions", exact: true }).click();
+  const notebook = page.getByRole("dialog", { name: "Your research", exact: true });
   await notebook
     .getByRole("button", { name: "Edit question", exact: true })
     .click();
@@ -244,8 +185,8 @@ let browser;
     .locator("#specific-question")
     .fill("What would change my view of this company?");
   await page.keyboard.press("Escape");
-  await sections.getByRole("tab", { name: "Outlook", exact: true }).click();
-  await page.getByRole("button", { name: "Notebook", exact: true }).click();
+  await sections.getByRole("tab", { name: "Financials", exact: true }).click();
+  await page.getByRole("button", { name: "Research questions", exact: true }).click();
   assert.equal(
     await notebook.locator("#specific-question").inputValue(),
     "What would change my view of this company?",
@@ -253,13 +194,11 @@ let browser;
   await page.keyboard.press("Escape");
   for (const width of [1440, 1920, 980, 390, 320]) {
     await page.setViewportSize({ width, height: width < 600 ? 844 : 1050 });
-    await top.getByRole("button", { name: "Workspace", exact: true }).click();
+    await top.getByRole("button", { name: "Home", exact: true }).click();
     await sections
       .getByRole("tab", { name: "Financials", exact: true })
       .click();
-    await chapters
-      .getByRole("tab", { name: "Performance", exact: true })
-      .click();
+    assert.equal(await page.getByRole('group',{name:'Financial history period basis'}).getByRole('button',{name:'Fiscal year',exact:true}).getAttribute('aria-pressed'),'true');
     await page.evaluate(() => {
       document.querySelector(".main-workspace").scrollTop = 0;
       window.scrollTo(0, 0);
@@ -281,12 +220,13 @@ let browser;
       animations: "disabled",
     });
     const reportEdges = await page.locator(".research-content").boundingBox();
-    for (const view of ["My ideas", "History", "Updates"]) {
-      await top.getByRole("button", { name: view, exact: true }).click();
+    for (const view of ["My views", "Updates"]) {
+      if (view === "History") await page.goto(base + `/?company=${iid}&view=history`);
+      else await top.getByRole("button", { name: view, exact: true }).click();
       assert.equal(await page.locator(".periodic-review-entry").count(), 0);
       assert.equal(
         await page
-          .getByRole("button", { name: "Notebook", exact: true })
+          .getByRole("button", { name: "Research questions", exact: true })
           .count(),
         0,
       );
@@ -308,16 +248,8 @@ let browser;
         Math.abs(frame.rect.width - frame.padding * 2 - reportEdges.width) < 2,
         `${view} reading width ${width}`,
       );
-      if (view === "History") {
-        await page.getByText("No saved history yet", { exact: true }).waitFor();
-        assert.equal(await page.locator(".history-empty").count(), 1);
-        assert.equal(
-          await page.locator(".idea-alert-checks:visible").count(),
-          0,
-        );
-      }
       if (view === "Updates") {
-        const card = page.locator(".inbox-record > summary");
+        const card = page.locator(".inbox-record");
         await card.waitFor();
         assert.equal(await card.locator("h3").innerText(), source.title);
         assert.equal(
@@ -345,22 +277,28 @@ let browser;
       });
     }
   }
-  // Opening evidence retains the old classification and the exact source.
-  const card = page.locator(".inbox-record > summary");
-  await card.focus();
-  await page.keyboard.press("Enter");
-  assert.match(await page.locator(".inbox-detail").innerText(), /AI reading:/);
+  // The flat evidence dialog keeps the exact original source and its link.
+  const card = page.locator(".inbox-record");
+  await card.getByRole('button',{name:'Inspect evidence',exact:true}).focus();
+  await page.keyboard.press('Enter');
+  assert.match(await page.locator('dialog[open]').innerText(), /construction delay/);
+  assert.equal(await page.locator('dialog[open]').getByRole('link',{name:/Read original/}).getAttribute('href'),source.url);
+  await page.keyboard.press('Escape');
   withheld = true;
   await page
     .getByRole("button", { name: "Refresh inbox", exact: true })
     .click();
-  await page
-    .getByRole("heading", { name: "Source access changed", exact: true })
-    .waitFor();
+  await card.getByRole('button',{name:'Inspect evidence',exact:true}).click();
+  await page.locator('dialog[open]').getByText(/Source access changed/).waitFor();
+  assert.doesNotMatch(await page.locator('dialog[open]').innerText(),/Factory opening|construction delay/);
+  await page.keyboard.press('Escape');
   assert.doesNotMatch(
     await page.locator(".inbox-record").innerText(),
     /Factory opening|construction delay/,
   );
+  // Legacy history links still load a page (History now lives inside the idea view).
+  await page.goto(base + `/?company=${iid}&view=history`);
+  await page.locator('.idea-page, .history-page, .ideas-page, main').first().waitFor();
   assert.deepEqual(errors, []);
   assert.deepEqual(writes, []);
   assert.deepEqual(external, []);
@@ -370,7 +308,7 @@ let browser;
     oneNotebookEntry: true,
     retainedQuestionDraft: true,
     horizontalKeyboardNavigation: true,
-    threeFinancialChapters: true,
+    financialChartsAndDisclosures: true,
     groupedEvidence: true,
     exactSourcePreview: true,
     withholding: true,

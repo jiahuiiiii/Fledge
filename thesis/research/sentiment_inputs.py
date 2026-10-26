@@ -25,7 +25,7 @@ def current(conn, iid, now=None):
         return None
     latest = one(
         conn,
-        "SELECT * FROM sentiment_analyses WHERE instrument_id=%s ORDER BY (packet->>'cutoff')::timestamptz DESC,created_at DESC,id DESC LIMIT 1",
+        sentiment.LATEST_SQL,
         (iid,),
     )
     visible = sentiment.present(conn, latest)

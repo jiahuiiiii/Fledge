@@ -46,3 +46,12 @@ routes `GET /api/v1/world-news`, `POST /api/v1/world-news/refresh`,
 `POST /api/v1/world-news/check`, `frontend/src/components/WorldNews.jsx`,
 `frontend/src/lib/worldNews.js`. Tests: `tests/test_world_news.py`,
 `frontend/src/lib/worldNews.test.js`.
+
+
+## Shared presentation — 25 October 2026
+
+World news uses the shared page header, action buttons, filter group, story cards,
+metadata, badges, inset effect cards, empty states and disclosure. Theme and
+company filters retain their original counts and meaning. Original text and
+links remain distinct from labelled AI possibilities. Existing refresh and
+watchlist-check policies are unchanged. See [UI verification](../reviews/2026-10-25/shared-reading-pages.md).

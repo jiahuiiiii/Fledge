@@ -63,3 +63,13 @@ test("calculation labels explain fiscal bridge roles without showing filing code
     "Operating income ÷ revenue × 100",
   );
 });
+
+import { evidenceDialogRows } from "./financialEvidence.js";
+test("dialog rows keep unknown values unknown and list inputs", () => {
+  const rows = evidenceDialogRows([
+    { key: "x", label: "Growth", value: null, unit: "percent", end: "2026-06-30", formula: "a / b", inputs: [{ value: 2, end: "2026-06-30", concept: "Revenues" }, { value: 1, end: "2025-06-30", concept: "Revenues" }] },
+    null,
+  ]);
+  assert.equal(rows[0].value, "Unavailable");
+  assert.equal(rows.length, 3);
+});

@@ -1,5 +1,6 @@
 import { formatTimestamp } from "../lib/dateTime";
 import Checkbox from "./Checkbox";
+import { Button } from "./ui";
 import { roleLabel, comparisonMeaning } from "../lib/conditionRoles";
 import { useState } from "react";
 import { EventSchedule } from "./EventConditions";
@@ -57,12 +58,14 @@ export function DefinitionText({ value, kind }) {
   );
 }
 export default function ProposalPanel({
+  embedded = false,
   proposals = [],
   current,
   busy,
   unavailableReason,
   onGenerate,
   onReview,
+  onWatch,
   onReject,
   onSource,
   onOpen,
@@ -146,6 +149,17 @@ export default function ProposalPanel({
             </button>
           </details>
         ))}
+        {p.status === "pending" && onWatch && !p.source_unavailable && p.operation === "add" && (
+          <div className="proposal-watch">
+            <Button variant="primary" size="sm" disabled={busy} onClick={() => onWatch(p)}>
+              Watch this
+            </Button>
+            <small>
+              Saves it to your idea and starts watching, using the standard dates
+              (past week to 90 days ahead). Change anything later with Edit.
+            </small>
+          </div>
+        )}
         {p.status === "pending" || p.status === "stale" ? (
           <button
             className="text-button proposal-reject"
@@ -171,34 +185,45 @@ export default function ProposalPanel({
     (p) => selected.includes(p.id) && !p.source_unavailable,
   );
   return (
-    <section className="proposal-panel" aria-label="Reviewable suggestions">
-      <h3>Make your idea testable</h3>
-      <p className="fine">
-        Compare suggested changes with your original idea. Nothing changes until
-        you choose a suggestion, review it and save.
-      </p>
+    <section
+      className={embedded ? "proposal-panel embedded" : "proposal-panel"}
+      aria-label="Reviewable suggestions"
+    >
+      {!embedded && (
+        <>
+          <h3>Make your idea testable</h3>
+          <p className="fine">
+            Compare suggested changes with your original idea. Nothing changes
+            until you choose a suggestion, review it and save.
+          </p>
+        </>
+      )}
       <button
-        className="secondary"
+        className={embedded ? "text-button" : "secondary"}
         onClick={onGenerate}
         disabled={busy || !!unavailableReason || current?.status === "archived"}
       >
         {busy
           ? "Working…"
           : current
-            ? "Suggest checks for my idea"
+            ? embedded
+              ? "Suggest things to watch (AI)"
+              : "Suggest checks for my idea"
             : "Suggest a starting idea"}
       </button>
       {unavailableReason && <p className="fine">{unavailableReason}</p>}
-      <details className="proposal-method">
-        <summary>How suggestions work</summary>
-        <p className="fine">
-          Suggestions use AI and the available sources. Thresholds and dates are
-          assumptions for you to choose or edit. Checks can describe a
-          requirement or a risk. A request uses the shared AI budget; the
-          selected sources cannot establish that every important risk has been
-          detected.
-        </p>
-      </details>
+      {!embedded && (
+        <details className="proposal-method">
+          <summary>How suggestions work</summary>
+          <p className="fine">
+            Suggestions use AI and the available sources. Thresholds and dates
+            are assumptions for you to choose or edit. Checks can describe a
+            requirement or a risk. A request uses the shared AI budget; the
+            selected sources cannot establish that every important risk has been
+            detected.
+          </p>
+        </details>
+      )}
       {pending.map(card)}
       {chosen.length > 0 && (
         <button
@@ -206,8 +231,8 @@ export default function ProposalPanel({
           disabled={busy}
           onClick={() => onReview(chosen)}
         >
-          Review {chosen.length} selected suggestion
-          {chosen.length === 1 ? "" : "s"}
+          Edit {chosen.length} selected suggestion
+          {chosen.length === 1 ? "" : "s"} first
         </button>
       )}
       {old.length > 0 && (

@@ -1,0 +1,69 @@
+import { useRef } from "react";
+import { useSlidingIndicator } from "../lib/useSlidingIndicator";
+
+// One header for the loading workspace, research pages and account settings.
+export default function WorkspaceHeader({
+  beginner,
+  view,
+  updatesWaiting = false,
+  onNavigate,
+  onHome,
+  account,
+}) {
+  const items = beginner
+    ? [
+        ["workspace", "Home"],
+        ["world", "World"],
+        ["ideas", "My views"],
+        ...(updatesWaiting ? [["updates", "Updates"]] : []),
+      ]
+    : [
+        ["workspace", "Home"],
+        ["ideas", "My views"],
+        ["updates", "Updates"],
+        ["world", "World"],
+      ];
+  const navRef = useRef(null);
+  const ready = useSlidingIndicator(navRef, "button.active", view, 5);
+  return (
+    <header className="topbar">
+      <a className="skip-link" href="#workspace">
+        Skip to content
+      </a>
+      <a
+        href="?view=workspace"
+        className="brand"
+        onClick={(event) => {
+          event.preventDefault();
+          onNavigate("workspace");
+        }}
+      >
+        fledge<span>↗</span>
+      </a>
+      <nav aria-label="Workspace navigation" ref={navRef} className={`has-indicator${ready ? " is-ready" : ""}`}>
+        {items.map(([key, label]) => {
+          const active =
+            view === key ||
+            (view === "idea" && key === "ideas");
+          return (
+            <button
+              key={key}
+              className={active ? "active" : ""}
+              aria-current={active ? "page" : undefined}
+              onClick={() =>
+                beginner && key === "workspace" ? onHome() : onNavigate(key)
+              }
+            >
+              {label}
+              {key === "updates" && updatesWaiting && <i className="dot" />}
+            </button>
+          );
+        })}
+        <span className="topbar-indicator" aria-hidden="true" />
+      </nav>
+      <div className="topbar-tools">
+        {account}
+      </div>
+    </header>
+  );
+}

@@ -92,8 +92,10 @@ export const api = {
     request(
       `/companies/${id}/sector-position${peers == null ? "" : `?peers=${encodeURIComponent(peers.join(","))}`}`,
     ),
-  refreshFmp: (id) =>
-    request(`/companies/${id}/fmp/refresh`, { method: "POST" }),
+  refreshFmp: (id, only) =>
+    request(`/companies/${id}/fmp/refresh${only ? `?only=${only}` : ""}`, {
+      method: "POST",
+    }),
   refreshPublicForecasts: (id) =>
     request(`/companies/${id}/financial-forecasts/refresh`, { method: "POST" }),
   savePeers: (id, selections) =>
@@ -347,6 +349,14 @@ export const api = {
       method: "POST",
       body: { expected_stage, instrument_id },
     }),
+  // Light reads for the home cards: every saved quote, then per-company
+  // news tone and (Pro) the two trailing filing figures.
+  homeCards: ({ signal } = {}) => request("/home-cards", { signal }),
+  // This company's alerts with details; the company read has status only.
+  companyAlerts: (id, { signal } = {}) =>
+    request(`/companies/${id}/alerts`, { signal }),
+  homeCard: (id, { figures = true, signal } = {}) =>
+    request(`/companies/${id}/home-card?figures=${figures}`, { signal }),
   workspace: (instrument_id, { includeFinancials = true, signal } = {}) =>
     request(
       `/workspace?include_financials=${includeFinancials}${instrument_id ? `&instrument_id=${encodeURIComponent(instrument_id)}` : ""}`,

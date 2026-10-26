@@ -163,12 +163,9 @@
 .revenue-forecast-reading {
   padding: var(--space-4);
   border: 1px solid var(--color-line);
-  border-left: 3px solid var(--color-info);
   border-radius: var(--radius-md);
 }
-.revenue-forecast-reading.forecast-management {
-  border-left-color: var(--color-gold);
-}
+
 .revenue-forecast-reading > div {
   display: flex;
   gap: var(--space-2);
@@ -258,7 +255,6 @@
 }
 .modal .revenue-forecast-evidence .forecast-date-note {
   padding: var(--space-3) var(--space-4);
-  border-left: 3px solid var(--color-info);
   border-radius: var(--radius-sm);
   background: var(--color-surface-2);
   font-size: var(--text-sm);

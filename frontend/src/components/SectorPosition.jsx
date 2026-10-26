@@ -1,3 +1,5 @@
+import { Button, Combobox, FilterGroup, SectionHeader } from "./ui";
+import { describeVendorCheck } from "../lib/vendorStatus";
 import { formatTimestamp } from "../lib/dateTime";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
@@ -691,6 +693,36 @@ export default function SectorPosition({
     setSearched("");
     searchVersion.current++;
   }
+  // Explicit provider check (no AI): collects FMP's similar-company list for
+  // this company, then re-reads the position with those as the starting group.
+  async function suggestSimilar() {
+    if (acting.current) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await api.refreshFmp(instrumentId, "peers");
+      const next = await load(true);
+      // Say what actually happened: the peers check can be refused (plan or
+      // key), paused, or rate-limited, which is different from "none found".
+      const outcome = (result?.outcomes || []).find((o) => o.dataset === "peers");
+      if (next?.vendor_suggestions?.length)
+        setNotice("Similar companies loaded. Save & compare to keep them, or change the list.");
+      else if (!outcome || outcome.status !== "ready") {
+        const refused = (result?.outcomes || []).find((o) => o.status !== "ready" && o.message);
+        // An hour-gap refusal hides what the earlier check did, so say that too.
+        const earlier = describeVendorCheck(next?.vendor_status, (v) => formatTimestamp(v));
+        setError(
+          `FMP did not provide similar companies: ${outcome?.message || refused?.message || "the check did not run"}. ${earlier}`,
+        );
+      } else
+        setNotice("FMP answered but listed no similar companies for this company. Add your own below.");
+    } catch (failure) {
+      setError(failure.message);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function save() {
     if (acting.current) return;
     let selected = [...(draft || [])];
@@ -877,10 +909,12 @@ export default function SectorPosition({
       Object.values(fetchStates).some((s) => s.status === "loading") || waiting;
   return (
     <section className="sector-position" aria-label="Competitor position">
-      <header className="outlook-section-heading">
-        <h2>Where {data?.symbol || "the company"} stands among competitors</h2>
-        <p>Compare saved growth, profitability and scale.</p>
-      </header>
+      <SectionHeader
+        level="section"
+        as="h2"
+        title={`Where ${data?.symbol || "the company"} stands among competitors`}
+        description="Compare saved growth, profitability and scale."
+      />
       {error && (
         <p role="alert" className="warning">
           {error}
@@ -896,57 +930,69 @@ export default function SectorPosition({
       {data && (
         <>
           <div className="position-group">
-            <h3>Peers</h3>
-            <label className="position-search">
-              Peer ticker or company
-              <input
-                value={search}
+            <div className="position-group-head">
+              <h3>Peers</h3>
+              <div className="position-save-row">
+                <span role="status">
+                  {notice}
+                  {(draft || []).length >= 8 ? " · 8-peer limit" : ""}
+                </span>
+                <Button variant="primary" size="sm" disabled={busy} onClick={save}>
+                  {phase === "saving"
+                    ? "Saving…"
+                    : phase === "fetching"
+                      ? "Fetching data…"
+                      : "Save & compare"}
+                </Button>
+              </div>
+            </div>
+            <div className="position-search">
+              <span>Add a peer</span>
+              <div className="position-search-row">
+              <Combobox
+                label="Peer ticker or company"
                 placeholder="Type a ticker or company name"
                 disabled={busy || (draft || []).length >= 8}
-                onChange={(event) => searchPeers(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter" || searched !== search) return;
-                  const choices = searchResults.filter(
-                    (c) => !draft?.includes(c.symbol),
-                  );
-                  const exact = choices.find(
-                    (c) => c.symbol === search.trim().toUpperCase(),
-                  );
-                  if (exact || choices.length === 1) {
-                    event.preventDefault();
-                    addPeer((exact || choices[0]).symbol);
-                  }
-                }}
+                filter={false}
+                onQueryChange={searchPeers}
+                options={searchResults
+                  .filter((c) => !draft?.includes(c.symbol))
+                  .map((c) => ({ value: c.symbol, label: `${c.symbol} · ${companyName(c)}` }))}
+                emptyText={
+                  searchError ||
+                  (searched !== search
+                    ? "Searching…"
+                    : searchResults.length
+                      ? "Already selected"
+                      : "No matching company")
+                }
+                onSelect={addPeer}
               />
-            </label>
-            {search.trim() && (
-              <div className="position-search-results" aria-live="polite">
-                {searchError ? (
-                  <p role="alert">{searchError}</p>
-                ) : searched !== search ? (
-                  <p>Searching…</p>
-                ) : searchResults.filter((c) => !draft?.includes(c.symbol))
-                    .length ? (
-                  searchResults
-                    .filter((c) => !draft?.includes(c.symbol))
-                    .slice(0, 6)
-                    .map((c) => (
-                      <button
-                        key={c.symbol}
-                        disabled={busy}
-                        onClick={() => addPeer(c.symbol)}
-                      >
-                        {c.symbol} · {companyName(c)}
-                      </button>
-                    ))
-                ) : (
-                  <p>
-                    {searchResults.length
-                      ? "Already selected."
-                      : "No matching company."}
-                  </p>
-                )}
+              {data.basis === "unselected" && !data.vendor_suggestions?.length && (
+                <Button variant="secondary" disabled={busy} onClick={suggestSimilar}>
+                  Suggest similar companies
+                </Button>
+              )}
               </div>
+              {data.basis === "unselected" && !data.vendor_suggestions?.length && (
+                <span className="position-caption">
+                  {data.vendor_status?.last_attempt_at
+                    ? describeVendorCheck(data.vendor_status, (v) => formatTimestamp(v))
+                    : "Suggestions come from FMP and are a starting point, not a competitor list."}
+                </span>
+              )}
+            </div>
+            {data.suggestion_origin === "fmp" && (
+              <p className="position-caption">
+                Suggested: similar companies by exchange, sector and size according to
+                FMP, largest first. This is a starting point, not a verified list of
+                competitors. Save &amp; compare keeps them; change the list any time.
+              </p>
+            )}
+            {!(draft || []).length && (
+              <p className="position-empty">
+                No peers yet. Search above, or use suggested companies, then save to compare.
+              </p>
             )}
             <ul
               className="position-peer-list"
@@ -1001,19 +1047,6 @@ export default function SectorPosition({
                 );
               })}
             </ul>
-            <div className="position-save-row">
-              <button disabled={busy} onClick={save}>
-                {phase === "saving"
-                  ? "Saving…"
-                  : phase === "fetching"
-                    ? "Fetching data…"
-                    : "Save & compare"}
-              </button>
-              <span role="status">
-                {notice}
-                {(draft || []).length >= 8 ? " · 8-peer limit" : ""}
-              </span>
-            </div>
             {!draft?.length && data.suggestion_source && (
               <p className="position-caption">
                 Saving with no peers restores the suggested group.
@@ -1021,24 +1054,16 @@ export default function SectorPosition({
             )}
           </div>
           {!financials && (
-            <div
+            <FilterGroup
               className="position-view"
-              role="group"
-              aria-label="Comparison time"
-            >
-              <button
-                aria-pressed={!expected}
-                onClick={() => setView("reported")}
-              >
-                Reported position
-              </button>
-              <button
-                aria-pressed={expected}
-                onClick={() => setView("expected")}
-              >
-                Expected growth
-              </button>
-            </div>
+              label="Comparison time"
+              value={expected ? "expected" : "reported"}
+              onValueChange={setView}
+              options={[
+                { value: "reported", label: "Reported position" },
+                { value: "expected", label: "Expected growth" },
+              ]}
+            />
           )}
           {!expected && measure !== "pe" && (
             <Map members={data.members} symbol={data.symbol} />

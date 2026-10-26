@@ -21,6 +21,14 @@ import {
 } from "../lib/priceRefresh";
 import ExtendedPrice from "./ExtendedPrice";
 import { freshPrice, LIVE_PRICE_MS } from "../lib/livePrice";
+import {
+  Badge,
+  Button,
+  Card,
+  ChevronRightIcon,
+  GridIcon,
+  SectionHeader,
+} from "./ui";
 import "./CompanyOverview.css";
 const stamp = (value) =>
   formatTimestamp(value, { fallback: "Date unavailable" });
@@ -40,69 +48,100 @@ function practiceNote(catalogue) {
   return `${lead} ${list} (not real) so you can see how Fledge works.`;
 }
 
-export default function CompanyOverview({
-  catalogue,
-  initialWorkspace,
-  onOpen,
-}) {
+export default function CompanyOverview({ catalogue, onOpen }) {
   const [readings, setReadings] = useState({});
   // Beginner mode keeps each card to the price and a plain news line.
   const beginner = useProfile().mode === "explain";
   const [refresh, setRefresh] = useState(0);
   const [query, setQuery] = useState("");
-  const current = useRef({ catalogue, initialWorkspace });
-  current.current = { catalogue, initialWorkspace };
+  const current = useRef({ catalogue });
+  current.current = { catalogue };
   const membership = catalogue.map((company) => company.id).join(",");
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
-    const { catalogue: companies, initialWorkspace: initial } = current.current;
+    const { catalogue: companies } = current.current;
+    const { signal } = controller;
     setReadings({});
-    let index = 0;
-    // Local, account-scoped reads only. Browsing does not refresh suppliers.
-    const worker = async () => {
-      while (active && index < companies.length) {
-        const company = companies[index++];
-        const [workspace, prices] = await Promise.allSettled([
-          !refresh &&
-          !initial?.financials_pending &&
-          initial?.instrument?.id === company.id
-            ? Promise.resolve(initial)
-            : api.workspace(company.id, { signal: controller.signal }),
-          company.mode === "sec"
-            ? api.priceHistory(company.id, { signal: controller.signal })
-            : Promise.resolve(null),
-        ]);
-        if (!active) return;
-        const data =
-          workspace.status === "fulfilled" &&
-          workspace.value?.instrument?.id === company.id
-            ? workspace.value
-            : null;
-        const history =
-          prices.status === "fulfilled" &&
-          prices.value?.symbol === company.symbol
-            ? prices.value
-            : null;
-        setReadings((previous) => ({
-          ...previous,
-          [company.id]: {
-            data,
-            history,
-            error: !data,
-            priceError: prices.status === "rejected",
-          },
-        }));
+    // Staged, local, account-scoped reads; browsing does not refresh suppliers.
+    // 1. One light read gives every card its saved quote, so cards appear at once.
+    // 2. Then each card's news tone, filing figures (Pro only) and price history,
+    //    three companies at a time.
+    // A server that predates the light reads (404, no JSON, no answer) gets the
+    // earlier full workspace read per card, so a new page works before a restart.
+    const load = async () => {
+      const quotes = await api.homeCards({ signal }).catch(() => null);
+      if (!active) return;
+      const light = Array.isArray(quotes);
+      if (light) {
+        const quoteFor = new Map(quotes.map((row) => [row.id, row]));
+        setReadings(
+          Object.fromEntries(
+            companies.map((company) => [
+              company.id,
+              {
+                data: {
+                  instrument: { id: company.id },
+                  ...quoteFor.get(company.id),
+                },
+                history: null,
+                pending: true,
+                error: false,
+              },
+            ]),
+          ),
+        );
       }
+      const read = light
+        ? (company) =>
+            api
+              .homeCard(company.id, { figures: !beginner, signal })
+              .then((card) => (card?.id === company.id ? card : null))
+        : (company) =>
+            api
+              .workspace(company.id, { includeFinancials: !beginner, signal })
+              .then((data) =>
+                data?.instrument?.id === company.id ? data : null,
+              );
+      let index = 0;
+      const worker = async () => {
+        while (active && index < companies.length) {
+          const company = companies[index++];
+          const [card, prices] = await Promise.allSettled([
+            read(company),
+            company.mode === "sec"
+              ? api.priceHistory(company.id, { signal })
+              : Promise.resolve(null),
+          ]);
+          if (!active) return;
+          const detail = card.status === "fulfilled" ? card.value : null;
+          const history =
+            prices.status === "fulfilled" &&
+            prices.value?.symbol === company.symbol
+              ? prices.value
+              : null;
+          setReadings((previous) => ({
+            ...previous,
+            [company.id]: {
+              data: { ...previous[company.id]?.data, ...detail },
+              history,
+              pending: false,
+              error: !detail,
+              priceError: prices.status === "rejected",
+            },
+          }));
+        }
+      };
+      await Promise.all(
+        Array.from({ length: Math.min(3, companies.length) }, worker),
+      );
     };
-    void Promise.all(
-      Array.from({ length: Math.min(3, companies.length) }, worker),
-    );
+    void load();
     return () => {
       active = false;
       controller.abort();
     };
-  }, [membership, refresh]);
+  }, [membership, refresh, beginner]);
   // Home prices refresh on their own while the page is visible.
   useEffect(() => {
     let stopped = false;
@@ -116,7 +155,10 @@ export default function CompanyOverview({
           if (stopped || history?.symbol !== company.symbol) continue;
           setReadings((previous) =>
             previous[company.id]
-              ? { ...previous, [company.id]: { ...previous[company.id], history } }
+              ? {
+                  ...previous,
+                  [company.id]: { ...previous[company.id], history },
+                }
               : previous,
           );
         } catch {
@@ -131,11 +173,17 @@ export default function CompanyOverview({
       clearInterval(timer);
     };
   }, [membership]);
-  const loading = catalogue.some((company) => !readings[company.id]);
+  const loading = catalogue.some(
+    (company) => !readings[company.id] || readings[company.id].pending,
+  );
   // Your own companies first, then practice companies (the worked example,
   // Northstar, before the others), so newcomers see one that has data.
   const rank = (c) =>
-    c.mode !== "recorded" ? 0 : c.id === "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" ? 1 : 2;
+    c.mode !== "recorded"
+      ? 0
+      : c.id === "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        ? 1
+        : 2;
   const companies = catalogue
     .filter((company) => companyMatches(company, query))
     .map((company, index) => [company, index])
@@ -146,28 +194,35 @@ export default function CompanyOverview({
       className="collection-page company-overview"
       aria-label="All company workspaces"
     >
-      <div className="company-overview-heading">
-        <div>
-          <span className="section-label">
-            {beginner ? "YOUR COMPANIES" : "YOUR RESEARCH"}
-          </span>
-          <h1>
+      <SectionHeader
+        level="page"
+        className="company-overview-heading"
+        icon={<GridIcon />}
+        eyebrow={beginner ? "Your companies" : "Your research"}
+        title={
+          <>
             {beginner ? "My companies" : "All companies"}{" "}
-            <span>{catalogue.length}</span>
-          </h1>
-          <p className="muted">
-            {beginner
-              ? practiceNote(catalogue)
-              : "Saved prices and financials, together. Open a company to explore its evidence."}
-          </p>
-        </div>
-        <button
-          onClick={() => setRefresh((value) => value + 1)}
-          disabled={loading}
-        >
-          Reload saved data
-        </button>
-      </div>
+            <Badge>{catalogue.length}</Badge>
+          </>
+        }
+        description={
+          beginner
+            ? practiceNote(catalogue)
+            : "Saved prices and financials, together. Open a company to explore its evidence."
+        }
+        actions={
+          // Beginner mode keeps the home to the cards themselves.
+          !beginner && (
+            <Button
+              size="sm"
+              onClick={() => setRefresh((value) => value + 1)}
+              disabled={loading}
+            >
+              Reload saved data
+            </Button>
+          )
+        }
+      />
       <label className="company-overview-search">
         <span>Find a company</span>
         <input
@@ -192,8 +247,12 @@ export default function CompanyOverview({
           const revenue = trailing(data?.financial_depth, "revenue");
           const margin = trailing(data?.financial_depth, "operating_margin");
           const tone = newsTone(data?.sentiment);
+          // The quote is shown first; tone and figures follow per card.
+          const waiting = !!reading?.pending;
           return (
-            <button
+            <Card
+              as="button"
+              interactive
               className="company-overview-card"
               key={company.id}
               data-company={company.id}
@@ -206,11 +265,13 @@ export default function CompanyOverview({
                   <strong title={company.name}>{companyName(company)}</strong>
                   <span className="company-overview-symbol">
                     {company.symbol}
-                    {company.mode === "recorded" && " · Fictional sample"}
+                    {company.mode === "recorded" && (
+                      <Badge>Fictional sample</Badge>
+                    )}
                   </span>
                 </span>
                 <span className="company-overview-arrow" aria-hidden="true">
-                  ↗
+                  <ChevronRightIcon />
                 </span>
               </span>
               {!reading ? (
@@ -251,62 +312,86 @@ export default function CompanyOverview({
                   <span className="company-overview-tone">
                     <span>
                       {beginner ? "News · " : "News tone · "}
-                      {tone?.label ||
-                        (tone
-                          ? beginner
-                            ? "Not enough to tell yet"
-                            : "Too few interpretable developments"
-                          : beginner
-                            ? "Not read yet"
-                            : "No saved reading")}
+                      {waiting
+                        ? "Loading…"
+                        : tone?.label ||
+                          (tone
+                            ? beginner
+                              ? "Not enough to tell yet"
+                              : "Too few interpretable developments"
+                            : beginner
+                              ? "Not read yet"
+                              : "No saved reading")}
                     </span>
                     <small>
                       {beginner
                         ? "Open the company for the headlines"
-                        : tone
-                          ? `${tone.selected} ${tone.selected === 1 ? "story" : "stories"} · ${tone.total} counted groups · ${tone.stale ? "older reading" : "saved"} ${stamp(tone.savedAt)}`
-                          : "Analyse news in the company workspace"}
+                        : waiting
+                          ? "Reading saved news"
+                          : tone
+                            ? `${tone.selected} ${tone.selected === 1 ? "story" : "stories"} · ${tone.total} counted groups · ${tone.stale ? "older reading" : "saved"} ${stamp(tone.savedAt)}`
+                            : "Analyse news in the company workspace"}
                     </small>
                   </span>
-                  <span
+                  <Card
+                    as="span"
+                    variant="inset"
                     className="company-overview-figures"
                     hidden={beginner}
                   >
                     <span>
                       <span>Revenue · 12 months</span>
                       <strong>
-                        {revenue ? money(revenue.value) : "Unavailable"}
+                        {waiting
+                          ? "…"
+                          : revenue
+                            ? money(revenue.value)
+                            : "Unavailable"}
                       </strong>
                       <small>
-                        {revenue
-                          ? `SEC · to ${day(revenue.end)}`
-                          : "No compatible saved figure"}
+                        {waiting
+                          ? "Loading saved figure"
+                          : revenue
+                            ? `SEC · to ${day(revenue.end)}`
+                            : "No compatible saved figure"}
                       </small>
                     </span>
                     <span>
                       <span>Operating margin</span>
                       <strong>
-                        {margin ? percent(margin.value) : "Unavailable"}
+                        {waiting
+                          ? "…"
+                          : margin
+                            ? percent(margin.value)
+                            : "Unavailable"}
                       </strong>
                       <small>
-                        {margin
-                          ? `SEC · to ${day(margin.end)}`
-                          : "No compatible saved figure"}
+                        {waiting
+                          ? "Loading saved figure"
+                          : margin
+                            ? `SEC · to ${day(margin.end)}`
+                            : "No compatible saved figure"}
                       </small>
                     </span>
-                  </span>
+                  </Card>
                 </>
               )}
               <span className="company-overview-footer">
                 <span>
                   {company.status
-                    ? beginner ? "View saved" : "Idea saved"
-                    : beginner ? "No view saved yet" : "No saved idea"}
-                  {company.unread > 0 && ` · ${company.unread} to review`}
+                    ? beginner
+                      ? "View saved"
+                      : "Idea saved"
+                    : beginner
+                      ? "No view saved yet"
+                      : "No saved idea"}
+                  {company.unread > 0 && (
+                    <Badge status="info">{company.unread} to review</Badge>
+                  )}
                 </span>
-                <span>{beginner ? "See summary →" : "Open workspace →"}</span>
+                <span>{beginner ? "See summary" : "Open workspace"}</span>
               </span>
-            </button>
+            </Card>
           );
         })}
       </div>

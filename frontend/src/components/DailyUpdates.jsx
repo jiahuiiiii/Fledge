@@ -7,6 +7,7 @@ import MoveAlertCard from "./MoveAlertCard";
 import { ConditionChange } from "./IdeasAndChanges";
 import AlertRating from "./AlertRating";
 import "./DailyUpdates.css";
+import { Button, Card, Disclosure, Pagination, SectionHeader } from "./ui";
 
 function money(value, exact = false) {
   const number = Number(value);
@@ -49,9 +50,9 @@ function DigestContents({ id, refresh, onOpen, onSource }) {
     return (
       <div role="alert">
         <p>{error}</p>
-        <button onClick={() => setRetry((n) => n + 1)}>
+        <Button onClick={() => setRetry((n) => n + 1)}>
           Try reading recap again
-        </button>
+        </Button>
       </div>
     );
   if (!data || data.id !== id || data.page !== page)
@@ -68,7 +69,8 @@ function DigestContents({ id, refresh, onOpen, onSource }) {
         </p>
       )}
       {data.records.map((record) => (
-        <article
+        <Card
+          as="article"
           className="daily-recap-record"
           key={`${record.kind}:${record.id}`}
         >
@@ -94,21 +96,19 @@ function DigestContents({ id, refresh, onOpen, onSource }) {
             <ConditionChange change={record.detail} onOpen={onOpen} />
           )}
           <AlertRating record={record} />
-        </article>
+        </Card>
       ))}
       {data.total > data.page_size && (
-        <div className="review-pagination">
-          <button disabled={!page} onClick={() => setPage((n) => n - 1)}>
-            Previous recap updates
-          </button>
-          <span>Page {page + 1}</span>
-          <button
-            disabled={(page + 1) * data.page_size >= data.total}
-            onClick={() => setPage((n) => n + 1)}
-          >
-            Next recap updates
-          </button>
-        </div>
+        <Pagination
+          className="review-pagination"
+          label="Recap pages"
+          page={page + 1}
+          totalPages={Math.ceil(data.total / data.page_size)}
+          previousLabel="Previous recap updates"
+          nextLabel="Next recap updates"
+          onPrevious={() => setPage((n) => n - 1)}
+          onNext={() => setPage((n) => n + 1)}
+        />
       )}
     </div>
   );
@@ -117,17 +117,15 @@ function DigestContents({ id, refresh, onOpen, onSource }) {
 function Recap({ digest, refresh, onOpen, onSource }) {
   const [opened, setOpened] = useState(false);
   return (
-    <details
+    <Disclosure
       className="daily-recap"
+      variant="inset"
+      title={`${stamp(digest.window_end)} · ${digest.total} ${digest.total === 1 ? "update" : "updates"}${digest.preview ? " · Preview" : ""}`}
       onToggle={(event) => {
-        setOpened(event.currentTarget.open);
+        if (event.target === event.currentTarget)
+          setOpened(event.currentTarget.open);
       }}
     >
-      <summary>
-        {stamp(digest.window_end)} · {digest.total}{" "}
-        {digest.total === 1 ? "update" : "updates"}
-        {digest.preview ? " · Preview" : ""}
-      </summary>
       {digest.preview && <p className="fine">Preview · not sent to Telegram</p>}
       {opened && (
         <DigestContents
@@ -137,7 +135,7 @@ function Recap({ digest, refresh, onOpen, onSource }) {
           onSource={onSource}
         />
       )}
-    </details>
+    </Disclosure>
   );
 }
 
@@ -164,23 +162,22 @@ export default function DailyUpdates({ refresh = 0, onOpen, onSource }) {
   if (data?.enabled === false) return null;
   const today = data?.today_spend;
   return (
-    <details
+    <Disclosure
       className="daily-updates"
+      title="Daily recaps"
+      description={data ? `${data.digests.length} saved` : undefined}
       aria-label="Daily recaps and AI spending"
       onToggle={(event) => {
         if (event.target === event.currentTarget)
           setOpened(event.currentTarget.open);
       }}
     >
-      <summary>
-        Daily recaps{today ? ` · AI today ${money(today.charged_usd)}` : ""}
-      </summary>
       {error && (
         <div role="alert">
           <p>{error}</p>
-          <button onClick={() => setRetry((n) => n + 1)}>
+          <Button onClick={() => setRetry((n) => n + 1)}>
             Try reading daily updates again
-          </button>
+          </Button>
         </div>
       )}
       {!data && !error && <p role="status">Reading saved daily updates…</p>}
@@ -193,8 +190,12 @@ export default function DailyUpdates({ refresh = 0, onOpen, onSource }) {
             </p>
           )}
           {today && (
-            <section className="daily-spend" aria-label="Today's AI spending">
-              <h3>AI spending today</h3>
+            <Card
+              variant="inset"
+              className="daily-spend"
+              aria-label="Today's AI spending"
+            >
+              <SectionHeader level="card" title="AI spending today" />
               <p>
                 <strong>{money(today.charged_usd)}</strong> confirmed ·{" "}
                 {money(today.pending_max_usd)} maximum awaiting confirmation
@@ -234,7 +235,7 @@ export default function DailyUpdates({ refresh = 0, onOpen, onSource }) {
                   ))}
                 </details>
               )}
-            </section>
+            </Card>
           )}
           {data.notices.map((notice) => (
             <p className="daily-cost-notice" role="status" key={notice.id}>
@@ -248,7 +249,7 @@ export default function DailyUpdates({ refresh = 0, onOpen, onSource }) {
             <p className="fine">No daily recap has been prepared yet.</p>
           ) : (
             <section aria-label="Saved daily recaps">
-              <h3>Saved daily recaps</h3>
+              <SectionHeader level="card" title="Saved daily recaps" />
               <p className="fine">
                 Medium-priority updates together. Opening a recap does not mark
                 its alerts reviewed.
@@ -266,6 +267,6 @@ export default function DailyUpdates({ refresh = 0, onOpen, onSource }) {
           )}
         </div>
       )}
-    </details>
+    </Disclosure>
   );
 }

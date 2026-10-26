@@ -293,9 +293,9 @@ export function snapshot(data) {
       action: "Open News & discussion",
     },
     {
-      tab: "expectations",
+      tab: "fundamentals",
       number: 4,
-      title: "Outlook",
+      title: "Guidance and forecasts",
       checks: [
         check("Management gave a revenue outlook", outlook ? true : null),
         ...(outlook
@@ -323,7 +323,7 @@ export function snapshot(data) {
       note: outlook?.publishedAt
         ? `From the release of ${day(outlook.publishedAt)}`
         : null,
-      action: "Open Outlook",
+      action: "Open Financials",
     },
     {
       tab: "valuation",

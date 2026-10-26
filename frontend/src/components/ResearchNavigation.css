@@ -1,0 +1,55 @@
+/* A single horizontal line-style strip at every viewport width. */
+.app-shell .research-navigation {
+  min-width: 0;
+  padding: 0;
+  border-bottom: 0;
+}
+.app-shell .research-navigation .content-tabs.ui-tabs-list {
+  flex-direction: row;
+  mask-image: none;
+  -webkit-mask-image: none;
+  gap: var(--space-5);
+  padding: 0;
+  overflow: auto hidden;
+  border-bottom: 1px solid var(--ui-line);
+  border-radius: 0;
+  scroll-padding-inline: var(--space-2);
+}
+.app-shell .research-navigation .ui-tabs-trigger {
+  position: relative;
+  flex: none;
+  width: auto;
+  min-height: 44px;
+  padding: var(--space-3) 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ui-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.app-shell .research-navigation .ui-tabs-trigger:hover:not(:disabled),
+.app-shell .research-navigation .ui-tabs-trigger[aria-selected="true"] {
+  background: transparent;
+  box-shadow: none;
+  color: var(--ui-text);
+}
+.app-shell .research-navigation .ui-tabs-trigger[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ui-accent);
+}
+.app-shell .research-navigation .ui-tabs-trigger:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: -3px;
+  border-radius: var(--radius-sm);
+}
+.app-shell .research-section-heading .ui-section-header__title {
+  font-size: var(--text-xl);
+  font-weight: 600;
+}

@@ -146,6 +146,32 @@ let browser;
       });
     return route.fulfill({ json: { result: workspace(c) } });
   });
+  // The home cards read light answers: every quote at once, then each card.
+  await page.route("**/api/v1/home-cards", (route) => {
+    reads.push({ kind: "home-cards" });
+    return route.fulfill({
+      json: {
+        result: catalogue.map((c) => ({ id: c.id, market: workspace(c).market })),
+      },
+    });
+  });
+  await page.route("**/api/v1/companies/*/home-card*", async (route) => {
+    const c = catalogue.find((c) => route.request().url().includes(c.id));
+    reads.push({ kind: "home-card", id: c?.id });
+    if (hold && c.symbol === "QCOM")
+      await new Promise((resolve) => (release = resolve));
+    if (fail && c.symbol === "LONG")
+      return route.fulfill({
+        status: 503,
+        json: {
+          result: { errors: [{ error_message: "Authored read unavailable" }] },
+        },
+      });
+    const { sentiment, financial_depth } = workspace(c);
+    return route.fulfill({
+      json: { result: { id: c.id, sentiment, financial_depth, figures: true } },
+    });
+  });
   await page.route("**/api/v1/companies/*/price-history", (route) => {
     const c = catalogue.find((c) => route.request().url().includes(c.id));
     reads.push({ kind: "price", id: c?.id });
@@ -205,7 +231,7 @@ let browser;
     await mrvl
       .locator(".company-avatar")
       .evaluate((el) => getComputedStyle(el).backgroundColor),
-    "rgb(38, 48, 67)",
+    "rgb(43, 43, 49)",
   );
   assert.match(
     await all.locator('[data-company="authored-LONG"]').innerText(),

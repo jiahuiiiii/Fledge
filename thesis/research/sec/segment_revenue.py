@@ -481,6 +481,14 @@ def parsed(conn, document):
 def present(conn, iid, flow=None):
     if not one(conn,"SELECT 1 FROM sources WHERE id=%s AND entitlement='sec-public'",(SOURCE,)):
         return dict(status='unavailable', groups=[], message='Original-filing source access is unavailable.', method=METHOD)
+    # Reuse this account's saved result for the exact same inputs (migration
+    # 072). The income flow it reads is itself fixed by those inputs. An empty
+    # result is saved too: it still took parsing every filing to find out.
+    from .filing_figures import cached
+    return cached(conn, iid, 'segment_revenue', lambda c, i: build(c, i, flow), keep=('available', 'empty'))
+
+
+def build(conn, iid, flow=None):
     if flow is None:
         from .income_flow import present as income_flow
         flow = income_flow(conn, iid)

@@ -44,3 +44,7 @@ complete comment bodies and unavailable required reply context. Generic comment
 titles and parents do not replace the comment's own wording. These records receive
 no sentiment label; their original saved sources remain in Data & sources. See
 [the diagnosed failure and separate paid-run blockers](../reviews/2026-10-09/sentiment-own-wording.md).
+
+## Open stories, one freshness line — 25 October 2026
+
+The tone panel shows one freshness line (news checked, tone analysed) and one caveat ("what people and publishers said, not facts or consensus"). The analysed stories are open by default, compact, filtered by the source and tone buttons (the relevance selector and "newest first" counter were removed; only relevant sources list). A story's headline or source chip opens the original in a new tab; with no link it opens the saved source. **Why this label** opens a flat dialog with the quotes and classification. **Source coverage** holds how sources are counted, unavailable sources, label repairs, reading limits, watch timing and the paid **Re-read everything** action. "Expectations reported in the news" and "More headlines, not analysed" no longer appear in Pro (Beginner keeps its headline list).

@@ -1,3 +1,5 @@
+import { Tabs, TabsList, TabsTrigger, SectionHeader } from "./ui";
+
 const sections = {
   summary: {
     label: "Summary",
@@ -14,19 +16,13 @@ const sections = {
   fundamentals: {
     label: "Financials",
     description:
-      "Read reported performance and trace the numbers to company filings.",
+      "Read reported performance, management guidance and analyst forecasts.",
     icon: "M5 20V10m7 10V4m7 16v-7M3 20h18",
-  },
-  expectations: {
-    label: "Outlook",
-    description:
-      "Read management guidance, analyst forecasts and expectations reported in the news.",
-    icon: "M4 19 10 13l4 3 6-11M14 5h6v6",
   },
   business: {
     label: "Overview",
     description:
-      "Understand the business through original company disclosures.",
+      "See the price, current signals and the business at a glance.",
     icon: "M4 21V7h10v14M14 11h6v10M8 11h2m-2 4h2m-2 4h2M2 21h20",
   },
   valuation: {
@@ -41,68 +37,37 @@ const sections = {
 export function researchTabs({ recorded, beginner }) {
   if (beginner) return ["summary", "evidence"];
   return recorded
-    ? ["summary", "business", "fundamentals", "evidence"]
-    : ["summary", "business", "fundamentals", "evidence", "expectations", "valuation"];
+    ? ["business", "evidence", "fundamentals"]
+    : ["business", "evidence", "fundamentals", "valuation"];
 }
 
-export default function ResearchNavigation({ selected, onChange, recorded, beginner }) {
+export default function ResearchNavigation({
+  selected,
+  onChange,
+  recorded,
+  beginner,
+}) {
   const keys = researchTabs({ recorded, beginner });
   return (
     <div className="research-navigation">
-      <div
-        className="content-tabs"
-        role="tablist"
-        aria-label="Research views"
-        aria-orientation="horizontal"
-      >
-        {keys.map((key) => (
-          <button
-            role="tab"
-            id={`research-tab-${key}`}
-            aria-controls="research-panel"
-            aria-selected={selected === key}
-            tabIndex={selected === key ? 0 : -1}
-            key={key}
-            onClick={() => onChange(key)}
-            onKeyDown={(event) => {
-              const previous = "ArrowLeft";
-              const next = "ArrowRight";
-              if (![previous, next, "Home", "End"].includes(event.key)) return;
-              event.preventDefault();
-              const buttons = [
-                ...event.currentTarget.parentElement.querySelectorAll(
-                  '[role="tab"]',
-                ),
-              ];
-              const index = buttons.indexOf(event.currentTarget);
-              const target =
-                event.key === "Home"
-                  ? 0
-                  : event.key === "End"
-                    ? buttons.length - 1
-                    : (index + (event.key === next ? 1 : -1) + buttons.length) %
-                      buttons.length;
-              buttons[target].focus();
-              buttons[target].click();
-            }}
-          >
-            <svg
-              width="19"
-              height="19"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
+      <Tabs value={selected} onValueChange={onChange}>
+        <TabsList
+          variant="line"
+          className="content-tabs"
+          aria-label="Research views"
+        >
+          {keys.map((key) => (
+            <TabsTrigger
+              key={key}
+              value={key}
+              id={`research-tab-${key}`}
+              aria-controls="research-panel"
             >
-              <path d={sections[key].icon} />
-            </svg>
-            <span>{sections[key].label}</span>
-          </button>
-        ))}
-      </div>
+              {sections[key].label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
     </div>
   );
 }
@@ -111,7 +76,7 @@ export function ResearchSectionHeader({ selected }) {
   const section = sections[selected] || sections.evidence;
   return (
     <header className="research-section-heading">
-      <h2>{section.label}</h2>
+      <SectionHeader level="page" as="h2" title={section.label} />
     </header>
   );
 }

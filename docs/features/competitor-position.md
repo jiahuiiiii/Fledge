@@ -1,6 +1,6 @@
 # Competitor position
 
-The complete comparison and editable peer group live only in **Compare & value**. Financials links there with one fiscal-year growth sentence using the same compatible-peer rules. Outlook opens with management guidance and analyst forecasts, without repeating this block. Broadcom defaults to NVIDIA, AMD, Marvell, Micron and Qualcomm, as requested by the owner. Saved private peer choices override this default. Other companies use their saved choices; no sector universe or competitors are inferred from a vendor classification.
+The complete comparison and editable peer group live only in **Compare & value**. Financials links there with one fiscal-year growth sentence using the same compatible-peer rules. Financials presents management guidance under the revenue chart and keeps the analyst forecast table in a closed disclosure, without repeating this block. Broadcom defaults to NVIDIA, AMD, Marvell, Micron and Qualcomm, as requested by the owner. Saved private peer choices override this default. Other companies use their saved choices; no sector universe or competitors are inferred from a vendor classification.
 
 ### One peer action and visible data status — 12 October 2026
 
@@ -52,6 +52,14 @@ The reading names which usable peers are above, below or equal to the researched
 
 Compare & value keeps expected growth separate from reported position. Supported expected revenue growth uses two consecutive annual forecast averages in the same FMP response with explicit USD currencies and an ordered annual gap of 350–380 days. The preceding forecast average must be positive. It is forecast-to-forecast growth, not actual-to-forecast growth or an actual-results verdict. Fiscal ends, source identity and observation date remain inspectable. Public tables with unspecified currency cannot supply a shared revenue scale or substitute for missing FMP forecasts. Underlying forecast vintage remains unknown.
 
-Current original management operating-margin targets retain their own quarterly end and basis. Expired, historical, withdrawn or truncated sections cannot populate current targets. Adjusted targets do not create a peer margin ranking, because company exclusions differ. Original guidance and analyst forecasts are expanded in Outlook; result comparisons, release history, evidence and provider controls remain available there. Existing paid news-expectation reading remains separate and explicit.
+Current original management operating-margin targets retain their own quarterly end and basis. Expired, historical, withdrawn or truncated sections cannot populate current targets. Adjusted targets do not create a peer margin ranking, because company exclusions differ. Original guidance and analyst forecasts are expanded in Financials; result comparisons, release history, evidence and provider controls remain available there. Existing paid news-expectation reading remains separate and explicit in News & discussion.
 
 Phone charts scroll within their own frame; the page does not overflow. Native text labels, keyboard peer/measure selection, Evidence Escape/focus return and the application's reduced-motion policy remain supported.
+
+## Peer search and analyst targets — 25 October 2026
+
+The peer search is a floating combobox: the list opens over the page, so typing never resizes the card. "Other comparison measures" was removed. Analyst price targets are drawn as saved daily closes with the low, mean and high targets projected to the right, each labelled with its distance from the last price; one line gives the source, analyst count, fetch time and a stale note, and the rest sits under **Source details and limits**.
+
+## Similar companies as the starting group — 25 October 2026 (later)
+
+With no saved peers, Broadcom still defaults to its curated five. Any other company now starts with FMP's similar companies (exchange, sector and size), largest first, at most five, one per issuer (a second share class is skipped). They are an unsaved starting group, labelled "not a verified list of competitors"; **Save & compare** keeps them and saved private peers always override them. When none have been collected, **Suggest similar companies** runs the explicit FMP check (no AI) and re-reads the position. The business brief's **Who it competes with** block shows what the filing says (with its source) or that it names none, plus these comparison companies with their origin, and a link to change them. The brief now lists only topics with evidence (cash and obligations dropped; Financials covers it) and one line naming what the passages did not cover.

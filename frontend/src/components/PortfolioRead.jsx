@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { formatTimestamp } from "../lib/dateTime";
-import { pctText, barWidth, toneLine } from "../lib/portfolioRead";
+import { pctText, barWidth, toneLine, plainRead } from "../lib/portfolioRead";
 import "./BeginnerSummary.css";
 import "./PortfolioRead.css";
 
@@ -11,24 +11,30 @@ import "./PortfolioRead.css";
 // every sentence cites the saved headline it relies on.
 const SHAPE = { good: "▲", bad: "▼", mixed: "◆", none: "●" };
 
-function Bars({ ids, byId, scale, onOpen }) {
+function Bars({ ids, byId, moves, scale, onOpen }) {
   return (
     <ul className="pr-bars">
       {ids.map((id) => {
         const c = byId[id];
         if (!c) return null;
-        const move = c.quote?.change_percent;
+        const move = moves ? moves[id]?.change_percent : c.quote?.change_percent;
         return (
           <li key={id}>
             <button type="button" onClick={() => onOpen?.(id)}>
               <strong>{c.symbol}</strong>
+              {/* Diverging bars: falls grow left of the zero line, gains right. */}
               <span className="pr-track" aria-hidden="true">
-                {move != null && (
-                  <span
-                    className={`pr-bar ${move < 0 ? "down" : "up"}`}
-                    style={{ width: barWidth(move, scale) }}
-                  />
-                )}
+                <span className="pr-half down">
+                  {move < 0 && (
+                    <span className="pr-bar down" style={{ width: barWidth(move, scale) }} />
+                  )}
+                </span>
+                <span className="pr-zero" />
+                <span className="pr-half up">
+                  {move > 0 && (
+                    <span className="pr-bar up" style={{ width: barWidth(move, scale) }} />
+                  )}
+                </span>
               </span>
               <span className={`pr-pct ${move < 0 ? "down" : move > 0 ? "up" : ""}`}>
                 {pctText(move)}
@@ -71,6 +77,12 @@ export default function PortfolioRead({ onOpenCompany }) {
     ...page.companies.map((c) => Math.abs(c.quote?.change_percent || 0)),
   );
   const e = page.explanation;
+  // Under the written explanation the bars show the moves it was written from,
+  // so its words and bars always agree even if prices refreshed since.
+  const written = e?.prices;
+  const writtenScale = written
+    ? Math.max(1, ...Object.values(written).map((p) => Math.abs(p.change_percent || 0)))
+    : scale;
   const lights = [
     ["TODAY", page.move],
     ["HOW SPREAD OUT", page.spread],
@@ -99,30 +111,51 @@ export default function PortfolioRead({ onOpenCompany }) {
         {page.prices_stale && " · these prices are a few days old"}
       </p>
 
-      <ul className="bs-lights pr-lights">
-        {lights.map(([title, light]) => (
-          <li key={title}>
-            <div className={`bs-light mood-${light.mood}`}>
-              <span className="bs-shape" aria-hidden="true">
-                {SHAPE[light.mood]}
-              </span>
-              <span className="bs-light-title">{title}</span>
-              <strong>{light.text}</strong>
-            </div>
-          </li>
-        ))}
-      </ul>
+      {/* Wide screens: chart in the main column, lights in a right rail.
+          The rail comes first in reading order so phones show it on top. */}
+      <div className="pr-layout">
+        <aside className="pr-rail" aria-label="Your list at a glance">
+          <ul className="bs-lights pr-lights">
+            {lights.map(([title, light]) => (
+              <li key={title}>
+                <div className={`bs-light mood-${light.mood}`}>
+                  <span className="bs-shape" aria-hidden="true">
+                    {SHAPE[light.mood]}
+                  </span>
+                  <span className="bs-light-title">{title}</span>
+                  <strong>{light.text}</strong>
+                  {title === "WORLD" && page.world.events?.length > 0 && (
+                    <ul className="pr-world">
+                      {page.world.events.map((ev) => (
+                        <li key={ev.article_id}>
+                          <a href={ev.url} target="_blank" rel="noreferrer">
+                            {ev.headline}
+                          </a>
+                          <small className="bs-meta">
+                            {ev.publisher} · {ev.companies.length} of your
+                            companies
+                          </small>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </aside>
 
+        <div className="pr-main">
       {e ? (
         <>
           {(e.headline || e.drivers.length > 0) && (
             <section className="bs-card">
               <h4>What happened</h4>
-              {e.headline && <p className="bs-meaning">{e.headline}</p>}
+              {e.headline && <p className="bs-meaning">{plainRead(e.headline)}</p>}
               <ul className="pr-drivers">
                 {e.drivers.map((d, i) => (
                   <li key={i}>
-                    {d.text}
+                    {plainRead(d.text)}
                     <small className="bs-meta">
                       {d.sources.map((s, j) => (
                         <span key={s.id}>
@@ -145,11 +178,18 @@ export default function PortfolioRead({ onOpenCompany }) {
           {e.groups.length > 0 && (
             <section className="bs-card">
               <h4>Why some moved more</h4>
+              <p className="bs-note">Moves when this was written</p>
               {e.groups.map((g) => (
                 <div className="pr-group" key={g.label}>
                   <span className="pr-group-label">{g.label}</span>
-                  <p className="pr-note">{g.note}</p>
-                  <Bars ids={g.company_ids} byId={byId} scale={scale} onOpen={onOpenCompany} />
+                  <p className="pr-note">{plainRead(g.note)}</p>
+                  <Bars
+                    ids={g.company_ids}
+                    byId={byId}
+                    moves={written}
+                    scale={writtenScale}
+                    onOpen={onOpenCompany}
+                  />
                 </div>
               ))}
             </section>
@@ -157,7 +197,7 @@ export default function PortfolioRead({ onOpenCompany }) {
           {e.takeaway && (
             <section className="bs-card pr-takeaway">
               <h4>For your list</h4>
-              <p>{e.takeaway}</p>
+              <p>{plainRead(e.takeaway)}</p>
             </section>
           )}
           <p className="bs-note">
@@ -177,23 +217,6 @@ export default function PortfolioRead({ onOpenCompany }) {
               </div>
             ))}
           </section>
-          {page.world.events?.length > 0 && (
-            <section className="bs-card">
-              <h4>World news touching your list</h4>
-              <ul className="pr-drivers">
-                {page.world.events.map((ev) => (
-                  <li key={ev.article_id}>
-                    <a href={ev.url} target="_blank" rel="noreferrer">
-                      {ev.headline}
-                    </a>
-                    <small className="bs-meta">
-                      {ev.publisher} · {ev.companies.length} of your companies
-                    </small>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
           <div className="pr-explain">
             {page.ai.available ? (
               <button
@@ -218,6 +241,8 @@ export default function PortfolioRead({ onOpenCompany }) {
           </div>
         </>
       )}
+        </div>
+      </div>
       <p className="bs-note">
         This shows what moved and what’s being said, not whether to buy or sell.
       </p>

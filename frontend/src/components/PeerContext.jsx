@@ -23,7 +23,7 @@ export default function PeerContext({ instrumentId, visible, onCompare }) {
     <p className="financial-peer-context">
       {peerGrowthContext(data)}{" "}
       <button className="source-link" onClick={onCompare}>
-        Compare <span aria-hidden="true">→</span>
+        Compare with peers <span aria-hidden="true">→</span>
       </button>
     </p>
   );

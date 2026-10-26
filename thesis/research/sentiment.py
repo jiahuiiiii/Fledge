@@ -904,12 +904,20 @@ def _generate(iid, *, transport, now, lookback_days, progress, retry_failed, rer
         return present(c, row, partial=True)
 
 
+# The newest assessment cutoff wins; ties fall back to save time and id.
+# Uses the indexed cutoff column (migration 071), not the packet.
+LATEST_SQL = (
+    "SELECT * FROM sentiment_analyses WHERE instrument_id=%s"
+    " ORDER BY cutoff DESC,created_at DESC,id DESC LIMIT 1"
+)
+
+
 def latest(conn, iid):
     return present(
         conn,
         one(
             conn,
-            "SELECT * FROM sentiment_analyses WHERE instrument_id=%s ORDER BY (packet->>'cutoff')::timestamptz DESC,created_at DESC,id DESC LIMIT 1",
+            LATEST_SQL,
             (iid,),
         ),
         partial=True,

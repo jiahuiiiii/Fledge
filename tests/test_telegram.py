@@ -436,3 +436,30 @@ def test_adverse_reporting_and_mixed_items_explain_why():
         "Why: a new report describes a development with a bad or mixed effect for the company."
     assert why_notified(dict(kind="new_reporting", coverage_links=[{}]), [bad]) == \
         "Why: a new report changes details of a story seen earlier."
+
+
+def test_company_excerpt_prefers_body_text_and_cleans_feed_artifacts():
+    # Shapes from the 20–21 Oct NVDA and QCOM cards: the headline repeated as the
+    # excerpt, a stats box glued to the story, entities and a cut-off preview.
+    nvda = dict(source_id="s1", sentiment="negative", reporting_basis=dict(kind="unconfirmed_event", impact="adverse", citations=[
+        dict(passage_id="p0", quote="Nvidia Reportedly Sees $35B In Chip Orders"),
+        dict(passage_id="p1", quote="Nvidia may be able to deliver only 5% to 10% of the total orders.")]))
+    qcom = dict(source_id="s2", sentiment="neutral", reporting_basis=dict(kind="reported_event", impact="not_stated", citations=[
+        dict(passage_id="p1", quote="Price Target: $195What Happened?Qualcomm (QCOM:NASDAQ) will cut jobs around the world.")]))
+    memo = dict(source_id="s3", sentiment="neutral", reporting_basis=dict(kind="unconfirmed_event", impact="not_stated", citations=[
+        dict(passage_id="p1", quote="Company to cut jobs globally in a &#34;performance-focused reduction&#34; following its annual employee reviews, CEO told staff, with notifications set to begin in")]))
+    sources = [dict(id="s1", title="Nvidia Reportedly Sees $35B In Chip Orders"), dict(id="s2", title="Qualcomm Cuts Jobs"),
+               dict(id="s3", title="&#39;Qualcomm to cut jobs&#39; - Reuters")]
+    def card(*items):
+        return render(dict(kind="company", title="t", created_at="2026-10-20T12:31:00Z",
+                           detail=dict(symbol="X", payload=dict(kind="important_reporting", items=list(items)), sources=sources)))
+    first = card(nvda)
+    assert first.count("$35B In Chip Orders") == 1 and "“Nvidia may be able to deliver only 5% to 10% of the total orders.”" in first
+    second = card(qcom, memo)
+    assert "<b>Source excerpt</b>\n“…Qualcomm (QCOM:NASDAQ) will cut jobs around the world.”" in second and "$195" not in second
+    assert "<b>Also (unconfirmed report): &#x27;Qualcomm to cut jobs&#x27; - Reuters</b>\n“Company to cut jobs globally in a &quot;performance-focused reduction&quot;" in second
+    assert "set to begin in…”" in second and "&amp;#34;" not in second and second.count("<b>Unconfirmed report</b>") == 0
+    # A short title-like passage is not marked as cut off; a headline stays whole.
+    from thesis.monitoring.telegram_message import excerpt
+    assert excerpt(dict(passage_id="p1", quote="Qualcomm Plans Workforce Cuts, Report Says"), 320) == "Qualcomm Plans Workforce Cuts, Report Says"
+    assert excerpt(dict(passage_id="p0", quote="U.S.Steel Wins"), 320) == "U.S.Steel Wins"

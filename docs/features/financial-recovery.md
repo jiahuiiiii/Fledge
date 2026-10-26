@@ -21,7 +21,7 @@ Only retained originals are read during page loads. Missing historical originals
 
 ## Optional OpenAI recovery
 
-Open **Financials → Missing figures · optional AI help**. Select a saved annual or quarterly report. A read-only preview lists unresolved supported figures, the bounded original-cell sample and the maximum new cost. **Find missing figures with OpenAI** is an explicit action; opening the panel, refreshing data or enabling a watch does not run it.
+Open **Financials → Fill missing figures** to expand the report checklist. The left-aligned header shows the report count. Shared missing figures are named once above the checklist; reports with different gaps retain their own labels. Choose individual reports or use **Select all**; **Clear selection** resets the choices. **Find figures with AI** reads only selected available reports, one at a time. A single combined maximum cost appears beside the action after selection; technical row counts and per-report costs are omitted from the main list. Limited samples retain one short availability note. Reports without suitable evidence or with a blocked reading stay visible and disabled. Opening, selecting or collapsing the checklist makes no AI call. A failed batch stops immediately, keeps completed suggestions and shows the failure; reloading the preview makes no paid retry. Saved readings remain under **Review saved suggestions**.
 
 The initial target set covers revenue, cost, gross/operating profit, operating expenses, selling/general/administrative expenses, parent net income, operating cash flow, cash purchases of property/plant/equipment, assets, liabilities and cash. The model can interpret a custom tag using its original row text, but it cannot supply numerical answers. It selects known cell IDs and an allowed reported/sum/subtract operation. Code validates identifiers, dates, periods, units and exact decimal arithmetic. Incompatible or duplicate suggestions are withheld.
 
@@ -47,3 +47,11 @@ Saved public-source replay, without new collection or AI calls:
 QCOM’s narrower cash-PPE-purchases target remains eligible for an optional interpretation; the existing broader cash-capital-spending reading remains distinct. No missing figure is filled merely to remove an “Unavailable” label.
 
 See [implementation review](../reviews/2026-10-11/financial-recovery.md) for tests, deployment evidence and limitations.
+
+## Use all suggestions at once — 25 October 2026
+
+Above the report selector, **Use all suggestions from all N reports** saves every suggested figure from every reviewed report as that report's choices in one step (reads and saves reviews only; no AI call). Each report keeps its calculation, original rows and its own untick-and-save revocation, and a line says how many figures from how many reports are now used. If one report fails, those saved before it stay saved.
+
+## Figures that stay unavailable — 25 October 2026
+
+Under the Fill missing figures bar, **Figures that stay unavailable (n)** appears only when the latest period still lacks a figure that the recovery tool cannot fix. Each entry gives the exact saved reason and what would help. Revenue growth is explained when no saved report covers the same period a year earlier (Fill missing figures only reads reports that are already saved; Update data collects earlier filings), or when either period's revenue is unavailable for a source reason. Facts missing from one saved filing stay with the recovery tool and are not listed here. The list is computed from the saved financial story; it makes no request.

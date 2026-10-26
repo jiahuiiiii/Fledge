@@ -8,6 +8,7 @@ import { api } from "../api/client";
 import { stamp } from "./MarketResearch";
 import SentimentContext from "./SentimentContext";
 import { SourceLabel } from "./SourceFilters";
+import { Button, Card, Disclosure, SectionHeader, SourceChip } from "./ui";
 import "./DiscussionThemes.css";
 const names = {
   all: "All sources",
@@ -167,14 +168,14 @@ export default function DiscussionThemes({
         <div className="theme-claim-sources">
           {citedSources.length ? (
             citedSources.map((source) => (
-              <button
+              <SourceChip
                 className="theme-claim-source"
                 key={source.id}
                 aria-haspopup="dialog"
-                onClick={() => setEvidence({ readingId: selected.id, value })}
-              >
-                {source.source} · {stamp(source.published_at)}
-              </button>
+                label={source.source}
+                date={stamp(source.published_at)}
+                onOpen={() => setEvidence({ readingId: selected.id, value })}
+              />
             ))
           ) : (
             <button
@@ -237,31 +238,36 @@ export default function DiscussionThemes({
   }
 
   return (
-    <details
+    <Disclosure
+      variant="flush"
       className="discussion-themes"
-      onToggle={(e) => setOpen(e.currentTarget.open)}
+      title="What are people discussing?"
+      description="Topics and differing views in the saved sources"
+      onToggle={(e) => {
+        if (e.target === e.currentTarget) setOpen(e.currentTarget.open);
+      }}
     >
-      <summary>What are people discussing?</summary>
       {open && (
         <section aria-label="Discussion themes" aria-busy={!!busy}>
-          <div className="market-section-head">
-            <div>
-              <h3>Discussion summary</h3>
-              <p className="theme-intro">
-                Topics and differing views in the saved sources.
-              </p>
-            </div>
-            <button
-              disabled={!!busy || !!generationBlock || !analysisId}
-              onClick={generate}
-            >
-              {busy === "generate"
-                ? "Creating discussion summary…"
-                : generationPlan?.saved_drafts && !generationPlan.cached
-                  ? "Continue discussion summary"
-                  : "Summarise discussions"}
-            </button>
-          </div>
+          <SectionHeader
+            level="card"
+            as="h3"
+            title="Discussion summary"
+            actions={
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={!!busy || !!generationBlock || !analysisId}
+                onClick={generate}
+              >
+                {busy === "generate"
+                  ? "Creating discussion summary…"
+                  : generationPlan?.saved_drafts && !generationPlan.cached
+                    ? "Continue discussion summary"
+                    : "Summarise discussions"}
+              </Button>
+            }
+          />
           {generationPlan?.maximum_new_usd != null && !generationBlock && (
             <p className="fine">
               {generationPlan.cached
@@ -407,7 +413,7 @@ export default function DiscussionThemes({
                     </p>
                   )}
                   {themes.map((t, i) => (
-                    <article className="theme-card" key={i}>
+                    <Card as="article" variant="inset" className="theme-card" key={i}>
                       <header>
                         <h3>{t.title}</h3>
                         <div className="theme-card-meta">
@@ -429,7 +435,7 @@ export default function DiscussionThemes({
                       <p className="theme-unknown">
                         <strong>Still unknown:</strong> {t.unknown}
                       </p>
-                    </article>
+                    </Card>
                   ))}
                   {!!selected.result.gaps.length && (
                     <details>
@@ -466,6 +472,6 @@ export default function DiscussionThemes({
           <div className="theme-evidence-body">{passages(activeEvidence)}</div>
         )}
       </Modal>
-    </details>
+    </Disclosure>
   );
 }

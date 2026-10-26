@@ -1,12 +1,24 @@
 import { useProfile } from "../lib/profile";
 
 // Everyone starts in Beginner. Pro tools (financials, charts, comparisons and
-// the full research tabs) are switched on here, inside the account menu, so
+// the full research tabs) are switched on here, on the account page, so
 // the first screens stay simple.
-export function ProModeSwitch() {
+export function ProModeSwitch({ compact = false }) {
   const { home, mode, setDetailMode } = useProfile();
   if (!home) return null;
   const pro = mode === "data";
+  if (compact)
+    return (
+      <label className="pro-mode-switch compact">
+        <input
+          type="checkbox"
+          role="switch"
+          aria-label="Pro tools"
+          checked={pro}
+          onChange={() => setDetailMode(pro ? "explain" : "data")}
+        />
+      </label>
+    );
   return (
     <div className="pro-mode-switch">
       <label>
@@ -18,26 +30,10 @@ export function ProModeSwitch() {
         />
         <span>
           <strong>Pro tools</strong>
-          <small>
-            {pro
-              ? "On: financials, charts, comparisons and every research tab."
-              : "Off: simple summaries only. Turn on for financials, charts and comparisons."}
-          </small>
+          <small>Financials, charts and comparisons.</small>
         </span>
       </label>
     </div>
-  );
-}
-
-// For a copy of Fledge without accounts: the same switch in a small menu.
-export function SettingsMenu() {
-  return (
-    <details className="account-menu">
-      <summary>Settings</summary>
-      <div>
-        <ProModeSwitch />
-      </div>
-    </details>
   );
 }
 

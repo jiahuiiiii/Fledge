@@ -38,7 +38,7 @@ let browser;
  assert.ok(savedNews.length>0);
  for(const source of savedNews) assert.ok((await original.locator('.original-source-text').allTextContents()).includes(source.body));
  assert.equal(await original.locator('.sentiment-tag,.sentiment-counts').count(),0);
- await evidenceDialog.getByRole('button',{name:'Current sources',exact:true}).click();
+ await evidenceDialog.getByRole('tab', { name: 'Current sources',exact:true}).click();
  const panel=evidenceDialog.getByRole('region',{name:'Current sentiment inputs',exact:true});
  await panel.getByText('The inputs selected now differ from the saved sentiment reading.',{exact:true}).waitFor();
  for(const scope of ['news','reddit','hackernews']){

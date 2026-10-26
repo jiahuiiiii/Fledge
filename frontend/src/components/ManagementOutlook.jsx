@@ -5,6 +5,7 @@ import { useId, useState } from "react";
 import TermHelp from "./TermHelp";
 import Select from "./Select";
 import EvidenceButton from "./EvidenceButton";
+import { Disclosure, SourceChip } from "./ui";
 import { day, amount } from "./FinancialOverview";
 import "./ManagementOutlook.css";
 
@@ -136,13 +137,12 @@ export default function ManagementOutlook({ data }) {
     releases.find((item) => item.current) ||
     releases[0];
   return (
-    <section className="management-outlook" aria-labelledby={id + "-title"}>
+    <section className="management-outlook" aria-label="Management outlook">
       <div className="outlook-heading">
         <div>
-          <span className="outlook-source-badge">Company guidance</span>
-          <TermHelp term="guidance" />
-          <h2 id={id + "-title"}>Management outlook</h2>
-          <p>What the company expects, from its original earnings release.</p>
+          <p className="fine">
+            From the company’s own earnings release. <TermHelp term="guidance" />
+          </p>
         </div>
         {release && (
           <label htmlFor={id + "-release"}>
@@ -209,26 +209,18 @@ export default function ManagementOutlook({ data }) {
                     "This section refers to earlier or withdrawn guidance. Read the context before treating it as a current expectation."}
                 </p>
               )}
-              <div className="outlook-dates">
-                <div>
-                  <span>Release’s stated date</span>
-                  <strong>
-                    {release.stated_release_date
-                      ? day(release.stated_release_date.date)
-                      : "Not established"}
-                  </strong>
-                </div>
-                <div>
-                  <span>Forecast period ends</span>
-                  <strong>
-                    {section.period_end
-                      ? day(section.period_end)
-                      : section.period_label
-                        ? `${section.period_label} · exact date not stated`
-                        : "Period not identified"}
-                  </strong>
-                </div>
-              </div>
+              <p className="outlook-meta fine">
+                Release dated{" "}
+                {release.stated_release_date
+                  ? day(release.stated_release_date.date)
+                  : "not established"}{" "}
+                · forecast period ends{" "}
+                {section.period_end
+                  ? day(section.period_end)
+                  : section.period_label
+                    ? `${section.period_label} (exact date not stated)`
+                    : "not identified"}
+              </p>
               <div className="outlook-forecasts">
                 {section.forecasts.map((forecast) => (
                   <Forecast
@@ -262,8 +254,7 @@ export default function ManagementOutlook({ data }) {
                     ))}
                 </details>
               )}
-              <details className="outlook-context">
-                <summary>Read the outlook in context</summary>
+              <Disclosure variant="flush" className="outlook-context" title="Read the outlook in context">
                 {release.stated_release_date && (
                   <blockquote>{release.stated_release_date.quote}</blockquote>
                 )}
@@ -279,36 +270,22 @@ export default function ManagementOutlook({ data }) {
                     read the rest.
                   </p>
                 )}
-                <a href={release.url} target="_blank" rel="noreferrer">
-                  Read the original release ↗
-                </a>
-              </details>
+                <SourceChip label="Original release" href={release.url} />
+              </Disclosure>
             </section>
           ))}
-          <details className="outlook-source-details">
-            <summary>Release details</summary>
-            <p>
-              First saved {stamp(release.available_at)}. SEC filing accepted{" "}
-              {stamp(release.published_at)}.
+          <Disclosure variant="flush" className="outlook-limits" title="Release details and limits">
+            <p className="fine">
+              First saved {stamp(release.available_at)}. SEC filing accepted {stamp(release.published_at)}. The stated release date comes from the release’s own dateline; SEC acceptance and first-saved time are separate dates.
             </p>
-            <p>
-              The stated release date comes from the release’s own dateline. SEC
-              acceptance and the first saved time are separate dates.
-            </p>
-            <a href={release.url} target="_blank" rel="noreferrer">
-              Open original earnings release ↗
-            </a>
-          </details>
-          <details className="outlook-limits">
-            <summary>About these forecasts</summary>
             {data.limitations.map((line) => (
-              <p key={line}>{readableNote(line)}</p>
+              <p className="fine" key={line}>{readableNote(line)}</p>
             ))}
-            <p>
-              This view covers a limited set of saved releases and reports.
-              Earlier forecasts and results may be missing.
+            <p className="fine">
+              This covers a limited set of saved releases and reports. Earlier forecasts and results may be missing.
             </p>
-          </details>
+            <SourceChip label="Open original earnings release" href={release.url} />
+          </Disclosure>
         </div>
       )}
     </section>

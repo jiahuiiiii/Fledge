@@ -262,6 +262,7 @@ export default function ValuationPanel({
   instrument,
   performance: currentPerformance,
   quote,
+  priceBars = [],
   visible = true,
   initialRead,
   revision,
@@ -448,6 +449,8 @@ export default function ValuationPanel({
       <AnalystTargets
         value={context?.analyst_targets}
         quote={quote}
+        bars={priceBars}
+        instrumentId={instrument?.id}
         onRefresh={requestUpdate}
       />
       <span className="section-label">WHAT WOULD HAVE TO BE TRUE?</span>

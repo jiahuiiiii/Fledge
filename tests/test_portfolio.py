@@ -157,6 +157,34 @@ def test_explanation_keeps_only_cited_grounded_parts_and_reuses_answers(owner, l
     assert portfolio.build(owner, now=NOW)['explanation'] is None
 
 
+def test_explanation_keeps_its_prices_and_hides_after_a_new_session(owner, listed):
+    model, _ = fake_model(dict(headline='Your whole list fell.', drivers=[], groups=[], takeaway='One shared worry.'))
+    e = portfolio.explain(owner, transport=model, now=NOW)['explanation']
+    assert e['prices'][listed['NVDA']]['change_percent'] == -3.16
+    # A refresh within the same session keeps the explanation and its original moves.
+    with transaction(admin=True) as conn:
+        conn.execute('INSERT INTO market_quotes VALUES(%s,%s,%s,%s)',
+                     (uuid4(), listed['NVDA'], Jsonb(dict(price=101.0, change_percent=-2.5,
+                                                          quoted_at=(NOW + timedelta(seconds=1)).isoformat())),
+                      NOW + timedelta(seconds=1)))
+    kept = portfolio.build(owner, now=NOW)['explanation']
+    assert kept['prices'][listed['NVDA']]['change_percent'] == -3.16
+    # A price from a later session means the words no longer describe the bars.
+    later = NOW + timedelta(days=3)
+    with transaction(admin=True) as conn:
+        conn.execute('INSERT INTO market_quotes VALUES(%s,%s,%s,%s)',
+                     (uuid4(), listed['NVDA'], Jsonb(dict(price=104.0, change_percent=2.5,
+                                                          quoted_at=later.isoformat())), later))
+    assert portfolio.build(owner, now=later)['explanation'] is None
+
+
+def test_explanation_saved_without_prices_is_hidden():
+    listed = [dict(id='a', quote=dict(change_percent=1.0, quoted_at=NOW.isoformat())),
+              dict(id='b', quote=dict(change_percent=-1.0, quoted_at=NOW.isoformat()))]
+    assert portfolio.same_sessions(None, listed) is False
+    assert portfolio.same_sessions(portfolio.price_snapshot(listed), listed) is True
+
+
 def test_explanation_needs_a_list_with_prices(owner, monkeypatch):
     monkeypatch.setattr(portfolio, 'news_for', lambda conn, iid: dict(counts={}, items=[]))
     with pytest.raises(ValueError, match='two companies'):
@@ -210,3 +238,10 @@ def test_list_uses_the_newest_price_from_the_refreshed_chart(owner, monkeypatch)
     finals = [b for b in series['bars'] if b['provisional'] is False and b['date'] < now.astimezone(ph.NY).date().isoformat()]
     previous = float(finals[-1]['close'])
     assert q['change_percent'] == round((110 - previous) / previous * 100, 2)
+
+
+def test_citation_ids_the_model_repeats_in_a_sentence_are_removed():
+    from thesis.portfolio import clean
+    assert clean("The AI trade looked softer. (w3)") == "The AI trade looked softer."
+    assert clean("Small declines are not explained by the news. (n1_1,n1_2,n3_4)") == "Small declines are not explained by the news."
+    assert clean("   ") is None

@@ -1,3 +1,4 @@
+import { FilterGroup } from "./ui";
 import redditIcon from "../assets/source-icons/reddit.svg";
 import hackerNewsIcon from "../assets/source-icons/hackernews.svg";
 import xIcon from "../assets/source-icons/x.svg";
@@ -37,8 +38,8 @@ export function SourceIcon({ scope }) {
   return (
     <svg
       className="source-icon"
-      width="22"
-      height="22"
+      width="16"
+      height="16"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -77,27 +78,32 @@ export default function SourceFilters({
   selected,
   onChange,
   label = "Sentiment source type",
+  showLabels = false,
 }) {
   return (
-    <div
+    <FilterGroup
+      label={label}
       className="sentiment-tabs source-filters"
-      role="group"
-      aria-label={label}
-    >
-      {Object.entries(sourceNames).map(([scope, name]) => (
-        <button
-          key={scope}
-          type="button"
-          aria-label={name}
-          title={name}
-          aria-pressed={selected === scope}
-          className={`source-filter ${selected === scope ? "active" : ""}`}
-          onClick={() => onChange(scope)}
-        >
-          <SourceIcon scope={scope} />
-          {scope === "all" && <span>All</span>}
-        </button>
-      ))}
-    </div>
+      itemClassName="source-filter"
+      value={selected}
+      onValueChange={onChange}
+      options={Object.entries(sourceNames).map(([scope, name]) => ({
+        value: scope,
+        ariaLabel: name,
+        title: name,
+        icon: <SourceIcon scope={scope} />,
+        label: showLabels
+          ? {
+              all: "All sources",
+              news: "Company news",
+              reddit: "Reddit",
+              hackernews: "Hacker News",
+              x: "X",
+            }[scope]
+          : scope === "all"
+            ? "All"
+            : undefined,
+      }))}
+    />
   );
 }

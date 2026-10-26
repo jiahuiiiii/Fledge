@@ -62,9 +62,13 @@ let browser;
       exact: true,
     })
     .waitFor();
+  // The vendor's similar companies are the unsaved starting group (labelled, not a competitor list).
+  await panel.getByText(/similar companies by exchange, sector and size/).waitFor();
+  assert.equal(await panel.locator(".position-peer-list > li").count(), 1);
+  await panel.getByRole("button", { name: "Remove NVDA", exact: true }).click();
   const peer = panel.getByLabel("Peer ticker or company");
   await peer.fill("NVDA");
-  await panel.getByRole("button", {name:/NVDA · NVIDIA/}).waitFor();
+  await panel.getByRole("option", {name:/NVDA · NVIDIA/}).waitFor();
   await panel
     .getByRole("button", { name: "Save & compare", exact: true })
     .click();

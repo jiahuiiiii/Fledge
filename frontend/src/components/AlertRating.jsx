@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import "./AlertRating.css";
+import { Button } from "./ui";
 
 export default function AlertRating({ record }) {
   const key = `${record.kind}:${record.id}`;
@@ -42,20 +43,24 @@ export default function AlertRating({ record }) {
     <section className="alert-rating" aria-label="Rate this alert">
       <span>Was this alert useful?</span>
       <div className="alert-rating-choices">
-        <button
+        <Button
+          variant="plain"
+          size="sm"
           disabled={busy}
           aria-pressed={value === "useful"}
           onClick={() => rate("useful")}
         >
           Useful
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="plain"
+          size="sm"
           disabled={busy}
           aria-pressed={value === "not_useful"}
           onClick={() => rate("not_useful")}
         >
           Not useful
-        </button>
+        </Button>
       </div>
       {notice && (
         <p className="fine" role="status">

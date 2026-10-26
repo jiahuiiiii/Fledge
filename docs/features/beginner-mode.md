@@ -12,9 +12,10 @@ data" and uses the same saved setting (`detail_mode`: `explain` = Beginner,
 server; accounts that skipped them keep it in this browser (default Pro).
 
 - **Beginner**: a company shows only **Summary** and **News & discussion**.
-  Overview, Financials, Outlook and Compare & value are hidden, and "?" term
-  help and reading notes open by default.
-- **Pro**: every tab, with **Summary** added first.
+  Overview, Financials and Compare & value are hidden, and "?" term help and
+  reading notes open by default.
+- **Pro**: four tabs — **Overview**, **News & discussion**, **Financials** and
+  **Compare & value**. There is no separate Pro Summary tab.
 
 ## The Summary page ("Signals", chosen 15 October 2026)
 
@@ -86,3 +87,19 @@ when Fledge runs without accounts). In Beginner:
   research tabs, section heading or practice-story bar. "All news & posts →"
   opens the news list with "← Back to summary".
 - Home: "My companies", one plain line, no search box or reload button.
+
+
+## Summary and Account presentation — 25 October 2026
+
+The Summary's three at-a-glance links now use compact, neutral shared cards.
+Their existing counts and section destinations remain; oversized shapes and the
+separate shape legend are removed. The price-change wording is unchanged and
+appears in a small shared badge.
+
+The top-right **Account** link opens `?view=account`, replacing the dropdown for
+both authenticated and local workspaces. The page contains the existing Pro
+switch, profile-question entry, applicable password/recovery controls and
+sign-out. Opening the page saves nothing. Account navigation retains the research
+subtree, supports Back/reload and reuses the workspace header. This supersedes
+the earlier menu presentation, without changing how display preferences are
+saved. [Verification](../reviews/2026-10-25/summary-account.md).

@@ -16,6 +16,7 @@ journeys = {
     "--company-overview",
     "--business",
     "--financials",
+    "--financial-recovery",
     "--sector-position",
     "--watch-continuity",
     "--research-design",
@@ -33,7 +34,6 @@ journeys = {
     "--recurring-events",
     "--report-expectations",
     "--event-watch",
-    "--expectations",
     "--filing-watch",
     "--idea",
     "--ideas",
@@ -43,6 +43,8 @@ journeys = {
     "--original-sources",
     "--performance",
     "--prices",
+    "--pro-cleanup",
+    "--responsive",
     "--proposal",
     "--questions",
     "--reporting-updates",
@@ -91,7 +93,22 @@ try:
             time.sleep(0.2)
     else:
         raise RuntimeError("Browser test server did not start")
-    if any(flag in sys.argv for flag in ["--financials", "--content-first", "--reading-flow", "--companion", "--topic-homes"]):
+    # Accounts start in Beginner with the first-login questions showing. The
+    # journeys exercise the Pro workspace, so give the test owner a completed
+    # profile in Pro mode (disposable database only).
+    subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from thesis import profile; from thesis.config import OWNER, DATA; "
+            "assert str(DATA).startswith('/private/tmp/thesis-browser-'); "
+            "profile.save(OWNER, 'stocks', goal='check', detail_mode='data')",
+        ],
+        cwd=root,
+        env=env,
+        check=True,
+    )
+    if any(flag in sys.argv for flag in ["--financials", "--financial-recovery", "--content-first", "--reading-flow", "--companion", "--topic-homes", "--pro-cleanup", "--responsive"]):
         subprocess.run([sys.executable, "tests/seed_financials_browser.py"], cwd=root, env=env, check=True)
     elif "--business" in sys.argv or "--sector-position" in sys.argv or "--company-overview" in sys.argv:
         subprocess.run([sys.executable, "tests/seed_business_browser.py"], cwd=root, env=env, check=True)
@@ -165,13 +182,6 @@ try:
     elif "--social-platforms" in sys.argv:
         subprocess.run(
             [sys.executable, "tests/seed_social_platforms_browser.py"],
-            cwd=root,
-            env=env,
-            check=True,
-        )
-    elif "--expectations" in sys.argv:
-        subprocess.run(
-            [sys.executable, "tests/seed_expectation_browser.py"],
             cwd=root,
             env=env,
             check=True,
@@ -304,7 +314,7 @@ try:
     result = subprocess.run(
         [
             os.environ.get("THESIS_NODE", "node"),
-            "tests/browser_topic_homes.cjs" if "--topic-homes" in sys.argv else "tests/browser_companion.cjs" if "--companion" in sys.argv else "tests/browser_reading_flow.cjs" if "--reading-flow" in sys.argv else "tests/browser_sentiment_guards.cjs" if "--sentiment-guards" in sys.argv else "tests/browser_content_first.cjs" if "--content-first" in sys.argv else "tests/browser_company_overview.cjs" if "--company-overview" in sys.argv else "tests/browser_news_discussion.cjs" if "--news-discussion" in sys.argv else "tests/browser_ideas.cjs" if "--ideas" in sys.argv else "tests/browser_sector_position.cjs" if "--sector-position" in sys.argv else "tests/browser_financials.cjs" if "--financials" in sys.argv else "tests/browser_business.cjs" if "--business" in sys.argv else "tests/browser_research_design.cjs" if "--research-design" in sys.argv else "tests/browser_source_filters.cjs" if "--source-filters" in sys.argv else "tests/browser_retained_watch.cjs" if "--watch-continuity" in sys.argv else "tests/browser_sentiment_limits.cjs" if "--sentiment-limits" in sys.argv else "tests/browser_report_expectations.cjs" if "--report-expectations" in sys.argv else (
+            "tests/browser_pro_cleanup.cjs" if "--pro-cleanup" in sys.argv else "tests/browser_responsive.cjs" if "--responsive" in sys.argv else "tests/browser_financial_recovery.cjs" if "--financial-recovery" in sys.argv else "tests/browser_topic_homes.cjs" if "--topic-homes" in sys.argv else "tests/browser_companion.cjs" if "--companion" in sys.argv else "tests/browser_reading_flow.cjs" if "--reading-flow" in sys.argv else "tests/browser_sentiment_guards.cjs" if "--sentiment-guards" in sys.argv else "tests/browser_content_first.cjs" if "--content-first" in sys.argv else "tests/browser_company_overview.cjs" if "--company-overview" in sys.argv else "tests/browser_news_discussion.cjs" if "--news-discussion" in sys.argv else "tests/browser_ideas.cjs" if "--ideas" in sys.argv else "tests/browser_sector_position.cjs" if "--sector-position" in sys.argv else "tests/browser_financials.cjs" if "--financials" in sys.argv else "tests/browser_business.cjs" if "--business" in sys.argv else "tests/browser_research_design.cjs" if "--research-design" in sys.argv else "tests/browser_source_filters.cjs" if "--source-filters" in sys.argv else "tests/browser_retained_watch.cjs" if "--watch-continuity" in sys.argv else "tests/browser_sentiment_limits.cjs" if "--sentiment-limits" in sys.argv else "tests/browser_report_expectations.cjs" if "--report-expectations" in sys.argv else (
                 (
                     "tests/browser_recurring_events.cjs"
                     if "--recurring-events" in sys.argv
@@ -345,9 +355,6 @@ try:
                                                     "tests/browser_roles.cjs"
                                                     if "--roles" in sys.argv
                                                     else (
-                                                        "tests/browser_expectations.cjs"
-                                                        if "--expectations" in sys.argv
-                                                        else (
                                                             "tests/browser_inbox.cjs"
                                                             if "--inbox" in sys.argv
                                                             else (
@@ -423,7 +430,6 @@ try:
                                                                                                                                     if "--age"
                                                                                                                                     in sys.argv
                                                                                                                                     else "tests/browser.cjs"
-                                                                                                                                )
                                                                                                                             )
                                                                                                                         )
                                                                                                                     )

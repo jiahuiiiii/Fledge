@@ -439,3 +439,30 @@ def test_week_with_a_price_move_saves_and_rejects_a_fabricated_move(owner):
         with transaction(owner) as c:
             c.execute("INSERT INTO scheduled_reviews VALUES(%s,%s,%s,%s,%s,%s,%s,%s)",
                       (uuid4(), owner, 99, row["scheduled_at"], row["generated_at"], "UTC", 0, Jsonb(row["manifest"])))
+
+
+def test_main_points_rank_bad_news_then_moves_and_count_every_record():
+    from datetime import datetime, timezone
+    at = lambda h: datetime(2026, 10, 20, h, tzinfo=timezone.utc)
+    rec = lambda kind, symbol, tone, h, **kw: dict(
+        kind=kind, instrument_id=symbol, created_at=at(h), title=f"{symbol} title {h}",
+        detail=dict(symbol=symbol, **({"brief": dict(tone=tone, headline=f"{symbol} headline {h}", why="Why text.")} if tone else {}), **kw))
+    points = review_digest.highlights([
+        rec("company", "GOOGL", "Good news", 5), rec("company", "GOOGL", "Neutral news", 6),
+        rec("move", "NVDA", None, 1), rec("company", "NVDA", "Bad news", 2),
+        rec("company", "NVDA", "Bad news", 3, withheld=True), rec("idea", "NVDA", None, 4)])
+    assert [p["symbol"] for p in points] == ["NVDA", "GOOGL"]
+    nvda = points[0]
+    assert {k: nvda[k] for k in ("total", "bad", "moves", "other")} == dict(total=4, bad=2, moves=1, other=1)
+    # A withheld record is counted but never shown as the top item.
+    assert nvda["top"]["headline"] == "NVDA headline 2" and nvda["top"]["tone"] == "Bad news"
+    assert points[1]["top"]["headline"] == "GOOGL headline 5"
+
+
+def test_saved_review_never_stores_headlines_and_rebuilds_main_points(owner):
+    _, _, item, _ = saved(owner)
+    with transaction(owner) as c:
+        manifest = one(c, "SELECT manifest FROM scheduled_reviews WHERE id=%s", (item["id"],))["manifest"]
+    assert "main_points" not in manifest
+    opened = R.read(owner, item["id"])
+    assert opened["main_points"] and opened["main_points"][0]["total"] == opened["total"]

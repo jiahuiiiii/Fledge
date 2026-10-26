@@ -23,3 +23,10 @@ test("news tone across the list in plain words", () => {
   );
   assert.equal(toneLine({}), "No news reading saved for these companies yet.");
 });
+
+import { plainRead } from "./portfolioRead.js";
+test("citation ids inside a sentence are removed", () => {
+  assert.equal(plainRead("Mixed or unclear. (w3)"), "Mixed or unclear.");
+  assert.equal(plainRead("not explained by the saved news. (n1_1,n1_2,n3_4)"), "not explained by the saved news.");
+  assert.equal(plainRead("Nothing to strip here."), "Nothing to strip here.");
+});

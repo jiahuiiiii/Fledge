@@ -13,6 +13,7 @@ from starlette.concurrency import run_in_threadpool
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from . import service
 from . import auth
 from . import wake
@@ -54,6 +55,23 @@ async def lifespan(app):
 
     thread = threading.Thread(target=loop, daemon=True)
     thread.start()
+
+    def warm_loop():
+        # A restart empties the parsed-filing cache, so the first Pro home page
+        # rebuilt every company's figures (about 21 s of work on 25 Oct data,
+        # 3.5 s warm). Parse them once in the background, a few seconds in,
+        # pausing between companies. Not per account: 21 accounts made this
+        # 21 times the work and slowed every page after a restart.
+        if stop.wait(3):
+            return
+        from .home_cards import warm_figures
+
+        try:
+            warm_figures(stop)
+        except Exception:
+            logging.getLogger("thesis").exception("Filing figure warm-up failed")
+
+    threading.Thread(target=warm_loop, daemon=True).start()
 
     def watch_loop(lane=None):
         from .monitoring.news_watch import run_once
@@ -312,10 +330,26 @@ async def local_session(request: Request, call_next):
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data: https://financialmodelingprep.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"
     )
-    response.headers["Cache-Control"] = (
-        "no-store" if request.url.path.startswith(("/api/", "/auth/")) else "no-cache"
-    )
+    response.headers["Cache-Control"] = cache_policy(request.url.path, response.status_code)
     return response
+
+
+def cache_policy(path, status):
+    """API answers are private and never stored. Built files under /assets
+    have content hashes in their names, so a browser may keep them for good;
+    fonts keep for a week; pages and anything else revalidate every time."""
+    if path.startswith(("/api/", "/auth/")):
+        return "no-store"
+    if status in (200, 304) and path.startswith("/assets/"):
+        return "public, max-age=31536000, immutable"
+    if status in (200, 304) and path.startswith("/fonts/"):
+        return "public, max-age=604800"
+    return "no-cache"
+
+
+# Outermost, so pages, built files and JSON answers over 1 KB are compressed
+# with the headers above already set. Event streams are left uncompressed.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
 @app.exception_handler(service.Conflict)
@@ -664,6 +698,33 @@ def workspace(instrument_id: UUID = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
     return {"result": result}
 
 
+@app.get("/api/v1/home-cards")
+def home_cards():
+    from .home_cards import quotes
+
+    return {"result": quotes(auth.current_owner())}
+
+
+@app.get("/api/v1/companies/{instrument_id}/home-card")
+def home_card(instrument_id: UUID, figures: bool = True):
+    from .home_cards import card
+
+    return {"result": card(auth.current_owner(), str(instrument_id), figures=figures)}
+
+
+@app.get("/api/v1/companies/{instrument_id}/alerts")
+def company_alerts(instrument_id: UUID):
+    """This company's news alerts with details. The company read carries only
+    their review status, so the page shows first and these follow."""
+    from .db import transaction
+    from .monitoring import news_watch
+
+    iid = str(instrument_id)
+    with transaction(auth.current_owner(), consistent=True) as conn:
+        alerts = news_watch.list_alerts(conn, auth.current_owner(), previous=False, detail_instrument=iid)
+    return {"result": [a for a in alerts if a["instrument_id"] == iid]}
+
+
 @app.get("/api/v1/companies/{instrument_id}/workspace-financials")
 def workspace_financials(instrument_id: UUID):
     return {"result": service.financial_workspace(auth.current_owner(), str(instrument_id))}
@@ -834,9 +895,9 @@ def sector_position(instrument_id: UUID, peers: str | None = None):
 
 
 @app.post("/api/v1/companies/{instrument_id}/fmp/refresh")
-def fmp_refresh(instrument_id: UUID):
+def fmp_refresh(instrument_id: UUID, only: str | None = None):
     from .research.fmp import refresh_company
-    return {"result": refresh_company(auth.current_owner(), str(instrument_id))}
+    return {"result": refresh_company(auth.current_owner(), str(instrument_id), only=only)}
 
 
 @app.post("/api/v1/companies/{instrument_id}/financial-forecasts/refresh")

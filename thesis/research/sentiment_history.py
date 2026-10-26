@@ -48,7 +48,7 @@ def history(iid, before=None):
             raise Missing("Choose a supported company.")
         cursor = record(conn, iid, before) if before else None
         condition = (
-            " AND ((packet->>'cutoff')::timestamptz,created_at,id)<(%s,%s,%s)"
+            " AND (cutoff,created_at,id)<(%s,%s,%s)"
             if cursor
             else ""
         )
@@ -63,7 +63,7 @@ def history(iid, before=None):
             conn,
             "SELECT * FROM sentiment_analyses WHERE instrument_id=%s"
             + condition
-            + " ORDER BY (packet->>'cutoff')::timestamptz DESC,created_at DESC,id DESC LIMIT 21",
+            + " ORDER BY cutoff DESC,created_at DESC,id DESC LIMIT 21",
             params,
         )
         return dict(

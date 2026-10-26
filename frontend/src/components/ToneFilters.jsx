@@ -1,3 +1,4 @@
+import { FilterGroup } from "./ui";
 export const toneNames = {
   positive: "Positive",
   negative: "Negative",
@@ -8,37 +9,21 @@ export const toneNames = {
 
 export default function ToneFilters({ selected, onChange, counts, controls }) {
   return (
-    <div
+    <FilterGroup
+      label="Filter analysed sources by tone"
       className="sentiment-counts tone-filters"
-      role="group"
-      aria-label="Filter analysed sources by tone"
-    >
-      <button
-        type="button"
-        aria-pressed={selected === "all"}
-        aria-controls={controls}
-        onClick={() => onChange("all")}
-      >
-        All tones
-      </button>
-      {Object.entries(toneNames).map(([key, label]) => (
-        <button
-          type="button"
-          className={`tone-${key}`}
-          key={key}
-          aria-pressed={selected === key}
-          aria-controls={controls}
-          onClick={() => onChange(selected === key ? "all" : key)}
-        >
-          {label}
-          {counts && (
-            <>
-              {" "}
-              <b>{counts[key]}</b>
-            </>
-          )}
-        </button>
-      ))}
-    </div>
+      controls={controls}
+      value={selected}
+      onValueChange={(value) => onChange(value === selected ? "all" : value)}
+      options={[
+        { value: "all", label: "All tones" },
+        ...Object.entries(toneNames).map(([value, label]) => ({
+          value,
+          label,
+          count: counts?.[value],
+          className: `tone-${value}`,
+        })),
+      ]}
+    />
   );
 }

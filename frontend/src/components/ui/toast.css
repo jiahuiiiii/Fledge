@@ -1,0 +1,41 @@
+/* react-toastify restyled with the shared tokens; its own colours are overridden. */
+.ui-toast-host.Toastify__toast-container {
+  width: min(520px, calc(100vw - 2 * var(--space-4)));
+  padding: 0;
+  bottom: var(--space-4);
+  --toastify-toast-width: 100%;
+}
+.ui-toast.Toastify__toast {
+  width: 100%;
+  min-height: 0;
+  margin-bottom: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface-2);
+  color: var(--ui-text);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.35);
+}
+.ui-toast .Toastify__toast-body { margin: 0; padding: 0; }
+.ui-toast__body { display: flex; align-items: center; gap: var(--space-3); width: 100%; }
+.ui-toast__message { flex: 1; min-width: 0; margin: 0; line-height: 1.45; }
+.ui-toast__action {
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--lime);
+  font-weight: 600;
+  cursor: pointer;
+}
+.ui-toast__action:hover { background: #ffffff14; }
+.ui-toast .Toastify__close-button { align-self: center; color: var(--ui-muted); opacity: 1; }
+.ui-toast .Toastify__close-button:hover { color: var(--ui-text); }
+.ui-toast .ui-toast__progress { height: 3px; background: var(--lime); }
+@media (prefers-reduced-motion: reduce) {
+  .ui-toast.Toastify__toast { animation-duration: 1ms; }
+}

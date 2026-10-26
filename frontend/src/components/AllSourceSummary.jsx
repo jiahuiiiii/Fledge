@@ -1,4 +1,6 @@
 import { SourceLabel } from "./SourceFilters";
+import { ToneCard } from "./ui";
+import { toneOf } from "../lib/tone";
 import { sourceCoverage, sourceExclusionLabels } from "../lib/sourceCoverage";
 import "./AllSourceSummary.css";
 import { sentimentSummaryParts } from "../lib/sentimentSummary";
@@ -10,9 +12,10 @@ export function SourceToneSummary({ analysis }) {
   return (
     <div className="source-summary-list" aria-label="Saved tone by source">
       {samples.map((sample) => (
-        <div key={sample.scope}>
+        <ToneCard as="div" key={sample.scope} tone={sample.withheld != null ? "unknown" : toneOf(sample.sentimentSummary?.tone)}>
           <SourceLabel scope={sample.scope} />
-          <strong>
+          <strong className="ui-tone-card__status">
+            <span className="ui-tone-card__dot" aria-hidden="true" />
             {sample.withheld != null
               ? "Tone totals withheld"
               : sentimentSummaryParts(sample.sentimentSummary).label}
@@ -22,7 +25,7 @@ export function SourceToneSummary({ analysis }) {
               ? "They counted a source that is no longer available."
               : sentimentSummaryParts(sample.sentimentSummary).detail}
           </small>
-        </div>
+        </ToneCard>
       ))}
     </div>
   );
@@ -151,7 +154,9 @@ export function SourceCountingDetails({ analysis }) {
       {analysis?.source_reuse?.reused > 0 && (
         <p>
           {analysis.source_reuse.reused} unchanged{" "}
-          {analysis.source_reuse.reused === 1 ? "source keeps its" : "sources keep their"}{" "}
+          {analysis.source_reuse.reused === 1
+            ? "source keeps its"
+            : "sources keep their"}{" "}
           labels from an earlier reading made the same way, so{" "}
           {analysis.source_reuse.new
             ? `only ${analysis.source_reuse.new} new or changed ${analysis.source_reuse.new === 1 ? "source was" : "sources were"} sent to the AI.`

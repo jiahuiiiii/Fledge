@@ -1,8 +1,22 @@
 import { formatTimestamp } from "../lib/dateTime";
+import { uniqueCitations } from "../lib/briefCitations";
 import { modelAvailability } from "../lib/modelAvailability";
 import { currentCompanyHeadlines } from "../lib/companyHeadlines";
 import { newsSourceStatus } from "../lib/newsPresentation";
-import Select from "./Select";
+import {
+  Badge,
+  Button,
+  Card,
+  Disclosure,
+  FilterGroup,
+  SourceChip,
+  EmptyState,
+  NewsIcon,
+  MetaRow,
+  SectionHeader,
+  StoryCard,
+} from "./ui";
+import "./NewsDiscussion.css";
 import { useId, useState } from "react";
 import {
   extendedLine,
@@ -85,7 +99,10 @@ export function MarketQuote({ market, history, compact = false }) {
             </small>
           </>
         ) : (
-          <p>No share price saved yet. Prices load once the company’s data is updated.</p>
+          <p>
+            No share price saved yet. Prices load once the company’s data is
+            updated.
+          </p>
         )}
         {!compact && status?.quote_error && (
           <p className="warning" role="status">
@@ -188,11 +205,11 @@ export default function MarketResearch({
           : "Compare each sourced development with your question and assumptions. A company-wide briefing does not automatically answer a custom research question.";
   if (headlinesOnly)
     return (
-      <details className="market-research unanalysed-headlines">
-        <summary>
-          More headlines{" "}
-          <span>{news.length} company mentions · not analysed</span>
-        </summary>
+      <Disclosure
+        className="market-research unanalysed-headlines"
+        title="More headlines"
+        description={`${news.length} company mentions · not analysed`}
+      >
         <p className="fine">
           Only headlines or supplied snippets that name {data.instrument.symbol}{" "}
           or the company appear here. The latest three appear above. These
@@ -206,96 +223,136 @@ export default function MarketResearch({
         )}
         <div className="news-list">
           {(expanded ? news : news.slice(0, 5)).map((d) => (
-            <article key={d.id} className="news-item">
-              <div className="news-meta">
-                <span>{d.source}</span>
-                <time dateTime={d.published_at}>{stamp(d.published_at)}</time>
-              </div>
-              <button className="news-title" onClick={() => onSource(d.id)}>
-                {d.title} <span>↗</span>
-              </button>
+            <StoryCard
+              key={d.id}
+              variant="flush"
+              className="news-item"
+              title={d.title}
+              onOpen={() => onSource(d.id)}
+              meta={
+                <>
+                  <span>{d.source}</span>
+                  <time dateTime={d.published_at}>{stamp(d.published_at)}</time>
+                </>
+              }
+              footer={
+                <Button
+                  variant="tertiary"
+                  size="sm"
+                  href={d.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Read original: ${d.title}`}
+                >
+                  Read original ↗
+                </Button>
+              }
+            >
               {d.body && <p>{d.body}</p>}
-              <a
-                href={d.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="source-link"
-                aria-label={`Read original: ${d.title}`}
-              >
-                Read original ↗
-              </a>
-            </article>
+            </StoryCard>
           ))}
         </div>
         {news.length > 5 && (
-          <button className="news-more" onClick={() => setExpanded(!expanded)}>
+          <Button
+            variant="plain"
+            className="news-more"
+            onClick={() => setExpanded(!expanded)}
+          >
             {expanded
               ? "Show fewer stories"
               : `Show all ${news.length} stories`}
-          </button>
+          </Button>
         )}
-      </details>
+      </Disclosure>
     );
   return (
     <section
       className="market-research news-developments"
       aria-label="Company developments"
     >
-      <div className="market-section-head">
-        <div>
-          <h2>What’s developing</h2>
-        </div>
-      </div>
-      <p className="fine">
-        Latest saved headlines
+      <SectionHeader
+        icon={<NewsIcon />}
+        title="What’s developing"
+        description="The latest company headlines, straight from saved sources."
+        actions={<Badge>Past 7 days</Badge>}
+      />
+      <MetaRow>
         {latestNews.length > 0 && (
-          <> · newest {stamp(latestNews[0].published_at)}</>
+          <span>Latest headline {stamp(latestNews[0].published_at)}</span>
         )}
-        .
         {sourceStatus.latest && (
-          <> Latest source check {stamp(sourceStatus.latest)}.</>
-        )}{" "}
-        Original publisher headlines and snippets; no AI reading needed.
-      </p>
+          <span>Latest source check {stamp(sourceStatus.latest)}</span>
+        )}
+      </MetaRow>
       {latestNews.length > 0 ? (
         <div className="development-headlines">
           {latestNews.map((story) => (
-            <article key={story.id}>
-              <span className="fine">
-                {story.source} · {stamp(story.published_at)}
-              </span>
-              <button className="news-title" onClick={() => onSource(story.id)}>
-                {story.title} <span>↗</span>
-              </button>
+            <StoryCard
+              key={story.id}
+              className="development-card"
+              title={story.title}
+              onOpen={() => onSource(story.id)}
+              meta={
+                <>
+                  <Badge>{story.source}</Badge>
+                  <time dateTime={story.published_at}>
+                    {stamp(story.published_at)}
+                  </time>
+                </>
+              }
+              footer={
+                <Button
+                  variant="tertiary"
+                  size="sm"
+                  onClick={() => onSource(story.id)}
+                  aria-haspopup="dialog"
+                >
+                  Read story <span aria-hidden="true">↗</span>
+                </Button>
+              }
+            >
               {story.body && <p>{story.body}</p>}
-            </article>
+            </StoryCard>
           ))}
         </div>
       ) : (
-        <p className="fine">
-          No saved headlines naming {data.instrument.symbol} in the current
-          seven-day news sample. Use Update data to check for news.
-        </p>
+        <EmptyState
+          className="news-empty"
+          title="No company headlines yet"
+          description={`No saved headlines naming ${data.instrument.symbol} in the current seven-day sample. Use Update data to check for news.`}
+        />
       )}
-      <details className="brief-unknowns current-news-summary">
-        <summary>{brief ? "Saved AI summary" : "Optional AI summary"}</summary>
-        {!brief && (
-          <button
-            disabled={
-              busy ||
-              !(data.market_news_ids || []).length ||
-              availability.blocked
-            }
-            onClick={onGenerate}
-            aria-describedby={
-              availability.blocked && availability.state !== "running"
-                ? "sentiment-disabled-reason"
-                : undefined
-            }
-          >
-            {busy ? "Reading sources…" : "Summarise sources"}
-          </button>
-        )}
+      <Disclosure
+        className="current-news-summary"
+        indicator={!!brief}
+        summary={
+          <span className="ai-summary-head">
+            <span className="ai-summary-title">
+              {brief ? "Saved AI summary" : "Optional AI summary"}
+              {!brief && <small>Reads the saved headlines and snippets above</small>}
+            </span>
+            {!brief && (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy || !(data.market_news_ids || []).length || availability.blocked}
+                aria-describedby={
+                  availability.blocked && availability.state !== "running"
+                    ? "sentiment-disabled-reason"
+                    : undefined
+                }
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onGenerate();
+                }}
+              >
+                {busy ? "Reading sources…" : "Summarise sources"}
+              </Button>
+            )}
+          </span>
+        }
+      >
         {brief ? (
           <>
             <p className="fine">
@@ -303,60 +360,55 @@ export default function MarketResearch({
               headlines/snippets · latest news {stamp(brief.latest_news_at)}.
               Interpretation may omit context.
             </p>
-            <label className="field" htmlFor={viewId}>
-              Briefing view
-              <Select
-                id={viewId}
-                aria-label="Briefing view"
-                value={pointKind}
-                onChange={(e) => setPointKind(e.target.value)}
-                aria-controls={`${viewId}-points`}
-              >
-                <option value="all">All points ({points.length})</option>
-                {Object.entries(kinds).map(([kind, label]) => (
-                  <option key={kind} value={kind}>
-                    {label} ({points.filter((p) => p.kind === kind).length})
-                  </option>
-                ))}
-              </Select>
-            </label>
+            <FilterGroup
+              label="Briefing view"
+              value={pointKind}
+              controls={`${viewId}-points`}
+              onValueChange={setPointKind}
+              options={[
+                { value: "all", label: "All", count: points.length },
+                ...Object.entries(kinds).map(([kind, label]) => ({
+                  value: kind,
+                  label,
+                  count: points.filter((p) => p.kind === kind).length,
+                })),
+              ]}
+            />
             <p className="fine" role="status">
               {visiblePoints.length
                 ? `Showing ${visiblePoints.length} of ${matchingPoints.length} developments. Labels describe the kind of statement, not whether it is favourable.`
                 : `No points in this briefing are labelled ${kinds[pointKind]?.toLowerCase()}. This does not establish that no risks or uncertainty exist; inspect All points and the original sources.`}
             </p>
-            <div className="market-brief-points" id={`${viewId}-points`}>
+            <div className="brief-points" id={`${viewId}-points`}>
               {visiblePoints.map((p, i) => (
-                <article key={i} className={`market-point ${p.kind}`}>
-                  <span className="section-label">
+                <Card as="article" variant="inset" key={i} className={`brief-point ${p.kind}`}>
+                  <Badge>
                     {p.kind === "reported"
-                      ? "REPORTED"
+                      ? "Reported"
                       : p.kind === "interpretation"
-                        ? "AI INTERPRETATION"
-                        : "UNCERTAINTY"}
-                  </span>
-                  <h3>{p.title}</h3>
+                        ? "AI interpretation"
+                        : "Uncertainty"}
+                  </Badge>
+                  <h4>{p.title}</h4>
                   <p>{p.text}</p>
                   <div className="brief-citations">
-                    {p.citations.map((c, j) => (
-                      <button
-                        key={j}
-                        className="source-link"
-                        onClick={() => onSource(c.source_id)}
+                    {uniqueCitations(p.citations, data.documents).map((c, j) => (
+                      <SourceChip
+                        key={c.source_id}
+                        label={`${c.doc?.source || "Source"} ${j + 1}`}
+                        onOpen={() => onSource(c.source_id)}
                         title={c.quote}
-                        aria-label={`Inspect source ${j + 1}: ${data.documents.find((d) => d.id === c.source_id)?.title || "Source unavailable"}`}
-                      >
-                        {data.documents.find((d) => d.id === c.source_id)
-                          ?.source || "Source"}{" "}
-                        {j + 1} ↗
-                      </button>
+                        aria-label={`Inspect source ${j + 1}: ${c.doc?.title || "Source unavailable"}`}
+                      />
                     ))}
                   </div>
-                </article>
+                </Card>
               ))}
             </div>
             {matchingPoints.length > 3 && (
-              <button
+              <Button
+                variant="tertiary"
+                size="sm"
                 type="button"
                 className="news-more"
                 onClick={() => setExpanded(!expanded)}
@@ -364,7 +416,7 @@ export default function MarketResearch({
                 {expanded
                   ? "Show fewer developments"
                   : `Read all ${matchingPoints.length} developments`}
-              </button>
+              </Button>
             )}
             <details className="brief-unknowns">
               <summary>About this AI summary</summary>
@@ -383,7 +435,7 @@ export default function MarketResearch({
             reading is older or could not finish.
           </p>
         )}
-      </details>
+      </Disclosure>
     </section>
   );
 }

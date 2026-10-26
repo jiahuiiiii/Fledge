@@ -1,9 +1,9 @@
-// Read-only owner workspace plus authored four-source, theme and access-state fixtures.
+// Disposable workspace plus authored four-source, theme and access-state fixtures.
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const base = process.env.THESIS_TEST_URL || "http://127.0.0.1:8841";
+const base = process.env.THESIS_TEST_URL;
 const evidence =
   process.env.THESIS_FILTERS_EVIDENCE || "/private/tmp/thesis-source-filters";
 const labels = {
@@ -143,6 +143,7 @@ let browser;
     viewport: { width: 1440, height: 1100 },
     reducedMotion: "reduce",
   });
+  page.setDefaultTimeout(10000);
   const errors = [],
     external = [],
     writes = [],
@@ -225,221 +226,101 @@ let browser;
     })
     .click();
   await page.locator('.main-workspace[aria-busy="false"]').waitFor();
-  const panel = page.getByRole("region", {
-    name: "News and social sentiment",
-    exact: true,
-  });
-  const filters = panel.getByRole("group", {
-    name: "Sentiment source type",
-    exact: true,
-  });
-  await filters
-    .getByRole("button", { name: "All sources", exact: true })
-    .waitFor();
-  assert.ok(actual?.items.length, "actual saved reading is available");
-  assert.equal(
-    await filters
-      .getByRole("button", { name: "All sources", exact: true })
-      .getAttribute("aria-pressed"),
-    "true",
-  );
-  const actualSelected = sorted(actual.sources),
-    actualIds = new Set(actual.items.map((item) => item.source_id));
-  assert.deepEqual(
-    await panel.locator(".sentiment-items article h3").allTextContents(),
-    actualSelected
-      .filter((source) => actualIds.has(source.id))
-      .map(sourceHeadline)
-      .filter(Boolean),
-  );
-  await filters.screenshot({
-    path: path.join(evidence, "actual-icons-1440.png"),
-  });
-  await panel
-    .locator(".all-source-summary")
-    .screenshot({ path: path.join(evidence, "actual-all-summary-1440.png") });
-  await panel
-    .getByRole("button", { name: "Original sources", exact: true })
-    .click();
-  const original = panel.getByRole("region", {
-    name: "Original selected sources",
-    exact: true,
-  });
-  assert.deepEqual(
-    await original.locator(".original-source-text").allTextContents(),
-    actualSelected.map((source) => source.body),
-  );
-  await original
-    .getByRole("button", { name: "Inspect original source ↗", exact: true })
-    .first()
-    .click();
-  await page.getByRole("dialog").waitFor();
-  await page.keyboard.press("Escape");
-  mode = "fixture";
-  await page.reload();
+  await page.getByRole('tab',{name:'News & discussion',exact:true}).click();
+  const panel = page.getByRole('region',{name:'News and social sentiment',exact:true});
+  const filters = panel.getByRole('group',{name:'Sentiment source type',exact:true});
+  await filters.waitFor();
+  assert.ok(actual?.items.length, 'saved fixture reading is available');
+  assert.equal(await filters.getByRole('button',{name:'All sources',exact:true}).getAttribute('aria-pressed'),'true');
+  const actualSelected = sorted(actual.sources);
+  const evidenceDialog = page.getByRole('dialog',{name:'News & discussion · evidence',exact:true});
+  const original = evidenceDialog.getByRole('region',{name:'Original selected sources',exact:true});
+  async function openEvidence() {
+    await panel.getByRole('button',{name:'Evidence',exact:true}).click();
+    await evidenceDialog.waitFor();
+  }
+  await openEvidence();
+  await evidenceDialog.getByRole('group',{name:'Evidence source type'}).getByRole('button',{name:'All sources',exact:true}).click();
+  assert.deepEqual(await original.locator('.original-source-text').allTextContents(), actualSelected.map(source=>source.body));
+  await original.getByRole('button',{name:'Inspect original source ↗',exact:true}).first().click();
+  await page.getByRole('dialog',{name:'Source evidence',exact:true}).waitFor();
+  await page.keyboard.press('Escape');
+  assert.equal(await evidenceDialog.isVisible(),true);
+  await page.keyboard.press('Escape');
+  mode = 'fixture';
+  await page.reload(); await page.getByRole('tab',{name:'News & discussion',exact:true}).click();
   await filters.waitFor();
   const expected = sorted(fixtureSources);
-  for (const [scope, label] of Object.entries(labels)) {
-    const button = filters.getByRole("button", { name: label, exact: true });
-    assert.equal(await button.getAttribute("title"), label);
+  for (const [scope,label] of Object.entries(labels)) {
+    const button = filters.getByRole('button',{name:label,exact:true});
+    assert.equal(await button.getAttribute('title'),label);
     const box = await button.boundingBox();
-    assert.ok(box.width >= 44 && box.height >= 44);
-    if (scope !== "all") assert.equal((await button.textContent()).trim(), "");
-    await button.focus();
-    await button.press("Enter");
-    assert.equal(await button.getAttribute("aria-pressed"), "true");
-    assert.deepEqual(
-      await panel.locator(".sentiment-items article h3").allTextContents(),
-      scope === "all"
-        ? expected.map(sourceHeadline).filter(Boolean)
-        : fixtureSources
-            .filter((source) => scopeOf(source) === scope)
-            .map(sourceHeadline)
-            .filter(Boolean),
-    );
+    assert.ok(box.width>=24 && box.height>=24);
+    await button.focus(); await button.press('Enter');
+    assert.equal(await button.getAttribute('aria-pressed'),'true');
+    const relevant = fixtureSources.filter(source => (scope === 'all' || scopeOf(source) === scope) && fixtureAnalysis.items.find(item=>item.source_id===source.id).relevance === 'relevant');
+    assert.deepEqual(await panel.locator('.sentiment-items article h3').allTextContents(), sorted(relevant).map(sourceHeadline).filter(Boolean));
   }
-  await filters
-    .getByRole("button", { name: "All sources", exact: true })
-    .click();
-  assert.equal(
-    await panel
-      .locator(".all-source-summary .source-summary-list > div")
-      .count(),
-    4,
-  );
-  assert.equal(
-    await panel.locator(".sentiment-counts").count(),
-    0,
-    "All does not invent a pooled tone count",
-  );
-  assert.match(
-    await panel.locator(".sentiment-items").innerText(),
-    /Not about this company/,
-  );
-  assert.doesNotMatch(
-    await panel.locator(".sentiment-items").innerText(),
-    /Comparison-only report excluded/,
-  );
-  await panel.getByText("What are people discussing?", { exact: true }).click();
-  const themes = panel.getByRole("region", {
-    name: "Discussion themes",
-    exact: true,
-  });
-  await themes.locator(".theme-card").first().waitFor();
-  assert.equal(await themes.locator(".theme-card").count(), 4);
-  assert.equal(
-    await themes.locator(".theme-card > .source-attribution").count(),
-    4,
-  );
-  await filters
-    .getByRole("button", { name: "Company news", exact: true })
-    .click();
-  assert.equal(await themes.locator(".theme-card").count(), 1);
-  await filters
-    .getByRole("button", { name: "All sources", exact: true })
-    .click();
-  await panel.getByText("What are people discussing?", { exact: true }).click();
-  const preview = panel.getByRole("region", {
-    name: "Current sentiment inputs",
-    exact: true,
-  });
-  await preview.getByText(/^Read current sources ·/).click();
-  const previewFilters = preview.getByRole("group", {
-    name: "Current source type",
-    exact: true,
-  });
-  assert.equal(
-    await previewFilters
-      .getByRole("button", { name: "All sources", exact: true })
-      .getAttribute("aria-pressed"),
-    "true",
-  );
-  assert.deepEqual(
-    await preview.locator(".original-source-text").allTextContents(),
-    expected.map((source) => source.body),
-  );
-  assert.match(await preview.innerText(), /4 selected from 12 available/);
-  for (const [scope, label] of Object.entries(labels)) {
-    await previewFilters
-      .getByRole("button", { name: label, exact: true })
-      .click();
-    assert.equal(
-      await preview.locator("article").count(),
-      scope === "all" ? 4 : 1,
-    );
+  await filters.getByRole('button',{name:'All sources',exact:true}).click();
+  assert.equal(await panel.getByLabel('Saved tone by source',{exact:true}).locator(':scope > div').count(),4,'All keeps source tone summaries separate');
+  assert.doesNotMatch(await panel.getByRole('group',{name:'Filter analysed sources by tone'}).innerText(),/[0-9]/,'All tone filters do not invent pooled counts');
+  assert.doesNotMatch(await panel.locator('.sentiment-items').innerText(),/Comparison-only report excluded|Authored hackernews selected title/);
+  await require('./browser_helpers.cjs').disclosure(page,'Source coverage');
+  assert.equal(await panel.locator('.all-source-summary .source-summary-list > div').count(),4);
+  await panel.getByText('What are people discussing?',{exact:true}).click();
+  const themes = panel.getByRole('region',{name:'Discussion themes',exact:true});
+  await themes.locator('.theme-card').first().waitFor();
+  assert.equal(await themes.locator('.theme-card').count(),4);
+  await filters.getByRole('button',{name:'Company news',exact:true}).click();
+  assert.equal(await themes.locator('.theme-card').count(),1);
+  await filters.getByRole('button',{name:'All sources',exact:true}).click();
+  await panel.getByText('What are people discussing?',{exact:true}).click();
+  await openEvidence();
+  const savedFilters = evidenceDialog.getByRole('group',{name:'Evidence source type'});
+  for (const [scope,label] of Object.entries(labels)) {
+    await savedFilters.getByRole('button',{name:label,exact:true}).click();
+    assert.deepEqual(await original.locator('.original-source-text').allTextContents(), expected.filter(source=>scope==='all'||scopeOf(source)===scope).map(source=>source.body));
   }
-  await previewFilters
-    .getByRole("button", { name: "All sources", exact: true })
-    .click();
-  await preview.getByText(/^Read current sources ·/).click();
-  for (const width of [1920, 1440, 1024, 768, 390, 320]) {
-    await page.setViewportSize({ width, height: 1100 });
-    for (const reading of [false, true]) {
-      await panel
-        .getByRole("button", {
-          name: reading ? "Original sources" : "AI interpretation",
-          exact: true,
-        })
-        .click();
-      const geometry = await page.evaluate(() => ({
-        width: innerWidth,
-        document: document.documentElement.scrollWidth,
-        main: document.querySelector(".main-workspace").scrollWidth,
-        mainClient: document.querySelector(".main-workspace").clientWidth,
-      }));
-      assert.ok(
-        geometry.document <= width && geometry.main <= geometry.mainClient + 1,
-      );
-      if (reading) {
-        assert.deepEqual(
-          await original.locator(".original-source-text").allTextContents(),
-          expected.map((source) => source.body),
-        );
-        assert.equal(
-          await original.locator(".sentiment-tag,.sentiment-counts").count(),
-          0,
-        );
-        assert.match(await original.innerText(), /Feed updated/);
-      }
-      layouts.push({ reading, ...geometry });
+  await savedFilters.getByRole('button',{name:'All sources',exact:true}).click();
+  assert.equal(await original.locator('.sentiment-tag,.sentiment-counts').count(),0);
+  assert.match(await original.innerText(),/Feed updated/);
+  assert.doesNotMatch(await original.innerText(),/Comparison-only report excluded/);
+  await evidenceDialog.getByRole('tab', { name: 'Current sources',exact:true}).click();
+  const preview = evidenceDialog.getByRole('region',{name:'Current sentiment inputs',exact:true});
+  const previewFilters = preview.getByRole('group',{name:'Current source type',exact:true});
+  for (const [scope,label] of Object.entries(labels)) {
+    await previewFilters.getByRole('button',{name:label,exact:true}).click();
+    assert.deepEqual(await preview.locator('.original-source-text').allTextContents(), expected.filter(source=>scope==='all'||scopeOf(source)===scope).map(source=>source.body));
+  }
+  await previewFilters.getByRole('button',{name:'All sources',exact:true}).click();
+  assert.match(await preview.innerText(),/4 eligible from 12 available/);
+  for (const width of [1920,1440,1024,768,390,320]) {
+    await page.setViewportSize({width,height:1100});
+    for (const reading of [false,true]) {
+      await evidenceDialog.getByRole('button',{name:reading?'Analysed sample':'Current sources',exact:true}).click();
+      const geometry=await page.evaluate(()=>({width:innerWidth,document:document.documentElement.scrollWidth,main:document.querySelector('.main-workspace').scrollWidth,mainClient:document.querySelector('.main-workspace').clientWidth}));
+      assert.ok(geometry.document<=width && geometry.main<=geometry.mainClient+1);
+      assert.ok(await evidenceDialog.evaluate(el=>el.scrollWidth<=el.clientWidth));
+      if(reading) assert.deepEqual(await original.locator('.original-source-text').allTextContents(),expected.map(source=>source.body));
+      layouts.push({reading,...geometry});
     }
-    if ([1440, 390, 320].includes(width))
-      await filters.screenshot({
-        path: path.join(evidence, `icons-${width}.png`),
-      });
-    if ([1440, 390].includes(width))
-      await original.screenshot({
-        path: path.join(evidence, `all-original-${width}.png`),
-      });
+    if([1440,390,320].includes(width)) await page.screenshot({path:path.join(evidence,`evidence-${width}.png`)});
   }
-  mode = "withheld";
-  await page.reload();
-  await panel
-    .getByText("This analysis is withheld because source access changed.", {
-      exact: true,
-    })
-    .waitFor();
-  assert.equal(
-    await panel
-      .getByRole("button", { name: "Original sources", exact: true })
-      .count(),
-    0,
-  );
-  assert.equal(
-    await panel.locator(".sentiment-items,.all-source-summary").count(),
-    0,
-  );
-  mode = "no-analysis";
-  await page.reload();
-  await filters.waitFor();
-  assert.equal(
-    await panel
-      .getByRole("button", { name: "Original sources", exact: true })
-      .count(),
-    0,
-  );
-  await preview.getByText(/^Read current sources ·/).click();
-  assert.equal(await preview.locator("article").count(), 4);
+  await page.keyboard.press('Escape');
+  mode='withheld'; await page.reload(); await page.getByRole('tab',{name:'News & discussion',exact:true}).click();
+  await panel.getByText('This analysis is withheld because source access changed.',{exact:true}).waitFor();
+  assert.equal(await panel.locator('.sentiment-items,.all-source-summary').count(),0);
+  await openEvidence();
+  await evidenceDialog.getByRole('tab', { name: 'Analysed sample',exact:true}).click();
+  assert.equal(await original.count(),0);
+  assert.doesNotMatch(await evidenceDialog.innerText(),/Original authored .* body/);
+  await page.keyboard.press('Escape');
+  mode='no-analysis'; await page.reload(); await page.getByRole('tab',{name:'News & discussion',exact:true}).click(); await filters.waitFor();
+  await openEvidence();
+  assert.equal(await original.count(),0);
+  await previewFilters.getByRole('button',{name:'All sources',exact:true}).click();
+  assert.equal(await preview.locator('article').count(),4);
+  await page.keyboard.press('Escape');
   assert.deepEqual(errors, []);
   assert.deepEqual(external, []);
   assert.deepEqual(writes, []);

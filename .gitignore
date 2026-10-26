@@ -14,3 +14,7 @@ fledge-owner-labels-*.json
 .env.*
 !.env.example
 output/Fledge - Group 6 - CP1001 Week 9.pptx
+
+# Review/test screenshots are local evidence, not source.
+docs/reviews/**/*screenshots*/
+docs/reviews/**/*.png

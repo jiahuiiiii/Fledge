@@ -36,7 +36,7 @@ export default function CompanionGuide({
           </p>
           <div className="companion-questions">
             {orderStarters(starterQuestions, home?.starter_order)
-              .filter((item) => !recorded || item.section !== "expectations")
+              .filter((item) => !recorded || item.id !== "outlook")
               .map((item) => (
                 <button
                   type="button"

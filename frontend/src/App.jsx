@@ -38,9 +38,7 @@ function focusMainHeading() {
     document
       .querySelectorAll(".main-workspace, .workspace-grid")
       .forEach((el) => el.scrollTo?.(0, 0));
-    const heading = document.querySelector(
-      ".main-workspace h1, .main-workspace h2",
-    );
+    const heading = [...document.querySelectorAll(".main-workspace h1, .main-workspace h2")].find(element => element.getClientRects().length);
     if (!heading) return;
     heading.setAttribute("tabindex", "-1");
     heading.focus({ preventScroll: true });
@@ -67,7 +65,6 @@ import ResearchNavigation, {
 import BeginnerSummary from "./components/BeginnerSummary";
 import SocialConversation from "./components/SocialConversation";
 import UpdateInbox from "./components/UpdateInbox";
-import TelegramSettings from "./components/TelegramSettings";
 import IdeasAndChanges from "./components/IdeasAndChanges";
 import FilingDetails from "./components/FilingDetails";
 import FinancialPerformance from "./components/FinancialPerformance";
@@ -87,28 +84,36 @@ import AccountGate from "./components/AccountGate";
 import FilingWatch from "./components/FilingWatch";
 import ValuationPanel from "./components/ValuationPanel";
 import IdeaAlertChecks from "./components/IdeaAlertChecks";
-const ReviewDigest = lazy(() => import("./components/ReviewDigest"));
 import HistoryPanel from "./components/HistoryPanel";
 import EventAssessment, {
   EventEditor,
   EventDefinitions,
 } from "./components/EventConditions";
 import ProposalPanel from "./components/ProposalPanel";
+import { statusLine, watchItems } from "./lib/ideaWatch";
 import { combineSuggestions } from "./lib/proposals";
+import { needsThreshold, withDefaultWindows } from "./lib/watchDefaults";
+import NewCompanySetup from "./components/NewCompanySetup";
+import { useTelegramGuard } from "./components/TelegramPrompt";
 import ReviewDownload from "./components/ReviewDownload";
 import ReportingAge, { ageLabel } from "./components/ReportingAge";
 import IdeaEvidenceReview from "./components/IdeaEvidenceReview";
 import Onboarding from "./components/Onboarding";
 import PortfolioRead from "./components/PortfolioRead";
 import PersonalHome from "./components/PersonalHome";
-import { SettingsMenu } from "./components/DetailModeToggle";
-import { ProfileContext, readLocalMode, writeLocalMode, useProfile } from "./lib/profile";
+import AccountPage from "./components/AccountPage";
+import WorkspaceHeader from "./components/WorkspaceHeader";
+import { Button, ToastHost, showToast, UserIcon } from "./components/ui";
+import {
+  ProfileContext,
+  readLocalMode,
+  writeLocalMode,
+  useProfile,
+} from "./lib/profile";
 import ReportExpectationEditor, {
   ReportExpectationText,
 } from "./components/ReportExpectation";
 
-const FmpPanel = lazy(() => import("./components/FmpPanel"));
-const OutlookPage = lazy(() => import("./components/OutlookPage"));
 
 const metrics = {
   revenue_growth: "Revenue growth",
@@ -223,8 +228,8 @@ function SourceLibrary({ documents, instrument, filterMentions, onOpen }) {
   const [shown, setShown] = useState(12);
   const mentioned = filterMentions
     ? documents.filter(
-        (d) => d.kind !== "news" || mentionsCompany(d, instrument),
-      )
+      (d) => d.kind !== "news" || mentionsCompany(d, instrument),
+    )
     : documents;
   const list = all ? documents : mentioned;
   const hidden = documents.length - mentioned.length;
@@ -279,8 +284,11 @@ function readDestination() {
       "world",
       "history",
       "review",
+      "account",
     ].includes(view)
-      ? view === "history"
+      ? view === "review"
+        ? "updates"
+        : view === "history"
         ? params.get("company")
           ? "idea"
           : "ideas"
@@ -293,19 +301,25 @@ function readDestination() {
 export default function App() {
   return (
     <AccountGate>
-      {(session, signOut) => (
+      {(session, accountControls) => (
         <ResearchApp
           key={session.account_id}
           session={session}
-          signOut={signOut}
+          accountControls={accountControls}
         />
       )}
     </AccountGate>
   );
 }
-function ResearchApp({ signOut, session }) {
+function ResearchApp({ accountControls, session }) {
   const companyVisibilityKey = `${hiddenCompaniesKey}:${session.account_id || "local"}`;
   const [destination, setDestination] = useState(readDestination);
+  const lastResearch = useRef(
+    destination.view === "account"
+      ? { ...destination, view: "workspace", evaluation: null }
+      : destination,
+  );
+  if (destination.view !== "account") lastResearch.current = destination;
   const [inboxState, setInboxState] = useState({
     review: "pending",
     page: 0,
@@ -341,14 +355,19 @@ function ResearchApp({ signOut, session }) {
     addEventListener("popstate", restore);
     return () => removeEventListener("popstate", restore);
   }, []);
-  function choose(id, view = "workspace", evaluation = null) {
+  function choose(
+    id,
+    view = "workspace",
+    evaluation = null,
+    { push = false } = {},
+  ) {
     if (view === "history") {
       view = id ? "idea" : "ideas";
       evaluation ||= "history";
     }
     const params = new URLSearchParams({ company: id, view });
     if (evaluation) params.set("evaluation", evaluation);
-    history.replaceState(null, "", `?${params}`);
+    history[push ? "pushState" : "replaceState"](null, "", `?${params}`);
     if (id !== destination.id) {
       setInboxState((state) => ({ ...state, page: 0, cutoff: "" }));
       // A different company or page starts at the top, not the old scroll spot.
@@ -362,7 +381,7 @@ function ResearchApp({ signOut, session }) {
     setDestination({ id, view, evaluation });
   }
   const [home, setHome] = useState(null);
-  // "Retake the quiz" in the Account menu reopens the five questions.
+  // Account settings reopen the existing profile questions.
   const [retakeQuiz, setRetakeQuiz] = useState(false);
   useEffect(() => {
     const open = () => {
@@ -437,10 +456,35 @@ function ResearchApp({ signOut, session }) {
         .catch(() => {});
     },
   };
+  const accountNavigation = (
+    <a
+      className="topbar-tab"
+      href={`?${new URLSearchParams({ company: destination.id, view: "account" })}`}
+      aria-current={destination.view === "account" ? "page" : undefined}
+      onClick={(event) => {
+        if (
+          event.button !== 0 ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey
+        )
+          return;
+        event.preventDefault();
+        if (destination.view !== "account")
+          choose(destination.id, "account", null, { push: true });
+      }}
+    >
+      Account
+    </a>
+  );
   return (
     <ProfileContext.Provider value={profileValue}>
       {home?.profile &&
-      (retakeQuiz || (!home.profile.completed && !onboardingSkipped)) ? (
+      (retakeQuiz ||
+        (destination.view !== "account" &&
+          !home.profile.completed &&
+          !onboardingSkipped)) ? (
         <Onboarding
           stage={retakeQuiz ? "type" : "start"}
           profile={home.profile}
@@ -458,45 +502,94 @@ function ResearchApp({ signOut, session }) {
           }}
         />
       ) : (
-        <CompanyWorkspace
-          signOut={signOut}
-          sharedCatalogue={
-            session.mode !== "password" || !!session.is_installation_owner
-          }
-          instrumentId={destination.id || defaultCompany}
-          selectedCompanyId={destination.id}
-          onWorkspaceReset={(resetSelection) => {
-            setHiddenCompanies([]);
-            if (resetSelection) choose("");
-          }}
-          inboxFilters={{ ...inboxState, company: destination.id }}
-          onInboxFiltersChange={(change) => {
-            const current = { ...inboxState, company: destination.id };
-            const next =
-              typeof change === "function" ? change(current) : change;
-            const { company, ...filters } = next;
-            setInboxState(filters);
-            if (company !== destination.id) choose(company, destination.view);
-          }}
-          initialView={destination.view}
-          initialEvaluation={destination.evaluation}
-          onChoose={choose}
-          hiddenCompanies={hiddenCompanies}
-          onHideCompany={(id) =>
-            setHiddenCompanies((ids) => [...new Set([...ids, id])])
-          }
-          onRestoreCompany={(id) =>
-            setHiddenCompanies((ids) => ids.filter((value) => value !== id))
-          }
-        />
+        <>
+          <RetainedView active={destination.view !== "account"}>
+            <CompanyWorkspace
+              accountNavigation={accountNavigation}
+              mainId={
+                destination.view === "account"
+                  ? "research-workspace"
+                  : "workspace"
+              }
+              sharedCatalogue={
+                session.mode !== "password" || !!session.is_installation_owner
+              }
+              instrumentId={destination.id || defaultCompany}
+              selectedCompanyId={destination.id}
+              onWorkspaceReset={(resetSelection) => {
+                setHiddenCompanies([]);
+                if (resetSelection) choose("");
+              }}
+              inboxFilters={{ ...inboxState, company: destination.id }}
+              onInboxFiltersChange={(change) => {
+                const current = { ...inboxState, company: destination.id };
+                const next =
+                  typeof change === "function" ? change(current) : change;
+                const { company, ...filters } = next;
+                setInboxState(filters);
+                if (company !== destination.id)
+                  choose(company, destination.view);
+              }}
+              initialView={
+                destination.view === "account"
+                  ? lastResearch.current.view
+                  : destination.view
+              }
+              initialEvaluation={
+                destination.view === "account"
+                  ? lastResearch.current.evaluation
+                  : destination.evaluation
+              }
+              onChoose={choose}
+              hiddenCompanies={hiddenCompanies}
+              onHideCompany={(id) =>
+                setHiddenCompanies((ids) => [...new Set([...ids, id])])
+              }
+              onRestoreCompany={(id) =>
+                setHiddenCompanies((ids) => ids.filter((value) => value !== id))
+              }
+            />
+          </RetainedView>
+          {destination.view === "account" && (
+            <div
+              className="app-shell account-settings-shell"
+              data-view="account"
+            >
+              <WorkspaceHeader
+                beginner={detailMode === "explain"}
+                view="account"
+                onNavigate={(view) => choose(destination.id, view)}
+                onHome={() => choose("", "workspace")}
+                account={accountNavigation}
+              />
+              <main
+                className="main-workspace account-settings-main"
+                id="workspace"
+                aria-label="Account settings"
+              >
+                <AccountPage
+                  session={session}
+                  controls={accountControls}
+                  onBack={() => {
+                    const previous = lastResearch.current;
+                    choose(previous.id, previous.view, previous.evaluation);
+                    focusMainHeading();
+                  }}
+                />
+              </main>
+            </div>
+          )}
+        </>
       )}
     </ProfileContext.Provider>
   );
 }
+
 const pendingPriceRead = { data: null, error: "" };
 
 function CompanyWorkspace({
-  signOut,
+  accountNavigation,
+  mainId = "workspace",
   sharedCatalogue = true,
   instrumentId,
   selectedCompanyId,
@@ -537,6 +630,7 @@ function CompanyWorkspace({
   const [loadError, setLoadError] = useState("");
   const companyLoading = loadedScope !== scope;
   const [removedCompany, setRemovedCompany] = useState(null);
+  const [confirmRemoval, setConfirmRemoval] = useState(null);
   const view = initialView;
   const ideaSidebarAvailable = !!selectedCompanyId && view === "workspace";
   const ideaSidebarHidden = true;
@@ -555,7 +649,6 @@ function CompanyWorkspace({
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [updatesOpen, setUpdatesOpen] = useState(false);
   const [updatePressed, setUpdatePressed] = useState(false);
-  const [priceChartOpen, setPriceChartOpen] = useState(false);
   useEffect(() => {
     mainPane.current?.scrollTo(0, 0);
   }, [view, initialEvaluation, scope]);
@@ -563,7 +656,8 @@ function CompanyWorkspace({
   const [data, setData] = useState(null),
     [priceRead, setPriceRead] = useState(null),
     [error, setError] = useState(""),
-    [notice, setNotice] = useState(""),
+    // Notices are shared bottom toasts; an empty message is ignored.
+    setNotice = (message) => showToast(message),
     [busy, setBusy] = useState(false),
     { mode: viewMode } = useProfile(),
     beginner = viewMode === "explain",
@@ -600,6 +694,7 @@ function CompanyWorkspace({
   const [loadingRun, setLoadingRun] = useState(null);
   const [loadingError, setLoadingError] = useState("");
   const lastLoadingRevision = useRef(null);
+  const lastLoadingRead = useRef(0);
   useEffect(() => {
     const open = () => setUpdatesOpen(true);
     window.addEventListener(UPDATE_EVENT, open);
@@ -608,6 +703,11 @@ function CompanyWorkspace({
   // Changes when an Update data run finishes, so open panels re-read saved data.
   const updatedAt =
     loadingRun && !loadingRun.active ? loadingRun.updated_at || null : null;
+  const [setupId, setSetupId] = useState(null);
+  const telegramGuard = useTelegramGuard({
+    onConnect: () => onChoose(selectedCompanyId, "account"),
+    what: "this watch",
+  });
   async function startLoading(options = {}) {
     const token = scope;
     setLoadingError("");
@@ -658,7 +758,12 @@ function CompanyWorkspace({
         ]);
         if (revision !== lastLoadingRevision.current) {
           lastLoadingRevision.current = revision;
-          await refresh();
+          // Re-read the company when the run finishes, and at most every 20 s
+          // while it runs, instead of after every step (each was a full read).
+          if (!run?.active || Date.now() - lastLoadingRead.current > 20000) {
+            lastLoadingRead.current = Date.now();
+            await refresh();
+          }
         }
       } catch (e) {
         if (!stopped && activeScope.current === scope)
@@ -679,8 +784,28 @@ function CompanyWorkspace({
   }
   // Beginner mode shows only Summary and News & discussion.
   const recordedCompany = data?.instrument?.mode === "recorded";
+  const [focusManagement, setFocusManagement] = useState(false);
+  useEffect(() => {
+    if (tab === "expectations") {
+      setFocusManagement(true);
+      setTab("fundamentals");
+    } else if (tab === "summary" && !beginner) setTab("business");
+  }, [tab, beginner]);
+  useEffect(() => {
+    if (!focusManagement || tab !== "fundamentals" || data?.financials_pending) return;
+    const timer = setTimeout(() => {
+      const heading = document.getElementById("management-expects");
+      if (!heading) return;
+      if (heading.tagName === "DETAILS") heading.open = true;
+      heading.focus({ preventScroll: true });
+      heading.scrollIntoView({ block: "start", behavior: "instant" });
+      setFocusManagement(false);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [focusManagement, tab, data?.financials_pending]);
   useEffect(() => {
     const allowed = researchTabs({ recorded: recordedCompany, beginner });
+    if (tab === "expectations" || (tab === "summary" && !beginner)) return;
     if (!allowed.includes(tab)) setTab(allowed[0]);
   }, [beginner, recordedCompany, tab]);
   const workspaceLane = useRef(createReadLane());
@@ -689,7 +814,8 @@ function CompanyWorkspace({
     sourcesOpen ||
     (view === "workspace" &&
       !!selectedCompanyId &&
-      ["summary", "business", "fundamentals"].includes(tab));
+      (["business", "fundamentals"].includes(tab) ||
+        (beginner && tab === "summary")));
   const includeFinancials = useRef(false);
   includeFinancials.current =
     !companyLoading && !data?.financials_pending && needsFinancials;
@@ -710,9 +836,9 @@ function CompanyWorkspace({
       if (loadedScope !== scope)
         setQuestion(
           next.question_library?.selected_question ||
-            next.versions[0]?.question ||
-            next.research_action?.question ||
-            questionDefault,
+          next.versions[0]?.question ||
+          next.research_action?.question ||
+          questionDefault,
         );
       setLoadedScope(scope);
       setLoadError("");
@@ -749,7 +875,7 @@ function CompanyWorkspace({
         if (!controller.signal.aborted && activeScope.current === scope)
           setModelStatus(result);
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => controller.abort();
   }, [scope, companyLoading, updatedAt]);
   // Keep the open company's price current while the tab is visible.
@@ -770,7 +896,7 @@ function CompanyWorkspace({
               preferPriceRead(old, { data: result, error: "" }),
             );
         })
-        .catch(() => {});
+        .catch(() => { });
     };
     const timer = setInterval(tick, LIVE_PRICE_MS);
     return () => {
@@ -822,7 +948,7 @@ function CompanyWorkspace({
     setResearchOpen(false);
     setSourcesOpen(false);
     setUpdatesOpen(false);
-    setPriceChartOpen(false);
+    setFocusManagement(false);
     setEditor(null);
     setApproved(false);
     setFormError("");
@@ -841,9 +967,9 @@ function CompanyWorkspace({
           setLoadedScope(scope);
           setQuestion(
             d.question_library?.selected_question ||
-              d.versions[0]?.question ||
-              d.research_action?.question ||
-              questionDefault,
+            d.versions[0]?.question ||
+            d.research_action?.question ||
+            questionDefault,
           );
         }
       })
@@ -897,7 +1023,7 @@ function CompanyWorkspace({
     } catch (e) {
       if (activeScope.current !== scope) return;
       setError(e.message);
-      await refresh().catch(() => {});
+      await refresh().catch(() => { });
     } finally {
       if (activeScope.current !== scope) return;
       setBusy(false);
@@ -907,6 +1033,78 @@ function CompanyWorkspace({
         .catch(() => setModelStatus(null));
     }
   }
+  // Alert details load after the company shows: the company read carries only
+  // each alert's review status, and building details took about 3 s.
+  const [alertDetail, setAlertDetail] = useState(null);
+  const alertKey = (data?.research_alerts || [])
+    .filter((a) => a.instrument_id === data?.instrument?.id)
+    .map((a) => `${a.id}:${a.review_action || ""}`)
+    .join(",");
+  useEffect(() => {
+    const id = data?.instrument?.id;
+    if (!id || !alertKey) return;
+    const controller = new AbortController();
+    api
+      .companyAlerts(id, { signal: controller.signal })
+      .then((list) => setAlertDetail({ id, list }))
+      .catch(() => {});
+    return () => controller.abort();
+  }, [data?.instrument?.id, alertKey]);
+  const snapshotData = useMemo(() => {
+    if (!data || alertDetail?.id !== data.instrument?.id) return data;
+    const detail = new Map(alertDetail.list.map((a) => [a.id, a]));
+    return {
+      ...data,
+      research_alerts: (data.research_alerts || []).map(
+        (a) => detail.get(a.id) || a,
+      ),
+    };
+  }, [data, alertDetail]);
+  // Beginner Summary content, reused by the merged Overview for fictional
+  // sample companies so removing the Pro Summary tab did not hide their news.
+  const summaryPanel = (active) => (
+    <BeginnerSummary
+      key={`summary-${instrumentId}`}
+      practice={recordedCompany}
+      data={data}
+      instrumentId={instrumentId}
+      visible={view === "workspace" && active}
+      savedView={current}
+      onSaveView={() => {
+        openEditor();
+        if (!current) {
+          const plain = `What do I think about ${data.instrument.name}, and why?`;
+          setEditor({
+            ...formFor(null, plain),
+            question: plain,
+          });
+        }
+      }}
+      onView={(next) => {
+        setTab(next);
+        requestAnimationFrame(() => {
+          window.scrollTo(0, 0);
+          document
+            .querySelectorAll(".main-workspace, .workspace-grid")
+            .forEach((el) => el.scrollTo?.(0, 0));
+        });
+      }}
+      onSource={setSource}
+      onWorld={() => setView("world")}
+      onUpdate={isRecorded ? undefined : () => setUpdatesOpen(true)}
+      onRate={
+        isRecorded
+          ? undefined
+          : () => startLoading({ analyze: true, lookback_days: 7 })
+      }
+      rating={
+        loadingRun?.active
+          ? loadingRun.steps.find((s) => s.key === "analysis")?.status || false
+          : false
+      }
+      priceHistory={priceRead?.data}
+    />
+  );
   if (!data)
     return (
       <div
@@ -915,58 +1113,20 @@ function CompanyWorkspace({
         data-idea-hidden={ideaSidebarHidden}
         className={`app-shell${view === "updates" ? " inbox-view" : ""}${view === "ideas" ? " ideas-view" : ""}${!selectedCompanyId ? " all-companies-view" : ""}`}
       >
-        <header className="topbar">
-          <a className="skip-link" href="#workspace">
-            Skip to content
-          </a>
-          <a className="brand" href="#workspace">
-            fledge<span>↗</span>
-          </a>
-          <nav aria-label="Workspace navigation">
-            {(beginner
-              ? [
-                  ["workspace", "Home"],
-                  ["world", "World"],
-                  ["ideas", "My views"],
-                ]
-              : [
-                  ["workspace", "Home"],
-                  ["ideas", "My views"],
-                  ["updates", "Updates"],
-                  ["world", "World"],
-                ]
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                className={view === key ? "active" : ""}
-                aria-current={
-                  view === key || (view === "idea" && key === "ideas")
-                    ? "page"
-                    : undefined
-                }
-                onClick={() =>
-                  // Beginner "Home" always goes back to the list of companies.
-                  beginner && key === "workspace"
-                    ? onChoose("", "workspace")
-                    : setView(key)
-                }
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
-          <div className="topbar-tools">
-            <TelegramSettings />
-            {signOut}
-          </div>
-        </header>
+        <WorkspaceHeader
+          beginner={beginner}
+          view={view}
+          onNavigate={setView}
+          onHome={() => onChoose("", "workspace")}
+          account={accountNavigation}
+        />
         <div className="workspace-grid">
           <CompanySidebar
             loading
             collapsed={!!layout.companiesHidden}
             onToggle={() => toggleLayout("companiesHidden")}
           />
-          <main className="main-workspace" id="workspace">
+          <main className="main-workspace" id={mainId}>
             {loadError ? (
               <div className="workspace-load-error" role="alert">
                 <h2>Research could not be loaded</h2>
@@ -1025,7 +1185,13 @@ function CompanyWorkspace({
   const hiddenCatalogue = data.catalogue.filter((company) =>
     hiddenCompanies.includes(company.id),
   );
+  // Removing a company also stops its watch, so ask before doing either.
   function removeCompany(company) {
+    setConfirmRemoval(company);
+  }
+  function confirmRemoveCompany(company) {
+    setConfirmRemoval(null);
+    setNotice("");
     onHideCompany(company.id);
     setRemovedCompany(company);
     api
@@ -1034,7 +1200,7 @@ function CompanyWorkspace({
         setWatchlist(summary);
         dispatchEvent(new Event("fledge:home-changed"));
       })
-      .catch(() => {});
+      .catch(() => { });
   }
   async function followCompany(id) {
     try {
@@ -1042,7 +1208,7 @@ function CompanyWorkspace({
       setWatchlistMessage("");
       // A newly registered company is not in the loaded catalogue yet.
       if (!data.catalogue.some((company) => company.id === id))
-        refresh().catch(() => {});
+        refresh().catch(() => { });
       dispatchEvent(new Event("fledge:home-changed"));
       return true;
     } catch (failure) {
@@ -1057,10 +1223,10 @@ function CompanyWorkspace({
     data.idea_alerts?.some((a) => a.published && !a.review_action);
   const displayInstrument = companyLoading
     ? data.catalogue.find((company) => company.id === instrumentId) || {
-        name: "Company research",
-        symbol: "",
-        sector: "",
-      }
+      name: "Company research",
+      symbol: "",
+      sector: "",
+    }
     : data.instrument;
   const isRecorded = displayInstrument.mode === "recorded";
   const filing = data.filing_calculations?.find(
@@ -1100,12 +1266,73 @@ function CompanyWorkspace({
     setFormError("");
     setConflict(null);
   };
+  // One click: apply a single suggestion with the standard date window, save it
+  // and start watching, then show the watching list. Anything that needs the
+  // user's own input (a threshold, or no written reasoning yet) opens the editor.
+  async function watchNow(p) {
+    let candidate;
+    try {
+      candidate = combineSuggestions([p]);
+    } catch (e) {
+      setError(e.message);
+      return;
+    }
+    const base = formFor(
+      { ...candidate, revision: candidate.expected_revision },
+      candidate.question,
+    );
+    const { form, applied } = withDefaultWindows(base);
+    if (needsThreshold(form) || !form.reasoning.trim() || !form.question.trim()) {
+      setEditor(form);
+      setProposalIds([p.id]);
+      setProposalStale(false);
+      setApproved(false);
+      setConflict(null);
+      setFormError(
+        needsThreshold(form)
+          ? "Choose your own threshold for this check, then save."
+          : "Write a sentence of reasoning first, then start watching.",
+      );
+      return;
+    }
+    const scope = activeScope.current;
+    setBusy(true);
+    setError("");
+    try {
+      await api.approveSuggestions([p.id], {
+        ...revisionPayload(form, "monitoring"),
+        instrument_id: instrumentId,
+      });
+      if (activeScope.current !== scope) return;
+      await refresh();
+      setNotice(
+        applied
+          ? `Now watching. Reports from ${date(applied.window_start)} to ${date(applied.deadline)} count; change the dates under Edit › More options.`
+          : "Now watching. You'll get an update when it matches.",
+      );
+      requestAnimationFrame(() => {
+        window.scrollTo(0, 0);
+        document
+          .querySelectorAll(".main-workspace, .workspace-grid")
+          .forEach((el) => el.scrollTo?.(0, 0));
+      });
+    } catch (e) {
+      if (activeScope.current === scope) setError(e.message);
+    } finally {
+      if (activeScope.current === scope) setBusy(false);
+    }
+  }
   async function save(status) {
     if (conflict) {
       setFormError("Resolve the saved-versus-draft comparison before saving.");
       return;
     }
-    if (beginner && status === "draft" && !proposalIds.length && !editor.reasoning?.trim()) {
+    if (
+      beginner &&
+      status === "draft" &&
+      !proposalIds.length &&
+      !editor.reasoning?.trim()
+    ) {
       setFormError("Write a sentence or two in “Your answer” first.");
       return;
     }
@@ -1115,11 +1342,11 @@ function CompanyWorkspace({
       const draft =
         status === "draft" && !proposalIds.length
           ? {
-              ...editor,
-              conditions: editor.conditions.filter(
-                (c) => String(c.value ?? "").trim() !== "",
-              ),
-            }
+            ...editor,
+            conditions: editor.conditions.filter(
+              (c) => String(c.value ?? "").trim() !== "",
+            ),
+          }
           : editor;
       const definition = {
         ...revisionPayload(draft, status),
@@ -1143,7 +1370,7 @@ function CompanyWorkspace({
               ? isRecorded
                 ? "Your view is saved."
                 : "Your view is saved."
-              : "Draft saved. Monitoring is off.",
+              : "Draft saved. Nothing is being watched yet; use “Watch news for this idea” on this page, or add a check below.",
       );
       // Show the confirmation instead of leaving it above the scrolled view.
       requestAnimationFrame(() => {
@@ -1159,7 +1386,7 @@ function CompanyWorkspace({
         setApproved(false);
         if (proposalIds.length) {
           setProposalStale(true);
-          await refresh().catch(() => {});
+          await refresh().catch(() => { });
           return;
         }
         try {
@@ -1209,13 +1436,13 @@ function CompanyWorkspace({
         busy={busy}
         onCheck={
           !historical &&
-          version.id === current?.id &&
-          (!review || version.events?.some((e) => e.repeat_months))
+            version.id === current?.id &&
+            (!review || version.events?.some((e) => e.repeat_months))
             ? (periods) =>
-                act(
-                  () => api.checkEvents(version.id, snapshot, periods),
-                  "Event evidence check saved. Current monitoring uses only its matching window; earlier-window checks are in History.",
-                )
+              act(
+                () => api.checkEvents(version.id, snapshot, periods),
+                "Event evidence check saved. Current monitoring uses only its matching window; earlier-window checks are in History.",
+              )
             : undefined
         }
         unavailableReason={
@@ -1224,44 +1451,53 @@ function CompanyWorkspace({
       />
     );
   }
-  function resultsPanel(e, v, history = false, compact = false) {
+  function resultsPanel(
+    e,
+    v,
+    history = false,
+    compact = false,
+    evidence = true,
+  ) {
     const linkedChange = data.changes.find((c) => c.evaluation_id === e.id);
     const previous = linkedChange
       ? v.evaluations.find(
-          (other) => other.id === linkedChange.previous_evaluation_id,
-        )
+        (other) => other.id === linkedChange.previous_evaluation_id,
+      )
       : v.evaluations[
-          v.evaluations.findIndex((other) => other.id === e.id) + 1
-        ];
+      v.evaluations.findIndex((other) => other.id === e.id) + 1
+      ];
     return (
       <>
-        <IdeaEvidenceReview
-          evaluation={e}
-          previous={previous}
-          version={v}
-          documents={data.documents}
-          change={linkedChange}
-          onSource={openSource}
-          review={v.evidence_reviews?.find((r) => r.evaluation_id === e.id)}
-          onCompare={
-            !e.manifest.snapshot_id
-              ? undefined
-              : () =>
+        {evidence && (
+          <IdeaEvidenceReview
+            evaluation={e}
+            previous={previous}
+            version={v}
+            documents={data.documents}
+            change={linkedChange}
+            onSource={openSource}
+            review={v.evidence_reviews?.find((r) => r.evaluation_id === e.id)}
+            onCompare={
+              !e.manifest.snapshot_id
+                ? undefined
+                : () =>
                   act(
                     () =>
                       api.compareEvidence(v.id, e.manifest.snapshot_id, e.id),
                     "Evidence comparison saved for this revision.",
                   )
-          }
-          busy={busy}
-          error={error}
-          unavailableReason={
-            modelAvailability(modelStatus, "comparison_enabled").message || null
-          }
-          compact={compact}
-          showReasoning={!history}
-          onOpen={() => onChoose(instrumentId, "history", e.id)}
-        />
+            }
+            busy={busy}
+            error={error}
+            unavailableReason={
+              modelAvailability(modelStatus, "comparison_enabled").message ||
+              null
+            }
+            compact={compact}
+            showReasoning={!history}
+            onOpen={() => onChoose(instrumentId, "history", e.id)}
+          />
+        )}
         {!compact && eventPanel(v, e, null, history)}
         <p className="numeric-scope-note">
           {v.events?.length ? (
@@ -1313,8 +1549,8 @@ function CompanyWorkspace({
             ? e.manifest.expiry.find((a) => a.condition_id === r.condition_id)
             : null;
           const observation = data.observations.find(
-              (o) => o.id === r.observation_id,
-            ),
+            (o) => o.id === r.observation_id,
+          ),
             prev = previous?.results.find(
               (p) => p.condition_id === r.condition_id,
             );
@@ -1557,7 +1793,7 @@ function CompanyWorkspace({
               : "These metrics use a quarterly reporting period."}{" "}
             Growth and margin use reported inputs; SEC ratios are calculated in
             the app. Guidance is an expectation, not an observed result. Read
-            forecasts separately in Outlook.
+            forecasts separately in Financials.
           </p>
         </div>
       </>
@@ -1646,66 +1882,14 @@ function CompanyWorkspace({
       data-idea-hidden={ideaSidebarHidden}
       className={`app-shell${view === "updates" ? " inbox-view" : ""}${view === "ideas" ? " ideas-view" : ""}${!selectedCompanyId ? " all-companies-view" : ""}`}
     >
-      <header className="topbar">
-        <a className="skip-link" href="#workspace">
-          Skip to content
-        </a>
-        <a
-          href="#workspace"
-          className="brand"
-          onClick={(e) => {
-            e.preventDefault();
-            setView("workspace");
-          }}
-        >
-          fledge<span>↗</span>
-        </a>
-        <nav aria-label="Workspace navigation">
-          {(beginner
-            ? [
-                ["workspace", "Home"],
-                ["world", "World"],
-                ["ideas", "My views"],
-                ...(updatesWaiting ? [["updates", "Updates"]] : []),
-              ]
-            : [
-                ["workspace", "Home"],
-                ["ideas", "My views"],
-                ["updates", "Updates"],
-                ["world", "World"],
-              ]
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              className={
-                view === key ||
-                (view === "idea" && key === "ideas") ||
-                (view === "review" && key === "updates")
-                  ? "active"
-                  : ""
-              }
-              aria-current={
-                view === key || (view === "idea" && key === "ideas")
-                  ? "page"
-                  : undefined
-              }
-              onClick={() =>
-                // Beginner "Home" always goes back to the list of companies.
-                beginner && key === "workspace"
-                  ? onChoose("", "workspace")
-                  : setView(key)
-              }
-            >
-              {label}
-              {key === "updates" && updatesWaiting && <i className="dot" />}
-            </button>
-          ))}
-        </nav>
-        <div className="topbar-tools">
-          {!beginner && <TelegramSettings />}
-          {signOut || <SettingsMenu />}
-        </div>
-      </header>
+      <WorkspaceHeader
+        beginner={beginner}
+        view={view}
+        updatesWaiting={updatesWaiting}
+        onNavigate={setView}
+        onHome={() => onChoose("", "workspace")}
+        account={accountNavigation}
+      />
       {watchlistMessage && (
         <p className="watchlist-notice" role="alert">
           {watchlistMessage}{" "}
@@ -1714,6 +1898,30 @@ function CompanyWorkspace({
           </button>
         </p>
       )}
+      <Modal
+        open={!!confirmRemoval}
+        onClose={() => setConfirmRemoval(null)}
+        title={`Remove ${confirmRemoval?.symbol || "company"} from your sidebar?`}
+      >
+        <div className="telegram-prompt__body">
+          <p>
+            Any watch on {confirmRemoval?.name || "this company"} will be turned off too, so
+            Fledge stops checking it and sends no more alerts for it. Your saved research stays.
+          </p>
+          <p className="fine">
+            You can add it back later, but you will need to turn its watch on again.
+          </p>
+          <div className="telegram-prompt__actions">
+            <Button variant="primary" onClick={() => confirmRemoveCompany(confirmRemoval)}>
+              Remove and stop watching
+            </Button>
+            <Button variant="plain" onClick={() => setConfirmRemoval(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
+      <ToastHost />
       <RemovalNotice
         company={removedCompany}
         onUndo={() => {
@@ -1751,14 +1959,6 @@ function CompanyWorkspace({
           {error}
           <button onClick={() => act(refresh, "Workspace refreshed.")}>
             Refresh
-          </button>
-        </div>
-      )}
-      {notice && !companyLoading && (
-        <div className="global-message" role="status">
-          {notice}
-          <button aria-label="Dismiss update" onClick={() => setNotice("")}>
-            ×
           </button>
         </div>
       )}
@@ -1802,7 +2002,7 @@ function CompanyWorkspace({
         />
         <main
           className="main-workspace"
-          id="workspace"
+          id={mainId}
           ref={mainPane}
           aria-label="Company research"
           aria-busy={companyLoading && !loadError}
@@ -1821,7 +2021,7 @@ function CompanyWorkspace({
                 {isRecorded
                   ? "Fictional company"
                   : displayInstrument.sector &&
-                      displayInstrument.sector !== "Not yet classified"
+                    displayInstrument.sector !== "Not yet classified"
                     ? displayInstrument.sector
                     : "Company research"}
               </p>
@@ -1913,6 +2113,7 @@ function CompanyWorkspace({
                       className="research-content"
                       role="tabpanel"
                       id="research-panel"
+                      tabIndex={0}
                       aria-labelledby={`research-tab-${tab}`}
                     >
                       <ResearchSectionHeader
@@ -1934,46 +2135,7 @@ function CompanyWorkspace({
                         }}
                       />
                       <RetainedView active={tab === "summary"}>
-                        <BeginnerSummary
-                          key={`summary-${instrumentId}`}
-                          practice={recordedCompany}
-                          data={data}
-                          instrumentId={instrumentId}
-                          visible={view === "workspace" && tab === "summary"}
-                          savedView={current}
-                          onSaveView={() => {
-                            openEditor();
-                            if (!current) {
-                              const plain = `What do I think about ${data.instrument.name}, and why?`;
-                              setEditor({ ...formFor(null, plain), question: plain });
-                            }
-                          }}
-                          onView={(next) => {
-                            setTab(next);
-                            requestAnimationFrame(() => {
-                              window.scrollTo(0, 0);
-                              document
-                                .querySelectorAll(".main-workspace, .workspace-grid")
-                                .forEach((el) => el.scrollTo?.(0, 0));
-                            });
-                          }}
-                          onSource={setSource}
-                          onWorld={() => setView("world")}
-                          onUpdate={
-                            isRecorded ? undefined : () => setUpdatesOpen(true)
-                          }
-                          onRate={
-                            isRecorded
-                              ? undefined
-                              : () => startLoading({ analyze: true, lookback_days: 7 })
-                          }
-                          rating={
-                            loadingRun?.active
-                              ? loadingRun.steps.find((s) => s.key === "analysis")?.status || false
-                              : false
-                          }
-                          priceHistory={priceRead?.data}
-                        />
+                        {summaryPanel(tab === "summary")}
                       </RetainedView>
                       <RetainedView active={tab === "evidence"}>
                         <>
@@ -1986,7 +2148,9 @@ function CompanyWorkspace({
                                 requestAnimationFrame(() => {
                                   window.scrollTo(0, 0);
                                   document
-                                    .querySelectorAll(".main-workspace, .workspace-grid")
+                                    .querySelectorAll(
+                                      ".main-workspace, .workspace-grid",
+                                    )
                                     .forEach((el) => el.scrollTo?.(0, 0));
                                 });
                               }}
@@ -2053,6 +2217,7 @@ function CompanyWorkspace({
                             <SentimentPanel
                               key={instrumentId}
                               onThemeSource={setSource}
+                              onConnectTelegram={() => onChoose(instrumentId, "account")}
                               onThemesChange={async () => {
                                 const status = await api.modelStatus();
                                 if (activeScope.current === scope)
@@ -2115,7 +2280,7 @@ function CompanyWorkspace({
                               }
                             />
                           )}
-                          {!isRecorded && (
+                          {!isRecorded && beginner && (
                             <MarketResearch
                               headlinesOnly
                               data={data}
@@ -2286,32 +2451,6 @@ function CompanyWorkspace({
                           </div>
                         </>
                       </RetainedView>
-                      <RetainedView active={tab === "expectations"}>
-                        <Suspense
-                          fallback={<p role="status">Loading outlook…</p>}
-                        >
-                          <OutlookPage
-                            key={instrumentId}
-                            revision={updatedAt}
-                            management={data.management_outlook}
-                            includeForecasts={!isRecorded}
-                            instrumentId={instrumentId}
-                            visible={
-                              view === "workspace" && tab === "expectations"
-                            }
-                            enabled={modelStatus?.briefing_enabled}
-                            onSource={setSource}
-                            onView={setTab}
-                            onDraft={(q) => {
-                              openEditor();
-                              setEditor({
-                                ...formFor(current, q),
-                                question: q,
-                              });
-                            }}
-                          />
-                        </Suspense>
-                      </RetainedView>
                       {isRecorded && (
                         <RetainedView active={tab === "business"}>
                           <div className="overview-welcome">
@@ -2330,6 +2469,7 @@ function CompanyWorkspace({
                               Read news &amp; discussion
                             </button>
                           </div>
+                          {!beginner && summaryPanel(tab === "business")}
                         </RetainedView>
                       )}
                       {!isRecorded && (
@@ -2344,7 +2484,7 @@ function CompanyWorkspace({
                               focusTopic={
                                 exploration?.topic ? exploration : null
                               }
-                              businessPanel={
+                              businessPanel={() =>
                                 <BusinessPanel
                                   key={`business-${instrumentId}`}
                                   instrumentId={instrumentId}
@@ -2356,6 +2496,7 @@ function CompanyWorkspace({
                                   }
                                   disclosures={data.disclosures}
                                   modelStatus={modelStatus}
+                                  onCompare={() => setTab("valuation")}
                                   onRefresh={() =>
                                     act(
                                       () =>
@@ -2372,12 +2513,15 @@ function CompanyWorkspace({
                                   }}
                                 />
                               }
-                              data={data}
+                              data={snapshotData}
                               financialError={financialError}
                               onRetryFinancials={retryFinancials}
                               instrumentId={instrumentId}
+                              priceHistory={priceRead?.data}
+                              onWorld={() => setView("world")}
                               onView={(next, destination) => {
                                 setTab(next);
+                                if (destination === "management") setFocusManagement(true);
                                 if (destination === "scenario")
                                   requestAnimationFrame(() => {
                                     const panel =
@@ -2398,28 +2542,14 @@ function CompanyWorkspace({
                               onAsk={() => setResearchOpen(true)}
                               onUpdate={() => setUpdatesOpen(true)}
                               chart={
-                                <details
-                                  className="company-chart-disclosure"
-                                  onToggle={(event) =>
-                                    setPriceChartOpen(event.currentTarget.open)
-                                  }
-                                >
-                                  <summary>Price chart · past year</summary>
-                                  <HistoricalPrices
-                                    key={`prices-${instrumentId}`}
-                                    instrumentId={instrumentId}
-                                    initialRead={priceRead || pendingPriceRead}
-                                    visible={
-                                      priceChartOpen &&
-                                      view === "workspace" &&
-                                      tab === "business"
-                                    }
-                                    onRead={setPriceRead}
-                                    loadStep={loadingRun?.steps.find(
-                                      (s) => s.key === "prices",
-                                    )}
-                                  />
-                                </details>
+                                <HistoricalPrices
+                                  key={`prices-${instrumentId}`}
+                                  instrumentId={instrumentId}
+                                  initialRead={priceRead || pendingPriceRead}
+                                  visible={view === "workspace" && tab === "business"}
+                                  onRead={setPriceRead}
+                                  loadStep={loadingRun?.steps.find((s) => s.key === "prices")}
+                                />
                               }
                             />
                           </>
@@ -2448,20 +2578,8 @@ function CompanyWorkspace({
                             instrument={data.instrument}
                             performance={data.performance}
                             quote={data.market?.quote?.quote}
+                            priceBars={priceRead?.data?.snapshot?.series?.bars}
                           />
-                          {!isRecorded && (
-                            <Suspense fallback={<p>Loading comparisons…</p>}>
-                              <FmpPanel
-                                key={`peers-${instrumentId}`}
-                                mode="ratios"
-                                revision={updatedAt}
-                                instrumentId={instrumentId}
-                                visible={
-                                  view === "workspace" && tab === "valuation"
-                                }
-                              />
-                            </Suspense>
-                          )}
                         </>
                       </RetainedView>
                       <RetainedView active={tab === "fundamentals"}>
@@ -2499,6 +2617,7 @@ function CompanyWorkspace({
                                 }
                                 onCompare={() => setTab("valuation")}
                                 onRefresh={refresh}
+                                management={data.management_outlook}
                               >
                                 {renderFinancialReports()}
                               </FinancialsPage>
@@ -2527,7 +2646,7 @@ function CompanyWorkspace({
                     )}
                     <RetainedView active={view === "updates"}>
                       <UpdateInbox
-                        onWeeklyReview={() => setView("review")}
+                        onReviewsChanged={refresh}
                         unseenReviews={data.review_schedule?.unseen_count || 0}
                         active={view === "updates"}
                         filters={inboxFilters}
@@ -2586,182 +2705,307 @@ function CompanyWorkspace({
                       onAddCompany={() => setAddingCompany(true)}
                       onOpenCompany={(id) => onChoose(id)}
                       practice={
-                        visibleCompanies.find((c) => c.id === INSTRUMENT_DEMO) ||
-                        visibleCompanies.find((c) => c.mode === "recorded")
+                        visibleCompanies.find(
+                          (c) => c.id === INSTRUMENT_DEMO,
+                        ) || visibleCompanies.find((c) => c.mode === "recorded")
                       }
                     />
                     <PortfolioRead onOpenCompany={(id) => onChoose(id)} />
                     <CompanyOverview
                       catalogue={visibleCompanies}
-                      initialWorkspace={data}
                       onOpen={onChoose}
                     />
                   </Suspense>
                 ) : !selectedCompanyId && view === "history" ? null : view ===
-                  "workspace" ? null : view === "review" ? (
-                  <Suspense
-                    fallback={
-                      <LoadingSkeleton label="Reading weekly review…" />
-                    }
-                  >
-                    {" "}
-                    <ReviewDigest
-                      onOpen={onChoose}
-                      onSource={setSource}
-                      selectedCompanyId={selectedCompanyId}
-                      onCompanyChange={chooseCompany}
-                    />
-                  </Suspense>
-                ) : ["ideas", "updates", "world"].includes(view) ? null : view ===
-                  "idea" ? (
-                  <section className="focus-page reasoning-page">
-                    <span className="section-label">YOUR REASONING</span>
-                    <h2>
-                      {current?.question ||
-                        "Give your research somewhere to live."}
-                    </h2>
-                    {!current && (
-                      <p className="reasoning large">
-                        Save what you think, what you are unsure about, and what
-                        could change your mind. A draft needs no monitoring
-                        rules.
-                      </p>
-                    )}
-                    <button className="primary" onClick={openEditor}>
-                      {current ? "Edit my idea" : "Save an idea"}{" "}
-                      <Icon name="arrow" />
-                    </button>
-                    <ProposalPanel
-                      proposals={data.proposals}
-                      current={current}
-                      busy={busy}
-                      unavailableReason={
-                        modelAvailability(modelStatus, "comparison_enabled")
-                          .message || null
-                      }
-                      onGenerate={() =>
-                        act(async () => {
-                          const result = await api.suggest({
-                            instrument_id: instrumentId,
-                            snapshot_id: data.snapshot_id,
-                            base_version_id: current?.id || null,
-                            question,
-                          });
-                          if (activeScope.current === scope)
-                            setNotice(result.explanation);
-                        })
-                      }
-                      onReview={(chosen) => {
-                        try {
-                          const candidate = combineSuggestions(chosen);
-                          setEditor(
-                            formFor(
-                              {
-                                ...candidate,
-                                revision: candidate.expected_revision,
-                              },
-                              candidate.question,
-                            ),
-                          );
-                          setProposalIds(chosen.map((p) => p.id));
-                          setProposalStale(false);
-                          setApproved(false);
-                          setFormError("");
-                          setConflict(null);
-                        } catch (e) {
-                          setError(e.message);
-                        }
-                      }}
-                      onReject={(id) =>
-                        act(
-                          () => api.rejectSuggestion(id),
-                          "Suggestion rejected. Your saved idea is unchanged.",
-                        )
-                      }
-                      onSource={openSource}
-                      onOpen={(id) =>
-                        onChoose(instrumentId, "history", `revision:${id}`)
-                      }
-                    />
-                    {current && (
-                      <>
-                        <div className="divider" />
+                  "workspace" ? null : ["ideas", "updates", "world"].includes(
+                    view,
+                  ) ? null : view === "idea" ? (
+                    <section className="focus-page reasoning-page idea-page">
+                      <header className="idea-head">
                         <span className="section-label">
-                          REVISION {current.revision} ·{" "}
-                          {current.status.toUpperCase()}
+                          {data.instrument.symbol} ·{" "}
+                          {beginner ? "MY VIEW" : "MY IDEA"}
                         </span>
-                        <ReviewDownload
-                          version={current}
-                          evaluation={evaluation}
-                          comparison={current.evidence_reviews?.find((r) =>
+                        <h2>
+                          {current?.question ||
+                            "What do you want to watch for this company?"}
+                        </h2>
+                        <p
+                          className={
+                            current?.reasoning?.trim()
+                              ? "idea-reasoning"
+                              : "idea-reasoning empty"
+                          }
+                        >
+                          {current?.reasoning?.trim() ||
+                            (current
+                              ? "No reasoning written yet."
+                              : "Write what you think and what would change your mind, then choose what to watch.")}
+                        </p>
+                        <p
+                          className={`idea-status ${current?.status === "monitoring" ? "on" : "off"}`}
+                        >
+                          {checkingCurrent
+                            ? "Checking recorded evidence…"
+                            : statusLine(current, evaluation)}
+                        </p>
+                        {current && !isRecorded && !data.news_watch?.enabled && (
+                          <div className="idea-watch-prompt">
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              disabled={busy}
+                              onClick={() =>
+                                telegramGuard.guard(() =>
+                                  act(
+                                    () =>
+                                      api.newsWatch(
+                                        instrumentId,
+                                        true,
+                                        240,
+                                        true,
+                                        false,
+                                        current.reasoning?.trim() ? "reasoning" : "question",
+                                      ),
+                                    "Watching news for this idea. Matches appear in Updates.",
+                                  ),
+                                )
+                              }
+                            >
+                              Watch news for this idea
+                            </Button>
+                            <small>
+                              Checks new news and posts against what you wrote about every four
+                              hours while the app runs. Each check can use your AI allowance;
+                              turn it off any time under News &amp; discussion › Watch.
+                            </small>
+                          </div>
+                        )}
+                        <div className="idea-actions">
+                          <button
+                            className="primary"
+                            onClick={openEditor}
+                            aria-label={current ? "Edit my idea" : "Save an idea"}
+                          >
+                            {current ? "Edit" : "Start an idea"}
+                          </button>
+                          {current && (
+                            <>
+                              <ReviewDownload
+                                inline
+                                version={current}
+                                evaluation={evaluation}
+                                comparison={current.evidence_reviews?.find((r) =>
+                                  evaluation
+                                    ? r.evaluation_id === evaluation.id
+                                    : r.evaluation_id == null &&
+                                    r.snapshot_id === data.snapshot_id,
+                                )}
+                              />
+                              <button
+                                className="text-button"
+                                onClick={() => onChoose(instrumentId, "history")}
+                              >
+                                History
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </header>
+                      <section className="idea-section">
+                        <h3>What I'm watching</h3>
+                        {current && watchItems(current, evaluation).length ? (
+                          <ul className="idea-watch-list">
+                            {watchItems(current, evaluation).map((item) => (
+                              <li key={item.key}>
+                                <span className="idea-watch-type">
+                                  {item.type}
+                                </span>
+                                <span className="idea-watch-label">
+                                  {item.label}
+                                </span>
+                                <span className="idea-watch-state">
+                                  {item.state}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="idea-empty">
+                            Nothing yet. Add an event or a number in Edit, and you
+                            get an alert when it happens.
+                          </p>
+                        )}
+                        <div className="idea-tools">
+                          <ProposalPanel
+                            embedded
+                            proposals={data.proposals}
+                            current={current}
+                            busy={busy}
+                            unavailableReason={
+                              modelAvailability(modelStatus, "comparison_enabled")
+                                .message || null
+                            }
+                            onGenerate={() =>
+                              act(async () => {
+                                const result = await api.suggest({
+                                  instrument_id: instrumentId,
+                                  snapshot_id: data.snapshot_id,
+                                  base_version_id: current?.id || null,
+                                  question,
+                                });
+                                if (activeScope.current === scope)
+                                  setNotice(result.explanation);
+                              })
+                            }
+                            onReview={(chosen) => {
+                              try {
+                                const candidate = combineSuggestions(chosen);
+                                setEditor(
+                                  formFor(
+                                    {
+                                      ...candidate,
+                                      revision: candidate.expected_revision,
+                                    },
+                                    candidate.question,
+                                  ),
+                                );
+                                setProposalIds(chosen.map((p) => p.id));
+                                setProposalStale(false);
+                                setApproved(false);
+                                setFormError("");
+                                setConflict(null);
+                              } catch (e) {
+                                setError(e.message);
+                              }
+                            }}
+                            onWatch={watchNow}
+                            onReject={(id) =>
+                              act(
+                                () => api.rejectSuggestion(id),
+                                "Suggestion rejected. Your saved idea is unchanged.",
+                              )
+                            }
+                            onSource={openSource}
+                            onOpen={(id) =>
+                              onChoose(instrumentId, "history", `revision:${id}`)
+                            }
+                          />
+                          {current &&
+                            !evaluation &&
+                            current.events?.length > 0 && (
+                              <button
+                                className="text-button"
+                                disabled={busy}
+                                onClick={() =>
+                                  act(
+                                    () =>
+                                      api.checkEvents(
+                                        current.id,
+                                        data.snapshot_id,
+                                        {},
+                                      ),
+                                    "Event check saved.",
+                                  )
+                                }
+                              >
+                                Check events now (AI)
+                              </button>
+                            )}
+                        </div>
+                      </section>
+                      {current && evaluation && (
+                        <section className="idea-section">
+                          <h3>Latest check</h3>
+                          {resultsPanel(evaluation, current, false, false, false)}
+                        </section>
+                      )}
+                      {current &&
+                        (() => {
+                          const review = current.evidence_reviews?.find((r) =>
                             evaluation
                               ? r.evaluation_id === evaluation.id
                               : r.evaluation_id == null &&
-                                r.snapshot_id === data.snapshot_id,
-                          )}
-                        />
-                        {evaluation ? (
-                          resultsPanel(evaluation, current)
-                        ) : (
-                          <>
-                            <p className="muted">
-                              {checkingCurrent
-                                ? "Checking recorded evidence…"
-                                : "No active assessment. Save and explicitly approve monitoring when you are ready."}
-                            </p>
-                            {eventPanel(current)}
-                            <IdeaEvidenceReview
-                              evaluation={{
-                                id: null,
-                                manifest: {
-                                  snapshot_id: data.snapshot_id,
-                                  document_ids: data.documents.map((d) => d.id),
-                                  active_document_id: data.active_document_id,
-                                  cutoff: data.demo.as_of,
-                                },
-                              }}
-                              version={current}
-                              documents={data.documents}
-                              onSource={openSource}
-                              draft
-                              onCompare={() =>
-                                act(
-                                  () =>
-                                    api.compareEvidence(
-                                      current.id,
-                                      data.snapshot_id,
-                                    ),
-                                  "Evidence comparison saved for this revision.",
-                                )
-                              }
-                              busy={busy}
-                              error={error}
-                              unavailableReason={
-                                modelAvailability(
-                                  modelStatus,
-                                  "comparison_enabled",
-                                ).message || null
-                              }
-                              review={current.evidence_reviews?.find(
-                                (r) =>
-                                  r.evaluation_id == null &&
-                                  r.snapshot_id === data.snapshot_id,
+                              r.snapshot_id === data.snapshot_id,
+                          );
+                          const compare = () =>
+                            act(
+                              () =>
+                                evaluation
+                                  ? api.compareEvidence(
+                                    current.id,
+                                    evaluation.manifest.snapshot_id,
+                                    evaluation.id,
+                                  )
+                                  : api.compareEvidence(
+                                    current.id,
+                                    data.snapshot_id,
+                                  ),
+                              "Comparison saved for this revision.",
+                            );
+                          const unavailable =
+                            modelAvailability(modelStatus, "comparison_enabled")
+                              .message || null;
+                          return (
+                            <section className="idea-section">
+                              <h3>Check my reasoning</h3>
+                              {review ? (
+                                <IdeaEvidenceReview
+                                  evaluation={
+                                    evaluation || {
+                                      id: null,
+                                      manifest: {
+                                        snapshot_id: data.snapshot_id,
+                                        document_ids: data.documents.map(
+                                          (d) => d.id,
+                                        ),
+                                        active_document_id:
+                                          data.active_document_id,
+                                        cutoff: data.demo.as_of,
+                                      },
+                                    }
+                                  }
+                                  version={current}
+                                  documents={data.documents}
+                                  onSource={openSource}
+                                  draft={!evaluation}
+                                  onCompare={compare}
+                                  busy={busy}
+                                  error={error}
+                                  unavailableReason={unavailable}
+                                  review={review}
+                                  showReasoning={false}
+                                />
+                              ) : (
+                                <>
+                                  <p className="idea-empty">
+                                    {current.reasoning?.trim()
+                                      ? "Compare what you wrote with this company's recent news. Uses AI."
+                                      : "Write your reasoning in Edit first, then compare it with recent news."}
+                                  </p>
+                                  <div className="idea-tools">
+                                    <button
+                                      className="text-button"
+                                      disabled={
+                                        busy ||
+                                        !!unavailable ||
+                                        !current.reasoning?.trim()
+                                      }
+                                      onClick={compare}
+                                    >
+                                      Compare with recent news (AI)
+                                    </button>
+                                  </div>
+                                  {unavailable && (
+                                    <p className="fine">{unavailable}</p>
+                                  )}
+                                </>
                               )}
-                            />
-                          </>
-                        )}
-                      </>
-                    )}
-                    <details
-                      className="idea-history"
-                      open={!!initialEvaluation}
-                      key={initialEvaluation || "idea-history"}
-                    >
-                      <summary>History · versions and evidence checks</summary>
-                      {renderIdeaHistory()}
-                    </details>
-                  </section>
-                ) : (
+                            </section>
+                          );
+                        })()}
+                    </section>
+                  ) : (
                   renderIdeaHistory()
                 )}
               </div>
@@ -2835,7 +3079,7 @@ function CompanyWorkspace({
                           activeScope.current === scope &&
                           setModelStatus(value),
                       )
-                      .catch(() => {})
+                      .catch(() => { })
                   }
                   onDraft={(q) => {
                     openEditor();
@@ -2910,7 +3154,7 @@ function CompanyWorkspace({
                           Assessed{" "}
                           {dateTime(
                             evaluation.manifest.assessed_at ||
-                              evaluation.manifest.cutoff,
+                            evaluation.manifest.cutoff,
                           )}{" "}
                           · revision {current.revision}
                         </small>
@@ -2948,11 +3192,11 @@ function CompanyWorkspace({
                       (j) =>
                         j.status === "failed" && j.version_id === current?.id,
                     ) && (
-                      <p role="alert" className="warning">
-                        Assessment unavailable. Your saved idea is intact. Edit
-                        and save a new revision to check again.
-                      </p>
-                    )}
+                        <p role="alert" className="warning">
+                          Assessment unavailable. Your saved idea is intact. Edit
+                          and save a new revision to check again.
+                        </p>
+                      )}
                     <details className="secondary-details monitoring-details">
                       <summary>Monitoring details</summary>
                       <p className="fine">
@@ -3227,15 +3471,15 @@ function CompanyWorkspace({
         {source && (
           <div className="source-modal">
             {!beginner && (
-            <span className="demo-tag">
-              {source.kind === "recorded"
-                ? "AUTHORED FICTIONAL SOURCE"
-                : source.kind === "news"
-                  ? "NEWS · PROVIDER SNIPPET"
-                  : source.kind === "social"
-                    ? "SOCIAL · PUBLIC DISCUSSION"
-                    : "CALCULATED FROM SEC FACTS"}
-            </span>
+              <span className="demo-tag">
+                {source.kind === "recorded"
+                  ? "AUTHORED FICTIONAL SOURCE"
+                  : source.kind === "news"
+                    ? "NEWS · PROVIDER SNIPPET"
+                    : source.kind === "social"
+                      ? "SOCIAL · PUBLIC DISCUSSION"
+                      : "CALCULATED FROM SEC FACTS"}
+              </span>
             )}
             <h3>{source.title}</h3>
             <p className="muted">
@@ -3313,6 +3557,26 @@ function CompanyWorkspace({
           </div>
         )}
       </Modal>
+      {telegramGuard.prompt}
+      <NewCompanySetup
+        open={!!setupId && setupId === selectedCompanyId && !companyLoading && !isRecorded}
+        name={data?.instrument ? companyName(data.instrument) : "this company"}
+        aiBlocked={modelAvailability(modelStatus, "briefing_enabled").blocked}
+        onSkip={() => setSetupId(null)}
+        onStart={async ({ analyse, watch }) => {
+          setSetupId(null);
+          if (analyse) startLoading({ analyze: true, lookback_days: 7 });
+          if (watch)
+            await telegramGuard.guard(() =>
+              act(() => api.newsWatch(instrumentId, true, 240), "Watching this company for changes."),
+            );
+        }}
+        onConnectTelegram={({ analyse }) => {
+          setSetupId(null);
+          if (analyse) startLoading({ analyze: true, lookback_days: 7 });
+          onChoose(selectedCompanyId, "account");
+        }}
+      />
       <CompanyDialog
         open={addingCompany}
         onClose={() => setAddingCompany(false)}
@@ -3331,6 +3595,7 @@ function CompanyWorkspace({
           onRestoreCompany(id);
           setAddingCompany(false);
           onChoose(id);
+          setSetupId(id);
         }}
       />
       <Modal
@@ -3362,32 +3627,33 @@ function CompanyWorkspace({
           >
             {proposalIds.length > 0 && (
               <div className="warning">
-                Review the complete resulting idea below. Fill every missing
-                threshold and date, and edit any wording before saving. Nothing
-                has changed yet.{" "}
+                Suggestions are filled in below. Check them and edit anything
+                before saving. Nothing is saved yet.{" "}
                 {proposalStale &&
                   "The idea or evidence changed while reviewing. Close this draft and request fresh suggestions; it cannot be silently applied to the new revision."}
               </div>
             )}
             <section className="idea-writing">
-              <p className="idea-intro">
-                {beginner
-                  ? "Say in your own words what you think of this company and why, whether you like it or not."
-                  : "Start with your question and your point of view. Add monitoring rules when you’re ready."}
-              </p>
+              {!proposalIds.length && (
+                <p className="idea-intro">
+                  {beginner
+                    ? "Say in your own words what you think of this company and why, whether you like it or not. Alerts are optional."
+                    : "Start with your question and your point of view. Add monitoring rules when you’re ready."}
+                </p>
+              )}
               {(!beginner || !editor.question.trim()) && (
-              <label className="field">
-                {beginner ? "Your question" : "Research question"}
-                <input
-                  value={editor.question}
-                  maxLength={200}
-                  required
-                  onChange={(e) => {
-                    setApproved(false);
-                    setEditor({ ...editor, question: e.target.value });
-                  }}
-                />
-              </label>
+                <label className="field">
+                  {beginner ? "Your question" : "Research question"}
+                  <input
+                    value={editor.question}
+                    maxLength={200}
+                    required
+                    onChange={(e) => {
+                      setApproved(false);
+                      setEditor({ ...editor, question: e.target.value });
+                    }}
+                  />
+                </label>
               )}
               <div className="field">
                 <label htmlFor="idea-reasoning">
@@ -3427,7 +3693,9 @@ function CompanyWorkspace({
               <summary>
                 <span>
                   <strong>
-                    {beginner ? "Get alerts (optional)" : "Add monitoring rules"}
+                    {beginner
+                      ? "Get alerts (optional)"
+                      : "Add monitoring rules"}
                   </strong>
                   <small>
                     {beginner
@@ -3548,7 +3816,7 @@ function CompanyWorkspace({
                     </button>
                     <small className="threshold-reference">
                       {latest(c.metric).value != null &&
-                      latest(c.metric).period_type ===
+                        latest(c.metric).period_type ===
                         (c.period_type || "quarter")
                         ? `Latest reported: ${displayNumber(latest(c.metric).value)}% · ${latest(c.metric).period}. This is context, not a suggested threshold.`
                         : "No comparable figure is available for this reporting scope."}
@@ -3583,14 +3851,14 @@ function CompanyWorkspace({
                           conditions: editor.conditions.map((r, j) =>
                             j === i
                               ? {
-                                  ...r,
-                                  ...(field === "clear"
-                                    ? {
-                                        expected_period_end: "",
-                                        expected_report_by: "",
-                                      }
-                                    : { [field]: value }),
-                                }
+                                ...r,
+                                ...(field === "clear"
+                                  ? {
+                                    expected_period_end: "",
+                                    expected_report_by: "",
+                                  }
+                                  : { [field]: value }),
+                              }
                               : r,
                           ),
                         });
@@ -3766,6 +4034,16 @@ function CompanyWorkspace({
               </section>
             )}
             <footer className="form-actions">
+              {current && (
+                <button
+                  type="button"
+                  className="archive-button"
+                  disabled={busy || !!conflict}
+                  onClick={() => save("archived")}
+                >
+                  Archive idea and stop monitoring
+                </button>
+              )}
               <button
                 type="submit"
                 className={approved ? "secondary" : "primary"}
@@ -3803,16 +4081,6 @@ function CompanyWorkspace({
                 </button>
               )}
             </footer>
-            {current && (
-              <button
-                type="button"
-                className="archive-button"
-                disabled={busy || !!conflict}
-                onClick={() => save("archived")}
-              >
-                Archive idea and stop monitoring
-              </button>
-            )}
           </form>
         )}
       </Modal>

@@ -1,16 +1,18 @@
 /* Fledge design tokens. Every colour, type size and corner radius in the
-   app's CSS comes from this file; change the look here, not per component. */
+   app's CSS comes from this file; change the look here, not per component.
+   Surfaces and text are neutral greys (no blue tint); text keeps at least
+   the contrast of the earlier slate palette. */
 :root {
-  --color-bg: #0f141c;
-  --color-surface: #171e29;
-  --color-surface-2: #1d2532;
-  --color-surface-3: #263043;
-  --color-line: #273142;
-  --color-line-strong: #3a4659;
-  --color-faint: #7c889b;
-  --color-muted: #a3aebf;
-  --color-text-2: #c9d1dd;
-  --color-text: #eef2f7;
+  --color-bg: #0c0c0e;
+  --color-surface: #18181b;
+  --color-surface-2: #212126;
+  --color-surface-3: #2b2b31;
+  --color-line: #2e2e35;
+  --color-line-strong: #44444c;
+  --color-faint: #8a8a94;
+  --color-muted: #a1a1aa;
+  --color-text-2: #d4d4d8;
+  --color-text: #fafafa;
   --color-on-accent: #10160a;
   --color-accent: #c2ed88;
   --color-accent-light: #e2faa6;
@@ -36,7 +38,7 @@
   --color-info-mid: #3a4e78;
   --color-info-soft: #1b2740;
   --color-white: #ffffff;
-  --color-shadow: #05080c;
+  --color-shadow: #050506;
 
   --text-xs: 12px;
   --text-sm: 13px;

@@ -4,7 +4,59 @@
   flex-direction: column;
   gap: var(--space-3);
   margin: 0 0 var(--space-5);
-  max-width: 860px;
+  max-width: 1180px;
+}
+/* Main column (chart or written explanation) beside a rail of lights.
+   Narrower screens stack them, rail first. */
+.pr-layout {
+  display: grid;
+  gap: var(--space-4);
+  align-items: start;
+}
+.pr-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+@media (min-width: 980px) {
+  .pr-layout {
+    grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+    grid-template-areas: "main rail";
+  }
+  .pr-main {
+    grid-area: main;
+  }
+  .pr-rail {
+    grid-area: rail;
+  }
+  .pr-rail .bs-lights {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* World headlines sit inside the World light instead of their own card. */
+.pr-world {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) 0 0;
+  border-top: 1px solid var(--color-line);
+  display: grid;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+.pr-world a {
+  color: var(--color-text);
+  font-weight: 500;
+  text-decoration: none;
+}
+.pr-world a:hover,
+.pr-world a:focus-visible {
+  text-decoration: underline;
+}
+.pr-world .bs-meta {
+  display: block;
+  margin-top: 2px;
 }
 .portfolio-read h2 {
   margin: 0;
@@ -71,23 +123,49 @@
   text-align: left;
   cursor: pointer;
 }
+/* Tighter rows than the app's 38 px button default; 44 px on touch screens. */
+.app-shell .portfolio-read .pr-bars button {
+  min-height: 32px;
+}
+@media (pointer: coarse) {
+  .app-shell .portfolio-read .pr-bars button {
+    min-height: 44px;
+  }
+}
 .pr-bars button:hover strong,
 .pr-bars button:focus-visible strong {
   text-decoration: underline;
 }
+/* Two halves around a zero line; each bar's square end sits on the line and
+   its rounded end points the way the price moved. */
 .pr-track {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+  align-items: center;
+  height: 24px;
+}
+.pr-half {
+  display: flex;
   height: 10px;
+}
+.pr-half.down {
+  justify-content: flex-end;
+}
+.pr-zero {
+  align-self: stretch;
+  background: var(--color-line-strong);
 }
 .pr-bar {
   display: block;
   height: 10px;
-  border-radius: 5px;
 }
 .pr-bar.down {
   background: var(--color-negative, #f08a96);
+  border-radius: 4px 0 0 4px;
 }
 .pr-bar.up {
   background: var(--color-positive, #5fd3a6);
+  border-radius: 0 4px 4px 0;
 }
 .pr-pct {
   text-align: right;
@@ -129,4 +207,10 @@
 }
 .pr-lights .bs-light {
   grid-template-columns: 20px minmax(0, 1fr);
+}
+/* On narrow phones the light becomes a grid; headlines sit under its text. */
+@media (max-width: 480px) {
+  .pr-lights .pr-world {
+    grid-column: 2;
+  }
 }

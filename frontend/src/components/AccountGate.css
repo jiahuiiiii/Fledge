@@ -211,7 +211,7 @@
   color: var(--color-text-2);
 }
 .account-card input::placeholder {
-  color: var(--color-faint, #7c889b);
+  color: var(--color-faint, #8a8a94);
 }
 .account-card .consent-check {
   min-height: 0;
@@ -313,3 +313,10 @@
 .security-dialog .account-submit {
   width: 100%;
 }
+
+/* The security dialog is one centred column at a sensible width. */
+.modal.security-dialog { width: min(480px, calc(100vw - 32px)); }
+.security-dialog .security-body { width: 100%; margin: 0 auto; padding: var(--space-5); display: grid; gap: var(--space-3); }
+.security-dialog .account-field input { width: 100%; }
+.security-dialog .security-nudge { margin: 0; font-size: var(--text-sm); }
+.security-dialog .recovery-tip { font-size: var(--text-sm); color: var(--color-muted); }

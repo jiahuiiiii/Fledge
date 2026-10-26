@@ -1,4 +1,21 @@
-import NewsStatus from "./NewsStatus";
+import { NewsFreshness, NewsStatusDetails } from "./NewsStatus";
+import {
+  Badge,
+  Button,
+  Card,
+  ChartIcon,
+  Disclosure,
+  MetaRow,
+  Pagination,
+  SectionHeader,
+  SourceChip,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  ToneCard,
+} from "./ui";
+import { toneOf } from "../lib/tone";
+import { useTelegramGuard } from "./TelegramPrompt";
 import { countedTone } from "../lib/newsPresentation";
 import { modelAvailability } from "../lib/modelAvailability";
 import {
@@ -20,7 +37,7 @@ import CurrentSentimentSources from "./CurrentSentimentSources";
 import WatchCheckHistory from "./WatchCheckHistory";
 import { watchFrequencyLabel } from "../lib/watchLanes";
 import SentimentHistory from "./SentimentHistory";
-import SourceFilters, { SourceLabel, sourceScope } from "./SourceFilters";
+import SourceFilters from "./SourceFilters";
 import AllSourceSummary, {
   SourceCountingDetails,
   SourceToneSummary,
@@ -49,6 +66,7 @@ export default function SentimentPanel({
   onThemeSource,
   onCoverage,
   onThemesChange,
+  onConnectTelegram,
 }) {
   const [days, setDays] = useState(
     data.sentiment?.social_lookback_days || loadingRun?.lookback_days || 7,
@@ -57,9 +75,8 @@ export default function SentimentPanel({
   const analysisStep = loadingRun?.steps.find((s) => s.key === "analysis");
   const batchProgress = analysisStep?.batches;
   const [tab, setTab] = useState("all");
-  const [relevanceFilter, setRelevanceFilter] = useState("relevant");
+  const relevanceFilter = "relevant";
   const [toneFilter, setToneFilter] = useState("all");
-  const [sourcesOpen, setSourcesOpen] = useState(false);
   const sourceListId = useId();
   const [page, setPage] = useState(1);
   const [checkPurpose, setCheckPurpose] = useState("reasoning");
@@ -67,6 +84,7 @@ export default function SentimentPanel({
   const platform = tab === "all" || tab === "news" ? null : tab;
   const [evidenceView, setEvidenceView] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const telegramGuard = useTelegramGuard({ onConnect: onConnectTelegram, what: "this watch" });
   const a = data.sentiment,
     watch = data.news_watch;
   const activeQuestion =
@@ -116,9 +134,7 @@ export default function SentimentPanel({
   useEffect(() => setPage(1), [a?.id, tab, relevanceFilter, toneFilter]);
   function filterTone(value) {
     setToneFilter(value);
-    if (value !== "all") setRelevanceFilter("relevant");
     setPage(1);
-    setSourcesOpen(true);
   }
   const filteredItems = items.filter(
     (item) =>
@@ -142,69 +158,56 @@ export default function SentimentPanel({
     ),
   ].join(", ");
   return (
-    <section className="sentiment-panel" aria-label="News and social sentiment">
-      <div className="market-section-head sentiment-heading">
-        <div>
-          <h2>What’s the tone?</h2>
-        </div>
-        <div className="sentiment-heading-actions">
-          <label className="sentiment-window">
-            <span>Discussion window</span>
-            <Select
-              aria-label="Discussion window"
-              value={days}
-              disabled={!!loadingRun?.active}
-              onChange={(e) => setDays(Number(e.target.value))}
-            >
-              <option value={1}>Past 24 hours</option>
-              <option value={7}>Past 7 days</option>
-              <option value={30}>Past 30 days</option>
-            </Select>
-          </label>
-          <button
-            type="button"
-            className="sentiment-watch-button"
-            data-enabled={!!watch?.enabled}
-            aria-haspopup="dialog"
-            onClick={() => setSettingsOpen(true)}
+    <Card className="sentiment-panel" aria-label="News and social sentiment">
+      <SectionHeader
+        icon={<ChartIcon />}
+        title="What’s the tone?"
+        description="Read each source’s tone, then explore the evidence behind it."
+      />
+      <div className="sentiment-heading-actions">
+        <label className="sentiment-window">
+          <span>Discussion window</span>
+          <Select
+            aria-label="Discussion window"
+            value={days}
+            disabled={!!loadingRun?.active}
+            onChange={(e) => setDays(Number(e.target.value))}
           >
-            <span className="sentiment-watch-dot" aria-hidden="true" />
-            Watch · {watch?.enabled ? "on" : "off"}
-          </button>
-          <button
-            className="sentiment-analyse-button"
-            aria-describedby={
-              disabledReason ? "sentiment-disabled-reason" : undefined
-            }
-            disabled={
-              !!loadingRun?.active ||
-              (availability.blocked && availability.state !== "running")
-            }
-            onClick={() => onAnalyze(days)}
-          >
-            {loadingRun?.active &&
-            loadingRun.steps.some((s) => s.key === "analysis")
-              ? loadingRun.steps.find((s) => s.key === "analysis")?.status ===
-                "running"
-                ? "Analysing sentiment…"
-                : "Fetching sources · analysis queued…"
-              : "Refresh & analyse"}
-          </button>
-        </div>
-      </div>
-      <details className="secondary-details">
-        <summary>Read saved sources again</summary>
-        <p className="fine">
-          Re-read every saved source with the current model. This is a new paid
-          reading; previous readings stay in History.
-        </p>
-        <button
-          disabled={!!loadingRun?.active || availability.blocked}
-          onClick={() => onAnalyze(days, { reread: true })}
+            <option value={1}>Past 24 hours</option>
+            <option value={7}>Past 7 days</option>
+            <option value={30}>Past 30 days</option>
+          </Select>
+        </label>
+        <Button
+          variant="plain"
+          className="sentiment-watch-button"
+          data-enabled={!!watch?.enabled}
+          aria-haspopup="dialog"
+          onClick={() => setSettingsOpen(true)}
         >
-          Re-read everything · paid AI
-        </button>
-      </details>
+          <span className="sentiment-watch-dot" aria-hidden="true" />
+          Watch · {watch?.enabled ? "on" : "off"}
+        </Button>
+        <Button
+          className="sentiment-analyse-button"
+          aria-describedby={
+            disabledReason ? "sentiment-disabled-reason" : undefined
+          }
+          disabled={
+            !!loadingRun?.active ||
+            (availability.blocked && availability.state !== "running")
+          }
+          onClick={() => onAnalyze(days)}
+        >
+          {loadingRun?.active &&
+          loadingRun.steps.some((s) => s.key === "analysis")
+            ? loadingRun.steps.find((s) => s.key === "analysis")?.status ===
+              "running"
+              ? "Analysing sentiment…"
+              : "Fetching sources · analysis queued…"
+            : "Refresh & analyse"}
+        </Button>
+      </div>
       {disabledReason && (
         <p
           id="sentiment-disabled-reason"
@@ -240,62 +243,40 @@ export default function SentimentPanel({
             </p>
           )}
           {!loadingRun.active && batchProgress.failure?.split_available && (
-            <button
+            <Button
+              variant="plain"
               disabled={availability.blocked}
               onClick={() => onAnalyze(days, { split_failed: true })}
             >
               Retry with smaller batches · paid AI
-            </button>
+            </Button>
           )}
         </div>
       )}
-      {(a || watch?.enabled) && (
-        <p className="fine sentiment-meta" role="status">
-          {a &&
-            `AI reading saved ${stamp(a.created_at)} · news 7 days · discussion ${a.social_lookback_days || 7} days`}
-          {a && watch?.enabled && " · "}
-          {watch?.enabled &&
-            `watch on, next check ${stamp(watch.next_check_at)}`}
-          {a?.social_lookback_days && a.social_lookback_days !== 7
-            ? ". This exploratory window does not publish watch alerts."
-            : ""}
-        </p>
-      )}
-      {a && !a.withheld && a.repairs?.repaired > 0 && (
-        <p className="fine sentiment-repairs" role="status">
-          {`${a.repairs.repaired} of ${a.repairs.total} labels needed repair: the AI's label and its evidence disagreed.`}
-        </p>
-      )}
-      {a && !a.withheld && (
-        <p className="fine sentiment-reading-limit">
-          {a.stale &&
-            "This AI reading uses a source sample captured over 24 hours ago; newer headlines may not be included. "}
-          {a.earlier_method && "It was saved with an earlier analysis method. "}
-          {coverage &&
-            !coverage.complete &&
-            (coverage.unanalysed > 0
-              ? "Some saved sources are outside this reading. "
-              : "Complete coverage of the saved sources is not established. ")}
-          News tone and social opinions describe their own samples, not investor
-          consensus or future returns.
-        </p>
-      )}
-      <NewsStatus
-        data={data}
-        availability={availability}
-        onCoverage={onCoverage}
-      />
+      <NewsFreshness data={data} />
+      <p className="fine sentiment-reading-limit">
+        Tone describes what people and publishers said, not facts, investor consensus or future returns.
+      </p>
       <div className="sample-browse-controls">
-        <SourceFilters selected={tab} onChange={setTab} />
-        <button
+        <SourceFilters selected={tab} onChange={setTab} showLabels />
+        <Button
+          variant="tertiary"
+          size="sm"
           className="evidence-button"
           onClick={() =>
-            setEvidenceView(a && !a.withheld ? "saved" : "current")
+            setEvidenceView(
+              a && !a.withheld && data.sentiment_inputs?.status !== "changed"
+                ? "saved"
+                : "current",
+            )
           }
           aria-haspopup="dialog"
         >
           Evidence
-        </button>
+          {data.sentiment_inputs?.status === "changed" && (
+            <Badge title="Saved sources have changed since this reading">Sources changed</Badge>
+          )}
+        </Button>
       </div>
       {a?.withheld ? (
         <>
@@ -311,29 +292,29 @@ export default function SentimentPanel({
         </>
       ) : sample || (tab === "all" && a) ? (
         <>
-          <p className="tone-reading-time">
-            Tone reading made {stamp(a.created_at)}
-            {a.cutoff && ` · covers sources saved up to ${stamp(a.cutoff)}`}
-          </p>
-          {a.coverage?.input_limits?.notice && (
-            <p className="fine">
-              Some sources were omitted. Open Evidence to inspect the limits.
-            </p>
-          )}
-          {withheldSourcesNote(a) && (
-            <p className="fine">{withheldSourcesNote(a)}</p>
-          )}
           {tab === "all" ? (
             <>
               <SourceToneSummary analysis={a} />
-              <details className="secondary-details">
-                <summary>Source coverage</summary>
+              <Disclosure variant="flush" className="secondary-details" title="Source coverage" description="How sources are counted, what was unavailable and reading limits">
                 <AllSourceSummary
                   analysis={a}
                   providerStatus={data.provider_status}
                   showDetails={false}
                 />
-              </details>
+                <SourceCountingDetails analysis={a} />
+                <div className="coverage-notes">
+                  {a.repairs?.repaired > 0 && <p className="fine">{`${a.repairs.repaired} of ${a.repairs.total} labels needed repair: the AI's label and its evidence disagreed.`}</p>}
+                  {a.stale && <p className="fine">This reading uses a source sample captured over 24 hours ago; newer headlines may not be included.</p>}
+                  {a.earlier_method && <p className="fine">Saved with an earlier analysis method.</p>}
+                  {coverage && !coverage.complete && <p className="fine">{coverage.unanalysed > 0 ? "Some saved sources are outside this reading." : "Complete coverage of the saved sources is not established."}</p>}
+                  {a.coverage?.input_limits?.notice && <p className="fine">Some sources were omitted from the reading.</p>}
+                  {withheldSourcesNote(a) && <p className="fine">{withheldSourcesNote(a)}</p>}
+                  {watch?.enabled && <p className="fine">Watch on · next check {stamp(watch.next_check_at)}</p>}
+                </div>
+                <NewsStatusDetails data={data} availability={availability} onCoverage={onCoverage} />
+                <p className="fine">Re-reading every saved source with the current model is a new paid reading; earlier readings stay in History.</p>
+                <Button variant="plain" size="sm" disabled={!!loadingRun?.active || availability.blocked} onClick={() => onAnalyze(days, { reread: true })}>Re-read everything · paid AI</Button>
+              </Disclosure>
               <ToneFilters
                 selected={toneFilter}
                 onChange={filterTone}
@@ -342,8 +323,8 @@ export default function SentimentPanel({
             </>
           ) : (
             <>
-              <div className="sentiment-summary">
-                <strong>{sentimentSummaryParts(sample).label}</strong>
+              <ToneCard as="div" tone={toneOf(sample.tone)} className="sentiment-summary">
+                <strong className="ui-tone-card__status"><span className="ui-tone-card__dot" aria-hidden="true" />{sentimentSummaryParts(sample).label.replace(/^./, (c) => c.toUpperCase())}</strong>
                 <small className="tone-detail">
                   {sentimentSummaryParts(sample).detail}
                 </small>
@@ -352,7 +333,7 @@ export default function SentimentPanel({
                     ? `${sample.selected} stories → ${sample.relevant} relevant → ${counts.total} ${a.summary_policy?.startsWith("sentiment-coverage-") ? "distinct developments" : "text groups"}`
                     : `${sample.selected} texts → ${sample.relevant} relevant → ${counts.total} counted groups`}
                 </span>
-              </div>
+              </ToneCard>
               <p className="fine sample-count-explanation">
                 {channel === "news"
                   ? "Repeated coverage counts once in these tone totals. "
@@ -370,44 +351,7 @@ export default function SentimentPanel({
               />
             </>
           )}
-          <details
-            className="sentiment-source-list"
-            id={sourceListId}
-            open={sourcesOpen}
-            onToggle={(event) => setSourcesOpen(event.currentTarget.open)}
-          >
-            <summary>
-              Read analysed sources{" "}
-              <span>
-                {filteredItems.length} in this view
-                {toneFilter !== "all" ? ` · ${names[toneFilter]}` : ""}
-              </span>
-            </summary>
-            <div className="sentiment-result-controls">
-              <label>
-                Show{" "}
-                <Select
-                  aria-label="Source relevance"
-                  value={relevanceFilter}
-                  onChange={(event) => {
-                    setRelevanceFilter(event.target.value);
-                    if (event.target.value !== "relevant") setToneFilter("all");
-                    setPage(1);
-                  }}
-                >
-                  <option value="all">All analysed texts</option>
-                  <option value="relevant">Relevant to company</option>
-                  <option value="unrelated">Unrelated</option>
-                  <option value="unclear">Relevance unclear</option>
-                </Select>
-              </label>
-              <span className="fine">
-                {filteredItems.length
-                  ? `${(currentPage - 1) * 6 + 1}–${Math.min(currentPage * 6, filteredItems.length)} of ${filteredItems.length}`
-                  : "0 matching texts"}{" "}
-                · newest first in All
-              </span>
-            </div>
+          <div className="sentiment-source-list" id={sourceListId}>
             {toneFilter !== "all" && (
               <p className="fine" role="status">
                 Showing {names[toneFilter].toLowerCase()} source labels. Tone
@@ -427,24 +371,34 @@ export default function SentimentPanel({
                       (s) => s.id === comparison.reference_source_id,
                     );
                   return (
-                    <article
+                    <Card
+                      as="article"
+                      variant="flush"
                       key={i.id}
                       className="source-story"
                       data-source-id={i.source_id}
                     >
                       {s && (
-                        <div className="sentiment-source-meta fine">
-                          <SourceLabel scope={sourceScope(s)}>
-                            {s.source}
-                          </SourceLabel>
-                          <time>
-                            {s.timestamp_basis === "feed_updated" &&
-                              "Feed updated · "}
-                            {stamp(s.published_at)}
-                          </time>
-                        </div>
+                        <MetaRow className="sentiment-source-meta fine">
+                          <SourceChip
+                            label={s.source}
+                            date={`${s.timestamp_basis === "feed_updated" ? "Feed updated · " : ""}${stamp(s.published_at)}`}
+                            href={s.url}
+                            onOpen={() => onSource(i.source_id)}
+                          />
+                        </MetaRow>
                       )}
-                      {sourceHeadline(s) && <h3>{sourceHeadline(s)}</h3>}
+                      {sourceHeadline(s) && (
+                        <h3>
+                          {s?.url ? (
+                            <a href={s.url} target="_blank" rel="noopener noreferrer">
+                              {sourceHeadline(s)}
+                            </a>
+                          ) : (
+                            sourceHeadline(s)
+                          )}
+                        </h3>
+                      )}
                       {s?.body ? (
                         <p
                           className={`story-source-text${s.kind === "social" ? " discussion-text" : ""}`}
@@ -472,13 +426,19 @@ export default function SentimentPanel({
                                 ? "Checked label"
                                 : "AI label"}
                           </span>
-                          <span className={`sentiment-tag tone-${i.sentiment}`}>
+                          <Badge
+                            tone={
+                              i.relevance === "relevant"
+                                ? i.sentiment
+                                : "unknown"
+                            }
+                          >
                             {i.relevance === "relevant"
                               ? names[i.sentiment]
                               : i.relevance === "unrelated"
                                 ? "Not about this company"
                                 : "Unclear relevance"}
-                          </span>
+                          </Badge>
                           {!i.prefilter && (
                             <span className="story-statement fine">
                               {i.statement.replaceAll("_", " ")}
@@ -487,22 +447,9 @@ export default function SentimentPanel({
                         </div>
                         <EvidenceButton
                           key={`${a.id}:${i.id}`}
-                          label="Inspect evidence"
-                          title="Story evidence"
+                          label="Why this label"
+                          title={sourceHeadline(s) || "Why this label"}
                         >
-                          {sourceHeadline(s) && <h3>{sourceHeadline(s)}</h3>}
-                          {s && (
-                            <p className="fine">
-                              <SourceLabel scope={sourceScope(s)}>
-                                {s.source}
-                              </SourceLabel>{" "}
-                              · {stamp(s.published_at)}
-                            </p>
-                          )}
-                          <div className="story-full-text">
-                            <h3>Original text</h3>
-                            <p>{s?.body || "Original text unavailable."}</p>
-                          </div>
                           <h3>
                             {i.prefilter ? "Quick check" : "AI classification"}
                           </h3>
@@ -536,50 +483,50 @@ export default function SentimentPanel({
                               {comparison.citations.map((c, j) => (
                                 <blockquote key={j}>{c.quote}</blockquote>
                               ))}
-                              <button
+                              <Button
+                                variant="plain"
                                 className="source-link"
                                 onClick={() => onSource(i.source_id)}
                               >
                                 Inspect this report ↗
-                              </button>
+                              </Button>
                               <strong>
                                 {reference?.title || "Earlier report"}
                               </strong>
                               {comparison.reference_citations.map((c, j) => (
                                 <blockquote key={j}>{c.quote}</blockquote>
                               ))}
-                              <button
+                              <Button
+                                variant="plain"
                                 className="source-link"
                                 onClick={() =>
                                   onSource(comparison.reference_source_id)
                                 }
                               >
                                 Inspect compared report ↗
-                              </button>
+                              </Button>
                             </details>
                           )}
-                          <details>
-                            <summary>Why this label · inspect evidence</summary>
-                            {!i.evidence_policy &&
-                              i.citations.map((c, j) => (
-                                <blockquote key={j}>{c.quote}</blockquote>
-                              ))}
-                            <SentimentContext value={i.conversation} />
-                            <RedditThreadContext value={i.thread_context} />
-                            <button
-                              className="source-link"
-                              onClick={() => onSource(i.source_id)}
-                            >
-                              Open original source ↗
-                            </button>
-                          </details>
+                          {!i.evidence_policy &&
+                            i.citations.map((c, j) => (
+                              <blockquote key={j}>{c.quote}</blockquote>
+                            ))}
+                          <SentimentContext value={i.conversation} />
+                          <RedditThreadContext value={i.thread_context} />
+                          {s && (
+                            <SourceChip
+                              label="Open original source"
+                              href={s.url}
+                              onOpen={() => onSource(i.source_id)}
+                            />
+                          )}
                         </EvidenceButton>
                       </div>
                       <SentimentPriceContext
                         values={i.price_comparisons}
                         compact
                       />
-                    </article>
+                    </Card>
                   );
                 })}
               </div>
@@ -591,31 +538,19 @@ export default function SentimentPanel({
               </p>
             )}
             {totalPages > 1 && (
-              <nav
+              <Pagination
                 className="sentiment-pagination"
-                aria-label="Analysed source pages"
-              >
-                <button
-                  disabled={currentPage === 1}
-                  onClick={() => setPage(currentPage - 1)}
-                >
-                  Previous sources
-                </button>
-                <span className="fine">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  disabled={currentPage === totalPages}
-                  onClick={() => setPage(currentPage + 1)}
-                >
-                  Next sources
-                </button>
-              </nav>
+                label="Analysed source pages"
+                page={currentPage}
+                totalPages={totalPages}
+                previousLabel="Previous sources"
+                nextLabel="Next sources"
+                onPrevious={() => setPage(currentPage - 1)}
+                onNext={() => setPage(currentPage + 1)}
+              />
             )}
-          </details>
-          {tab === "all" ? (
-            <SourceCountingDetails analysis={a} />
-          ) : (
+          </div>
+          {tab === "all" ? null : (
             <details className="secondary-details sample-method">
               <summary>Sample details &amp; method</summary>
               {Number.isInteger(pool) && (
@@ -705,30 +640,16 @@ export default function SentimentPanel({
                 : a.withheld_sources > 0
                   ? "Some saved sources in this sample are no longer available. Choose Refresh & analyse before creating a new summary."
                   : busy
-                  ? "Wait for the current workspace action to finish. Saved readings remain available."
-                  : availability.state === "running"
-                    ? "Another AI request is running. Wait for it to finish before starting a discussion summary. Saved readings remain available."
-                    : availability.blocked
-                      ? availability.message
-                      : ""
+                    ? "Wait for the current workspace action to finish. Saved readings remain available."
+                    : availability.state === "running"
+                      ? "Another AI request is running. Wait for it to finish before starting a discussion summary. Saved readings remain available."
+                      : availability.blocked
+                        ? availability.message
+                        : ""
           }
           onRefresh={onThemesChange}
           onSource={onThemeSource}
         />
-      )}
-      {data.sentiment_inputs?.status === "changed" && (
-        <div className="evidence-summary-bar">
-          <p>
-            The saved sources have changed. This AI reading still describes its
-            earlier sample; new or changed sources have not been included in it.
-          </p>
-          <button
-            className="source-link"
-            onClick={() => setEvidenceView("current")}
-          >
-            Compare current sources
-          </button>
-        </div>
       )}
       <Modal
         open={settingsOpen}
@@ -742,9 +663,11 @@ export default function SentimentPanel({
             <Checkbox
               disabled={busy}
               checked={!!watch?.enabled}
-              onChange={(e) =>
-                onWatch(e.target.checked, watch?.interval_minutes || 240)
-              }
+              onChange={(e) => {
+                const enabled = e.target.checked;
+                if (enabled) telegramGuard.guard(() => onWatch(true, watch?.interval_minutes || 240));
+                else onWatch(false, watch?.interval_minutes || 240);
+              }}
             />{" "}
             Watch news + social changes
           </label>
@@ -915,12 +838,13 @@ export default function SentimentPanel({
                             before resuming.
                           </p>
                           {approvedEvents && (
-                            <button
+                            <Button
+                              variant="plain"
                               disabled={busy || !watch?.enabled}
                               onClick={() => onEventWatch(data.versions[0].id)}
                             >
                               Use current approved events
-                            </button>
+                            </Button>
                           )}
                         </div>
                       )}
@@ -973,7 +897,8 @@ export default function SentimentPanel({
                         </option>
                       </Select>
                     </label>
-                    <button
+                    <Button
+                      variant="plain"
                       disabled={
                         busy ||
                         !(checkPurpose === "question"
@@ -987,7 +912,7 @@ export default function SentimentPanel({
                       onClick={() => onCheckIdea(checkPurpose)}
                     >
                       Check this sample against my idea
-                    </button>
+                    </Button>
                   </div>
                   <p className="fine">
                     {checkPurpose === "question"
@@ -997,9 +922,9 @@ export default function SentimentPanel({
                   </p>
                   {a?.withheld_sources > 0 && (
                     <p className="fine">
-                      Some saved sources in this sample are no longer
-                      available. Choose Refresh & analyse before checking it
-                      against your idea.
+                      Some saved sources in this sample are no longer available.
+                      Choose Refresh & analyse before checking it against your
+                      idea.
                     </p>
                   )}
                   {checkPurpose === "question" && activeQuestion && (
@@ -1021,29 +946,25 @@ export default function SentimentPanel({
         title="News & discussion · evidence"
         className="evidence-dialog"
       >
-        <div
-          className="dialog-view-switch"
-          role="group"
-          aria-label="Evidence view"
-        >
-          {[
-            ["saved", "Analysed sample"],
-            ["current", "Current sources"],
-            ["history", "History"],
-          ].map(([key, label]) => (
-            <button
-              key={key}
-              aria-pressed={evidenceView === key}
-              onClick={() => setEvidenceView(key)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <details className="secondary-details sentiment-window-info">
-          <summary>Source window &amp; limits</summary>
+        <Tabs value={evidenceView} onValueChange={setEvidenceView}>
+          <TabsList variant="line" aria-label="Evidence view">
+            <TabsTrigger value="saved">Analysed sample</TabsTrigger>
+            <TabsTrigger value="current">Current sources</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <p className="evidence-view-note">
+          {evidenceView === "saved"
+            ? "The exact sources the AI read for this tone reading."
+            : evidenceView === "current"
+              ? data.sentiment_inputs?.status === "changed"
+                ? "What is saved now. Sources added or changed since the reading are not in its tone yet."
+                : "What is saved now, which matches the reading."
+              : "Earlier readings and watch checks."}
+        </p>
+        <Disclosure variant="flush" title="Source window and limits" className="sentiment-window-info">
           <p className="fine">
-            Refresh & analyse checks news and discussions, then analyses the
+            Refresh &amp; analyse checks news and discussions, then analyses the
             available passages. News covers 7 days. Discussion searches use your
             selected window. Reddit searches for the company and ticker, with up
             to 50 posts and replies from three threads, so a wider window does
@@ -1051,7 +972,7 @@ export default function SentimentPanel({
             original posts and only covers the last 7 days, including when you
             select 30 days. Automatic watches keep their 7-day window.
           </p>
-        </details>
+        </Disclosure>
         {evidenceView === "saved" &&
           (a && !a.withheld ? (
             <>
@@ -1059,6 +980,7 @@ export default function SentimentPanel({
                 selected={tab}
                 onChange={setTab}
                 label="Evidence source type"
+                showLabels
               />
               <OriginalSample
                 analysis={a}
@@ -1094,7 +1016,8 @@ export default function SentimentPanel({
           </>
         )}
       </Modal>
-    </section>
+      {telegramGuard.prompt}
+    </Card>
   );
 }
 
@@ -1125,9 +1048,13 @@ function AlertEvidence({ item, sources, onSource, comparison }) {
         ]
           .filter(Boolean)
           .join(" · ")}
-        <button className="source-link" onClick={() => onSource(source)}>
+        <Button
+          variant="plain"
+          className="source-link"
+          onClick={() => onSource(source)}
+        >
           Inspect source ↗
-        </button>
+        </Button>
       </p>
       <SentimentBasis item={item} compact />
       {(item.explanation || importanceQuotes.length > 0) && (
@@ -1184,9 +1111,13 @@ function AlertEvidence({ item, sources, onSource, comparison }) {
           {comparison.reference_citations.map((c, j) => (
             <blockquote key={j}>{c.quote}</blockquote>
           ))}
-          <button className="source-link" onClick={() => onSource(reference)}>
+          <Button
+            variant="plain"
+            className="source-link"
+            onClick={() => onSource(reference)}
+          >
             Inspect earlier report ↗
-          </button>
+          </Button>
         </details>
       )}
     </div>
@@ -1216,7 +1147,9 @@ function PreviousSample({ alert, onSource }) {
   }
   return (
     <details onToggle={(event) => event.currentTarget.open && load()}>
-      <summary>Previous sample · {stamp(alert.payload.previous_cutoff)}</summary>
+      <summary>
+        Previous sample · {stamp(alert.payload.previous_cutoff)}
+      </summary>
       {sample?.withheld ? (
         <p className="warning">
           Evidence is currently unavailable; this earlier sample is withheld.
@@ -1233,9 +1166,9 @@ function PreviousSample({ alert, onSource }) {
       ) : error ? (
         <p className="warning" role="alert">
           {error}{" "}
-          <button type="button" onClick={load}>
+          <Button variant="plain" type="button" onClick={load}>
             Try again
-          </button>
+          </Button>
         </p>
       ) : (
         <p className="muted" aria-live="polite">
@@ -1382,9 +1315,12 @@ export function ResearchAlerts({
                   </p>
                 </details>
               )}
-              <button onClick={() => onOpen(a.instrument_id, "idea")}>
+              <Button
+                variant="plain"
+                onClick={() => onOpen(a.instrument_id, "idea")}
+              >
                 Review my idea ↗
-              </button>
+              </Button>
             </>
           )}
           {a.review_action ? (
@@ -1394,18 +1330,20 @@ export function ResearchAlerts({
           ) : (
             !readOnly && (
               <div className="sentiment-controls">
-                <button
+                <Button
+                  variant="plain"
                   disabled={busy}
                   onClick={() => onReview(a.id, "reviewed")}
                 >
                   Mark reviewed
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="plain"
                   disabled={busy}
                   onClick={() => onReview(a.id, "unresolved")}
                 >
                   Leave unresolved
-                </button>
+                </Button>
               </div>
             )
           )}

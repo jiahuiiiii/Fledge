@@ -218,7 +218,6 @@
 }
 .position-reading {
   background: var(--color-accent-soft);
-  border-left: 3px solid var(--color-accent-mid);
   padding: var(--space-4);
   border-radius: var(--radius-md);
   margin-bottom: var(--space-4);
@@ -657,3 +656,46 @@
     font-size: var(--text-xs);
   }
 }
+
+/* One look with the other tabs: filled surfaces, no outlines or heavy corners. */
+.sector-position { display: grid; gap: var(--space-4); }
+.sector-position .position-group,
+.sector-position .position-map-wrap,
+.sector-position .position-comparison,
+.sector-position .position-reading { border: 0; border-radius: var(--radius-md); background: var(--color-surface); }
+.sector-position .position-group { padding: var(--space-4); }
+.sector-position .position-reading { padding: var(--space-3) var(--space-4); }
+.sector-position .position-measure h3 { margin: 0; font-size: var(--text-md); }
+.sector-position .position-caption { color: var(--color-muted); font-size: var(--text-xs); line-height: 1.5; margin: 0; }
+.sector-position .position-view { margin: 0; }
+.sector-position { grid-template-columns: minmax(0, 1fr); }
+.sector-position > * { min-width: 0; }
+
+/* Compact comparison rows: one line each, so eight peers fit on a screen. */
+.sector-position .position-comparison-row { min-height: 40px; padding: var(--space-2) var(--space-3); }
+.sector-position .position-average-slot { height: 36px; }
+.sector-position .position-row-label { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: nowrap; padding: 0 var(--space-2); }
+.sector-position .position-row-label > strong { font-size: var(--text-sm); flex: 0 0 auto; }
+.sector-position .position-row-label > span { font-size: var(--text-sm); min-width: 0; }
+.sector-position .position-row-period, .sector-position .position-period-badge { flex: 0 0 auto; font-size: var(--text-xs); }
+.sector-position .position-row-end { top: var(--space-1); bottom: var(--space-1); }
+.sector-position .position-scale { height: 22px; }
+@media (max-width: 560px) { .sector-position .position-row-period { display: none; } }
+.sector-position .position-suggest { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+
+/* Looser than the first compact pass, tighter than the original tall rows. */
+.sector-position .position-comparison-row { min-height: 56px; padding: var(--space-3) var(--space-4); }
+.sector-position .position-average-slot { height: 44px; }
+.sector-position .position-row-label { gap: var(--space-3); }
+.sector-position .position-row-label > strong { font-size: var(--text-base); }
+.sector-position .position-row-end { top: var(--space-2); bottom: var(--space-2); }
+.sector-position .position-scale { height: 26px; }
+
+/* Peers card: title and Save share a row; search and suggestions sit together. */
+.sector-position .position-group-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.sector-position .position-save-row { margin-left: auto; justify-content: flex-end; }
+.sector-position .position-search { max-width: none; margin-top: var(--space-4); }
+.sector-position .position-search-row { display: flex; align-items: flex-start; gap: var(--space-3); flex-wrap: wrap; }
+.sector-position .position-search-row > :first-child { flex: 1 1 280px; min-width: 0; }
+.sector-position .position-search-row > .ui-button { flex: 0 0 auto; }
+.sector-position .position-empty { margin: var(--space-4) 0 0; padding: var(--space-4); border-radius: var(--radius-sm); background: var(--ui-surface-2); color: var(--color-muted); font-size: var(--text-sm); }
