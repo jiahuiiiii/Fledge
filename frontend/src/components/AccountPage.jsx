@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useProfile } from "../lib/profile";
 import { INVESTOR_TYPES, typeName } from "../lib/investorTypes";
-import { ProModeSwitch } from "./DetailModeToggle";
 import { AccountSecurityDialog } from "./AccountSecurity";
 import TelegramSettings from "./TelegramSettings";
 import { useTelegramLink } from "../lib/useTelegramLink";
@@ -55,15 +54,6 @@ export default function AccountPage({ session, controls, onBack }) {
                   : "Local access"}
             </Badge>
           }
-        />
-      </Card>
-      <Card>
-        <SectionHeader
-          level="card"
-          as="h2"
-          title="Pro tools"
-          description="Financials, charts, comparisons and the full research tabs. Off keeps the simpler Beginner view."
-          actions={home ? <ProModeSwitch compact /> : null}
         />
       </Card>
       {profile && (

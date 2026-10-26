@@ -428,9 +428,9 @@ function ResearchApp({ accountControls, session }) {
     };
   }, []);
   const [localMode, setLocalMode] = useState(readLocalMode);
-  const detailMode = home?.profile?.completed
-    ? home.detail_mode
-    : localMode || "explain";
+  // One page for everyone: plain wording, every tab, and the deeper
+  // overview behind "Show full details". The stored setting is ignored.
+  const detailMode = "explain";
   useEffect(() => {
     document.documentElement.dataset.detailMode = detailMode;
   }, [detailMode]);
@@ -489,7 +489,6 @@ function ResearchApp({ accountControls, session }) {
           stage={retakeQuiz ? "type" : "start"}
           profile={home.profile}
           onSkip={retakeQuiz ? () => setRetakeQuiz(false) : skipOnboarding}
-          onTurnOnPro={() => api.saveDetailMode("data").catch(() => {})}
           onDone={(profile) => {
             setRetakeQuiz(false);
             focusMainHeading();
@@ -662,6 +661,7 @@ function CompanyWorkspace({
     { mode: viewMode } = useProfile(),
     beginner = viewMode === "explain",
     [tab, setTab] = useState(() => (beginner ? "summary" : "business")),
+    [fullDetails, setFullDetails] = useState(false),
     [question, setQuestion] = useState(questionDefault);
   const [source, setSource] = useState(null),
     [editor, setEditor] = useState(null),
@@ -1062,6 +1062,8 @@ function CompanyWorkspace({
   }, [data, alertDetail]);
   // Beginner Summary content, reused by the merged Overview for fictional
   // sample companies so removing the Pro Summary tab did not hide their news.
+  const showOverview =
+    view === "workspace" && tab === "summary" && fullDetails;
   const summaryPanel = (active) => (
     <BeginnerSummary
       key={`summary-${instrumentId}`}
@@ -2137,6 +2139,17 @@ function CompanyWorkspace({
                       <RetainedView active={tab === "summary"}>
                         {summaryPanel(tab === "summary")}
                       </RetainedView>
+                      {!isRecorded && tab === "summary" && (
+                        <button
+                          type="button"
+                          className="full-details-toggle"
+                          aria-expanded={fullDetails}
+                          onClick={() => setFullDetails((open) => !open)}
+                        >
+                          {fullDetails ? "Hide details ▴" : "Show full details ▾"}
+                          {!fullDetails && <small>Price chart, business summary and latest activity</small>}
+                        </button>
+                      )}
                       <RetainedView active={tab === "evidence"}>
                         <>
                           {beginner && (
@@ -2473,12 +2486,13 @@ function CompanyWorkspace({
                         </RetainedView>
                       )}
                       {!isRecorded && (
-                        <RetainedView active={tab === "business"}>
+                        <RetainedView active={showOverview}>
                           <>
                             <CompanySnapshot
+                              detailsOnly
                               key={`snapshot-${instrumentId}`}
                               visible={
-                                view === "workspace" && tab === "business"
+                                showOverview
                               }
                               onSource={setSource}
                               focusTopic={
@@ -2492,7 +2506,7 @@ function CompanyWorkspace({
                                     exploration?.topic ? exploration : null
                                   }
                                   visible={
-                                    view === "workspace" && tab === "business"
+                                    showOverview
                                   }
                                   disclosures={data.disclosures}
                                   modelStatus={modelStatus}
@@ -2546,7 +2560,7 @@ function CompanyWorkspace({
                                   key={`prices-${instrumentId}`}
                                   instrumentId={instrumentId}
                                   initialRead={priceRead || pendingPriceRead}
-                                  visible={view === "workspace" && tab === "business"}
+                                  visible={showOverview}
                                   onRead={setPriceRead}
                                   loadStep={loadingRun?.steps.find((s) => s.key === "prices")}
                                 />

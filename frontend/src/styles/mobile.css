@@ -87,8 +87,6 @@
 }
 
 /* ---- Beginner shell: fewer things to click ---- */
-[data-detail-mode="explain"] .app-shell .company-actions,
-[data-detail-mode="explain"] .app-shell .research-navigation,
 [data-detail-mode="explain"] .app-shell .research-section-heading,
 [data-detail-mode="explain"] .app-shell .demo-bar,
 [data-detail-mode="explain"] .company-overview-search {
@@ -200,4 +198,27 @@
 [data-detail-mode="explain"] .news-section-status,
 [data-detail-mode="explain"] .current-news-summary {
   display: none !important;
+}
+
+/* One page: "Show full details" under the Summary. */
+.full-details-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  margin: var(--space-4) 0;
+  padding: var(--space-3);
+  min-height: 44px;
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.full-details-toggle small {
+  color: var(--color-text-2);
+  font-weight: 500;
 }
