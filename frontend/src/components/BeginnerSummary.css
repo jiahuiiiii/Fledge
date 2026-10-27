@@ -403,16 +403,10 @@
 .bs-group.tone-mixed h5 {
   color: var(--color-gold);
 }
-/* Good, bad and mixed stand out at a glance: tinted box with a coloured edge. */
-.bs-group.tone-good,
-.bs-group.tone-bad,
-.bs-group.tone-mixed,
-.bs-group.tone-neutral {
-  border-left: 4px solid var(--color-line-strong);
-}
-.bs-group.tone-good { background: var(--color-positive-soft); border-left-color: var(--color-positive); }
-.bs-group.tone-bad { background: var(--color-negative-soft); border-left-color: var(--color-negative); }
-.bs-group.tone-mixed { background: var(--color-gold-soft); border-left-color: var(--color-gold); }
+/* Good, bad and mixed get a tinted box (no coloured edge); neutral stays grey. */
+.bs-group.tone-good { background: var(--color-positive-soft); }
+.bs-group.tone-bad { background: var(--color-negative-soft); }
+.bs-group.tone-mixed { background: var(--color-gold-soft); }
 
 /* Summary uses the same neutral cards and headings as the research pages. */
 .bs-summary-cards {
