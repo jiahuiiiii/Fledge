@@ -33,7 +33,7 @@ trial. See [the actual test and accounting](../reviews/2026-10-09/sentiment-low-
 
 The local fictional workflow and offline tests can run in a clone; source collectors have their own configuration and do not depend on the paid-model path guard. Paid features also require the approved provider/model settings, explicit opt-in, the original cumulative ledger and sufficient unreserved budget. An unresolved charge can block new requests even in the approved folder. The UI does not automatically confirm provider charges.
 
-There is no supported self-service rebind or independent per-installation budget flow yet. A deliberate relocation must preserve the original database with all requests, charges, reservations and accounting decisions, then update the approved location through a reviewed code/configuration change. Do not reset the ledger or copy credentials into Git. `.env` and `.local/` are excluded from the repository; cloning or pushing does not transfer either. See [setup and the exact required locations](../../README.md#paid-ai-installation-restriction).
+There is no supported self-service rebind or independent per-installation budget flow yet. A deliberate relocation must preserve the original database with all requests, charges, reservations and accounting decisions, then update the approved location through a reviewed code/configuration change. Do not reset the ledger or copy credentials into Git. `.env` and `.local/` are excluded from the repository; cloning or pushing does not transfer either. See [setup and the exact required locations](../setup-and-reference.md#paid-ai-installation-restriction).
 
 ## Implemented boundary
 

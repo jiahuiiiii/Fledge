@@ -257,7 +257,7 @@ The verification uses authored fictional records and no external model/data call
 - Production frontend build succeeds. The installed frontend dependency audit reports **0 known vulnerabilities** after replacing inherited vulnerable build dependencies and removing unused packages. This is a point-in-time dependency check, not proof of application security.
 - The Python tests currently emit a Starlette deprecation notice for its supported `httpx` TestClient compatibility. All checks pass; a future test-client upgrade can address the warning without changing the app transport.
 
-Test commands are in [README](../../../README.md). Tests run in separate temporary database clusters and do not overwrite the local demo's history.
+Test commands are in [README](../../setup-and-reference.md). Tests run in separate temporary database clusters and do not overwrite the local demo's history.
 
 ## Schema and API boundary
 
