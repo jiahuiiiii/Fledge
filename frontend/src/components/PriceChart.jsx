@@ -90,26 +90,48 @@ export default function PriceChart({ prices, fictional = true }) {
             · {chosen.date}
           </small>
         </div>
-        <div className="segmented">
-          {ranges.map(([n, title]) => (
+        <div className="chart-controls">
+          <div className="segmented" role="group" aria-label="Date range">
+            {ranges.map(([n, title]) => (
+              <button
+                key={n}
+                aria-pressed={range === n}
+                onClick={() => {
+                  setRange(n);
+                  setHover(null);
+                  setSelected(null);
+                }}
+              >
+                {title}
+              </button>
+            ))}
+          </div>
+          <div className="segmented" role="group" aria-label="Chart type">
             <button
-              key={n}
-              aria-pressed={range === n}
-              onClick={() => {
-                setRange(n);
-                setHover(null);
-                setSelected(null);
-              }}
+              className="icon-only"
+              aria-pressed={mode === "Candles"}
+              aria-label="Candlestick chart"
+              title="Candlestick chart"
+              onClick={() => setMode("Candles")}
             >
-              {title}
+              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+                <path d="M4.5 2v12M11.5 1.5v13" />
+                <rect x="2.5" y="5" width="4" height="6" rx=".5" fill="currentColor" />
+                <rect x="9.5" y="4" width="4" height="7" rx=".5" />
+              </svg>
             </button>
-          ))}
-          <button
-            aria-pressed={mode === "Line"}
-            onClick={() => setMode(mode === "Line" ? "Candles" : "Line")}
-          >
-            {mode}
-          </button>
+            <button
+              className="icon-only"
+              aria-pressed={mode === "Line"}
+              aria-label="Line chart"
+              title="Line chart"
+              onClick={() => setMode("Line")}
+            >
+              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1.5 11.5l4-4 3 2.5 6-7" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
       <svg

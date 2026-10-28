@@ -8453,3 +8453,18 @@ details > summary:hover {
     padding: 14px var(--space-4);
   }
 }
+
+.chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.app-shell .segmented button.icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  padding: 7px 8px;
+}
