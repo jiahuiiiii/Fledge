@@ -186,6 +186,13 @@ def read(kind, value, *, transport=None, cache_only=False):
                             raise ValueError('Reddit RSS exceeded the reading limit.')
             body = bytes(body)
             xml(body)
+        except (httpx.ConnectError, httpx.ConnectTimeout):
+            # Nothing reached Reddit, so this feed's fifteen-minute lease is
+            # given back. Global pacing and the daily count still apply.
+            with transaction(source=True) as c:
+                c.execute('UPDATE provider_clocks SET next_at=%s WHERE provider=%s',
+                          (datetime.now(timezone.utc), cache_key))
+            raise ValueError(f'Reddit RSS {kind} could not be reached. Saved sources are retained.') from None
         except httpx.HTTPError:
             raise ValueError(f'Reddit RSS {kind} could not be reached. Saved sources are retained.') from None
         with transaction(source=True) as c:
@@ -322,6 +329,13 @@ def collect(company, days, enabled, now, fetcher=None, *, cache_only=False, incr
     except (ValueError, Conflict, httpx.HTTPError) as exc:
         checks['posts']['errors'].append(str(exc))
         live_allowed=False
+        if not cache_only:
+            # The error stays visible; the last saved search feed still counts.
+            try:
+                accept(*posts(cached('search', query), enabled, now, days, search=True))
+                checks['posts']['cached'] = True
+            except (ValueError, Conflict, httpx.HTTPError):
+                pass
     # Previously acquired hot feeds supplement discovery without spending
     # another request per community. Missing optional caches are not failures.
     # New company search is the sole live post-discovery request.

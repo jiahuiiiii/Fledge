@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { combineSuggestions } from "./proposals.js";
+import {
+  combineSuggestions,
+  splitSuggestions,
+  suggestionKey,
+  addedConditionIds,
+} from "./proposals.js";
 const base = {
   expected_revision: 1,
   question: "Question",
@@ -97,4 +102,32 @@ test("numeric risk update and addition preserve roles and untouched rules", () =
     added,
   ]);
   assert.deepEqual(current.conditions, [existing, kept]);
+});
+
+const numeric = (id, status, metric = "revenue_growth", extra = {}) => ({
+  ...common,
+  id,
+  status,
+  kind: "numeric",
+  operation: "add",
+  proposed: { definition: { metric, role: "required", operator: ">=", period_type: "quarter" } },
+  candidate: { ...base, conditions: [{ condition_id: "c-" + id, metric }] },
+  ...extra,
+});
+
+test("a repeated suggestion shows once and does not reappear in the history", () => {
+  const newest = numeric("new", "pending");
+  const older = numeric("old", "pending");
+  const stale = numeric("stale", "stale");
+  const other = numeric("margin", "pending", "operating_margin");
+  const accepted = { ...numeric("done", "approved"), kind: "reasoning", operation: "update", proposed: {} };
+  const { open, past } = splitSuggestions([newest, other, older, stale, accepted]);
+  assert.deepEqual(open.map((p) => p.id), ["new", "margin"]);
+  assert.deepEqual(past.map((p) => p.id), ["done"]);
+  assert.notEqual(suggestionKey(newest), suggestionKey(other));
+});
+
+test("a typed threshold is matched to the condition the suggestion adds", () => {
+  assert.deepEqual(addedConditionIds(numeric("a", "pending")), ["c-a"]);
+  assert.deepEqual(addedConditionIds({ ...numeric("b", "pending"), kind: "event" }), []);
 });

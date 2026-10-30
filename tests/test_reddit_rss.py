@@ -501,3 +501,51 @@ def test_paced_rss_lease_still_rejects_expired_collection(owner):
     with pytest.raises(Conflict,match='expired'):
         reddit_research.refresh(iid,collector='rss',fetcher=get,now=now)
     with transaction() as c:assert not social.documents(c,iid,now)
+
+
+def test_unreached_request_gives_the_feed_lease_back(owner):
+    prepare(owner)
+    def refuse(request):raise httpx.ConnectError('offline',request=request)
+    with pytest.raises(ValueError,match='could not be reached'):
+        rss.read('posts','stocks',transport=httpx.MockTransport(refuse))
+    with transaction() as c:
+        lease=one(c,"SELECT next_at FROM provider_clocks WHERE provider LIKE 'reddit-rss:r/stocks%%'")
+    assert lease['next_at']<=datetime.now(timezone.utc)
+
+
+def test_failed_live_search_does_not_start_the_reuse_window_or_hide_the_failure(owner,monkeypatch):
+    iid=prepare(owner);calls=[];now=datetime.now(timezone.utc)
+    def read(kind,value,**kwargs):
+        calls.append(kwargs.get('cache_only',False))
+        if kind=='search' and not kwargs.get('cache_only'):raise ValueError('Reddit RSS search could not be reached.')
+        if kind=='search':return feed()
+        if kind=='posts':return b'<feed xmlns="http://www.w3.org/2005/Atom"/>'
+        return comments_feed(value,now)
+    monkeypatch.setattr(rss,'read',read)
+    first=reddit_research.refresh(iid,now=now)
+    with transaction() as c:
+        assert one(c,'SELECT last_attempt_at FROM reddit_company_checks WHERE instrument_id=%s',(iid,))['last_attempt_at'] is None
+        assert one(c,"SELECT outcome FROM provider_checks WHERE instrument_id=%s AND provider='reddit_rss_posts'",(iid,))['outcome']=='partial'
+    # The saved search feed still counted, and the next check tries live again.
+    assert first['posts']==1
+    calls.clear()
+    reddit_research.refresh(iid,now=now+timedelta(seconds=30))
+    assert False in calls
+
+
+def test_reused_feeds_keep_the_last_live_problem(owner,monkeypatch):
+    iid=prepare(owner);now=datetime.now(timezone.utc)
+    def read(kind,value,**kwargs):
+        if kind=='search':return feed()
+        if kind=='posts':return b'<feed xmlns="http://www.w3.org/2005/Atom"/>'
+        return comments_feed(value,now)
+    monkeypatch.setattr(rss,'read',read)
+    reddit_research.refresh(iid,now=now)
+    with transaction(admin=True) as c:
+        c.execute("UPDATE provider_checks SET outcome='failed',message='could not be reached' WHERE instrument_id=%s AND provider='reddit_rss_posts'",(iid,))
+        c.execute("UPDATE reddit_company_checks SET error='could not be reached' WHERE instrument_id=%s",(iid,))
+    assert reddit_research.refresh(iid,now=now+timedelta(seconds=30))['status']=='cached'
+    with transaction() as c:
+        check=one(c,"SELECT outcome,message FROM provider_checks WHERE instrument_id=%s AND provider='reddit_rss_posts'",(iid,))
+        assert check['outcome']=='failed' and 'reached' in check['message']
+        assert one(c,'SELECT error FROM reddit_company_checks WHERE instrument_id=%s',(iid,))['error']=='could not be reached'

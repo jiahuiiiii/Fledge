@@ -1001,6 +1001,11 @@ def save(payload: SaveIdea):
     return {"result": service.save_idea(auth.current_owner(), payload)}
 
 
+@app.post("/api/v1/companies/{instrument_id}/idea/archive")
+def archive_idea(instrument_id: UUID):
+    return {"result": service.archive_idea(auth.current_owner(), instrument_id)}
+
+
 @app.post("/api/v1/research-actions")
 def research(payload: ResearchAction):
     service.research_action(auth.current_owner(), payload)
@@ -1031,7 +1036,7 @@ class WatchSettings(BaseModel):
     interval_minutes: Literal[60, 240] = 60
     match_idea: bool | None = None
     include_context: bool | None = None
-    idea_purpose: Literal["reasoning", "question"] | None = None
+    idea_purpose: Literal["reasoning", "question", "both"] | None = None
 
 
 class ReviewScheduleSettings(BaseModel):

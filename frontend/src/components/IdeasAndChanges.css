@@ -218,3 +218,13 @@
     transition: none;
   }
 }
+
+.app-shell .ideas-page .idea-summary-wrap {
+  position: relative;
+  min-width: 0;
+}
+.app-shell .ideas-page .idea-remove {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+}

@@ -55,7 +55,7 @@ export function statusLine(version, evaluation) {
   if (version.status === "archived") return "Archived. Not watching.";
   if (version.status !== "monitoring")
     return count
-      ? `Not watching yet. Approve the ${things} below in Edit to start alerts.`
+      ? `Not watching yet. The ${things} under “What I’m watching” are saved but not approved. Approve them to start alerts.`
       : "Not watching yet. Add something to watch in Edit, then approve it.";
   return evaluation
     ? `Watching ${things}. Last checked ${new Date(evaluation.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Singapore" })} SGT.`

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { withDefaultWindows, needsThreshold } from "./watchDefaults.js";
+import { withDefaultWindows, needsThreshold, suggestThreshold } from "./watchDefaults.js";
 
 const today = new Date("2026-10-25T10:00:00Z");
 
@@ -21,4 +21,13 @@ test("no event needing dates means nothing is applied", () => {
 test("a blank threshold needs the user", () => {
   assert.equal(needsThreshold({ conditions: [{ value: "" }] }), true);
   assert.equal(needsThreshold({ conditions: [{ value: "15" }] }), false);
+});
+
+test("the suggested threshold starts just below the latest reported figure", () => {
+  assert.equal(suggestThreshold(14.2), "10");
+  assert.equal(suggestThreshold(25), "20");
+  assert.equal(suggestThreshold("31.9"), "30");
+  assert.equal(suggestThreshold(-3), "-5");
+  assert.equal(suggestThreshold(null), null);
+  assert.equal(suggestThreshold("n/a"), null);
 });

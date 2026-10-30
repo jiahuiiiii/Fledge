@@ -541,3 +541,28 @@ def test_old_method_warning_preserves_saved_output_and_makes_no_call(
             == original
         )
     assert before == ledger.snapshot()
+
+
+def test_present_lists_held_source_ids(owner):
+    iid = prepare(owner)
+    add_social(iid)
+    result = sentiment.generate(iid, transport=provider())
+    with transaction() as c:
+        stored = one(c, "SELECT * FROM sentiment_analyses WHERE id=%s", (result["id"],))
+        held = [{"id": "held-1", "channel": "news", "reason": "x"}]
+        shown = sentiment.present(c, dict(stored, packet=dict(stored["packet"], held_sources=held)))
+        assert shown["held_source_ids"] == ["held-1"]
+        assert sentiment.present(c, stored)["held_source_ids"] == []
+
+
+def test_present_adds_a_one_day_view_of_the_same_labels(owner):
+    iid = prepare(owner)
+    add_social(iid)
+    result = sentiment.generate(iid, transport=provider())
+    with transaction() as c:
+        shown = sentiment.latest(c, iid)
+    recent, ids = shown["recent_summary"], set(shown["recent_source_ids"])
+    assert ids <= {s["id"] for s in shown["sources"]}
+    for channel in ("news", "social"):
+        assert recent[channel]["selected"] <= shown["summary"][channel]["selected"]
+        assert recent[channel]["relevant"] <= shown["summary"][channel]["relevant"]

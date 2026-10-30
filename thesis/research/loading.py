@@ -242,8 +242,27 @@ def start(owner, iid, *, initial=False, analyze=False, lookback_days=7,
             steps[-1]['reread_token'] = str(run_id)
         if split_failed:
             steps[-1]['split_failed'] = True
+            # A batch that failed in an explicit re-read belongs to that run's
+            # identity: continue it, reusing its settled batches, and skip the
+            # quick check that re-read never used.
+            token = _failed_reread_token(conn, iid)
+            if token:
+                steps[-1]['reread_token'] = token
         return one(conn, 'INSERT INTO research_loads(id,owner_id,instrument_id,lookback_days,steps) VALUES(%s,%s,%s,%s,%s) RETURNING *',
                    (run_id,owner,iid,lookback_days,Jsonb(steps)))
+
+
+def _failed_reread_token(conn, iid):
+    """The latest re-read run's token, if its analysis stopped and no later run finished one."""
+    for run in rows(conn, 'SELECT steps FROM research_loads WHERE instrument_id=%s ORDER BY created_at DESC,id DESC LIMIT 10', (iid,)):
+        step = next((s for s in run['steps'] if s['key']=='analysis'), None)
+        if not step or step['status'] in ('queued', 'running'):
+            continue
+        if step['status'] == 'blocked' and step.get('reread_token'):
+            return step['reread_token']
+        if step['status'] != 'blocked':
+            return None
+    return None
 
 
 def _write(conn, run, index, **fields):

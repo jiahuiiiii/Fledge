@@ -188,7 +188,7 @@ def active_watch(conn, owner, iid, token, purpose=None):
         watch
         and watch["enabled"]
         and watch["match_idea"]
-        and (purpose is None or watch["idea_purpose"] == purpose)
+        and (purpose is None or watch["idea_purpose"] in (purpose, "both"))
         and active(conn, owner, iid, token, datetime.now(timezone.utc), watch=watch)
     )
 
@@ -209,11 +209,13 @@ def prepare(
     if automatic and not active_watch(conn, owner, iid, token):
         return None, "stopped"
     if automatic:
-        purpose = one(
+        saved = one(
             conn,
             "SELECT idea_purpose FROM news_watches WHERE owner_id=%s AND instrument_id=%s",
             (owner, iid),
         )["idea_purpose"]
+        # A watch set to both runs one check per focus; the caller names which.
+        purpose = (purpose if purpose in PURPOSES else "reasoning") if saved == "both" else saved
     purpose = purpose_for({"purpose": purpose if purpose is not None else "reasoning"})
     idea = current_idea(conn, owner, iid)
     if not idea or (purpose == "reasoning" and not idea["reasoning"].strip()):
@@ -788,6 +790,7 @@ def generate(
     purpose=None,
     claim_token=None,
     transport=None,
+    keep_unseen=False,
 ):
     with transaction(owner) as c:
         packet, status = prepare(
@@ -876,8 +879,10 @@ def generate(
                 or not watch
                 or not watch["enabled"]
                 or not watch["match_idea"]
-                or watch["idea_purpose"] == purpose_for(packet)
-            ):
+                or watch["idea_purpose"] in (purpose_for(packet), "both")
+            ) and not keep_unseen:
+                # keep_unseen: another focus of the same watch still has to read
+                # these sources, so they stay "new" until it has.
                 remember(c, owner, packet["version_id"], latest["packet"]["sources"])
                 advance(
                     c,
