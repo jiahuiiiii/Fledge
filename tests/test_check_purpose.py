@@ -7,7 +7,7 @@ import pytest
 from pydantic import ValidationError
 from thesis import service, review_digest
 from thesis.app import IdeaAlertRequest, WatchSettings
-from thesis.db import transaction, one
+from thesis.db import transaction, one, rows
 from thesis.providers import ledger
 from thesis.monitoring import news_watch as W, watch_history
 from thesis.research import idea_alerts as A
@@ -409,3 +409,40 @@ def test_question_schema_binds_each_item_to_its_own_source_and_parent(owner):
     rendered = A.render({"response_body": question_provider()(req)}, p)
     assert rendered["noteworthy_count"] == len(p["sources"])
     assert any(i.get("conversation") for i in rendered["items"])
+
+
+def test_a_watch_set_to_both_checks_reasoning_and_question_on_the_same_sources(owner):
+    iid, _, _ = setup(owner)
+    W.configure(
+        owner,
+        iid,
+        True,
+        match_idea=True,
+        idea_purpose="both",
+        now=datetime.now(timezone.utc) - timedelta(minutes=61),
+    )
+    assert service.state(owner, iid)["news_watch"]["idea_purpose"] == "both"
+    fresh = newer(iid)
+    seen = []
+
+    def check(*a, **kw):
+        seen.append((kw["purpose"], kw["keep_unseen"]))
+        provider = question_provider() if kw["purpose"] == "question" else broad_provider()
+        return A.generate(*a, **kw, transport=provider)
+
+    assert W.run_once(
+        owner,
+        market_refresh=lambda _: None,
+        social_refresh=lambda: None,
+        analyzer=lambda _: fresh,
+        idea_analyzer=check,
+    )
+    assert seen == [("reasoning", True), ("question", False)]
+    with transaction(owner) as c:
+        purposes = {
+            r["packet"]["purpose"]
+            for r in rows(c, "SELECT packet FROM idea_alert_checks WHERE owner_id=%s", (owner,))
+        }
+    assert purposes >= {"reasoning", "question"}
+    recorded = watch_history.history(owner, iid)["items"][0]
+    assert recorded["idea_purpose"] == "both" and recorded["status"] == "completed"

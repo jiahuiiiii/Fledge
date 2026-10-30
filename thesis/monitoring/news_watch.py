@@ -49,7 +49,7 @@ def configure(
             raise ValueError("Choose company updates or saved-idea alerts.")
         if include_context is not None and type(include_context) is not bool:
             raise ValueError("Choose whether to check original reply context.")
-        if idea_purpose is not None and idea_purpose not in ("reasoning", "question"):
+        if idea_purpose is not None and idea_purpose not in ("reasoning", "question", "both"):
             raise ValueError(
                 "Choose answers to your question or connections to your reasoning."
             )
@@ -732,12 +732,40 @@ def run_once(
 
                 stage = "saved-reasoning analysis"
                 watch_context.require_active(owner, iid, token, supplied_clock)
-                checked = (idea_analyzer or idea_alerts.generate)(
-                    owner, iid, record["id"], automatic=True, claim_token=token
-                )
-                details["private"] = "completed"
-                details["idea_status"] = checked["status"]
-                idea_check_id = checked.get("id")
+                run_idea = idea_analyzer or idea_alerts.generate
+                if watch.get("idea_purpose") == "both":
+                    # One private check per focus, on the same new sources: the
+                    # first leaves them unseen until the second has read them.
+                    statuses = {}
+                    for focus in ("reasoning", "question"):
+                        watch_context.require_active(owner, iid, token, supplied_clock)
+                        try:
+                            checked = run_idea(
+                                owner,
+                                iid,
+                                record["id"],
+                                automatic=True,
+                                claim_token=token,
+                                purpose=focus,
+                                keep_unseen=focus == "reasoning",
+                            )
+                        except ValueError:
+                            if focus != "reasoning":
+                                raise
+                            statuses[focus] = "skipped"
+                            continue
+                        statuses[focus] = checked["status"]
+                        idea_check_id = checked.get("id") or idea_check_id
+                    details["private"] = "completed"
+                    details["idea_statuses"] = statuses
+                    details["idea_status"] = statuses["question"]
+                else:
+                    checked = run_idea(
+                        owner, iid, record["id"], automatic=True, claim_token=token
+                    )
+                    details["private"] = "completed"
+                    details["idea_status"] = checked["status"]
+                    idea_check_id = checked.get("id")
         else:
             status = "stopped"
     except WatchStopped:

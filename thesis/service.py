@@ -383,6 +383,55 @@ def save_idea(owner, payload):
         return _save_revision(conn, owner, payload)
 
 
+def archive_idea(owner, instrument_id):
+    """Take a saved view off the list: a new archived revision with the same content.
+
+    History is append-only, so earlier revisions stay readable; monitoring stops.
+    """
+    from .models import SaveIdea
+
+    with transaction(owner) as conn:
+        thesis = one(
+            conn,
+            "SELECT * FROM theses WHERE owner_id=%s AND instrument_id=%s",
+            (owner, str(instrument_id)),
+        )
+        if not thesis:
+            raise ValueError("There is no saved view for this company.")
+        version = one(
+            conn,
+            "SELECT * FROM thesis_versions WHERE owner_id=%s AND thesis_id=%s AND revision=%s",
+            (owner, thesis["id"], thesis["revision"]),
+        )
+        if version["status"] == "archived":
+            return dict(thesis_id=str(thesis["id"]), version_id=str(version["id"]),
+                        revision=thesis["revision"], archived=True)
+        conditions = rows(
+            conn,
+            """SELECT condition_id,role,metric,operator,threshold,unit,basis,period_type,
+                      max_report_age_days,expected_period_end,expected_report_by
+               FROM version_conditions WHERE owner_id=%s AND version_id=%s""",
+            (owner, version["id"]),
+        )
+        events = rows(
+            conn,
+            """SELECT condition_id,description,evidence_requirement,role,date_basis,
+                      repeat_months,repeat_count,window_start,deadline
+               FROM version_events WHERE owner_id=%s AND version_id=%s""",
+            (owner, version["id"]),
+        )
+        payload = SaveIdea(
+            instrument_id=instrument_id,
+            expected_revision=thesis["revision"],
+            question=version["question"],
+            reasoning=version["reasoning"],
+            status="archived",
+            conditions=conditions,
+            events=events,
+        )
+        return _save_revision(conn, owner, payload)
+
+
 def _save_revision(conn, owner, payload):
     if payload.status == "monitoring" and (
         not (payload.conditions or payload.events) or not payload.reasoning.strip()

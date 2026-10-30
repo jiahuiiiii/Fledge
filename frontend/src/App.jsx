@@ -89,8 +89,8 @@ import EventAssessment, {
 } from "./components/EventConditions";
 import ProposalPanel from "./components/ProposalPanel";
 import { statusLine, watchItems } from "./lib/ideaWatch";
-import { combineSuggestions } from "./lib/proposals";
-import { needsThreshold, withDefaultWindows } from "./lib/watchDefaults";
+import { combineSuggestions, addedConditionIds } from "./lib/proposals";
+import { needsThreshold, suggestThreshold, withDefaultWindows } from "./lib/watchDefaults";
 import NewCompanySetup from "./components/NewCompanySetup";
 import { useTelegramGuard } from "./components/TelegramPrompt";
 import ReviewDownload from "./components/ReviewDownload";
@@ -102,6 +102,8 @@ import PersonalHome from "./components/PersonalHome";
 import AccountPage from "./components/AccountPage";
 import WorkspaceHeader from "./components/WorkspaceHeader";
 import { Button, ToastHost, showToast, hideToast, UserIcon } from "./components/ui";
+import IdeaReasoning from "./components/IdeaReasoning";
+import ConfirmDialog from "./components/ConfirmDialog";
 import {
   ProfileContext,
   readLocalMode,
@@ -666,6 +668,7 @@ function CompanyWorkspace({
     [editor, setEditor] = useState(null),
     [approved, setApproved] = useState(false),
     [formError, setFormError] = useState(""),
+    [removing, setRemoving] = useState(null),
     [conflict, setConflict] = useState(null),
     [proposalIds, setProposalIds] = useState([]),
     [proposalStale, setProposalStale] = useState(false),
@@ -1310,6 +1313,19 @@ function CompanyWorkspace({
       reason: "No compatible observation",
       document_version_id: null,
     };
+  // What a numeric suggestion could start from: the latest reported figure for
+  // its metric and reporting scope, and a round number just below it.
+  const startingPoint = (p) => {
+    if (p.kind !== "numeric" || p.operation !== "add") return null;
+    const d = p.proposed?.definition;
+    const figure = d && latest(d.metric);
+    if (!figure || figure.value == null || figure.period_type !== (d.period_type || "quarter"))
+      return null;
+    const threshold = suggestThreshold(figure.value);
+    return threshold == null
+      ? null
+      : { threshold, value: displayNumber(figure.value), period: figure.period };
+  };
   const doc = (id) => data.documents.find((d) => d.id === id);
   const openSource = (id) => {
     const found =
@@ -1326,49 +1342,80 @@ function CompanyWorkspace({
     setFormError("");
     setConflict(null);
   };
-  // One click: apply a single suggestion with the standard date window, save it
-  // and start watching, then show the watching list. Anything that needs the
-  // user's own input (a threshold, or no written reasoning yet) opens the editor.
-  async function watchNow(p) {
+  // One step: apply the chosen suggestions with the standard date window and any
+  // thresholds typed on their cards, save and start watching. Anything still
+  // missing the user's own input opens the editor with the reason.
+  async function watchNow(list, thresholds = {}) {
     let candidate;
     try {
-      candidate = combineSuggestions([p]);
+      candidate = combineSuggestions(list);
     } catch (e) {
       setError(e.message);
       return;
     }
-    const base = formFor(
+    const typed = {};
+    for (const p of list)
+      for (const id of addedConditionIds(p))
+      {
+        const chosen = String(thresholds[p.id] ?? startingPoint(p)?.threshold ?? "").trim();
+        if (chosen !== "") typed[id] = chosen;
+      }
+    const start = formFor(
       { ...candidate, revision: candidate.expected_revision },
       candidate.question,
     );
+    const base = {
+      ...start,
+      conditions: start.conditions.map((c) =>
+        String(c.value ?? "").trim() === "" && typed[c.id] != null
+          ? { ...c, value: typed[c.id] }
+          : c,
+      ),
+    };
     const { form, applied } = withDefaultWindows(base);
+    const ids = list.map((p) => p.id);
     if (needsThreshold(form) || !form.reasoning.trim() || !form.question.trim()) {
       setEditor(form);
-      setProposalIds([p.id]);
+      setProposalIds(ids);
       setProposalStale(false);
       setApproved(false);
       setConflict(null);
       setFormError(
         needsThreshold(form)
-          ? "Choose your own threshold for this check, then save."
+          ? "Choose a threshold for this check, then save."
           : "Write a sentence of reasoning first, then start watching.",
       );
+      // The inputs sit below the reasoning box; bring the first empty one into view.
+      setTimeout(() => {
+        const input = [...document.querySelectorAll('.idea-dialog input[id^="value-"]')].find((el) => !el.value);
+        input?.scrollIntoView({ block: "center" });
+        input?.focus();
+      }, 50);
       return;
     }
     const scope = activeScope.current;
     setBusy(true);
     setError("");
     try {
-      await api.approveSuggestions([p.id], {
+      await api.approveSuggestions(ids, {
         ...revisionPayload(form, "monitoring"),
         instrument_id: instrumentId,
       });
       if (activeScope.current !== scope) return;
       await refresh({ light: true });
+      const added = [
+        ...form.conditions.map(
+          (c) =>
+            `${{ revenue_growth: "revenue growth", operating_margin: "operating margin" }[c.metric] || c.metric} ${c.operator} ${c.value}%`,
+        ),
+        ...form.events.map((e) => e.description),
+      ];
       setNotice(
-        applied
-          ? `Now watching. Reports from ${date(applied.window_start)} to ${date(applied.deadline)} count; change the dates under Edit › More options.`
-          : "Now watching. You'll get an update when it matches.",
+        `Now watching ${added.length} thing${added.length === 1 ? "" : "s"}: ${added.join("; ")}. ` +
+          "It is checked against new reports; matches show in Updates, and the status line at the top of this page shows the last check. " +
+          (applied
+            ? `Event reports from ${date(applied.window_start)} to ${date(applied.deadline)} count; change the dates under Edit › More options.`
+            : "Change anything with Edit."),
       );
       requestAnimationFrame(() => {
         window.scrollTo(0, 0);
@@ -1376,6 +1423,63 @@ function CompanyWorkspace({
           .querySelectorAll(".main-workspace, .workspace-grid")
           .forEach((el) => el.scrollTo?.(0, 0));
       });
+    } catch (e) {
+      if (activeScope.current === scope) setError(e.message);
+    } finally {
+      if (activeScope.current === scope) setBusy(false);
+    }
+  }
+  // Take one thing off the list. The earlier revision stays in History.
+  async function removeWatched({ key, label }) {
+    const form = formFor(current, question);
+    const next = {
+      ...form,
+      conditions: form.conditions.filter((c) => c.id !== key),
+      events: form.events.filter((e) => e.condition_id !== key),
+    };
+    const status =
+      current.status === "monitoring" && next.conditions.length + next.events.length > 0
+        ? "monitoring"
+        : "draft";
+    const scope = activeScope.current;
+    setBusy(true);
+    setError("");
+    try {
+      await api.save(
+        { ...revisionPayload(next, status), instrument_id: instrumentId },
+        instrumentId,
+      );
+      if (activeScope.current !== scope) return;
+      await refresh({ light: true });
+      setNotice(`No longer watching “${label}”.`);
+    } catch (e) {
+      if (activeScope.current === scope) setError(e.message);
+    } finally {
+      setRemoving(null);
+      if (activeScope.current === scope) setBusy(false);
+    }
+  }
+  // Approve what is already saved on the idea, without opening the editor.
+  async function approveCurrent() {
+    const { form } = withDefaultWindows(formFor(current, question));
+    if (needsThreshold(form) || !form.reasoning.trim() || !form.question.trim()) {
+      openEditor();
+      setFormError("Fill in what is missing, then approve.");
+      return;
+    }
+    const scope = activeScope.current;
+    setBusy(true);
+    setError("");
+    try {
+      await api.save(
+        { ...revisionPayload(form, "monitoring"), instrument_id: instrumentId },
+        instrumentId,
+      );
+      if (activeScope.current !== scope) return;
+      await refresh({ light: true });
+      setNotice(
+        "Now watching what is listed under “What I’m watching”. Matches show in Updates, and the status line shows the last check.",
+      );
     } catch (e) {
       if (activeScope.current === scope) setError(e.message);
     } finally {
@@ -2742,6 +2846,12 @@ function CompanyWorkspace({
                         changes={data.changes}
                         onOpen={onChoose}
                         onCreate={selectedCompanyId ? openEditor : undefined}
+                        onRemove={(c) =>
+                          act(
+                            () => api.archiveIdea(c.id),
+                            `Removed your ${c.symbol} view. It stays in History.`,
+                          )
+                        }
                       />
                     )}
                     <RetainedView active={view === "updates"}>
@@ -2830,18 +2940,14 @@ function CompanyWorkspace({
                           {current?.question ||
                             "What do you want to watch for this company?"}
                         </h2>
-                        <p
-                          className={
-                            current?.reasoning?.trim()
-                              ? "idea-reasoning"
-                              : "idea-reasoning empty"
-                          }
-                        >
-                          {current?.reasoning?.trim() ||
-                            (current
+                        <IdeaReasoning
+                          text={current?.reasoning}
+                          empty={
+                            current
                               ? "No reasoning written yet."
-                              : "Write what you think and what would change your mind, then choose what to watch.")}
-                        </p>
+                              : "Write what you think and what would change your mind, then choose what to watch."
+                          }
+                        />
                         <p
                           className={`idea-status ${current?.status === "monitoring" ? "on" : "off"}`}
                         >
@@ -2882,8 +2988,18 @@ function CompanyWorkspace({
                           </div>
                         )}
                         <div className="idea-actions">
+                          {current?.status === "draft" &&
+                            (current.events?.length || 0) + (current.conditions?.length || 0) > 0 && (
+                              <button
+                                className="primary"
+                                disabled={busy}
+                                onClick={approveCurrent}
+                              >
+                                Approve &amp; start watching
+                              </button>
+                            )}
                           <button
-                            className="primary"
+                            className={current?.status === "draft" && (current.events?.length || 0) + (current.conditions?.length || 0) > 0 ? "secondary" : "primary"}
                             onClick={openEditor}
                             aria-label={current ? "Edit my idea" : "Save an idea"}
                           >
@@ -2926,6 +3042,26 @@ function CompanyWorkspace({
                                 </span>
                                 <span className="idea-watch-state">
                                   {item.state}
+                                </span>
+                                <span className="idea-watch-actions">
+                                  <button
+                                    type="button"
+                                    className="text-button"
+                                    disabled={busy}
+                                    onClick={openEditor}
+                                    aria-label={`Edit ${item.label}`}
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="text-button"
+                                    disabled={busy}
+                                    onClick={() => setRemoving({ key: item.key, label: item.label })}
+                                    aria-label={`Remove ${item.label}`}
+                                  >
+                                    Remove
+                                  </button>
                                 </span>
                               </li>
                             ))}
@@ -2980,6 +3116,7 @@ function CompanyWorkspace({
                               }
                             }}
                             onWatch={watchNow}
+                            startingPoint={startingPoint}
                             onReject={(id) =>
                               act(
                                 () => api.rejectSuggestion(id),
@@ -3601,6 +3738,17 @@ function CompanyWorkspace({
           setSetupId(id);
         }}
       />
+      <ConfirmDialog
+        open={!!removing}
+        title="Stop watching this?"
+        confirmLabel="Stop watching"
+        danger
+        busy={busy}
+        onCancel={() => setRemoving(null)}
+        onConfirm={() => removeWatched(removing)}
+      >
+        {removing && `“${removing.label}” will no longer be watched. The earlier version stays in History.`}
+      </ConfirmDialog>
       <Modal
         open={!companyLoading && !!editor}
         className="idea-dialog"
@@ -3821,7 +3969,11 @@ function CompanyWorkspace({
                       {latest(c.metric).value != null &&
                         latest(c.metric).period_type ===
                         (c.period_type || "quarter")
-                        ? `Latest reported: ${displayNumber(latest(c.metric).value)}% · ${latest(c.metric).period}. This is context, not a suggested threshold.`
+                        ? `Latest reported: ${displayNumber(latest(c.metric).value)}% · ${latest(c.metric).period}. ${
+                            String(c.value) === suggestThreshold(latest(c.metric).value)
+                              ? "The number above is a starting point just below it; change it to your own."
+                              : "This is context, not a suggested threshold."
+                          }`
                         : "No comparable figure is available for this reporting scope."}
                     </small>
                     <label className="condition-period">

@@ -183,6 +183,14 @@ export default function MarketResearch({
   const news = currentNews.filter(
     (d) => !analysed.has(d.id) && !previewIds.has(d.id),
   );
+  // Held stories were selected but their AI check was interrupted; the app
+  // never resends an uncertain paid request by itself.
+  const held = new Set(
+    data.sentiment && !data.sentiment.withheld
+      ? data.sentiment.held_source_ids || []
+      : [],
+  );
+  const heldCount = news.filter((d) => held.has(d.id)).length;
   const availability = modelAvailability(modelStatus, "briefing_enabled");
   const brief = data.market_brief;
   const kinds = {
@@ -208,13 +216,22 @@ export default function MarketResearch({
       <Disclosure
         className="market-research unanalysed-headlines"
         title="More headlines"
-        description={`${news.length} company mentions · not analysed`}
+        description={`${news.length} company mentions · not analysed${heldCount ? ` · ${heldCount} on hold` : ""}`}
       >
         <p className="fine">
           Only headlines or supplied snippets that name {data.instrument.symbol}{" "}
           or the company appear here. The latest three appear above. These
           additional headlines have no saved tone label.
         </p>
+        {heldCount > 0 && (
+          <p className="fine">
+            {heldCount} of these {heldCount === 1 ? "was" : "were"} sent for
+            analysis, but the AI request was interrupted before an answer was
+            saved. The app does not resend a request that may already have
+            been charged, so {heldCount === 1 ? "it stays" : "they stay"} on
+            hold until you run Refresh &amp; analyse.
+          </p>
+        )}
         {!news.length && (
           <p className="fine">
             No additional unanalysed company headlines. Saved readings and the
@@ -233,6 +250,7 @@ export default function MarketResearch({
                 <>
                   <span>{d.source}</span>
                   <time dateTime={d.published_at}>{stamp(d.published_at)}</time>
+                  {held.has(d.id) && <span>On hold · analysis interrupted</span>}
                 </>
               }
               footer={

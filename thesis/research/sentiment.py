@@ -730,6 +730,23 @@ def present(conn, record, *, partial=False):
     for scope in affected:
         summary.pop(scope, None)
         (summary.get("social_platforms") or {}).pop(scope, None)
+    # The same saved labels, counted again for sources published in the day
+    # before the reading's cutoff. No new AI call: it only narrows the window.
+    since = datetime.fromisoformat(p["cutoff"]) - timedelta(hours=24)
+    recent_ids = {
+        s["id"]
+        for s in selected
+        if s.get("published_at") and datetime.fromisoformat(s["published_at"]) >= since
+    }
+    recent_summary = summarize(
+        [i for i in items if i["source_id"] in recent_ids],
+        [s for s in selected if s["id"] in recent_ids],
+        [l for l in links if l["source_id"] in recent_ids],
+        comparison,
+    )
+    for scope in affected:
+        recent_summary.pop(scope, None)
+        (recent_summary.get("social_platforms") or {}).pop(scope, None)
     withheld_sources = sum(
         s["id"] in hidden for s in p["sources"] + p.get("comparison_sources", [])
     )
@@ -741,6 +758,10 @@ def present(conn, record, *, partial=False):
         coverage_links=links,
         summary=summary,
         withheld_sources=withheld_sources,
+        recent_summary=recent_summary,
+        recent_source_ids=sorted(recent_ids),
+        # Ids only: a held source was never read, so it has nothing else to show.
+        held_source_ids=[h["id"] for h in p.get("held_sources", []) if h["id"] not in hidden],
         # Selected sources withheld per sample whose saved totals are not shown.
         withheld_summaries=dict(sorted(affected.items())),
         id=str(record["id"]),

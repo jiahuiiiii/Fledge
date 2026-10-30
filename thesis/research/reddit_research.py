@@ -182,6 +182,7 @@ def refresh(iid, *, lookback_days=7, fetcher=None, now=None, collector=None, inc
             cache_only=True
         # Four RSS requests can each wait for a reported reset (up to a minute)
         # and use a bounded HTTP timeout. Keep room for that paced acquisition.
+        previous_attempt=state['last_attempt_at']
         lease_minutes = 6 if collector == 'rss' else 4
         c.execute('UPDATE reddit_company_checks SET attempt_id=%s,lease_until=%s,last_attempt_at=%s WHERE instrument_id=%s',(token,now+timedelta(minutes=lease_minutes),state['last_attempt_at'] if cache_only else now,iid))
     get=fetcher or (lambda kind,post=None:(adapter.fetch if adapter else fetch)(kind,company,lookback_days,post,enabled))
@@ -246,14 +247,23 @@ def refresh(iid, *, lookback_days=7, fetcher=None, now=None, collector=None, inc
                 if check['errors']:
                     message += ' ' + ' '.join(dict.fromkeys(check['errors']))
                 if cache_only:
+                    # A reused feed must not overwrite the last live check's problem.
+                    last=one(c,'SELECT outcome FROM provider_checks WHERE instrument_id=%s AND provider=%s',(iid,'reddit_rss_'+kind))
+                    if last and last['outcome'] in ('failed','partial'):
+                        continue
                     message='Reused saved feeds; no new source request. ' + message
                 elif check.get('cached'):
                     message='Includes previously saved feeds. ' + message
                 outcome='partial' if check['errors'] and check['matched'] else 'failed' if check['errors'] else 'ready'
                 c.execute('INSERT INTO provider_checks(instrument_id,provider,last_attempt_at,completed_at,outcome,message,fetched,matched) VALUES(%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(instrument_id,provider) DO UPDATE SET last_attempt_at=excluded.last_attempt_at,completed_at=excluded.completed_at,outcome=excluded.outcome,message=excluded.message,fetched=excluded.fetched,matched=excluded.matched',
                           (iid,'reddit_rss_'+kind,now,done,outcome,message,check['fetched'],check['matched']))
+        # Reusing saved feeds is not a live check: keep the last live problem.
+        saved_error=state['error'] if cache_only else error
         c.execute('UPDATE reddit_company_checks SET lease_until=NULL,completed_at=%s,lookback_days=%s,post_count=%s,matched_count=%s,excluded_count=%s,error=%s WHERE instrument_id=%s',
-                  (done,lookback_days,discovered,retained,excluded,error,iid))
+                  (done,lookback_days,discovered,retained,excluded,saved_error,iid))
+        if rss_result and not cache_only and rss_result['checks']['posts']['errors']:
+            # A failed live search does not start the fifteen-minute reuse window.
+            c.execute('UPDATE reddit_company_checks SET last_attempt_at=%s WHERE instrument_id=%s',(previous_attempt,iid))
     result=dict(checked=['reddit'],failures=int(bool(error)),matched=retained,posts=len(posts),comments=len(comments),
                 collector=collector,message=error or f'{len(posts)} company posts and {len(comments)} replies collected through {"public HTML" if adapter else "company RSS search" if collector == "rss" else "public feeds"}.')
     if collector == 'rss':

@@ -1,8 +1,8 @@
 import { formatTimestamp } from "../lib/dateTime";
-import Checkbox from "./Checkbox";
 import { Button } from "./ui";
 import { roleLabel, comparisonMeaning } from "../lib/conditionRoles";
 import { useState } from "react";
+import { splitSuggestions, addedConditionIds } from "../lib/proposals";
 import { EventSchedule } from "./EventConditions";
 import { ReportExpectationText } from "./ReportExpectation";
 const stamp = (value) => formatTimestamp(value, { fallback: "Not recorded" });
@@ -57,6 +57,10 @@ export function DefinitionText({ value, kind }) {
     </>
   );
 }
+const validNumber = (v) => String(v ?? "").trim() !== "" && Number.isFinite(Number(v));
+const kindLabel = (p) =>
+  p.kind === "numeric" ? "Number to watch" : p.kind === "event" ? "Event to watch" : "Reword your question";
+
 export default function ProposalPanel({
   embedded = false,
   proposals = [],
@@ -66,58 +70,50 @@ export default function ProposalPanel({
   onGenerate,
   onReview,
   onWatch,
+  startingPoint = () => null,
   onReject,
   onSource,
   onOpen,
 }) {
-  const [selected, setSelected] = useState([]);
-  const pending = proposals.filter((p) => p.status === "pending"),
-    old = proposals.filter((p) => p.status !== "pending");
-  function card(p, index) {
+  const [thresholds, setThresholds] = useState({});
+  const { open, past } = splitSuggestions(proposals);
+  const usable = open.filter((p) => !p.source_unavailable);
+  // A suggestion that only adds a check can start watching in one step.
+  const watchable = (p) =>
+    onWatch && !p.source_unavailable && p.operation === "add" && p.kind !== "reasoning";
+  const valueOf = (p) => thresholds[p.id] ?? startingPoint(p)?.threshold ?? "";
+  const ready = (p) => p.kind !== "numeric" || validNumber(valueOf(p));
+  const effective = (list) => Object.fromEntries(list.map((p) => [p.id, valueOf(p)]));
+  const addable = usable.filter(watchable);
+  function card(p, { actions = false } = {}) {
     const field = p.kind === "numeric" ? "conditions" : "events";
     const before =
       p.kind === "reasoning"
         ? p.base
         : p.base[field]?.find((c) => c.condition_id === p.target_condition_id);
     const after = p.kind === "reasoning" ? p.proposed : p.proposed?.definition;
+    const adding = p.operation === "add";
+    const inputId = `threshold-${p.id}`;
     return (
       <article className="proposal-card" key={p.id}>
         <div className="row proposal-heading">
           <span className="section-label">
-            {p.status.toUpperCase()} ·{" "}
-            {p.kind === "numeric"
-              ? "NUMERICAL CHECK"
-              : p.kind === "event"
-                ? "EVENT CHECK"
-                : "REASONING"}
+            {actions ? kindLabel(p).toUpperCase() : `${p.status.toUpperCase()} · ${kindLabel(p).toUpperCase()}`}
           </span>
-          {p.status === "pending" && (
-            <label className="proposal-choice">
-              <Checkbox
-                aria-label={`Select suggestion ${index + 1}`}
-                checked={selected.includes(p.id)}
-                disabled={busy || p.source_unavailable}
-                onChange={(e) =>
-                  setSelected(
-                    e.target.checked
-                      ? [...selected, p.id]
-                      : selected.filter((id) => id !== p.id),
-                  )
-                }
-              />{" "}
-              Select
-            </label>
-          )}
         </div>
         <p className="proposal-rationale">{p.rationale}</p>
         {!p.source_unavailable && (
           <div className="proposal-diff">
+            {!adding && (
+              <div>
+                <span className="section-label">Your current idea</span>
+                <DefinitionText value={before} kind={p.kind} />
+              </div>
+            )}
             <div>
-              <span className="section-label">Your current idea</span>
-              <DefinitionText value={before} kind={p.kind} />
-            </div>
-            <div>
-              <span className="section-label">Suggested {p.operation}</span>
+              <span className="section-label">
+                {adding ? "What it would watch" : `Suggested ${p.operation}`}
+              </span>
               <DefinitionText
                 value={p.operation === "remove" ? null : after}
                 kind={p.kind}
@@ -134,7 +130,7 @@ export default function ProposalPanel({
             : "Starting idea · nothing saved yet"}{" "}
           · Sources through {stamp(p.cutoff)}.{" "}
           {p.status === "stale"
-            ? "The idea or source snapshot changed. Request fresh suggestions before applying this change."
+            ? "Your idea changed after this was made, so it can no longer be applied. Ask for fresh suggestions if you still want it."
             : ""}
         </p>
         {p.citations.map((c, i) => (
@@ -149,41 +145,88 @@ export default function ProposalPanel({
             </button>
           </details>
         ))}
-        {p.status === "pending" && onWatch && !p.source_unavailable && p.operation === "add" && (
+        {actions && !p.source_unavailable && (
           <div className="proposal-watch">
-            <Button variant="primary" size="sm" disabled={busy} onClick={() => onWatch(p)}>
-              Watch this
-            </Button>
+            {watchable(p) && p.kind === "numeric" && (
+              <label className="field" htmlFor={inputId}>
+                Your threshold (%)
+                <input
+                  id={inputId}
+                  type="number"
+                  step="any"
+                  inputMode="decimal"
+                  placeholder="e.g. 10"
+                  value={valueOf(p)}
+                  onChange={(e) =>
+                    setThresholds({ ...thresholds, [p.id]: e.target.value })
+                  }
+                />
+              </label>
+            )}
+            {watchable(p) && p.kind === "numeric" && startingPoint(p) && (
+              <small>
+                Latest reported: {startingPoint(p).value}% ({startingPoint(p).period}).{" "}
+                {startingPoint(p).threshold}% is a starting point just below it;
+                change it to your own.
+              </small>
+            )}
+            <div className="row">
+              {watchable(p) ? (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={busy || !ready(p)}
+                  onClick={() => onWatch([p], effective([p]))}
+                >
+                  Watch this
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={busy || !p.candidate}
+                  onClick={() => onReview([p])}
+                >
+                  {p.kind === "reasoning" ? "Use this wording" : "Review this change"}
+                </Button>
+              )}
+              <button
+                className="text-button proposal-reject"
+                disabled={busy}
+                onClick={() => onReject(p.id)}
+              >
+                Not now
+              </button>
+            </div>
             <small>
-              Saves it to your idea and starts watching, using the standard dates
-              (past week to 90 days ahead). Change anything later with Edit.
+              {watchable(p)
+                ? p.kind === "numeric"
+                  ? "Saves this to your view and starts watching once you enter a threshold. You can change it later with Edit."
+                  : "Saves it to your view and starts watching, using the standard dates (past week to 90 days ahead). Change anything later with Edit."
+                : "Opens your question and reasoning with this filled in. Nothing is saved until you save."}
             </small>
           </div>
         )}
-        {p.status === "pending" || p.status === "stale" ? (
+        {!actions && p.status === "stale" && (
           <button
             className="text-button proposal-reject"
             disabled={busy}
             onClick={() => onReject(p.id)}
           >
-            Reject suggestion
+            Dismiss
           </button>
-        ) : (
-          p.accepted_version_id && (
-            <button
-              className="text-button"
-              onClick={() => onOpen(p.accepted_version_id)}
-            >
-              Open the accepted revision ↗
-            </button>
-          )
+        )}
+        {!actions && p.status === "approved" && p.accepted_version_id && (
+          <button
+            className="text-button"
+            onClick={() => onOpen(p.accepted_version_id)}
+          >
+            Open the accepted revision ↗
+          </button>
         )}
       </article>
     );
   }
-  const chosen = pending.filter(
-    (p) => selected.includes(p.id) && !p.source_unavailable,
-  );
   return (
     <section
       className={embedded ? "proposal-panel embedded" : "proposal-panel"}
@@ -194,7 +237,7 @@ export default function ProposalPanel({
           <h3>Make your idea testable</h3>
           <p className="fine">
             Compare suggested changes with your original idea. Nothing changes
-            until you choose a suggestion, review it and save.
+            until you choose a suggestion and confirm it.
           </p>
         </>
       )}
@@ -224,21 +267,28 @@ export default function ProposalPanel({
           </p>
         </details>
       )}
-      {pending.map(card)}
-      {chosen.length > 0 && (
-        <button
-          className="primary"
-          disabled={busy}
-          onClick={() => onReview(chosen)}
-        >
-          Edit {chosen.length} selected suggestion
-          {chosen.length === 1 ? "" : "s"} first
-        </button>
+      {open.length > 0 && (
+        <p className="fine">
+          {open.length} suggestion{open.length === 1 ? "" : "s"}. Using one
+          saves a new version of your idea, so use the ones you want together
+          {addable.length > 1 ? " with “Watch all”" : ""}; the rest then need a
+          fresh request.
+        </p>
       )}
-      {old.length > 0 && (
+      {addable.length > 1 && (
+        <Button
+          variant="primary"
+          disabled={busy || !addable.every(ready)}
+          onClick={() => onWatch(addable, effective(addable))}
+        >
+          Watch all {addable.length} checks
+        </Button>
+      )}
+      {open.map((p) => card(p, { actions: true }))}
+      {past.length > 0 && (
         <details className="past-proposals">
-          <summary>Previous suggestions ({old.length})</summary>
-          {old.map(card)}
+          <summary>Earlier suggestions ({past.length})</summary>
+          {past.map((p) => card(p))}
         </details>
       )}
     </section>

@@ -306,3 +306,21 @@ def test_stale_split_action_never_starts_a_fresh_paid_reading(owner,prefilter):
         with pytest.raises(ValueError):
             B.run(sample(),split_failed=True,prefilter=prefilter,transport=lambda _:pytest.fail('fresh paid work from stale recovery action'))
     assert ledger.snapshot()['calls'] == 0
+
+
+def test_split_recovery_continues_the_blocked_reread_run(owner):
+    from thesis.research import loading
+    from test_market import prepare
+    iid=prepare(owner)
+    first=loading.start(owner,iid,analyze=True,split_failed=True)
+    assert "reread_token" not in first["steps"][0]
+    with transaction(admin=True) as c:
+        c.execute("UPDATE research_loads SET active=false,steps=jsonb_set(steps,'{0,status}','\"blocked\"') WHERE id=%s",(first["id"],))
+    reread=loading.start(owner,iid,analyze=True,reread=True)
+    with transaction(admin=True) as c:
+        c.execute("UPDATE research_loads SET active=false,steps=jsonb_set(steps,'{0,status}','\"blocked\"') WHERE id=%s",(reread["id"],))
+    split=loading.start(owner,iid,analyze=True,split_failed=True)
+    assert split["steps"][0]["reread_token"] == str(reread["id"]) and split["steps"][0]["split_failed"]
+    with transaction(admin=True) as c:
+        c.execute("UPDATE research_loads SET active=false,steps=jsonb_set(steps,'{0,status}','\"ready\"') WHERE id=%s",(split["id"],))
+    assert "reread_token" not in loading.start(owner,iid,analyze=True,split_failed=True)["steps"][0]

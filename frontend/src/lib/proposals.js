@@ -51,3 +51,49 @@ export function combineSuggestions(proposals) {
     );
   return result;
 }
+
+// What a suggestion would do, ignoring when it was made. Two suggestions with
+// the same key ask for the same thing.
+export function suggestionKey(p) {
+  const d = p.proposed?.definition || p.proposed || {};
+  const what =
+    p.kind === "reasoning"
+      ? "reasoning"
+      : p.kind === "numeric"
+        ? [d.metric, d.role, d.operator, d.period_type].join("/")
+        : [d.role, (d.description || "").trim().toLowerCase()].join("/");
+  return [p.kind, p.operation, p.target_condition_id || "", what].join("|");
+}
+
+// Newest first in, newest of each kind out. Older repeats and anything that
+// repeats a still-open suggestion are left out of the history.
+export function splitSuggestions(proposals) {
+  const open = [];
+  const openKeys = new Set();
+  for (const p of proposals.filter((q) => q.status === "pending")) {
+    const key = suggestionKey(p);
+    if (openKeys.has(key)) continue;
+    openKeys.add(key);
+    open.push(p);
+  }
+  const past = [];
+  const pastKeys = new Set();
+  for (const p of proposals.filter((q) => q.status !== "pending")) {
+    const key = suggestionKey(p);
+    if (p.status !== "approved" && (openKeys.has(key) || pastKeys.has(key)))
+      continue;
+    pastKeys.add(key);
+    past.push(p);
+  }
+  return { open, past };
+}
+
+// The condition ids a suggestion would add, so a threshold typed on its card
+// reaches the right row.
+export function addedConditionIds(p) {
+  if (p.kind !== "numeric" || p.operation !== "add") return [];
+  const have = new Set((p.base?.conditions || []).map((c) => c.condition_id));
+  return (p.candidate?.conditions || [])
+    .map((c) => c.condition_id)
+    .filter((id) => !have.has(id));
+}

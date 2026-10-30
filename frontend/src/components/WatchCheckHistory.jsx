@@ -106,9 +106,11 @@ export default function WatchCheckHistory({ instrumentId, lastCheck }) {
           )}
           <p className="fine">
             {c.match_idea
-              ? c.idea_purpose === "question"
-                ? "Saved-question answer watch"
-                : "Saved-reasoning watch"
+              ? c.idea_purpose === "both"
+                ? "Saved-reasoning and saved-question watch"
+                : c.idea_purpose === "question"
+                  ? "Saved-question answer watch"
+                  : "Saved-reasoning watch"
               : "Company news and sentiment watch"}{" "}
             ·{" "}
             {c.completed_at
@@ -127,9 +129,11 @@ export default function WatchCheckHistory({ instrumentId, lastCheck }) {
                     ? [
                         [
                           "private",
-                          c.idea_purpose === "question"
-                            ? "Saved question"
-                            : "Saved reasoning",
+                          c.idea_purpose === "both"
+                            ? "Saved reasoning and question"
+                            : c.idea_purpose === "question"
+                              ? "Saved question"
+                              : "Saved reasoning",
                         ],
                       ]
                     : []),

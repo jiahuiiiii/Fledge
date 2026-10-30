@@ -5,6 +5,7 @@ import {
   Card,
   ChartIcon,
   Disclosure,
+  FilterGroup,
   MetaRow,
   Pagination,
   SectionHeader,
@@ -77,6 +78,8 @@ export default function SentimentPanel({
   const [tab, setTab] = useState("all");
   const relevanceFilter = "relevant";
   const [toneFilter, setToneFilter] = useState("all");
+  // View only: the saved labels counted over a shorter window, no new analysis.
+  const [range, setRange] = useState("7d");
   const sourceListId = useId();
   const [page, setPage] = useState(1);
   const [checkPurpose, setCheckPurpose] = useState("reasoning");
@@ -96,12 +99,35 @@ export default function SentimentPanel({
     data.versions?.[0]?.events?.length > 0;
   const eventWatchCurrent =
     watch?.event_version_id === data.versions?.[0]?.id && approvedEvents;
+  const oneDay = range === "1d" && !!a?.recent_summary;
+  const recentIds = new Set(a?.recent_source_ids || []);
+  const summary = oneDay ? a.recent_summary : a?.summary;
   const sample =
     channel === "news"
-      ? a?.summary?.news
-      : a?.summary?.social_platforms?.[platform] ||
-        (platform === "reddit" ? a?.summary?.social : null);
+      ? summary?.news
+      : summary?.social_platforms?.[platform] ||
+        (platform === "reddit" ? summary?.social : null);
   const counts = countedTone(sample);
+  const newestPost = (a?.sources || [])
+    .filter(
+      (s) =>
+        s.kind === "social" &&
+        (!platform || (s.platform || "reddit") === platform) &&
+        (!oneDay || recentIds.has(s.id)),
+    )
+    .map((s) => s.published_at)
+    .filter(Boolean)
+    .sort()
+    .pop();
+  // The reading as the chosen range sees it: the same saved labels, narrowed.
+  const view = oneDay
+    ? {
+        ...a,
+        summary: a.recent_summary,
+        items: (a.items || []).filter((i) => recentIds.has(i.source_id)),
+        sources: (a.sources || []).filter((s) => recentIds.has(s.id)),
+      }
+    : a;
   const coverage = a && !a.withheld ? sourceCoverage(a) : null;
   const disabledReason = loadingRun?.active
     ? "A research update is already running. Wait for it to finish."
@@ -116,6 +142,7 @@ export default function SentimentPanel({
     originalSample(a, "all").map((source, index) => [source.id, index]),
   );
   const items = (a?.items || [])
+    .filter((item) => !oneDay || recentIds.has(item.source_id))
     .filter(
       (item) =>
         tab === "all" ||
@@ -131,7 +158,7 @@ export default function SentimentPanel({
         : 0,
     );
   const coverageLinks = a?.coverage_links || [];
-  useEffect(() => setPage(1), [a?.id, tab, relevanceFilter, toneFilter]);
+  useEffect(() => setPage(1), [a?.id, tab, relevanceFilter, toneFilter, range]);
   function filterTone(value) {
     setToneFilter(value);
     setPage(1);
@@ -164,6 +191,24 @@ export default function SentimentPanel({
         title="What’s the tone?"
         description="Read each source’s tone, then explore the evidence behind it."
       />
+      {a && !a.withheld && a.recent_summary && (
+        <FilterGroup
+          label="Tone time range"
+          value={range}
+          onValueChange={setRange}
+          options={[
+            { value: "7d", label: "7 days" },
+            { value: "1d", label: "1 day" },
+          ]}
+        />
+      )}
+      {oneDay && (
+        <p className="fine">
+          Counting only sources published in the 24 hours before this reading
+          ({recentIds.size} of {a.sources.length}). Labels are the saved ones;
+          nothing was re-analysed.
+        </p>
+      )}
       <div className="sentiment-heading-actions">
         <label className="sentiment-window">
           <span>Discussion window</span>
@@ -294,7 +339,7 @@ export default function SentimentPanel({
         <>
           {tab === "all" ? (
             <>
-              <SourceToneSummary analysis={a} />
+              <SourceToneSummary analysis={view} />
               <Disclosure variant="flush" className="secondary-details" title="Source coverage" description="How sources are counted, what was unavailable and reading limits">
                 <AllSourceSummary
                   analysis={a}
@@ -334,6 +379,13 @@ export default function SentimentPanel({
                     : `${sample.selected} texts → ${sample.relevant} relevant → ${counts.total} counted groups`}
                 </span>
               </ToneCard>
+              {channel !== "news" && newestPost && (
+                <p className="fine">
+                  Newest {platform || "discussion"} post in this sample:{" "}
+                  {stamp(newestPost)}. Anything posted after that is not
+                  counted here.
+                </p>
+              )}
               <p className="fine sample-count-explanation">
                 {channel === "news"
                   ? "Repeated coverage counts once in these tone totals. "
@@ -699,46 +751,65 @@ export default function SentimentPanel({
             </p>
           )}
           {watch?.enabled && (
-            <label className="watch-scope">
-              Alerts to receive{" "}
-              <Select
-                aria-label="Alert focus"
-                disabled={busy}
-                value={
-                  watch.match_idea
-                    ? watch.idea_purpose === "question"
-                      ? "question"
-                      : "idea"
-                    : "company"
-                }
-                onChange={(e) =>
-                  onWatch(
-                    true,
-                    watch.interval_minutes,
-                    e.target.value !== "company",
-                    undefined,
-                    e.target.value === "question" ? "question" : "reasoning",
-                  )
-                }
-              >
-                <option value="company">
-                  Company news and sentiment changes
-                </option>
-                <option value="idea" disabled={!activeReasoning}>
-                  Changes linked to my saved reasoning
-                </option>
-                <option value="question" disabled={!activeQuestion}>
-                  Answers to my saved question
-                </option>
-              </Select>
-            </label>
+            <fieldset className="watch-scope" disabled={busy}>
+              <legend>Alerts to receive</legend>
+              <label>
+                <Checkbox checked disabled /> Company news and sentiment changes
+                <small> · always on</small>
+              </label>
+              {[
+                ["reasoning", "Changes linked to my saved reasoning", activeReasoning],
+                ["question", "Answers to my saved question", activeQuestion],
+              ].map(([focus, label, available]) => {
+                const on =
+                  !!watch.match_idea &&
+                  (watch.idea_purpose === focus || watch.idea_purpose === "both");
+                return (
+                  <label key={focus}>
+                    <Checkbox
+                      checked={on}
+                      disabled={!available && !on}
+                      onChange={(e) => {
+                        const chosen = new Set(
+                          !watch.match_idea
+                            ? []
+                            : watch.idea_purpose === "both"
+                              ? ["reasoning", "question"]
+                              : [watch.idea_purpose],
+                        );
+                        if (e.target.checked) chosen.add(focus);
+                        else chosen.delete(focus);
+                        const purpose =
+                          chosen.size === 2
+                            ? "both"
+                            : chosen.has("question")
+                              ? "question"
+                              : "reasoning";
+                        onWatch(
+                          true,
+                          watch.interval_minutes,
+                          chosen.size > 0,
+                          undefined,
+                          purpose,
+                        );
+                      }}
+                    />{" "}
+                    {label}
+                  </label>
+                );
+              })}
+            </fieldset>
           )}
           {watch?.enabled && watch.match_idea && (
             <p className="fine">
-              {watch.idea_purpose === "question"
-                ? "Question-focused checks look for concrete answers to your saved question. They do not alert on inferred investment risks."
-                : "Reasoning checks look for support, challenges, specific risks and answers linked to your saved words."}{" "}
-              New eligible text uses another private AI request. Quiet results
+              {watch.idea_purpose === "both"
+                ? "Both checks read the same new sources: one for support, challenges and risks linked to your reasoning, one for concrete answers to your question. "
+                : watch.idea_purpose === "question"
+                  ? "Question-focused checks look for concrete answers to your saved question. They do not alert on inferred investment risks. "
+                  : "Reasoning checks look for support, challenges, specific risks and answers linked to your saved words. "}
+              {watch.idea_purpose === "both"
+                ? "New eligible text uses two private AI requests, one per check."
+                : "New eligible text uses another private AI request."} Quiet results
               stay in history. Changing focus or reasoning starts a quiet
               baseline for future sources; numerical and event conditions stay
               unchanged.

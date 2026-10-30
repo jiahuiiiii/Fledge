@@ -5,7 +5,8 @@ import { useState } from "react";
 import CompanyAvatar from "./CompanyAvatar";
 import { companyName } from "../lib/companyIdentity";
 import { useProfile } from "../lib/profile";
-import { LightbulbIcon, RefreshIcon, SectionHeader } from "./ui";
+import { Button, LightbulbIcon, RefreshIcon, SectionHeader } from "./ui";
+import ConfirmDialog from "./ConfirmDialog";
 import "./IdeasAndChanges.css";
 const metrics = {
   revenue_growth: "Revenue growth",
@@ -20,11 +21,15 @@ export default function IdeasAndChanges({
   onOpen,
   selectedCompany,
   onCreate,
+  onRemove,
 }) {
   const beginner = useProfile().mode === "explain";
   const [filter, setFilter] = useState("unreviewed");
+  const [removing, setRemoving] = useState(null);
+  const [busy, setBusy] = useState(false);
+  // A removed view is archived, never erased: it leaves this list, not History.
   const ideas = catalogue
-    .filter((c) => c.status)
+    .filter((c) => c.status && c.status !== "archived")
     .sort((a, b) => b.unread - a.unread);
   const updates = changes.filter(
     (c) =>
@@ -68,8 +73,8 @@ export default function IdeasAndChanges({
         ideas.length ? (
           <div className="idea-collection">
             {ideas.map((c) => (
+              <div key={c.id} className="idea-summary-wrap">
               <button
-                key={c.id}
                 className="idea-summary"
                 onClick={() => onOpen(c.id, "idea")}
               >
@@ -110,7 +115,39 @@ export default function IdeasAndChanges({
                   <IdeaArrow />
                 </div>
               </button>
+              {onRemove && (
+                <Button
+                  variant="plain"
+                  size="sm"
+                  className="idea-remove"
+                  aria-label={`Remove my ${c.symbol} view`}
+                  onClick={() => setRemoving(c)}
+                >
+                  Remove
+                </Button>
+              )}
+              </div>
             ))}
+            <ConfirmDialog
+              open={!!removing}
+              title="Remove this view?"
+              confirmLabel="Remove view"
+              danger
+              busy={busy}
+              onCancel={() => setRemoving(null)}
+              onConfirm={async () => {
+                setBusy(true);
+                try {
+                  await onRemove(removing);
+                } finally {
+                  setBusy(false);
+                  setRemoving(null);
+                }
+              }}
+            >
+              {removing &&
+                `Your ${removing.symbol} view leaves this list and its watching stops. Earlier versions stay in History.`}
+            </ConfirmDialog>
           </div>
         ) : (
           <div className="ideas-empty">

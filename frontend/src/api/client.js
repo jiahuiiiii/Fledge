@@ -367,6 +367,8 @@ export const api = {
       method: "POST",
       body: { ...body, ...(instrument_id ? { instrument_id } : {}) },
     }),
+  archiveIdea: (instrument_id) =>
+    request(`/companies/${instrument_id}/idea/archive`, { method: "POST" }),
   research: (body) => request("/research-actions", { method: "POST", body }),
   review: (id, action) =>
     request(`/evaluations/${id}/review`, { method: "POST", body: { action } }),

@@ -24,7 +24,7 @@ test("a draft says plainly that nothing is watched", () => {
   const draft = { status: "draft", events: [event], conditions: [number] };
   assert.equal(
     statusLine(draft),
-    "Not watching yet. Approve the 2 things below in Edit to start alerts.",
+    "Not watching yet. The 2 things under “What I’m watching” are saved but not approved. Approve them to start alerts.",
   );
   assert.deepEqual(
     watchItems(draft).map((i) => [i.type, i.label, i.state]),

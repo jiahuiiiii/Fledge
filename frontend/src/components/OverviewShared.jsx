@@ -112,12 +112,23 @@ export function ToneHeadlineGroups({
       </small>
     </li>
   );
+  // The people-online count adds every discussion platform together; say how
+  // much each contributes so it matches the platform tabs.
+  const byPlatform = (list) => {
+    const counts = new Map();
+    for (const item of list)
+      counts.set(item.platform || "reddit", (counts.get(item.platform || "reddit") || 0) + 1);
+    return [...counts].map(([name, n]) => `${platformName(name)} ${n}`).join(" · ");
+  };
   const group = (label, mood, list, limit = 3) =>
     list.length > 0 && (
       <div className={`bs-group tone-${mood}`}>
         <h5>
           {label} <Badge>{list.length}</Badge>
         </h5>
+        {social && mood !== "none" && (
+          <small className="fine">{byPlatform(list)}</small>
+        )}
         <ul className="bs-headlines">{list.slice(0, limit).map(headline)}</ul>
       </div>
     );

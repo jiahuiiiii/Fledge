@@ -23,3 +23,11 @@ export const needsThreshold = (form) =>
   (form.conditions || []).some(
     (c) => c.value == null || String(c.value).trim() === "",
   );
+
+// A starting point, not advice: the round multiple of 5 just below the latest
+// reported figure, so the check begins below where the company is today.
+export function suggestThreshold(latest) {
+  const value = Number(latest);
+  if (latest == null || latest === "" || !Number.isFinite(value)) return null;
+  return String(Math.floor((value - 1e-9) / 5) * 5);
+}

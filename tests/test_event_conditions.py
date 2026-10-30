@@ -389,3 +389,21 @@ def test_revoked_source_hides_event_interpretation_and_overall_status(
 def test_max_date_does_not_overflow_scheduler():
     with pytest.raises(ValidationError):
         EventCondition(**event(window_start="9999-01-01", deadline="9999-12-31"))
+
+
+def test_archiving_a_view_keeps_its_content_and_history(owner):
+    first = save(owner)
+    from thesis.config import INSTRUMENT
+    done = service.archive_idea(owner, INSTRUMENT)
+    assert done["revision"] == first["revision"] + 1
+    with transaction(owner) as c:
+        latest = one(c, "SELECT * FROM thesis_versions WHERE id=%s", (done["version_id"],))
+        earlier = one(c, "SELECT * FROM thesis_versions WHERE id=%s", (first["version_id"],))
+        assert latest["status"] == "archived" and latest["question"] == earlier["question"]
+        assert earlier["status"] != "archived"
+        kept = one(c, "SELECT count(*) n FROM version_events WHERE version_id=%s", (done["version_id"],))
+        assert kept["n"] == 1
+    # Archiving again changes nothing.
+    assert service.archive_idea(owner, INSTRUMENT)["archived"] is True
+    with pytest.raises(ValueError):
+        service.archive_idea(owner, uuid4())
