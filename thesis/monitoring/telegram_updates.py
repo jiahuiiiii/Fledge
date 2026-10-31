@@ -160,7 +160,15 @@ def polling():
 
 
 def poll_feedback():
-    if not polling():return False
+    if not polling():
+        # Commands just turned off with ratings off too: take the menu down once.
+        if telegram_commands.menu_shown():
+            try:telegram_commands.sync_menu()
+            except Exception:pass
+        return False
     received=receive()
     if telegram_commands.enabled():telegram_commands.sweep()
+    # The "/" command menu follows the switch; cosmetic, so never fatal here.
+    try:telegram_commands.sync_menu()
+    except Exception:pass
     return received

@@ -5,6 +5,11 @@
 //
 // Columns: lg 12, md 10, sm 6. Heights (h, in grid rows) are only a starting
 // size; each widget grows to fit its content, so nothing is cut off.
+//
+// optional: starts hidden, listed under "Sections you can add" in Arrange.
+// modes: detail modes that offer it ("explain" Beginner, "data" Pro).
+// when(context): offered only if true for this page (e.g. not for the
+// fictional practice companies, which have no real prices or filings).
 import {
   SummaryNews,
   SummaryPeople,
@@ -12,7 +17,25 @@ import {
   SummaryView,
   SummaryWorld,
 } from "./SummaryWidgets";
-import { HomeCompanies, HomePortfolio, HomeWelcome } from "./HomeWidgets";
+import {
+  CompanyActivity,
+  CompanyBusiness,
+  CompanyChart,
+  CompanyGlance,
+  CompanyTargets,
+  CompanyWatch,
+} from "./CompanyWidgets";
+import {
+  HomeAlerts,
+  HomeCompanies,
+  HomeInbox,
+  HomePortfolio,
+  HomeWelcome,
+  HomeWorld,
+} from "./HomeWidgets";
+
+const real = (context) => !context.recorded;
+const PRO = ["data"];
 
 const full = (y, h) => ({
   lg: { x: 0, y, w: 12, h },
@@ -63,6 +86,62 @@ export const WIDGETS = {
       minW: 3,
       default: half(1, 220, 60, 440),
     },
+    {
+      id: "glance",
+      title: "At a glance",
+      component: CompanyGlance,
+      minW: 4,
+      optional: true,
+      modes: PRO,
+      when: real,
+      default: half(0, 300, 60, 520),
+    },
+    {
+      id: "activity",
+      title: "Latest activity",
+      component: CompanyActivity,
+      minW: 3,
+      optional: true,
+      when: real,
+      default: half(1, 300, 60, 580),
+    },
+    {
+      id: "chart",
+      title: "Price chart",
+      component: CompanyChart,
+      minW: 4,
+      optional: true,
+      when: real,
+      default: full(360, 160),
+    },
+    {
+      id: "business",
+      title: "The business",
+      component: CompanyBusiness,
+      minW: 4,
+      optional: true,
+      when: real,
+      default: full(700, 160),
+    },
+    {
+      id: "targets",
+      title: "Analyst price targets",
+      component: CompanyTargets,
+      minW: 4,
+      optional: true,
+      modes: PRO,
+      when: real,
+      default: half(0, 860, 120, 860),
+    },
+    {
+      id: "watch",
+      title: "News watch",
+      component: CompanyWatch,
+      minW: 3,
+      optional: true,
+      when: real,
+      default: half(1, 860, 60, 980),
+    },
   ],
   home: [
     {
@@ -85,6 +164,30 @@ export const WIDGETS = {
       component: HomeCompanies,
       minW: 4,
       default: full(200, 200),
+    },
+    {
+      id: "alerts",
+      title: "Today’s alerts",
+      component: HomeAlerts,
+      minW: 3,
+      optional: true,
+      default: half(0, 400, 80, 400),
+    },
+    {
+      id: "inbox",
+      title: "Updates to review",
+      component: HomeInbox,
+      minW: 3,
+      optional: true,
+      default: half(1, 400, 80, 480),
+    },
+    {
+      id: "world",
+      title: "World headlines",
+      component: HomeWorld,
+      minW: 4,
+      optional: true,
+      default: full(560, 100),
     },
   ],
 };

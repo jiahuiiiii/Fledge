@@ -12,10 +12,15 @@ export const MARGIN = [16, 16];
 export const STACK_BELOW = 768;
 // A board narrower than this also stacks, even on a wide window.
 export const STACK_BOARD_BELOW = 600;
-export const MAX_ROWS = 400;
+// Kept in step with MAX_H / MAX_Y in thesis/workspace_layouts.py. Rows are
+// ROW_HEIGHT + MARGIN[1] = 18 px, so 2,000 rows is about 36,000 px.
+export const MAX_ROWS = 2000;
+export const MAX_Y = 20000;
 
+// Strictly wider than the breakpoint, as react-grid-layout decides it, so the
+// board and the grid always agree on which layout is showing.
 export const breakpointFor = (width) =>
-  width >= BREAKPOINTS.lg ? "lg" : width >= BREAKPOINTS.md ? "md" : "sm";
+  width > BREAKPOINTS.lg ? "lg" : width > BREAKPOINTS.md ? "md" : "sm";
 
 const whole = (value, low, high) =>
   Number.isInteger(value) && value >= low && value <= high;
@@ -28,7 +33,7 @@ function valid(item, bp) {
     whole(item.w, 1, cols) &&
     whole(item.x, 0, cols - 1) &&
     item.x + item.w <= cols &&
-    whole(item.y, 0, 1000) &&
+    whole(item.y, 0, MAX_Y) &&
     whole(item.h, 1, MAX_ROWS)
   );
 }
@@ -38,7 +43,8 @@ export const defaultLayout = (spec, bp) =>
 
 // Merge what the server returned with the registry: unknown or broken items are
 // dropped and widgets added since the save appear at their default width, below
-// everything already placed. Never throws; a missing save gives the defaults.
+// everything already placed (optional ones hidden). Never throws; a missing
+// save gives the defaults.
 export function reconcile(spec, saved) {
   const ids = new Set(spec.map((w) => w.id));
   const layouts = {};
@@ -66,8 +72,20 @@ export function reconcile(spec, saved) {
     }
     layouts[bp] = kept.map(({ i, x, y, w, h }) => ({ i, x, y, w, h }));
   }
+  // Optional widgets start hidden (listed under "Sections you can add") until
+  // the user adds one. A save made before an optional widget existed doesn't
+  // mention it, so it stays hidden there too; once saved, the hidden list
+  // records the choice either way.
+  const mentioned = new Set(
+    savedAt.flatMap((bp) => saved[bp].map((item) => item?.i)),
+  );
   const hidden = [
-    ...new Set((saved?.hidden || []).filter((id) => ids.has(id))),
+    ...new Set([
+      ...(saved?.hidden || []).filter((id) => ids.has(id)),
+      ...spec
+        .filter((w) => w.optional && !mentioned.has(w.id))
+        .map((w) => w.id),
+    ]),
   ];
   return { layouts, hidden, savedAt };
 }
@@ -129,3 +147,10 @@ export function saveBody(state) {
   for (const bp of state.savedAt) body[bp] = state.layouts[bp];
   return body;
 }
+
+// Widgets this page can offer right now: the right detail mode (Beginner
+// "explain" / Pro "data") and, if the widget asks, the page's context.
+export const offered = (spec, mode, context) =>
+  spec.filter(
+    (w) => (!w.modes || w.modes.includes(mode)) && (!w.when || w.when(context)),
+  );

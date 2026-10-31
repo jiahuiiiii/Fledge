@@ -57,6 +57,81 @@ function Freshness({ data }) {
   );
 }
 
+// "At a glance": revenue growth and the plain summary sentences from saved
+// filings, then when sources were last checked. Shared by the Overview details
+// and the At a glance widget.
+export function SnapshotGlance({
+  data,
+  financialError,
+  onRetryFinancials,
+  title = "At a glance",
+}) {
+  const { sentences, growth } = snapshot(data);
+  const { latestQuarter } = revenueComparisons(
+    data,
+    currentGuidance(data?.management_outlook),
+  );
+  return (
+    <>
+      <SectionHeader level="section" as="h2" title={title} />
+      {data.financials_pending ? (
+        <p className="glance-summary muted" role="status">
+          {financialError || "Loading saved financials…"}
+          {financialError && (
+            <Button variant="tertiary" onClick={onRetryFinancials}>
+              Try again
+            </Button>
+          )}
+        </p>
+      ) : sentences.length ? (
+        <p className="glance-summary">
+          {latestQuarter ? (
+            <span className="glance-growth">
+              <span className="glance-growth-title">
+                <strong>
+                  Revenue {latestQuarter.growth >= 0 ? "up" : "down"}{" "}
+                  {Math.abs(latestQuarter.growth).toFixed(1)}% · latest quarter
+                  vs a year earlier
+                </strong>
+                <TermHelp term="revenue_growth" />
+              </span>
+              <small>
+                Quarter to {day(latestQuarter.current.end)} vs quarter to{" "}
+                {day(latestQuarter.previous.end)}
+                {growth &&
+                  ` · fiscal year to ${day(growth.periodEnd)}: ${growth.growth >= 0 ? "+" : "−"}${Math.abs(growth.growth).toFixed(1)}%`}
+              </small>
+            </span>
+          ) : (
+            growth && (
+              <span className="glance-growth">
+                <span className="glance-growth-title">
+                  <strong>
+                    Revenue {growth.growth >= 0 ? "grew" : "fell"}{" "}
+                    {Math.abs(growth.growth).toFixed(1)}% · last fiscal year
+                  </strong>
+                  <TermHelp term="revenue_growth" />
+                </span>
+                <small>
+                  Year ended {day(growth.periodEnd)} vs year ended{" "}
+                  {day(growth.previousEnd)}
+                </small>
+              </span>
+            )
+          )}
+          {sentences.slice(growth ? 1 : 0).join(" ")}
+        </p>
+      ) : (
+        <p className="glance-summary muted">
+          A short summary appears once filings and news are loaded. Use Update
+          to load them.
+        </p>
+      )}
+      <Freshness data={data} />
+    </>
+  );
+}
+
 export default function CompanySnapshot({
   data,
   instrumentId,
@@ -75,11 +150,6 @@ export default function CompanySnapshot({
   onWorld,
   detailsOnly = false,
 }) {
-  const { sentences, growth } = snapshot(data);
-  const { latestQuarter } = revenueComparisons(
-    data,
-    currentGuidance(data?.management_outlook),
-  );
   const [world, setWorld] = useState(null);
   const [briefOpen, setBriefOpen] = useState(false);
   useEffect(() => {
@@ -156,61 +226,11 @@ export default function CompanySnapshot({
   return (
     <section className="glance pro-overview" aria-label="Company overview">
       {!detailsOnly && <PriceMoveLine price={price} pro />}
-      <SectionHeader level="section" as="h2" title="At a glance" />
-      {data.financials_pending ? (
-        <p className="glance-summary muted" role="status">
-          {financialError || "Loading saved financials…"}
-          {financialError && (
-            <Button variant="tertiary" onClick={onRetryFinancials}>
-              Try again
-            </Button>
-          )}
-        </p>
-      ) : sentences.length ? (
-        <p className="glance-summary">
-          {latestQuarter ? (
-            <span className="glance-growth">
-              <span className="glance-growth-title">
-                <strong>
-                  Revenue {latestQuarter.growth >= 0 ? "up" : "down"}{" "}
-                  {Math.abs(latestQuarter.growth).toFixed(1)}% · latest quarter
-                  vs a year earlier
-                </strong>
-                <TermHelp term="revenue_growth" />
-              </span>
-              <small>
-                Quarter to {day(latestQuarter.current.end)} vs quarter to{" "}
-                {day(latestQuarter.previous.end)}
-                {growth &&
-                  ` · fiscal year to ${day(growth.periodEnd)}: ${growth.growth >= 0 ? "+" : "−"}${Math.abs(growth.growth).toFixed(1)}%`}
-              </small>
-            </span>
-          ) : (
-            growth && (
-              <span className="glance-growth">
-                <span className="glance-growth-title">
-                  <strong>
-                    Revenue {growth.growth >= 0 ? "grew" : "fell"}{" "}
-                    {Math.abs(growth.growth).toFixed(1)}% · last fiscal year
-                  </strong>
-                  <TermHelp term="revenue_growth" />
-                </span>
-                <small>
-                  Year ended {day(growth.periodEnd)} vs year ended{" "}
-                  {day(growth.previousEnd)}
-                </small>
-              </span>
-            )
-          )}
-          {sentences.slice(growth ? 1 : 0).join(" ")}
-        </p>
-      ) : (
-        <p className="glance-summary muted">
-          A short summary appears once filings and news are loaded. Use Update
-          to load them.
-        </p>
-      )}
-      <Freshness data={data} />
+      <SnapshotGlance
+        data={data}
+        financialError={financialError}
+        onRetryFinancials={onRetryFinancials}
+      />
       {!detailsOnly && (
         <SignalLights
           name={name}

@@ -10,6 +10,7 @@ import {
   resizeItem,
   rowsFor,
   saveBody,
+  offered,
 } from "./workspaceLayout.js";
 
 const place = (x, y, w, h) => ({
@@ -106,4 +107,44 @@ test("only arranged widths are saved, with hidden widgets", () => {
   assert.equal(breakpointFor(1200), "lg");
   assert.equal(breakpointFor(900), "md");
   assert.equal(breakpointFor(640), "sm");
+  // At exactly a breakpoint the grid still shows the narrower layout.
+  assert.equal(breakpointFor(1100), "md");
+  assert.equal(breakpointFor(860), "sm");
+});
+
+const WITH_OPTIONAL = [
+  ...SPEC,
+  { id: "d", optional: true, modes: ["data"], default: place(0, 20, 6, 4) },
+  {
+    id: "e",
+    optional: true,
+    when: (c) => !c.recorded,
+    default: place(6, 20, 6, 4),
+  },
+];
+
+test("optional widgets start hidden until the user adds them", () => {
+  assert.deepEqual(reconcile(WITH_OPTIONAL, null).hidden, ["d", "e"]);
+  // A save from before they existed doesn't show them either.
+  const old = { lg: defaultLayout(SPEC, "lg"), hidden: ["b"] };
+  assert.deepEqual(reconcile(WITH_OPTIONAL, old).hidden, ["b", "d", "e"]);
+  // Once added and saved, a widget stays shown; hidden ones stay hidden.
+  const added = { lg: defaultLayout(WITH_OPTIONAL, "lg"), hidden: ["e"] };
+  assert.deepEqual(reconcile(WITH_OPTIONAL, added).hidden, ["e"]);
+});
+
+test("Pro-only and context-dependent widgets are offered only where they apply", () => {
+  const ids = (list) => list.map((w) => w.id);
+  assert.deepEqual(ids(offered(WITH_OPTIONAL, "explain", {})), [
+    "a",
+    "b",
+    "c",
+    "e",
+  ]);
+  assert.deepEqual(ids(offered(WITH_OPTIONAL, "data", { recorded: true })), [
+    "a",
+    "b",
+    "c",
+    "d",
+  ]);
 });

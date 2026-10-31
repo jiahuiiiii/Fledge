@@ -12,6 +12,15 @@ The company summary (Beginner summary; also the Pro Business tab) and the home p
 
 Heights follow content, so evidence is never cut off; only width is chosen by hand. Boards narrower than 600 px, and windows under 768 px, show one stacked column (order from the `sm` layout; arrows and hide still work). Widget content is inert while arranging so a drag never opens a link.
 
+## Widgets
+
+| Page | Shown by default | Optional (start hidden; Arrange → "Add") |
+| --- | --- | --- |
+| Company summary | Price and signals · News · People online · World · Your view | Latest activity · Price chart · The business · News watch (status; managed on the News tab) · **Pro only:** At a glance · Analyst price targets |
+| Home | Welcome · Your list today · Your companies | Today's alerts (past day) · Updates to review · World headlines |
+
+Optional company widgets are not offered for the fictional practice companies. A widget's `modes` limits it to Beginner (`explain`) or Pro (`data`); one that isn't offered keeps its saved place but is neither shown nor listed. No widget starts a supplier refresh or AI request by appearing: they read saved data, and their buttons are the same explicit actions as elsewhere (for example Analyst targets' "Update data").
+
 ## Where things are
 
 | Piece | File |
@@ -28,7 +37,7 @@ Breakpoints are on the board's width: `lg` ≥ 1100 px (12 columns), `md` ≥ 86
 
 ## API
 
-`GET /api/v1/layouts/{page}` → `{lg, md, sm, hidden, saved}`; a width never arranged is `null` and the browser uses the registry default. `PUT` with `{lg?, md?, sm?, hidden}` saves only the widths the user arranged (one PUT 500 ms after a change settles). `DELETE` resets. `page` is `overview` or `home`; every `i` must be a known widget id; positions must fit the column count; `h` ≤ 400 rows.
+`GET /api/v1/layouts/{page}` → `{lg, md, sm, hidden, saved}`; a width never arranged is `null` and the browser uses the registry default. `PUT` with `{lg?, md?, sm?, hidden}` saves only the widths the user arranged (one PUT 500 ms after a change settles). `DELETE` resets. `page` is `overview` or `home`; every `i` must be a known widget id; positions must fit the column count; `h` ≤ 2,000 rows and `y` ≤ 20,000 (rows are 18 px).
 
 Reconcile on read is mandatory: the server drops unknown ids and broken items; the browser adds widgets missing from a save at their default width below everything else. Adding a widget means adding it to **both** the registry and `WIDGETS` in `thesis/workspace_layouts.py`.
 

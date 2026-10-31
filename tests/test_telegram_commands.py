@@ -30,7 +30,7 @@ class Bot:
         if method == "sendMessage":
             self.next_id += 1
             return dict(message_id=self.next_id, chat=dict(id=body["chat_id"]))
-        if method in {"editMessageText", "answerCallbackQuery"}: return True
+        if method in {"editMessageText", "answerCallbackQuery", "setMyCommands", "deleteMyCommands"}: return True
         pytest.fail(f"Unexpected Telegram method {method}")
     def texts(self, method="sendMessage"):
         return [b["text"] for m, b in self.calls if m == method]
@@ -51,7 +51,12 @@ def bot(monkeypatch):
     monkeypatch.setattr(HTTP, "call", mock)
     monkeypatch.setattr(C, "enabled", lambda: True)
     monkeypatch.setattr(C.threading, "Thread", NoThread)
+    monkeypatch.setattr(C, "_menus", {})
+    monkeypatch.setattr(C, "_strangers", {})
     NoThread.started = []
+    # The cursor is keyed by bot, not account, so it outlives each test's accounts.
+    with transaction(admin=True) as conn:
+        conn.execute("TRUNCATE telegram_poll_state")
     return mock
 
 
@@ -129,7 +134,7 @@ def test_long_replies_are_split_for_telegram():
     assert C.chunks("y" * 9000) == ["y" * 4000, "y" * 4000, "y" * 1000]
 
 
-def test_today_answers_the_linked_chat_and_records_the_command(listed, bot):
+def test_today_answers_the_linked_chat_and_records_the_command(linked, listed, bot):
     send(bot, update(10, "/today"))
     text, = bot.texts()
     assert text.startswith("Your list today")
@@ -137,13 +142,13 @@ def test_today_answers_the_linked_chat_and_records_the_command(listed, bot):
     assert C.DISCLAIMER in text
     sent = [b for m, b in bot.calls if m == "sendMessage"][0]
     assert sent["chat_id"] == CHAT and "parse_mode" not in sent
-    row, = commands(listed)
+    row, = commands(linked)
     assert (row["command"], row["status"], row["message_id"]) == ("today", "answered", 501)
     # Replaying the same update (a cursor reset) never answers twice.
     with transaction(admin=True) as conn:
         conn.execute("UPDATE telegram_poll_state SET update_offset=0")
     U.receive(force=True)
-    assert len(bot.texts()) == 1 and len(commands(listed)) == 1
+    assert len(bot.texts()) == 1 and len(commands(linked)) == 1
 
 
 @pytest.mark.parametrize("patch", [
@@ -187,14 +192,14 @@ def test_commands_off_reads_nothing_new(linked, bot, monkeypatch):
     assert bot.texts() == [] and commands(linked) == []
 
 
-def test_rate_limit_answers_one_notice_then_stays_quiet(listed, bot):
+def test_rate_limit_answers_one_notice_then_stays_quiet(linked, listed, bot):
     send(bot, *[update(50 + i, "/help") for i in range(8)])
     texts = bot.texts()
     assert texts.count(C.HELP) == 6 and texts.count(C.TOO_MANY) == 1 and len(texts) == 7
-    assert [r["status"] for r in commands(listed)].count("limited") == 2
+    assert [r["status"] for r in commands(linked)].count("limited") == 2
 
 
-def test_why_shows_saved_evidence_without_claiming_a_cause(listed, bot):
+def test_why_shows_saved_evidence_without_claiming_a_cause(linked, listed, bot):
     send(bot, update(60, "/why nvda"), update(61, "/why ZZZZ"), update(62, "/why"))
     why, missing, empty = bot.texts()
     assert why.startswith("NVDA · NVIDIA Corp\nPrice 100.00, −3.2% since the last close (saved ")
@@ -202,10 +207,10 @@ def test_why_shows_saved_evidence_without_claiming_a_cause(listed, bot):
     assert "don't prove what caused it" in why and C.DISCLAIMER in why
     assert missing == "Fledge has no company saved as ZZZZ. Add it in the app first."
     assert empty.startswith("Add a ticker, for example /why NVDA.")
-    assert [r["argument"] for r in commands(listed)] == ["NVDA", "ZZZZ", None]
+    assert [r["argument"] for r in commands(linked)] == ["NVDA", "ZZZZ", None]
 
 
-def test_world_lists_linked_headlines_as_possible_channels(listed, bot, monkeypatch):
+def test_world_lists_linked_headlines_as_possible_channels(linked, listed, bot, monkeypatch):
     from thesis.research import world_news
     article = dict(id="a1", headline="New export rules for advanced chips", publisher="Reuters",
                    url="https://example.com/chips", published_at=(NOW - timedelta(hours=1)).isoformat(),
@@ -222,20 +227,20 @@ def test_world_lists_linked_headlines_as_possible_channels(listed, bot, monkeypa
     assert "Central bank holds rates" not in text and "not predictions" in text
 
 
-def test_watch_turns_on_the_apps_news_watch(listed, bot, monkeypatch):
+def test_watch_turns_on_the_apps_news_watch(linked, listed, bot, monkeypatch):
     from thesis.monitoring import news_watch
     calls = []
     monkeypatch.setattr(news_watch, "configure", lambda owner, iid, on, interval, now=None: calls.append(
         (owner, iid, on, interval)))
     send(bot, update(80, "/watch NVDA"))
-    assert calls == [(listed, listed["NVDA"], True, 240)]
+    assert calls == [(linked, listed["NVDA"], True, 240)]
     assert bot.texts()[0].startswith("Watching NVDA · NVIDIA Corp for news every four hours")
     with transaction(admin=True) as conn:
         conn.execute("INSERT INTO news_watches(owner_id,instrument_id,enabled,interval_minutes) VALUES(%s,%s,true,60)",
-                     (listed, listed["AVGO"]))
+                     (linked, listed["AVGO"]))
     send(bot, update(81, "/watch avgo"))
     assert len(calls) == 1 and bot.texts()[1].startswith("AVGO is already watched every hour.")
-    latest = C.latest(listed)["latest"]
+    latest = C.latest(linked)["latest"]
     assert latest["command"] == "watch"
 
 
@@ -256,40 +261,40 @@ EXPLAINED = dict(
 )
 
 
-def test_explain_queues_then_publishes_the_same_saved_result_as_the_app(listed, bot):
+def test_explain_queues_then_publishes_the_same_saved_result_as_the_app(linked, listed, bot):
     send(bot, update(90, "/explain"))
     note, = bot.texts()
     assert note.startswith("Working on it") and "at most about US$" in note
-    row, = commands(listed)
+    row, = commands(linked)
     assert row["status"] == "queued" and row["message_id"] == 501
-    assert NoThread.started == [(listed, str(row["id"]))]
+    assert NoThread.started == [(linked, str(row["id"]))]
     # The worker: one ledger call, result and command state saved together.
-    assert C.run_explain(listed, row["id"], model=fake_model(EXPLAINED)) is True
-    assert C.run_explain(listed, row["id"], model=fake_model(EXPLAINED)) is False  # claimed once
-    done, = commands(listed)
-    with transaction(listed) as conn:
-        saved = one(conn, "SELECT * FROM portfolio_reads WHERE owner_id=%s", (listed,))
+    assert C.run_explain(linked, row["id"], model=fake_model(EXPLAINED)) is True
+    assert C.run_explain(linked, row["id"], model=fake_model(EXPLAINED)) is False  # claimed once
+    done, = commands(linked)
+    with transaction(linked) as conn:
+        saved = one(conn, "SELECT * FROM portfolio_reads WHERE owner_id=%s", (linked,))
     assert done["status"] == "done" and done["result_id"] == saved["id"] and done["delivered_at"]
-    page = portfolio.build(listed)
+    page = portfolio.build(linked)
     assert page["explanation"]["headline"] == EXPLAINED["headline"]
     edit, = [b for m, b in bot.calls if m == "editMessageText"]
     assert edit["message_id"] == 501 and edit["chat_id"] == CHAT
     assert EXPLAINED["headline"] in edit["text"] and "[Reuters]" in edit["text"]
     assert "Buy the dip" not in edit["text"] and "1 uncited or advice-like part(s) were left out." in edit["text"]
-    assert C.latest(listed)["latest"]["id"] == str(done["id"])
+    assert C.latest(linked)["latest"]["id"] == str(done["id"])
     # Asking again with the same list and news reuses the saved answer for free.
     send(bot, update(91, "/explain"))
     assert "reuses that answer at no cost" in bot.texts()[-1]
 
 
-def test_explain_failures_are_recorded_and_never_retried(listed, bot):
+def test_explain_failures_are_recorded_and_never_retried(linked, listed, bot):
     send(bot, update(100, "/explain"))
-    row, = commands(listed)
+    row, = commands(linked)
 
     def broken(body):
         raise RuntimeError("connection reset")
-    assert C.run_explain(listed, row["id"], model=broken)
-    failed, = commands(listed)
+    assert C.run_explain(linked, row["id"], model=broken)
+    failed, = commands(linked)
     assert failed["status"] == "failed" and "failed before a result was saved" in failed["error"]
     edit, = [b for m, b in bot.calls if m == "editMessageText"]
     assert edit["text"].startswith("Couldn't explain your list:")
@@ -307,24 +312,24 @@ def test_explain_needs_a_list_and_spends_nothing_otherwise(linked, bot, monkeypa
     assert row["status"] == "answered" and NoThread.started == []
 
 
-def test_sweep_marks_stopped_explanations_and_tells_the_chat(listed, bot):
+def test_sweep_marks_stopped_explanations_and_tells_the_chat(linked, listed, bot):
     send(bot, update(120, "/explain"))
-    row, = commands(listed)
+    row, = commands(linked)
     with transaction(admin=True) as conn:
         conn.execute("UPDATE telegram_commands SET status='running',started_at=%s WHERE id=%s",
                      (NOW - timedelta(minutes=20), row["id"]))
     assert C.sweep() == (1, 0)
-    stopped, = commands(listed)
+    stopped, = commands(linked)
     assert stopped["status"] == "interrupted"
     assert [b["text"] for m, b in bot.calls if m == "editMessageText"][0].startswith("This explanation stopped")
     # A queued one the worker never started is run once it is 30 seconds old.
     send(bot, update(121, "/explain"))
-    queued = commands(listed)[-1]
+    queued = commands(linked)[-1]
     NoThread.started = []
     with transaction(admin=True) as conn:
         conn.execute("UPDATE telegram_commands SET received_at=%s WHERE id=%s",
                      (datetime.now(timezone.utc) - timedelta(minutes=1), queued["id"]))
-    assert C.sweep() == (0, 1) and NoThread.started == [(listed, queued["id"])]
+    assert C.sweep() == (0, 1) and NoThread.started == [(linked, queued["id"])]
 
 
 def test_latest_endpoint_reports_off(owner, monkeypatch):
@@ -332,3 +337,107 @@ def test_latest_endpoint_reports_off(owner, monkeypatch):
     client = TestClient(app)
     client.get("/api/v1/session")
     assert client.get("/api/v1/telegram/commands/latest").json()["result"] == dict(enabled=False, latest=None)
+
+
+def menu_calls(bot):
+    return [(m, b) for m, b in bot.calls if m in ("setMyCommands", "deleteMyCommands")]
+
+
+def test_command_menu_follows_the_switch_for_linked_chats_only(linked, bot, monkeypatch):
+    U.poll_feedback()
+    (method, body), = menu_calls(bot)
+    assert method == "setMyCommands" and body["scope"] == dict(type="chat", chat_id=CHAT)
+    assert [c["command"] for c in body["commands"]] == ["today", "why", "world", "explain", "watch", "help"]
+    assert all(3 <= len(c["description"]) <= 256 for c in body["commands"])
+    U.poll_feedback()
+    assert len(menu_calls(bot)) == 1  # once per change, not every poll
+    # Commands off while rating buttons still poll: the menu is removed once.
+    monkeypatch.setattr(C, "enabled", lambda: False)
+    monkeypatch.setattr(U.alert_feedback, "enabled", lambda: True)
+    U.poll_feedback()
+    U.poll_feedback()
+    assert [m for m, _ in menu_calls(bot)] == ["setMyCommands", "deleteMyCommands"]
+
+
+def test_a_failed_menu_update_waits_before_trying_again(linked, bot, monkeypatch):
+    calls = []
+
+    def refuse(key, method, body):
+        calls.append(method)
+        raise HTTP.TelegramError("unavailable", "Telegram could not be reached.")
+    monkeypatch.setattr(HTTP, "call", refuse)
+    now = datetime.now(timezone.utc)
+    assert C.sync_menu(now=now) == 0 and calls == ["setMyCommands"]
+    assert C.sync_menu(now=now + timedelta(minutes=5)) == 0 and len(calls) == 1
+    monkeypatch.setattr(HTTP, "call", bot)
+    assert C.sync_menu(now=now + timedelta(minutes=11)) == 1
+    assert [m for m, _ in menu_calls(bot)] == ["setMyCommands"]
+
+
+
+def second_account(bot, uid):
+    other = str(uuid4())
+    with transaction(admin=True) as conn:
+        conn.execute("INSERT INTO accounts VALUES(%s,%s)", (other, "Second test account"))
+    nonce = parse_qs(urlsplit(T.connect(other)["url"]).query)["start"][0]
+    bot.updates.append(update(uid, "/start " + nonce))
+    assert T.check_connection(other)["linked"]
+    return other
+
+
+def signed_in(account, username, at):
+    with transaction(admin=True) as conn:
+        conn.execute("INSERT INTO password_credentials(account_id,username,password_hash) VALUES(%s,%s,'x')",
+                     (account, username))
+        conn.execute("INSERT INTO password_sessions(token_hash,account_id,created_at,expires_at) VALUES(%s,%s,%s,%s)",
+                     (uuid4().hex, account, at, at + timedelta(days=30)))
+
+
+def test_a_chat_linked_to_several_accounts_answers_for_the_right_one(linked, bot):
+    other = second_account(bot, 2)
+    now = datetime.now(timezone.utc)
+    signed_in(linked, "first.account", now - timedelta(days=2))
+    signed_in(other, "second.account", now - timedelta(hours=1))
+    bot.calls.clear()
+    # No alerts on anywhere: the account signed into last answers, and says so.
+    send(bot, update(3, "/help"))
+    assert commands(other)[0]["command"] == "help" and commands(linked) == []
+    assert bot.texts()[-1].endswith("connected to more than one account; it uses the one with "
+                                    "Telegram alerts on that you signed into last.")
+    assert "“second.account”" in bot.texts()[-1]
+    # An account with Telegram alerts on wins over a later sign-in.
+    with transaction(admin=True) as conn:
+        conn.execute("UPDATE telegram_settings SET enabled=true,enabled_at=now() WHERE owner_id=%s", (linked,))
+    send(bot, update(4, "/help"))
+    assert len(commands(linked)) == 1 and "“first.account”" in bot.texts()[-1]
+
+
+def test_an_unlinked_chat_is_told_once_not_every_message(linked, bot):
+    send(bot, update(500, "/today", chat=555), update(501, "/help", chat=555), update(502, "/world", chat=556))
+    assert bot.texts() == [C.LINK_FIRST, C.LINK_FIRST]
+    assert [b["chat_id"] for m, b in bot.calls if m == "sendMessage"] == [555, 556]
+
+
+def test_a_saved_explanation_is_never_reported_as_failed(linked, listed, bot, monkeypatch):
+    send(bot, update(510, "/explain"))
+    row, = commands(linked)
+
+    def broken(page):
+        raise RuntimeError("formatting failed after the save")
+    monkeypatch.setattr(C, "explanation_text", broken)
+    assert C.run_explain(linked, row["id"], model=fake_model(EXPLAINED))
+    done, = commands(linked)
+    assert done["status"] == "done" and done["result_id"] and done["error"] is None
+    edit, = [b for m, b in bot.calls if m == "editMessageText"]
+    assert edit["text"].startswith("Your list was explained and saved.")
+
+
+def test_menu_comes_down_even_when_nothing_else_polls(linked, bot, monkeypatch):
+    U.poll_feedback()
+    monkeypatch.setattr(C, "enabled", lambda: False)
+    monkeypatch.setattr(U.alert_feedback, "enabled", lambda: False)
+    assert U.poll_feedback() is False
+    assert [m for m, _ in menu_calls(bot)] == ["setMyCommands", "deleteMyCommands"]
+    U.poll_feedback()
+    assert len(menu_calls(bot)) == 2
+

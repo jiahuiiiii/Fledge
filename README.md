@@ -34,6 +34,10 @@ Someone who starts investing faces three problems:
 - Urgent items go straight to your phone on **Telegram**. Everything else is collected into a **daily summary** and a **weekly review**.
 - Tap **Useful** or **Not useful** on an alert, so alert quality can be measured over time.
 
+**Ask from Telegram.** In your linked chat, type `/` to see the commands: `/today` (how your list moved), `/why NVDA` (the saved news, tone and filing next to one company's move), `/world` (world headlines that might matter for your list), `/explain` (a written explanation of your list, one AI request with its cost shown first) and `/watch NVDA` (turn on a company's news watch). Answers are facts and saved evidence only, and they also show up in the app.
+
+**Arrange your pages.** On the home page and each company's summary, choose **Arrange** to drag sections, change their width, hide them or add optional ones: latest activity, price chart, the business, news watch, today's alerts, updates to review and world headlines, plus at-a-glance figures and analyst price targets in Pro. Your layout is saved to your account for each screen size. Phones get one simple column.
+
 **Beginner and Pro modes.** Beginner mode rewords the same evidence in simpler language. Pro mode keeps the detailed tabs. Neither one changes the underlying facts.
 
 ## Principles
@@ -54,8 +58,9 @@ Someone who starts investing faces three problems:
  │ Reddit, HN       │      │    original quotes      │      │  your notes)     │
  │ Prices (Yahoo)   │      │ 3. AI reads the tone    │      │                  │
  │ Analyst targets  │      │ 4. Compare with before  │      │ Telegram         │
- └──────────────────┘      │ 5. Decide who to tell   │      │ (urgent alerts)  │
-                           └─────────────────────────┘      │ Daily & weekly   │
+ └──────────────────┘      │ 5. Decide who to tell   │      │ (alerts and      │
+                           └─────────────────────────┘      │  commands)       │
+                                                            │ Daily & weekly   │
                                                             │ summaries        │
                                                             └──────────────────┘
 ```
@@ -107,5 +112,7 @@ It needs your own API keys for news and AI, which go in a private `.env` file th
 - [Documentation index](docs/README.md): every feature and its rules
 - [Companion journey and product thinking](docs/features/companion-journey.md)
 - [How alerts and Telegram work](docs/features/telegram-alerts.md)
+- [Telegram commands](docs/features/telegram-commands.md)
+- [Arrangeable home and summary pages](docs/features/workspace-widgets.md)
 - [Where the code came from](PROVENANCE.md)
 - [Implementation guide for contributors](AGENTS.md)

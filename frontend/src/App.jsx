@@ -60,7 +60,9 @@ import ResearchNavigation, {
 } from "./components/ResearchNavigation";
 import BeginnerSummary from "./components/BeginnerSummary";
 import { WorkspaceProvider } from "./components/workspace/WorkspaceContext";
-import WidgetBoard from "./components/workspace/WidgetBoard";
+import WidgetBoard, {
+  forgetSavedLayouts,
+} from "./components/workspace/WidgetBoard";
 import SocialConversation from "./components/SocialConversation";
 import UpdateInbox from "./components/UpdateInbox";
 import IdeasAndChanges from "./components/IdeasAndChanges";
@@ -325,6 +327,9 @@ export default function App() {
 }
 function ResearchApp({ accountControls, session }) {
   useTelegramCommandSync();
+  // This component is keyed by account: a new sign-in starts with no layouts
+  // remembered from the previous account.
+  useState(forgetSavedLayouts);
   const companyVisibilityKey = `${hiddenCompaniesKey}:${session.account_id || "local"}`;
   const [destination, setDestination] = useState(readDestination);
   const lastResearch = useRef(
@@ -1177,6 +1182,32 @@ function CompanyWorkspace({
   // Each company starts on the plain Compare view.
   useEffect(() => setCompareAll(false), [selectedCompanyId]);
   const showOverview = view === "workspace" && tab === "summary" && fullDetails;
+  // The business topics (Overview details and the Business summary widget)
+  // open the same competitor and documents panel.
+  const businessPanelFor = (visible) => () => (
+    <BusinessPanel
+      key={`business-${instrumentId}`}
+      instrumentId={instrumentId}
+      focusTopic={exploration?.topic ? exploration : null}
+      visible={visible}
+      disclosures={data.disclosures}
+      modelStatus={modelStatus}
+      onCompare={() => setTab("valuation")}
+      onRefresh={() =>
+        act(
+          () => api.refreshDisclosures(instrumentId),
+          "Original company documents checked.",
+        )
+      }
+      onDraft={(q) => {
+        openEditor();
+        setEditor({
+          ...formFor(current, q),
+          question: q,
+        });
+      }}
+    />
+  );
   const summaryPanel = (active) => (
     <WorkspaceProvider
       key={`summary-${instrumentId}`}
@@ -1196,8 +1227,10 @@ function CompanyWorkspace({
             });
           }
         },
-        onView: (next) => {
+        onView: (next, destination) => {
           setTab(next);
+          // Widgets from the Overview details can point at a section.
+          if (destination === "management") setFocusManagement(true);
           requestAnimationFrame(() => {
             window.scrollTo(0, 0);
             document
@@ -1215,6 +1248,17 @@ function CompanyWorkspace({
           ? loadingRun.steps.find((s) => s.key === "analysis")?.status || false
           : false,
         priceHistory: priceRead?.data,
+        // For the optional widgets (chart, activity, business, glance,
+        // targets, watch); the same values the Overview details receive.
+        snapshotData,
+        recorded: isRecorded,
+        financialError,
+        onRetryFinancials: retryFinancials,
+        priceRead: priceRead || pendingPriceRead,
+        onPriceRead: setPriceRead,
+        pricesStep: loadingRun?.steps.find((s) => s.key === "prices"),
+        onUpdates: () => setView("updates"),
+        businessPanel: businessPanelFor(view === "workspace" && active),
       }}
     >
       <BeginnerSummary />
@@ -2753,33 +2797,7 @@ function CompanyWorkspace({
                               focusTopic={
                                 exploration?.topic ? exploration : null
                               }
-                              businessPanel={() => (
-                                <BusinessPanel
-                                  key={`business-${instrumentId}`}
-                                  instrumentId={instrumentId}
-                                  focusTopic={
-                                    exploration?.topic ? exploration : null
-                                  }
-                                  visible={showOverview}
-                                  disclosures={data.disclosures}
-                                  modelStatus={modelStatus}
-                                  onCompare={() => setTab("valuation")}
-                                  onRefresh={() =>
-                                    act(
-                                      () =>
-                                        api.refreshDisclosures(instrumentId),
-                                      "Original company documents checked.",
-                                    )
-                                  }
-                                  onDraft={(q) => {
-                                    openEditor();
-                                    setEditor({
-                                      ...formFor(current, q),
-                                      question: q,
-                                    });
-                                  }}
-                                />
-                              )}
+                              businessPanel={businessPanelFor(showOverview)}
                               data={snapshotData}
                               financialError={financialError}
                               onRetryFinancials={retryFinancials}
@@ -3035,6 +3053,9 @@ function CompanyWorkspace({
                         onAddCompany: () => setAddingCompany(true),
                         onOpenCompany: (id) => onChoose(id),
                         onOpen: onChoose,
+                        onSource: setSource,
+                        onUpdates: () => setView("updates"),
+                        onWorld: () => setView("world"),
                       }}
                     >
                       <WidgetBoard page="home" />

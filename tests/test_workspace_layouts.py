@@ -31,7 +31,8 @@ def test_unsaved_page_reads_empty(owner):
     ('home', {'lg': [HOME[0], HOME[0]]}),
     ('home', {'lg': [dict(HOME[0], x=6, w=12)]}),
     ('home', {'lg': [dict(HOME[0], w=0)]}),
-    ('home', {'lg': [dict(HOME[0], h=500)]}),
+    ('home', {'lg': [dict(HOME[0], h=5000)]}),
+    ('home', {'lg': [dict(HOME[0], y=30000)]}),
     ('home', {'lg': [dict(HOME[0], y=-1)]}),
     ('home', {'lg': [dict(HOME[0], x='0')]}),
     ('home', {'sm': [dict(HOME[0], w=7)]}),
@@ -87,3 +88,15 @@ def test_layout_api(owner):
     assert client.delete('/api/v1/layouts/home', headers=HEADERS).json()['result']['saved'] is False
     with transaction(admin=True) as conn:
         assert one(conn, 'SELECT count(*) n FROM workspace_layouts WHERE owner_id=%s', (OWNER,))['n'] == 0
+
+
+def test_optional_widgets_are_allowed_ids(owner):
+    extra = [{'i': 'alerts', 'x': 0, 'y': 12, 'w': 6, 'h': 8}, {'i': 'world', 'x': 6, 'y': 12, 'w': 6, 'h': 8}]
+    assert [i['i'] for i in layouts.save(owner, 'home', {'lg': HOME + extra, 'hidden': ['inbox']})['lg']] == \
+        ['welcome', 'portfolio', 'companies', 'alerts', 'world']
+    overview = [{'i': i, 'x': 0, 'y': n * 10, 'w': 12, 'h': 10}
+                for n, i in enumerate(('glance', 'activity', 'chart', 'business', 'targets', 'watch'))]
+    assert len(layouts.save(owner, 'overview', {'lg': overview})['lg']) == 6
+    with pytest.raises(ValueError):
+        layouts.save(owner, 'home', {'lg': [dict(HOME[0], i='chart')]})
+

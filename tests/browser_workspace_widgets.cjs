@@ -46,6 +46,10 @@ let browser;
 
   await board.getByRole("button", { name: "Arrange" }).click();
   assert.equal(await board.locator(".ws-bar").count(), 3);
+  // Optional widgets start in the add list, not on the page.
+  const add = board.getByRole("group", { name: "Sections you can add" });
+  for (const name of ["Today’s alerts", "Updates to review", "World headlines"])
+    await add.getByRole("button", { name }).waitFor();
   // Keyboard: move the welcome block later and keep focus on the control.
   const later = board.getByRole("button", { name: "Move later: Welcome" });
   await later.focus();
@@ -82,7 +86,7 @@ let browser;
   // Hide and add back.
   await board.getByRole("button", { name: "Hide Your list today" }).click();
   assert.equal(await board.locator('[data-widget="portfolio"]').count(), 0);
-  await board.getByRole("group", { name: "Hidden sections" }).getByRole("button", { name: "Your list today" }).click();
+  await board.getByRole("group", { name: "Sections you can add" }).getByRole("button", { name: "Your list today" }).click();
   assert.equal(await board.locator('[data-widget="portfolio"]').count(), 1);
   await board.getByRole("button", { name: "Done" }).click();
   await settle();

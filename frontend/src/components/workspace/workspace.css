@@ -48,10 +48,13 @@
   gap: var(--space-4);
 }
 
-/* A widget's own outer margins would add to the grid gap. */
+/* A widget's own outer margins would add to the grid gap. Each frame is a
+   size container, so the blocks inside lay out for the widget's width, not
+   the window's (rules at the end of this file). */
 .ws-frame {
   display: flow-root;
   min-width: 0;
+  container: widget / inline-size;
 }
 .ws-body > * {
   margin-top: 0;
@@ -123,25 +126,32 @@
   outline: 2px solid var(--color-accent, #3b6cf6);
   outline-offset: 1px;
 }
-/* Width handle: a full-height strip on the right edge, easier to grab. */
-.ws-grid.editing .react-resizable-handle-e {
+/* Width handle: a full-height strip on the right edge, easier to grab.
+   react-grid-layout's own stylesheet loads later (lazy chunk) and rotates the
+   handle, so these selectors are deliberately more specific than its rules. */
+.ws-grid.editing
+  .react-grid-item
+  > .react-resizable-handle.react-resizable-handle-e {
   top: 0;
   right: 0;
   width: 12px;
   height: 100%;
   margin: 0;
+  padding: 0;
   transform: none;
   background: none;
   cursor: ew-resize;
 }
-.ws-grid.editing .react-resizable-handle-e::after {
-  content: "";
-  position: absolute;
+.ws-grid.editing
+  .react-grid-item
+  > .react-resizable-handle.react-resizable-handle-e::after {
   top: 50%;
   right: 3px;
+  bottom: auto;
   width: 4px;
   height: 32px;
   margin-top: -16px;
+  border: 0;
   border-radius: 2px;
   background: var(--color-line);
 }
@@ -159,4 +169,180 @@
   .ws-grid .react-grid-item.cssTransforms {
     transition: none;
   }
+}
+
+/* ---- Widget contents follow the widget's width ----
+   The blocks were written for the page width (viewport media queries). Inside
+   a widget the same layouts switch on the frame's width instead, so a
+   narrowed widget stacks like a phone and a wide one spreads out. Outside the
+   board nothing here applies. */
+
+/* Your list today: chart beside the lights only when the widget is wide. */
+@container widget (min-width: 720px) {
+  .portfolio-read .pr-layout {
+    grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
+    grid-template-areas: "main rail";
+  }
+  .portfolio-read .pr-main {
+    grid-area: main;
+  }
+  .portfolio-read .pr-rail {
+    grid-area: rail;
+  }
+  .portfolio-read .pr-rail .bs-lights {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@container widget (max-width: 719px) {
+  .portfolio-read .pr-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: none;
+  }
+  .portfolio-read .pr-main,
+  .portfolio-read .pr-rail {
+    grid-area: auto;
+  }
+  /* Stacked: the rail (lights) comes first, three across while they fit. */
+  .portfolio-read .pr-rail .bs-lights {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .portfolio-read .pr-explain {
+    justify-items: stretch;
+  }
+}
+
+/* Cards inside narrow widgets: less padding, single-column card grids. */
+@container widget (max-width: 600px) {
+  .ws-frame .bs-card {
+    padding: var(--space-4);
+  }
+  .ws-frame .bs-summary-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ws-frame .personal-home {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ws-frame .personal-home-actions {
+    justify-content: stretch;
+  }
+  .ws-frame .personal-home-actions button {
+    flex: 1 1 auto;
+  }
+}
+
+/* Very narrow widgets: the three lights become easy-to-read rows. */
+@container widget (max-width: 520px) {
+  .ws-frame .bs-lights,
+  .portfolio-read .pr-rail .bs-lights {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+  .ws-frame .bs-light {
+    min-height: 56px;
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    grid-template-areas: "shape title" "shape status";
+    align-items: center;
+    column-gap: var(--space-3);
+    row-gap: 2px;
+    padding: var(--space-3) var(--space-4);
+  }
+  .ws-frame .bs-light .bs-shape {
+    grid-area: shape;
+    font-size: 18px;
+  }
+  .ws-frame .bs-light .bs-light-title {
+    grid-area: title;
+  }
+  .ws-frame .bs-light strong {
+    grid-area: status;
+    font-size: var(--text-base);
+  }
+  .ws-frame .pr-lights .pr-world {
+    grid-column: 2;
+  }
+  .ws-frame .bs-price-row strong {
+    font-size: 30px;
+  }
+  .ws-frame .company-overview-figures.ui-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Edit bar: a narrow widget keeps its title readable and its controls tidy. */
+@container widget (max-width: 420px) {
+  .ws-bar {
+    flex-wrap: wrap;
+  }
+  .ws-bar strong {
+    flex-basis: calc(100% - 32px);
+  }
+  .ws-tools {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+.ws-catalog-label {
+  align-self: center;
+  color: var(--color-text-2);
+  font-size: var(--text-sm);
+}
+
+/* Short lists in the optional home widgets (alerts, updates, world). */
+.ws-records {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.ws-records li {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.ws-record-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  color: var(--color-text-2);
+  font-size: var(--text-xs);
+}
+.ws-record-title {
+  color: var(--color-text);
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+a.ws-record-title {
+  text-decoration: none;
+}
+a.ws-record-title:hover,
+a.ws-record-title:focus-visible {
+  text-decoration: underline;
+}
+.ws-effect {
+  color: var(--color-text-2);
+  font-size: var(--text-sm);
+}
+.ws-effect.could_hurt {
+  color: var(--color-negative-light, var(--color-negative));
+}
+.ws-effect.could_help {
+  color: var(--color-positive-light, var(--color-positive));
+}
+.ws-more,
+.ws-quiet {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-2);
+  font-size: var(--text-sm);
+}
+.ws-count {
+  margin-left: var(--space-2);
+  vertical-align: middle;
+}
+.ws-watch p {
+  margin: 0 0 var(--space-2);
 }

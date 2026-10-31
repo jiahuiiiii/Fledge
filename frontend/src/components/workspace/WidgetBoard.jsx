@@ -17,33 +17,51 @@ import {
   breakpointFor,
   fitHeights,
   moveItem,
+  offered,
   ordered,
   reconcile,
   resizeItem,
   saveBody,
 } from "../../lib/workspaceLayout";
 import { WIDGETS } from "./widgets";
+import { useWorkspace } from "./WorkspaceContext";
+import { useProfile } from "../../lib/profile";
 import "./workspace.css";
 
 const WidgetGrid = lazy(() => import("./WidgetGrid"));
 
 // The last saved arrangement per page, shared by every board of that page so
-// switching companies does not read it again. Reads are deduplicated.
+// switching companies does not read it again. Reads are deduplicated. It
+// belongs to one account: signing in as another clears it (and a read still
+// in flight from before is ignored), so one account's layout is never shown
+// to, or saved over, another's.
 const savedLayouts = new Map();
 const reading = new Map();
+let generation = 0;
+export function forgetSavedLayouts() {
+  generation += 1;
+  savedLayouts.clear();
+  reading.clear();
+}
 function readLayout(page) {
   if (savedLayouts.has(page)) return Promise.resolve(savedLayouts.get(page));
-  if (!reading.has(page))
+  if (!reading.has(page)) {
+    const asked = generation;
     reading.set(
       page,
       api
         .layout(page)
         .then((result) => {
-          savedLayouts.set(page, result);
-          return result;
+          if (asked !== generation) throw new Error("Account changed.");
+          // A change made while this read was in flight is newer; keep it.
+          if (!savedLayouts.has(page)) savedLayouts.set(page, result);
+          return savedLayouts.get(page);
         })
-        .finally(() => reading.delete(page)),
+        .finally(() => {
+          if (asked === generation) reading.delete(page);
+        }),
     );
+  }
   return reading.get(page);
 }
 
@@ -159,12 +177,14 @@ export default function WidgetBoard({ page }) {
   const refocus = useRef(null);
   const timer = useRef(null);
   const unsaved = useRef(null);
+  const touched = useRef(false);
+  const saving = useRef(Promise.resolve());
 
   useEffect(() => {
     let active = true;
     readLayout(page)
       .then((result) => {
-        if (active && !unsaved.current) setState(reconcile(spec, result));
+        if (active && !touched.current) setState(reconcile(spec, result));
       })
       .catch(() => {});
     return () => {
@@ -188,18 +208,22 @@ export default function WidgetBoard({ page }) {
     const body = unsaved.current;
     unsaved.current = null;
     if (!body) return;
-    api
-      .saveLayout(page, body)
-      .then((result) => {
-        savedLayouts.set(page, result);
-        setSaveError(false);
-      })
-      .catch(() => setSaveError(true));
+    // Saves go out one after another, so an older one never lands last.
+    saving.current = saving.current
+      .then(() => api.saveLayout(page, body))
+      .then(
+        (result) => {
+          savedLayouts.set(page, result);
+          setSaveError(false);
+        },
+        (failure) => setSaveError(failure?.message || true),
+      );
   }, [page]);
   // Leaving the page within the half second still saves.
   useEffect(() => flush, [flush]);
 
   const commit = (next) => {
+    touched.current = true;
     setState(next);
     const body = saveBody(next);
     savedLayouts.set(page, body);
@@ -218,8 +242,16 @@ export default function WidgetBoard({ page }) {
 
   const stack = narrow || (width > 0 && width < STACK_BOARD_BELOW);
   const bp = stack ? "sm" : breakpointFor(width);
-  const visible = spec.filter((w) => !state.hidden.includes(w.id));
-  const hiddenWidgets = spec.filter((w) => state.hidden.includes(w.id));
+  // Pro-only widgets in Beginner, or ones that don't apply to this company
+  // (practice companies have no real prices or filings), are left out
+  // entirely: not shown and not offered. Their saved places are kept.
+  const workspace = useWorkspace();
+  const { mode } = useProfile();
+  const available = offered(spec, mode, workspace);
+  const absent = spec.filter((w) => !available.includes(w)).map((w) => w.id);
+  const skipped = [...state.hidden, ...absent];
+  const visible = available.filter((w) => !state.hidden.includes(w.id));
+  const hiddenWidgets = available.filter((w) => state.hidden.includes(w.id));
   const byId = Object.fromEntries(spec.map((w) => [w.id, w]));
 
   const arranged = (layouts) => ({
@@ -244,13 +276,7 @@ export default function WidgetBoard({ page }) {
     }
     const next =
       action === "earlier" || action === "later"
-        ? moveItem(
-            layout,
-            id,
-            action === "earlier" ? -1 : 1,
-            COLS[bp],
-            state.hidden,
-          )
+        ? moveItem(layout, id, action === "earlier" ? -1 : 1, COLS[bp], skipped)
         : resizeItem(
             layout,
             id,
@@ -291,15 +317,19 @@ export default function WidgetBoard({ page }) {
   const reset = () => {
     clearTimeout(timer.current);
     unsaved.current = null;
+    touched.current = true;
     setState(reconcile(spec, null));
     savedLayouts.set(page, null);
-    api.resetLayout(page).then(
-      (result) => {
-        savedLayouts.set(page, result);
-        setSaveError(false);
-      },
-      () => setSaveError(true),
-    );
+    // After any save already on its way, so the old layout can't come back.
+    saving.current = saving.current
+      .then(() => api.resetLayout(page))
+      .then(
+        (result) => {
+          savedLayouts.set(page, result);
+          setSaveError(false);
+        },
+        (failure) => setSaveError(failure?.message || true),
+      );
     setAnnouncement("Back to the original arrangement.");
   };
 
@@ -324,14 +354,14 @@ export default function WidgetBoard({ page }) {
   const inOrder = (layout) =>
     ordered(layout)
       .map((item) => byId[item.i])
-      .filter((w) => w && !state.hidden.includes(w.id));
+      .filter((w) => w && !skipped.includes(w.id));
   const stacked = (
     <div className="ws-stack">{inOrder(state.layouts.sm).map(frame)}</div>
   );
   const gridLayouts = Object.fromEntries(
     Object.entries(state.layouts).map(([key, layout]) => {
       const shown = layout
-        .filter((item) => !state.hidden.includes(item.i))
+        .filter((item) => !skipped.includes(item.i))
         .map((item) => ({
           ...item,
           minW: Math.min(byId[item.i].minW, COLS[key]),
@@ -358,8 +388,9 @@ export default function WidgetBoard({ page }) {
               <div
                 className="ws-catalog"
                 role="group"
-                aria-label="Hidden sections"
+                aria-label="Sections you can add"
               >
+                <span className="ws-catalog-label">Add:</span>
                 {hiddenWidgets.map((w) => (
                   <Button
                     key={w.id}
@@ -402,7 +433,11 @@ export default function WidgetBoard({ page }) {
         )}
         {saveError && (
           <small className="ws-save-error" role="alert">
-            Your arrangement couldn’t be saved, so it may reset when you reload.
+            Your arrangement couldn’t be saved
+            {typeof saveError === "string"
+              ? ` (${saveError.replace(/\.$/, "")})`
+              : ""}
+            , so it may reset when you reload.
           </small>
         )}
         <span className="sr-only" role="status">
@@ -411,7 +446,7 @@ export default function WidgetBoard({ page }) {
       </div>
       {!visible.length ? (
         <p className="ws-empty">
-          Every section is hidden. Choose Arrange to add them back.
+          Every section is hidden. Choose Arrange to add some back.
         </p>
       ) : stack || !width ? (
         stacked

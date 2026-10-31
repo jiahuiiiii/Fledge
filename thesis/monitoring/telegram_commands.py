@@ -57,6 +57,22 @@ HELP = "\n".join([
     "",
     "Results also appear in the app. " + DISCLAIMER,
 ])
+# The "/" menu Telegram shows while typing (setMyCommands), for linked chats
+# only. Descriptions: 3–256 characters; names: lowercase, 1–32 characters.
+MENU = (
+    ("today", "How your list moved, from saved prices and news"),
+    ("why", "Saved news and filing next to one company's move, e.g. /why NVDA"),
+    ("world", "World headlines that might matter for your list"),
+    ("explain", "A written explanation of your list (one AI request)"),
+    ("watch", "Turn on the news watch for a company, e.g. /watch NVDA"),
+    ("help", "What each command does"),
+)
+MENU_RETRY = timedelta(minutes=10)
+# A chat that isn't linked gets the "connect first" reply at most this often,
+# so strangers can't make the bot (and its poll loop) busy. In memory only.
+STRANGER_QUIET = timedelta(minutes=10)
+_strangers = {}  # chat -> when it was last told to link
+_menus = {}  # (bot fingerprint, chat) -> (state shown, or None after a failure, when)
 TONE_WORDS = {"positive": "good", "negative": "bad", "mixed": "mixed", "neutral": "neutral"}
 TONE_SHAPE = {"positive": "▲", "negative": "▼", "mixed": "◆", "neutral": "●"}
 log = logging.getLogger("thesis.telegram")
@@ -110,9 +126,14 @@ def intake(conn, update, fingerprint, now):
     if type(sent) is not int or abs(now - datetime.fromtimestamp(sent, timezone.utc)) > MAX_AGE:
         return None
     chat = sender["id"]
-    cfg = one(conn, "SELECT owner_id FROM telegram_settings WHERE bot_fingerprint=%s AND chat_id=%s",
-              (fingerprint, chat))
+    cfg = account_for(conn, fingerprint, chat)
     if not cfg:
+        told = _strangers.get(chat)
+        if told and now - told < STRANGER_QUIET:
+            return None
+        if len(_strangers) > 1000:
+            _strangers.clear()
+        _strangers[chat] = now
         return dict(chat=chat, text=LINK_FIRST)
     owner = str(cfg["owner_id"])
     recent = one(conn, "SELECT count(*) n FROM telegram_commands WHERE owner_id=%s AND received_at>%s",
@@ -128,6 +149,48 @@ def intake(conn, update, fingerprint, now):
         # One notice per flood; later commands in the window get no reply.
         return dict(chat=chat, text=TOO_MANY) if recent == RATE_LIMIT else None
     return dict(parsed, chat=chat, id=str(row["id"]), owner=owner)
+
+
+# One person can link the same chat from several Fledge accounts (each link
+# proved by its own one-time /start code). Commands answer for one of them:
+# an account with Telegram alerts on first, then the one signed into most
+# recently, then a fixed order (owner choice, 31 October 2026).
+LINKED_ACCOUNTS = """SELECT s.owner_id, s.enabled, coalesce(p.username, a.label) AS name,
+       greatest((SELECT max(x.created_at) FROM password_sessions x WHERE x.account_id=s.owner_id),
+                (SELECT max(y.verified_at) FROM auth_sessions y WHERE y.account_id=s.owner_id)) AS signed_in
+  FROM telegram_settings s JOIN accounts a ON a.id=s.owner_id
+  LEFT JOIN password_credentials p ON p.account_id=s.owner_id
+  WHERE s.bot_fingerprint=%s AND s.chat_id=%s
+  ORDER BY s.enabled DESC, signed_in DESC NULLS LAST, s.owner_id"""
+
+
+def account_for(conn, fingerprint, chat):
+    linked = rows(conn, LINKED_ACCOUNTS, (fingerprint, chat))
+    return dict(linked[0], shared=len(linked) > 1) if linked else None
+
+
+def safe_note(owner):
+    try:
+        return account_note(owner)
+    except Exception:
+        log.exception("Telegram account note failed")
+        return ""
+
+
+def account_note(owner):
+    """'Answered for …' when this account's chat is linked to other accounts too."""
+    from . import telegram as T
+    key = transport.token()
+    if not key:
+        return ""
+    with transaction(admin=True, consistent=True) as conn:
+        chat = one(conn, "SELECT chat_id FROM telegram_settings WHERE owner_id=%s AND bot_fingerprint=%s",
+                   (owner, T.fingerprint(key)))
+        cfg = account_for(conn, T.fingerprint(key), chat["chat_id"]) if chat and chat["chat_id"] else None
+    if not cfg or not cfg["shared"] or str(cfg["owner_id"]) != str(owner):
+        return ""
+    return (f"\n\nAnswered for your Fledge account “{cfg['name']}”. This chat is connected to more "
+            "than one account; it uses the one with Telegram alerts on that you signed into last.")
 
 
 def chunks(text):
@@ -173,10 +236,16 @@ def reply(key, intent, text, *, status="answered"):
     if not claimed:
         return None
     try:
-        ids = send(key, intent["chat"], text)
+        ids = send(key, intent["chat"], text + safe_note(owner))
     except transport.TelegramError as failure:
         _finish(owner, command_id, status="uncertain" if failure.code == "uncertain" else "failed",
                 error=str(failure)[:300], finished_at=clock())
+        return None
+    except Exception:
+        # Anything else after 'sending' is ambiguous: close the row, never resend.
+        log.exception("Telegram command reply failed")
+        _finish(owner, command_id, status="uncertain", error="The reply could not be confirmed.",
+                finished_at=clock())
         return None
     now = clock()
     _finish(owner, command_id, status=status, message_id=ids[0], delivered_at=now,
@@ -403,16 +472,27 @@ def run_explain(owner, command_id, *, model=None):
 
     try:
         text = explanation_text(portfolio.explain(owner, transport=model, now=now, on_saved=saved))
-    except ValueError as failure:
-        _finish(owner, command_id, status="failed", error=str(failure)[:300], finished_at=clock())
-        text = f"Couldn't explain your list: {failure}\n\n{DISCLAIMER}"
-    except Exception:
-        log.exception("Telegram explanation failed")
-        _finish(owner, command_id, status="failed", error="Unexpected failure.", finished_at=clock())
-        text = ("Couldn't explain your list this time. Nothing is retried automatically; "
-                "send /explain again later.\n\n" + DISCLAIMER)
-    deliver(owner, command_id, row["message_id"], text)
+    except Exception as failure:
+        if not isinstance(failure, ValueError):
+            log.exception("Telegram explanation failed")
+        error = str(failure)[:300] if isinstance(failure, ValueError) else "Unexpected failure."
+        if _fail_running(owner, command_id, error):
+            text = (f"Couldn't explain your list: {failure}\n\n{DISCLAIMER}" if isinstance(failure, ValueError)
+                    else "Couldn't explain your list this time. Nothing is retried automatically; "
+                         "send /explain again later.\n\n" + DISCLAIMER)
+        else:
+            # The explanation was saved (status 'done'); only the reply text failed.
+            text = ("Your list was explained and saved. Open Your list today in Fledge to read it.\n\n"
+                    + DISCLAIMER)
+    deliver(owner, command_id, row["message_id"], text + safe_note(owner))
     return True
+
+
+def _fail_running(owner, command_id, error):
+    """Mark a running explanation failed; False if it had already been saved."""
+    with transaction(owner) as conn:
+        return bool(one(conn, "UPDATE telegram_commands SET status='failed',error=%s,finished_at=%s "
+                        "WHERE id=%s AND status='running' RETURNING id", (error, clock(), command_id)))
 
 
 def deliver(owner, command_id, message_id, text):
@@ -464,6 +544,46 @@ def sweep(*, now=None):
         threading.Thread(target=run_explain, args=(str(row["owner_id"]), row["id"]), daemon=True,
                          name="telegram-explain").start()
     return len(stuck), len(waiting)
+
+
+def menu_shown():
+    """Whether this app put the command menu in any chat since it started."""
+    return any(shown for shown, _ in _menus.values())
+
+
+def sync_menu(*, now=None):
+    """Show the command menu in each linked chat while commands are on, and
+    remove it once they are off. One call per chat per change (and per app
+    start); a failed call is tried again after ten minutes, never in a loop.
+    Cosmetic only: commands work with or without the menu."""
+    from . import telegram as T
+    key = transport.token()
+    if not key:
+        return 0
+    now = now or clock()
+    fingerprint = T.fingerprint(key)
+    want = enabled()
+    with transaction(admin=True) as conn:
+        chats = [r["chat_id"] for r in rows(conn, "SELECT chat_id FROM telegram_settings WHERE bot_fingerprint=%s "
+                                            "AND chat_id IS NOT NULL ORDER BY chat_id", (fingerprint,))]
+    changed = 0
+    for chat in chats:
+        shown, at = _menus.get((fingerprint, chat), (False, None))
+        if (shown == want and at is not None) or (shown is None and now - at < MENU_RETRY):
+            continue
+        scope = dict(type="chat", chat_id=chat)
+        try:
+            if want:
+                transport.call(key, "setMyCommands", dict(
+                    commands=[dict(command=c, description=d) for c, d in MENU], scope=scope))
+            else:
+                transport.call(key, "deleteMyCommands", dict(scope=scope))
+        except transport.TelegramError:
+            _menus[(fingerprint, chat)] = (None, now)
+            continue
+        _menus[(fingerprint, chat)] = (want, now)
+        changed += 1
+    return changed
 
 
 def latest(owner):

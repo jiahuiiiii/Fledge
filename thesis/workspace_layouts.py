@@ -12,12 +12,15 @@ from .db import transaction, rows
 
 # Keep in step with frontend/src/components/workspace/widgets.js.
 WIDGETS = {
-    'overview': ('signals', 'news', 'people', 'world', 'view'),
-    'home': ('welcome', 'portfolio', 'companies'),
+    'overview': ('signals', 'news', 'people', 'world', 'view',
+                 'glance', 'activity', 'chart', 'business', 'targets', 'watch'),
+    'home': ('welcome', 'portfolio', 'companies', 'alerts', 'inbox', 'world'),
 }
 COLUMNS = {'lg': 12, 'md': 10, 'sm': 6}
-MAX_Y = 1000
-MAX_H = 400
+# Grid rows are 18 px; these allow very long pages and widgets (about
+# 36,000 px). Kept in step with MAX_ROWS / MAX_Y in workspaceLayout.js.
+MAX_Y = 20000
+MAX_H = 2000
 
 
 def _page(page):
@@ -104,6 +107,11 @@ def read(owner, page):
 def save(owner, page, body):
     layouts, hidden = validate(page, body)
     with transaction(owner) as conn:
+        # Saves of one page run one at a time. Two at once (two open tabs, or
+        # leaving the page mid-save) would otherwise lock the width rows in
+        # different orders and one would fail as a deadlock.
+        conn.execute('SELECT pg_advisory_xact_lock(hashtextextended(%s,0))',
+                     (f'workspace-layout:{owner}:{page}',))
         for bp, items in layouts.items():
             conn.execute(
                 '''INSERT INTO workspace_layouts(owner_id,page,breakpoint,layout,hidden)
@@ -120,5 +128,7 @@ def save(owner, page, body):
 def reset(owner, page):
     _page(page)
     with transaction(owner) as conn:
+        conn.execute('SELECT pg_advisory_xact_lock(hashtextextended(%s,0))',
+                     (f'workspace-layout:{owner}:{page}',))
         conn.execute('DELETE FROM workspace_layouts WHERE owner_id=%s AND page=%s', (owner, page))
     return read(owner, page)
