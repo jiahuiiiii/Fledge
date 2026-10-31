@@ -1,7 +1,6 @@
-import { Button } from "./ui";
+import { Button, Select } from "./ui";
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
-import Select from "./Select";
 import { day } from "../lib/financialStory";
 import "./FinancialEvidence.css";
 import { stamp } from "./MarketResearch";
@@ -294,8 +293,7 @@ export default function MoveAlertCard({
               <th scope="row">
                 {onOpen ? (
                   <Button
-                    variant="plain"
-                    className="text-button"
+                    variant="link"
                     onClick={() => onOpen(member.instrument_id, "workspace")}
                     aria-label={`Open ${member.symbol} research`}
                   >

@@ -11,7 +11,9 @@ import "./AccountPage.css";
 export default function AccountPage({ session, controls, onBack }) {
   const { profile } = useProfile();
   const [securityOpen, setSecurityOpen] = useState(false);
-  const type = profile?.completed ? INVESTOR_TYPES[profile.investor_type] : null;
+  const type = profile?.completed
+    ? INVESTOR_TYPES[profile.investor_type]
+    : null;
   const canSignOut = ["managed", "password"].includes(session.mode);
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -24,7 +26,10 @@ export default function AccountPage({ session, controls, onBack }) {
     return () => cancelAnimationFrame(frame);
   }, []);
   return (
-    <section className="account-settings-page" aria-labelledby="account-settings-title">
+    <section
+      className="account-settings-page"
+      aria-labelledby="account-settings-title"
+    >
       <SectionHeader
         level="page"
         as="h1"
@@ -60,7 +65,9 @@ export default function AccountPage({ session, controls, onBack }) {
             level="card"
             as="h2"
             title="Investor profile"
-            description={type?.name || typeName(profile.investor_type) || "Not set up yet."}
+            description={
+              type?.name || typeName(profile.investor_type) || "Not set up yet."
+            }
             actions={
               <Button
                 variant="secondary"
@@ -74,9 +81,14 @@ export default function AccountPage({ session, controls, onBack }) {
           <div className="account-explain">
             <strong>How Fledge uses it</strong>
             <ul>
-              <li>Chooses which research questions and shortcuts come first.</li>
+              <li>
+                Chooses which research questions and shortcuts come first.
+              </li>
               <li>Shapes the wording and the examples on your home page.</li>
-              <li>Never picks, ranks or recommends investments, and nothing is shared.</li>
+              <li>
+                Never picks, ranks or recommends investments, and nothing is
+                shared.
+              </li>
             </ul>
           </div>
         </Card>
@@ -122,15 +134,31 @@ export default function AccountPage({ session, controls, onBack }) {
       {controls?.error && <p role="alert">{controls.error}</p>}
       <footer className="account-settings-footer">
         {canSignOut && (
-          <Button danger disabled={controls?.busy} onClick={controls?.onSignOut}>
+          <Button
+            danger
+            disabled={controls?.busy}
+            onClick={controls?.onSignOut}
+          >
             Sign out
           </Button>
         )}
         <div className="account-settings-legal">
-          <Button variant="tertiary" size="sm" href="/terms" target="_blank" rel="noopener">
+          <Button
+            variant="tertiary"
+            size="sm"
+            href="/terms"
+            target="_blank"
+            rel="noopener"
+          >
             Terms
           </Button>
-          <Button variant="tertiary" size="sm" href="/privacy" target="_blank" rel="noopener">
+          <Button
+            variant="tertiary"
+            size="sm"
+            href="/privacy"
+            target="_blank"
+            rel="noopener"
+          >
             Privacy
           </Button>
         </div>

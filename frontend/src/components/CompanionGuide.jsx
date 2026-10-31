@@ -1,5 +1,5 @@
 import { useState } from "react";
-import Modal from "./Modal";
+import { Modal } from "./ui";
 import { companionPromise, starterQuestions } from "../lib/companion";
 import { orderStarters, useProfile } from "../lib/profile";
 import "./Companion.css";

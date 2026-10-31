@@ -1,6 +1,5 @@
-import { Button } from "./ui";
+import { Button, Modal } from "./ui";
 import { useState } from "react";
-import Modal from "./Modal";
 import { api } from "../api/client";
 
 // A recovery code is shown once, right after it is made. The server keeps
@@ -37,14 +36,15 @@ export function RecoveryCodeScreen({ code, reason = "new", onDone }) {
           />
           <span>I’ve saved it somewhere safe.</span>
         </label>
-        <button
+        <Button
+          variant="primary"
           type="button"
-          className="primary account-submit"
+          className="account-submit"
           disabled={!saved}
           onClick={onDone}
         >
           Continue
-        </button>
+        </Button>
       </section>
     </main>
   );
@@ -65,8 +65,8 @@ function RecoveryCodeBody({ code, reason, copied, onCopy }) {
         {copied ? "Copied ✓" : "Copy code"}
       </button>
       <p className="recovery-tip">
-        Keep it in your password manager or notes app. Anyone with your
-        username and this code can change your password.
+        Keep it in your password manager or notes app. Anyone with your username
+        and this code can change your password.
       </p>
     </>
   );
@@ -87,7 +87,9 @@ export function ForgotPasswordForm({ onDone, onBack }) {
       return;
     }
     if (password.length < 8) {
-      setError(`Use a new password of at least 8 characters (you have ${password.length}).`);
+      setError(
+        `Use a new password of at least 8 characters (you have ${password.length}).`,
+      );
       document.getElementById("reset-password")?.focus();
       return;
     }
@@ -95,12 +97,17 @@ export function ForgotPasswordForm({ onDone, onBack }) {
     setBusy(true);
     setError("");
     try {
-      const result = await api.passwordReset(username.trim(), code.trim(), password);
+      const result = await api.passwordReset(
+        username.trim(),
+        code.trim(),
+        password,
+      );
       setPassword("");
       onDone(result?.recovery_code || "");
     } catch (failure) {
       setError(failure.message);
-      if (failure.retryAfter) setRetryAt(Date.now() + failure.retryAfter * 1000);
+      if (failure.retryAfter)
+        setRetryAt(Date.now() + failure.retryAfter * 1000);
     } finally {
       setBusy(false);
     }
@@ -149,9 +156,14 @@ export function ForgotPasswordForm({ onDone, onBack }) {
           {error}
         </p>
       )}
-      <button type="submit" className="primary account-submit" disabled={busy}>
+      <Button
+        type="submit"
+        variant="primary"
+        className="account-submit"
+        disabled={busy}
+      >
         {busy ? "Please wait…" : "Set new password"}
-      </button>
+      </Button>
       <p className="account-alt">
         Lost your code too? Contact the Fledge team to reset it.
       </p>
@@ -165,7 +177,12 @@ export function ForgotPasswordForm({ onDone, onBack }) {
 }
 
 // Signed-in: change password, or make a new recovery code.
-export function AccountSecurityDialog({ open, onClose, hasRecoveryCode, onCodeChanged }) {
+export function AccountSecurityDialog({
+  open,
+  onClose,
+  hasRecoveryCode,
+  onCodeChanged,
+}) {
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [busy, setBusy] = useState("");
@@ -191,7 +208,9 @@ export function AccountSecurityDialog({ open, onClose, hasRecoveryCode, onCodeCh
       return;
     }
     if (kind === "password" && next.length < 8) {
-      setError(`Use a new password of at least 8 characters (you have ${next.length}).`);
+      setError(
+        `Use a new password of at least 8 characters (you have ${next.length}).`,
+      );
       document.getElementById("security-new")?.focus();
       return;
     }
@@ -200,7 +219,9 @@ export function AccountSecurityDialog({ open, onClose, hasRecoveryCode, onCodeCh
       if (kind === "password") {
         await api.changePassword(current, next);
         setNext("");
-        setNotice("Password changed. Other browsers signed in to this account were signed out.");
+        setNotice(
+          "Password changed. Other browsers signed in to this account were signed out.",
+        );
       } else {
         const result = await api.newRecoveryCode(current);
         setCode(result.recovery_code);
@@ -239,9 +260,14 @@ export function AccountSecurityDialog({ open, onClose, hasRecoveryCode, onCodeCh
               }}
             />
             <p className="recovery-tip">Your previous code no longer works.</p>
-            <button type="button" className="primary account-submit" onClick={close}>
+            <Button
+              variant="primary"
+              type="button"
+              className="account-submit"
+              onClick={close}
+            >
               I’ve saved it
-            </button>
+            </Button>
           </>
         ) : (
           <form
@@ -281,7 +307,12 @@ export function AccountSecurityDialog({ open, onClose, hasRecoveryCode, onCodeCh
                 onChange={(event) => setNext(event.target.value)}
               />
             </div>
-            <Button type="submit" variant="primary" className="account-submit" disabled={!!busy}>
+            <Button
+              type="submit"
+              variant="primary"
+              className="account-submit"
+              disabled={!!busy}
+            >
               {busy === "password" ? "Please wait…" : "Change password"}
             </Button>
             <Button

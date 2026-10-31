@@ -3,8 +3,7 @@ import SentimentPriceContext from "./SentimentPriceContext";
 // compact: alert cards show the quote alone; the reason and the shared
 // AI-interpretation note are rendered once by the card instead.
 export default function SentimentBasis({ item, compact = false }) {
-  if (!item.evidence_policy)
-    return compact ? null : <p>{item.explanation}</p>;
+  if (!item.evidence_policy) return compact ? null : <p>{item.explanation}</p>;
   // Alert cards lead with the quote; the full view keeps its original order.
   const quotes = item.citations.map((c, i) => (
     <blockquote key={i}>{c.quote}</blockquote>

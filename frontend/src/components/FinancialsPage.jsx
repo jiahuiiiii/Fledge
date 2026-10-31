@@ -5,16 +5,22 @@ import EvidenceButton from "./EvidenceButton";
 import FinancialEvidence from "./FinancialEvidence";
 import RevenueFlow from "./RevenueFlow";
 import FinancialRecovery from "./FinancialRecovery";
-import Select from "./Select";
 import ManagementOutlook from "./ManagementOutlook";
 import FmpPanel from "./FmpPanel";
 import PeerContext from "./PeerContext";
-import { Disclosure, DisclosureGroup, EvidenceDialog, SectionHeader, TrendTile } from "./ui";
+import {
+  Disclosure,
+  DisclosureGroup,
+  EvidenceDialog,
+  SectionHeader,
+  TrendTile,
+  Select,
+  Skeleton as LoadingSkeleton,
+} from "./ui";
 import { evidenceDialogRows } from "../lib/financialEvidence";
 import { trendPoints } from "../lib/financialTrends";
 import { unfixableGaps } from "../lib/financialGaps";
 import TermHelp from "./TermHelp";
-import LoadingSkeleton from "./LoadingSkeleton";
 import {
   number,
   metric,
@@ -331,7 +337,10 @@ export default function FinancialsPage({
       rows: [coverage].filter(Boolean),
     });
   const basisLabel = mode === "annual" ? "Fiscal year" : "Past 12 months";
-  const gaps = safe?.status === "available" ? unfixableGaps({ rows: incomeRows, active, balance, mode, day }) : [];
+  const gaps =
+    safe?.status === "available"
+      ? unfixableGaps({ rows: incomeRows, active, balance, mode, day })
+      : [];
   const growth = readings[0];
   const summary = [
     {
@@ -399,209 +408,246 @@ export default function FinancialsPage({
         {!showAll && <small>Charts, every year, cash and debt, filings</small>}
       </button>
       <div hidden={!showAll} className="financial-full-details">
-      <FinancialRecovery
-        key={instrumentId}
-        instrumentId={instrumentId}
-        onApplied={async () => {
-          await onRefresh?.();
-          setAttempt((n) => n + 1);
-        }}
-      />
-      {safe?.ai_reviewed_figures > 0 && (
-        <p className="figure-help">
-          Includes AI-assisted figure mappings you reviewed. Open a figure to
-          inspect its original cells, or change your choices under Fill in
-          missing figures with AI.
-        </p>
-      )}
-      {gaps.length > 0 && (
-        <Disclosure
-          className="financial-gaps"
-          title={`Figures that stay unavailable (${gaps.length})`}
-          description="Why each one is missing, and what would help. Fill missing figures can’t fix these."
+        <FinancialRecovery
+          key={instrumentId}
+          instrumentId={instrumentId}
+          onApplied={async () => {
+            await onRefresh?.();
+            setAttempt((n) => n + 1);
+          }}
+        />
+        {safe?.ai_reviewed_figures > 0 && (
+          <p className="figure-help">
+            Includes AI-assisted figure mappings you reviewed. Open a figure to
+            inspect its original cells, or change your choices under Fill in
+            missing figures with AI.
+          </p>
+        )}
+        {gaps.length > 0 && (
+          <Disclosure
+            className="financial-gaps"
+            title={`Figures that stay unavailable (${gaps.length})`}
+            description="Why each one is missing, and what would help. Fill missing figures can’t fix these."
+          >
+            <ul className="financial-gap-list">
+              {gaps.map((gap) => (
+                <li key={gap.key}>
+                  <strong>{gap.title}</strong>
+                  <small>{gap.period}</small>
+                  <p>{gap.reason}</p>
+                  {gap.help && <p className="fine">{gap.help}</p>}
+                </li>
+              ))}
+            </ul>
+          </Disclosure>
+        )}
+        <PeerContext
+          instrumentId={instrumentId}
+          visible={visible && showAll}
+          onCompare={onCompare}
+        />
+        <div
+          hidden={!safe}
+          className="story-period-controls"
+          role="group"
+          aria-label="Financial history period basis"
         >
-          <ul className="financial-gap-list">
-            {gaps.map((gap) => (
-              <li key={gap.key}>
-                <strong>{gap.title}</strong>
-                <small>{gap.period}</small>
-                <p>{gap.reason}</p>
-                {gap.help && <p className="fine">{gap.help}</p>}
-              </li>
-            ))}
-          </ul>
-        </Disclosure>
-      )}
-      <PeerContext
-        instrumentId={instrumentId}
-        visible={visible && showAll}
-        onCompare={onCompare}
-      />
-      <div
-        hidden={!safe}
-        className="story-period-controls"
-        role="group"
-        aria-label="Financial history period basis"
-      >
-        {[
-          ["trailing", "Past 12 months"],
-          ["annual", "Fiscal year"],
-        ].map(([key, label]) => (
-          <button
-            key={key}
-            aria-pressed={mode === key}
-            onClick={() => {
-              setMode(key);
-              setIncomeId("");
+          {[
+            ["trailing", "Past 12 months"],
+            ["annual", "Fiscal year"],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              aria-pressed={mode === key}
+              onClick={() => {
+                setMode(key);
+                setIncomeId("");
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {safe && (
+          <>
+            <div
+              className="financial-summary-row"
+              role="group"
+              aria-label="Financial trends"
+            >
+              {summary.map((item) => (
+                <TrendTile
+                  key={item.label}
+                  title={item.short}
+                  value={item.value}
+                  caption={
+                    active
+                      ? `${day(active.start)} – ${day(active.end)}`
+                      : "No compatible saved period"
+                  }
+                  points={trendPoints(incomeRows, item.trend)}
+                  tone={item.tone}
+                  onOpen={() => setFigure(item)}
+                />
+              ))}
+            </div>
+            <section
+              className="financial-story-section"
+              aria-label="Revenue and expense story"
+            >
+              <Heading title="How sales become profit" />
+              <RevenueFlow
+                data={workspace.income_flow}
+                segments={workspace.segment_revenue}
+                compactHeading
+              />
+            </section>
+            <section
+              className="financial-story-section"
+              aria-label="Earnings and cash-flow history"
+            >
+              <RevenueHistory
+                revision={revision}
+                instrumentId={instrumentId}
+                workspace={workspace}
+                story={safe}
+                visible={visible}
+                series={incomeSeries}
+              />
+            </section>
+            <EvidenceDialog
+              open={!!figure}
+              onClose={() => setFigure(null)}
+              title={figure?.label || "Evidence"}
+              intro={
+                figure?.detail
+                  ? `${figure.detail.title}. ${figure.detail.detail}`
+                  : null
+              }
+              rows={figure ? evidenceDialogRows(figure.rows) : []}
+            />
+            <section
+              className="financial-story-section"
+              aria-label="What it owns and owes"
+            >
+              <Heading title="What it owns and owes">
+                Assets and liabilities at one reporting date. Cash is part of
+                assets; borrowing is part of liabilities.
+              </Heading>
+              {balance && (
+                <label className="story-balance-select">
+                  Balance-sheet date
+                  <Select
+                    value={balance.id}
+                    onChange={(e) => setBalanceId(e.target.value)}
+                  >
+                    {balances.map((row) => (
+                      <option key={row.id} value={row.id}>
+                        {day(row.end)} · {row.form}
+                      </option>
+                    ))}
+                  </Select>
+                </label>
+              )}
+              <BalanceSummary period={balance} />
+              <DisclosureGroup>
+                <Disclosure
+                  title="Near-term and longer-term obligations"
+                  variant="inset"
+                >
+                  <BalancePairs period={balance} />
+                  <Insights readings={positionReadings.slice(0, 1)} />
+                </Disclosure>
+                <Disclosure
+                  title="Borrowing, cash and equity over time"
+                  variant="inset"
+                >
+                  <FinancialHistory
+                    rows={balances}
+                    series={balanceSeries}
+                    active={balance}
+                    onSelect={setBalanceId}
+                    label="Borrowing, cash and equity"
+                  />
+                  <Insights readings={debtReadings} />
+                </Disclosure>
+                <Disclosure
+                  title="What makes up the balance sheet"
+                  variant="inset"
+                >
+                  <div className="story-balance-maps">
+                    <BalanceMap period={balance} side="assets" />
+                    <BalanceMap period={balance} side="funding" />
+                  </div>
+                  <p className="story-footnote">
+                    Block area shows share of total assets. Book values may
+                    differ from resale values. Goodwill and intangible assets
+                    are not cash.
+                  </p>
+                </Disclosure>
+                <Disclosure
+                  title={`Reading these figures · ${basisLabel.toLowerCase()}`}
+                  variant="inset"
+                >
+                  <Insights readings={readings} />
+                </Disclosure>
+              </DisclosureGroup>
+            </section>
+          </>
+        )}
+        <DisclosureGroup>
+          <Disclosure
+            id="management-expects"
+            tabIndex={-1}
+            title="What management expects"
+            description="The company’s own guidance, quoted from its earnings release (revenue guidance is also plotted above)"
+            variant="inset"
+          >
+            <ManagementOutlook data={management} />
+          </Disclosure>
+          <Disclosure
+            className="financial-analyst-disclosure"
+            title="Analyst forecasts table"
+            description="Numbers behind the forecast points"
+            variant="inset"
+            open={analystOpen}
+            onToggle={(event) => {
+              if (event.target === event.currentTarget)
+                setAnalystOpen(event.currentTarget.open);
             }}
           >
-            {label}
-          </button>
-        ))}
-      </div>
-      {safe && (
-        <>
-          <div className="financial-summary-row" role="group" aria-label="Financial trends">
-            {summary.map((item) => (
-              <TrendTile
-                key={item.label}
-                title={item.short}
-                value={item.value}
-                caption={active ? `${day(active.start)} – ${day(active.end)}` : "No compatible saved period"}
-                points={trendPoints(incomeRows, item.trend)}
-                tone={item.tone}
-                onOpen={() => setFigure(item)}
+            {analystOpen && (
+              <FmpPanel
+                instrumentId={instrumentId}
+                visible={visible}
+                revision={revision}
               />
-            ))}
-          </div>
-          <section
-            className="financial-story-section"
-            aria-label="Revenue and expense story"
-          >
-            <Heading title="How sales become profit" />
-            <RevenueFlow
-              data={workspace.income_flow}
-              segments={workspace.segment_revenue}
-              compactHeading
-            />
-          </section>
-          <section
-            className="financial-story-section"
-            aria-label="Earnings and cash-flow history"
-          >
-            <RevenueHistory
-              revision={revision}
-              instrumentId={instrumentId}
-              workspace={workspace}
-              story={safe}
-              visible={visible}
-              series={incomeSeries}
-            />
-          </section>
-          <EvidenceDialog
-            open={!!figure}
-            onClose={() => setFigure(null)}
-            title={figure?.label || "Evidence"}
-            intro={figure?.detail ? `${figure.detail.title}. ${figure.detail.detail}` : null}
-            rows={figure ? evidenceDialogRows(figure.rows) : []}
-          />
-          <section
-            className="financial-story-section"
-            aria-label="What it owns and owes"
-          >
-            <Heading title="What it owns and owes">
-              Assets and liabilities at one reporting date. Cash is part of
-              assets; borrowing is part of liabilities.
-            </Heading>
-            {balance && (
-              <label className="story-balance-select">
-                Balance-sheet date
-                <Select
-                  value={balance.id}
-                  onChange={(e) => setBalanceId(e.target.value)}
-                >
-                  {balances.map((row) => (
-                    <option key={row.id} value={row.id}>
-                      {day(row.end)} · {row.form}
-                    </option>
-                  ))}
-                </Select>
-              </label>
             )}
-            <BalanceSummary period={balance} />
-            <DisclosureGroup>
-              <Disclosure title="Near-term and longer-term obligations" variant="inset">
-                <BalancePairs period={balance} />
-                <Insights readings={positionReadings.slice(0, 1)} />
-              </Disclosure>
-              <Disclosure title="Borrowing, cash and equity over time" variant="inset">
-                <FinancialHistory
-                  rows={balances}
-                  series={balanceSeries}
-                  active={balance}
-                  onSelect={setBalanceId}
-                  label="Borrowing, cash and equity"
-                />
-                <Insights readings={debtReadings} />
-              </Disclosure>
-              <Disclosure title="What makes up the balance sheet" variant="inset">
-                <div className="story-balance-maps">
-                  <BalanceMap period={balance} side="assets" />
-                  <BalanceMap period={balance} side="funding" />
-                </div>
-                <p className="story-footnote">
-                  Block area shows share of total assets. Book values may differ from resale values. Goodwill and intangible assets are not cash.
+          </Disclosure>
+          {children && (
+            <Disclosure title="Reported figures and filings" variant="inset">
+              {children}
+            </Disclosure>
+          )}
+          {safe?.limitations && (
+            <Disclosure title="Definitions and coverage" variant="inset">
+              {safe.limitations.map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+              <p>
+                SEC filing data checked {formatTimestamp(safe.checked_at)}.
+                First saved observation:{" "}
+                {formatTimestamp(safe.first_recorded_at)}. Method: {safe.method}
+                .
+              </p>
+              {workspace.performance?.source_status?.last_error && (
+                <p>
+                  The latest source check failed; these are retained figures.
                 </p>
-              </Disclosure>
-              <Disclosure title={`Reading these figures · ${basisLabel.toLowerCase()}`} variant="inset">
-                <Insights readings={readings} />
-              </Disclosure>
-            </DisclosureGroup>
-          </section>
-        </>
-      )}
-      <DisclosureGroup>
-        <Disclosure
-          id="management-expects"
-          tabIndex={-1}
-          title="What management expects"
-          description="The company’s own guidance, quoted from its earnings release (revenue guidance is also plotted above)"
-          variant="inset"
-        >
-          <ManagementOutlook data={management} />
-        </Disclosure>
-        <Disclosure
-          className="financial-analyst-disclosure"
-          title="Analyst forecasts table"
-          description="Numbers behind the forecast points"
-          variant="inset"
-          open={analystOpen}
-          onToggle={(event) => {
-            if (event.target === event.currentTarget)
-              setAnalystOpen(event.currentTarget.open);
-          }}
-        >
-          {analystOpen && <FmpPanel instrumentId={instrumentId} visible={visible} revision={revision} />}
-        </Disclosure>
-        {children && (
-          <Disclosure title="Reported figures and filings" variant="inset">
-            {children}
-          </Disclosure>
-        )}
-        {safe?.limitations && (
-          <Disclosure title="Definitions and coverage" variant="inset">
-            {safe.limitations.map((line) => (
-              <p key={line}>{line}</p>
-            ))}
-            <p>
-              SEC filing data checked {formatTimestamp(safe.checked_at)}. First saved observation: {formatTimestamp(safe.first_recorded_at)}. Method: {safe.method}.
-            </p>
-            {workspace.performance?.source_status?.last_error && (
-              <p>The latest source check failed; these are retained figures.</p>
-            )}
-          </Disclosure>
-        )}
-      </DisclosureGroup>
+              )}
+            </Disclosure>
+          )}
+        </DisclosureGroup>
       </div>
     </div>
   );

@@ -158,6 +158,9 @@ export const api = {
   startResearchLoading: (id, body = {}) =>
     request(`/companies/${id}/loading`, { method: "POST", body }),
   telegram: () => request("/telegram"),
+  // Newest Telegram command that changed saved data ({enabled, latest}).
+  telegramCommandLatest: ({ signal } = {}) =>
+    request("/telegram/commands/latest", { signal }),
   telegramConnect: () => request("/telegram/connect", { method: "POST" }),
   telegramCheck: () => request("/telegram/check", { method: "POST" }),
   telegramDelivery: (enabled) =>
@@ -174,7 +177,8 @@ export const api = {
     request(`/scheduled-reviews/${id}?page=${page}`),
   seeReview: (id) =>
     request(`/scheduled-reviews/${id}/seen`, { method: "POST" }),
-  alertPreviousSample: (id) => request(`/research-alerts/${id}/previous-sample`),
+  alertPreviousSample: (id) =>
+    request(`/research-alerts/${id}/previous-sample`),
   conversation: (id, collect = false) =>
     request(`/social-sources/${id}/conversation`, {
       method: collect ? "POST" : "GET",
@@ -352,6 +356,11 @@ export const api = {
   // Light reads for the home cards: every saved quote, then per-company
   // news tone and (Pro) the two trailing filing figures.
   homeCards: ({ signal } = {}) => request("/home-cards", { signal }),
+  // Saved widget arrangement for the overview or home page ({lg, md, sm, hidden}).
+  layout: (page, { signal } = {}) => request(`/layouts/${page}`, { signal }),
+  saveLayout: (page, body) =>
+    request(`/layouts/${page}`, { method: "PUT", body }),
+  resetLayout: (page) => request(`/layouts/${page}`, { method: "DELETE" }),
   // This company's alerts with details; the company read has status only.
   companyAlerts: (id, { signal } = {}) =>
     request(`/companies/${id}/alerts`, { signal }),
@@ -362,6 +371,9 @@ export const api = {
       `/workspace?include_financials=${includeFinancials}${instrument_id ? `&instrument_id=${encodeURIComponent(instrument_id)}` : ""}`,
       { signal },
     ),
+  // Loaded separately from the workspace so presenting every saved relevance
+  // check never delays the page.
+  ideaAlerts: ({ signal } = {}) => request("/idea-alerts", { signal }),
   save: (body, instrument_id) =>
     request("/idea", {
       method: "POST",

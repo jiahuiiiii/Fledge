@@ -55,3 +55,5 @@ loads the existing external-network guard only into its disposable server, never
 the owner's app. This is a presentation change, not a change to pairing or delivery.
 
 Protocol references: [Bot API: polling and webhook behavior](https://core.telegram.org/bots/api#getupdates), [sendMessage and acknowledgement contract](https://core.telegram.org/bots/api#sendmessage), [private-chat connection links](https://core.telegram.org/bots/features#deep-linking), and [Telegram message pacing](https://core.telegram.org/bots/faq#my-bot-is-hitting-limits-how-do-i-avoid-this). Reviewed 5 October 2026.
+
+Commands from the linked chat (/today, /why, /world, /explain, /watch) share this bot cursor and link guard; see [Telegram commands](telegram-commands.md).

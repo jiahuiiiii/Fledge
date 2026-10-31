@@ -1,4 +1,5 @@
 import { formatTimestamp } from "../lib/dateTime";
+import { Button } from "./ui";
 import { useState } from "react";
 import { researchStep } from "../lib/researchProgress";
 import "./ResearchLoading.css";
@@ -94,13 +95,13 @@ export default function ResearchLoading({
               <span>
                 {finished}/{steps.length}
               </span>
-              <button
-                className="text-button"
+              <Button
+                variant="link"
                 aria-expanded={expanded}
                 onClick={() => setExpanded(!expanded)}
               >
                 {expanded ? "Hide details" : "View progress"}
-              </button>
+              </Button>
               <button
                 type="button"
                 className="collapse-progress"

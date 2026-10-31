@@ -1,5 +1,5 @@
-import LoadingSkeleton from "./LoadingSkeleton";
 import { useEffect, useState } from "react";
+import { Skeleton as LoadingSkeleton } from "./ui";
 import { api } from "../api/client";
 import { stamp } from "./MarketResearch";
 import { watchLaneLabel, separateWatchSteps } from "../lib/watchLanes";

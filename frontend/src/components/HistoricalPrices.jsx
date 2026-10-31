@@ -1,5 +1,5 @@
-import LoadingSkeleton from "./LoadingSkeleton";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Skeleton as LoadingSkeleton } from "./ui";
 import { api } from "../api/client";
 import PriceChart from "./PriceChart";
 import { stamp } from "./MarketResearch";
@@ -94,12 +94,28 @@ export default function HistoricalPrices({
     }
   }, [instrumentId, onRead]);
   useEffect(() => {
-    if (!visible || !pageVisible || paused || checking || (!autoRefresh && !refreshChosen)) return;
+    if (
+      !visible ||
+      !pageVisible ||
+      paused ||
+      checking ||
+      (!autoRefresh && !refreshChosen)
+    )
+      return;
     const delay = priceRefreshDelay(data);
     if (delay == null) return;
     const timer = setTimeout(refreshPrices, Math.max(1000, delay));
     return () => clearTimeout(timer);
-  }, [data, visible, pageVisible, paused, checking, refreshPrices, autoRefresh, refreshChosen]);
+  }, [
+    data,
+    visible,
+    pageVisible,
+    paused,
+    checking,
+    refreshPrices,
+    autoRefresh,
+    refreshChosen,
+  ]);
   const snapshot = data?.snapshot,
     series = snapshot?.series;
   const bars =
@@ -119,7 +135,10 @@ export default function HistoricalPrices({
           <span className="fine"> · Yahoo Finance</span>
         </div>
         <button
-          onClick={() => { setRefreshChosen(true); refreshPrices(); }}
+          onClick={() => {
+            setRefreshChosen(true);
+            refreshPrices();
+          }}
           disabled={checking || !data?.available || !data?.configured}
         >
           {checking ? "Checking prices…" : "Refresh prices"}

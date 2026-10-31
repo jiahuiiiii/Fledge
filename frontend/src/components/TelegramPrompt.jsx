@@ -1,21 +1,31 @@
 import { useState } from "react";
-import Modal from "./Modal";
-import { Button } from "./ui";
+import { Button, Modal } from "./ui";
 import { useTelegramLink } from "../lib/useTelegramLink";
 
 // Watches send their alerts to Telegram. When no chat is connected yet, ask to
 // connect it first; the alternative keeps alerts in the app only (Updates).
-export function TelegramPrompt({ open, onClose, onConnect, onContinue, what = "this watch" }) {
+export function TelegramPrompt({
+  open,
+  onClose,
+  onConnect,
+  onContinue,
+  what = "this watch",
+}) {
   return (
-    <Modal open={open} onClose={onClose} title="Connect Telegram first" className="telegram-prompt">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Connect Telegram first"
+      className="telegram-prompt"
+    >
       <div className="telegram-prompt__body">
         <p>
-          Alerts from {what} are sent to Telegram, so you hear about changes without opening
-          Fledge. Telegram isn’t connected yet.
+          Alerts from {what} are sent to Telegram, so you hear about changes
+          without opening Fledge. Telegram isn’t connected yet.
         </p>
         <p className="fine">
-          Connecting takes about a minute from your Account page. Without it, alerts still appear
-          in Updates inside the app.
+          Connecting takes about a minute from your Account page. Without it,
+          alerts still appear in Updates inside the app.
         </p>
         <div className="telegram-prompt__actions">
           <Button variant="primary" onClick={onConnect}>

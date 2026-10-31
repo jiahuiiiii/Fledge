@@ -37,7 +37,11 @@ export default function SectionHeader({
         {eyebrow && (
           <Text className="ui-section-header__eyebrow">{eyebrow}</Text>
         )}
-        <Heading id={id} tabIndex={tabIndex} className="ui-section-header__title">
+        <Heading
+          id={id}
+          tabIndex={tabIndex}
+          className="ui-section-header__title"
+        >
           {title}
         </Heading>
         {description && (

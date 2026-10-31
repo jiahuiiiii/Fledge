@@ -18,7 +18,13 @@ const reviewName = (action) =>
 
 // One saved update: a compact summary, the review actions, and a flat
 // evidence dialog with just the sources and the useful / not useful rating.
-export default function InboxRecord({ record, busy, onOpen, onSource, onReview }) {
+export default function InboxRecord({
+  record,
+  busy,
+  onOpen,
+  onSource,
+  onReview,
+}) {
   const [open, setOpen] = useState(false);
   const d = record.detail;
   const summary = inboxSummary(record);
@@ -31,7 +37,8 @@ export default function InboxRecord({ record, busy, onOpen, onSource, onReview }
     href: row.url,
     onOpen: () => onSource?.(row.source_obj),
   }));
-  const canReview = !record.review_action && !d.withheld && d.published !== false;
+  const canReview =
+    !record.review_action && !d.withheld && d.published !== false;
   return (
     <Card
       as="article"
@@ -66,16 +73,38 @@ export default function InboxRecord({ record, busy, onOpen, onSource, onReview }
         </Button>
         {canReview && (
           <>
-            <Button size="sm" disabled={busy} onClick={() => onReview(record.kind, d.id ?? record.id, "reviewed")}>
+            <Button
+              size="sm"
+              disabled={busy}
+              onClick={() =>
+                onReview(record.kind, d.id ?? record.id, "reviewed")
+              }
+            >
               Mark reviewed
             </Button>
-            <Button variant="plain" size="sm" disabled={busy} onClick={() => onReview(record.kind, d.id ?? record.id, "unresolved")}>
+            <Button
+              variant="plain"
+              size="sm"
+              disabled={busy}
+              onClick={() =>
+                onReview(record.kind, d.id ?? record.id, "unresolved")
+              }
+            >
               Leave unresolved
             </Button>
           </>
         )}
         {d.instrument_id && (
-          <Button variant="plain" size="sm" onClick={() => onOpen(d.instrument_id, record.kind === "idea" ? "idea" : "workspace")}>
+          <Button
+            variant="plain"
+            size="sm"
+            onClick={() =>
+              onOpen(
+                d.instrument_id,
+                record.kind === "idea" ? "idea" : "workspace",
+              )
+            }
+          >
             Open {d.symbol} ↗
           </Button>
         )}

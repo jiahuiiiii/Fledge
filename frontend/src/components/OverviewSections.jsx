@@ -84,7 +84,10 @@ export default function OverviewSections({
     mix = m.mix[0],
     guidance = m.guidance;
   const show = (title, rows, extra = []) =>
-    setEvidence({ title, rows: [...evidenceDialogRows(rows), ...extra.filter(Boolean)] });
+    setEvidence({
+      title,
+      rows: [...evidenceDialogRows(rows), ...extra.filter(Boolean)],
+    });
   const annualPrior = m.revenue?.prior
     ? {
         ...m.revenue.prior,
@@ -121,7 +124,11 @@ export default function OverviewSections({
           ? `${name} reports ${mix.members.length} business categories: ${mix.members.map((g) => g.label).join(", ")}.`
           : "Read the company’s revenue, operating results and original business description together."),
       figures: [
-        { label: "Revenue", value: money(m.revenue?.value), onOpen: () => show("Revenue", [m.revenue]) },
+        {
+          label: "Revenue",
+          value: money(m.revenue?.value),
+          onOpen: () => show("Revenue", [m.revenue]),
+        },
         { label: "Reporting period", value: day(m.revenue?.end) },
       ],
       to: ["fundamentals", "Financials"],
@@ -134,10 +141,25 @@ export default function OverviewSections({
           ? `Annual revenue ${growthNumber >= 0 ? "grew" : "fell"} ${Math.abs(growthNumber).toFixed(1)}%.`
           : "Comparable revenue growth is unavailable.",
       figures: [
-        { label: "Annual growth", value: signedPercent(growthNumber), onOpen: () => show("Revenue growth", [m.growth, m.revenue, annualPrior]) },
-        { label: "Management guidance", value: guidance ? guidanceAmount(guidance) : "Unavailable", onOpen: guidance ? () => show("Management guidance", [], [guidanceRow]) : undefined },
+        {
+          label: "Annual growth",
+          value: signedPercent(growthNumber),
+          onOpen: () =>
+            show("Revenue growth", [m.growth, m.revenue, annualPrior]),
+        },
+        {
+          label: "Management guidance",
+          value: guidance ? guidanceAmount(guidance) : "Unavailable",
+          onOpen: guidance
+            ? () => show("Management guidance", [], [guidanceRow])
+            : undefined,
+        },
       ],
-      to: ["fundamentals", "Financials · what management expects", "management"],
+      to: [
+        "fundamentals",
+        "Financials · what management expects",
+        "management",
+      ],
     },
     health: {
       label: "Financial health",
@@ -146,16 +168,33 @@ export default function OverviewSections({
           ? `Reported assets are ${multiple(m.assetsRatio)} liabilities. Read cash flow and borrowing alongside this snapshot.`
           : "A matching assets-to-liabilities comparison is unavailable. Read the reported cash flow and borrowing.",
       figures: [
-        { label: "Free cash flow", value: money(m.freeCash?.value), onOpen: () => show("Free cash flow", [m.freeCash]) },
-        { label: "Assets ÷ liabilities", value: multiple(m.assetsRatio), onOpen: () => show("Assets and liabilities", [m.assets, m.liabilities]) },
+        {
+          label: "Free cash flow",
+          value: money(m.freeCash?.value),
+          onOpen: () => show("Free cash flow", [m.freeCash]),
+        },
+        {
+          label: "Assets ÷ liabilities",
+          value: multiple(m.assetsRatio),
+          onOpen: () =>
+            show("Assets and liabilities", [m.assets, m.liabilities]),
+        },
       ],
       to: ["fundamentals", "Financials"],
     },
     value: {
       label: "Value",
-      reading: peVsPeers || "Whether a valuation looks high or low depends on growth, risks and the assumptions you compare it with.",
+      reading:
+        peVsPeers ||
+        "Whether a valuation looks high or low depends on growth, risks and the assumptions you compare it with.",
       figures: [
-        { label: "Price to earnings", value: multiple(m.pe), onOpen: m.reference ? () => show("Valuation ratios", [m.reference]) : undefined },
+        {
+          label: "Price to earnings",
+          value: multiple(m.pe),
+          onOpen: m.reference
+            ? () => show("Valuation ratios", [m.reference])
+            : undefined,
+        },
         { label: "Price to sales", value: multiple(m.ps) },
       ],
       to: ["valuation", "Compare & value"],
@@ -169,7 +208,10 @@ export default function OverviewSections({
         label="Business topic"
         value={topic}
         onValueChange={setTopic}
-        options={Object.entries(topics).map(([value, t]) => ({ value, label: t.label }))}
+        options={Object.entries(topics).map(([value, t]) => ({
+          value,
+          label: t.label,
+        }))}
       />
       <OverviewReadCard
         reading={current.reading}
@@ -182,10 +224,14 @@ export default function OverviewSections({
         description="Saved brief, original evidence and what to research next"
         open={briefOpen}
         onToggle={(event) => {
-          if (event.target === event.currentTarget) onBriefToggle(event.currentTarget.open);
+          if (event.target === event.currentTarget)
+            onBriefToggle(event.currentTarget.open);
         }}
       >
-        {briefOpen && (typeof businessPanel === "function" ? businessPanel() : businessPanel)}
+        {briefOpen &&
+          (typeof businessPanel === "function"
+            ? businessPanel()
+            : businessPanel)}
       </Disclosure>
       <EvidenceDialog
         open={!!evidence}

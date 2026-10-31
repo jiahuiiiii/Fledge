@@ -2,10 +2,7 @@ import { formatTimestamp } from "../lib/dateTime";
 // Kestrel's connect/disconnect notification flow, adapted for this local app.
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
-import Modal from "./Modal";
-import LoadingSkeleton from "./LoadingSkeleton";
-import Checkbox from "./Checkbox";
-import { Button } from "./ui";
+import { Button, Modal, Checkbox, Skeleton as LoadingSkeleton } from "./ui";
 import "./TelegramSettings.css";
 
 const labels = {
@@ -121,12 +118,12 @@ export default function TelegramSettings({ wrap }) {
   if (!configured) return null;
   const trigger = (
     <Button
-        variant="secondary"
-        aria-label="Telegram alerts"
-        icon={<TelegramIcon />}
-        onClick={() => setOpen(true)}
-      >
-        Manage
+      variant="secondary"
+      aria-label="Telegram alerts"
+      icon={<TelegramIcon />}
+      onClick={() => setOpen(true)}
+    >
+      Manage
     </Button>
   );
   return (
@@ -279,14 +276,15 @@ export default function TelegramSettings({ wrap }) {
                       className={`telegram-actions telegram-pairing-actions ${link ? "has-link" : ""}`}
                     >
                       {link && (
-                        <a
-                          className="telegram-open primary"
+                        <Button
+                          variant="primary"
+                          className="telegram-open"
                           href={link.url}
                           target="_blank"
                           rel="noreferrer"
                         >
                           Open Telegram ↗
-                        </a>
+                        </Button>
                       )}
                       <button
                         className={link ? "" : "primary"}

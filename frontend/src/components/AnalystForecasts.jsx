@@ -1,8 +1,8 @@
 import { formatTimestamp } from "../lib/dateTime";
+import { Skeleton as LoadingSkeleton } from "./ui";
 import { readableNote, sourceTiming } from "../lib/readingNotes";
 import PublicForecasts from "./PublicForecasts";
 import ForecastRange from "./ForecastRange";
-import LoadingSkeleton from "./LoadingSkeleton";
 import TermHelp from "./TermHelp";
 
 const stamp = (value) =>

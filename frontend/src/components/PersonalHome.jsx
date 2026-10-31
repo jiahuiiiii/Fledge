@@ -1,11 +1,16 @@
 import { useProfile } from "../lib/profile";
+import { Button } from "./ui";
 import { typeName } from "../lib/investorTypes";
 import "./Onboarding.css";
 
 // The tailored part of the home page: built by the server from the user's
 // first-login answers and watchlist (GET /api/v1/home). No company is suggested
 // except the practice company, which is labelled as an example.
-export default function PersonalHome({ onAddCompany, onOpenCompany, practice }) {
+export default function PersonalHome({
+  onAddCompany,
+  onOpenCompany,
+  practice,
+}) {
   const { home } = useProfile();
   if (!home?.profile) return null;
   const { headline, next_step: step, watchlist, profile } = home;
@@ -19,13 +24,13 @@ export default function PersonalHome({ onAddCompany, onOpenCompany, practice }) 
         </div>
         <div className="personal-home-actions">
           {practice && (
-            <button
+            <Button
+              variant="primary"
               type="button"
-              className="primary"
               onClick={() => onOpenCompany(practice.id)}
             >
               See an example: {practice.name || practice.symbol}
-            </button>
+            </Button>
           )}
           <button type="button" onClick={onAddCompany}>
             Add a company
@@ -64,9 +69,9 @@ export default function PersonalHome({ onAddCompany, onOpenCompany, practice }) 
       </div>
       <div className="personal-home-actions">
         {action && (
-          <button type="button" className="primary" onClick={action[1]}>
+          <Button variant="primary" onClick={action[1]}>
             {action[0]}
-          </button>
+          </Button>
         )}
         {!first && practice && (
           <button type="button" onClick={() => onOpenCompany(practice.id)}>

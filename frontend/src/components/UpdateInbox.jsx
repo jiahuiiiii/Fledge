@@ -1,6 +1,4 @@
-import LoadingSkeleton from "./LoadingSkeleton";
 import { readableLoad } from "../lib/loading";
-import Select from "./Select";
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { stamp } from "./MarketResearch";
@@ -23,6 +21,8 @@ import {
   Pagination,
   RefreshIcon,
   SectionHeader,
+  Select,
+  Skeleton as LoadingSkeleton,
 } from "./ui";
 
 const kindName = {
@@ -177,14 +177,14 @@ export default function UpdateInbox({
         description="Price moves, company reporting and changes to your saved research."
       />
       <div className="reading-page-actions inbox-heading-actions">
-        {(
+        {
           <Button onClick={() => setWeeklyOpen(true)}>
             Weekly review
             {unseenReviews > 0 && (
               <Badge status="accent">{unseenReviews} new</Badge>
             )}
           </Button>
-        )}
+        }
         <Button
           variant="plain"
           icon={<RefreshIcon />}

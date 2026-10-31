@@ -3,9 +3,8 @@ import { guidanceReason } from "../lib/overviewSections";
 import { readableNote } from "../lib/readingNotes";
 import { useId, useState } from "react";
 import TermHelp from "./TermHelp";
-import Select from "./Select";
 import EvidenceButton from "./EvidenceButton";
-import { Disclosure, SourceChip } from "./ui";
+import { Disclosure, SourceChip, Select } from "./ui";
 import { day, amount } from "./FinancialOverview";
 import "./ManagementOutlook.css";
 
@@ -141,7 +140,8 @@ export default function ManagementOutlook({ data }) {
       <div className="outlook-heading">
         <div>
           <p className="fine">
-            From the company’s own earnings release. <TermHelp term="guidance" />
+            From the company’s own earnings release.{" "}
+            <TermHelp term="guidance" />
           </p>
         </div>
         {release && (
@@ -254,7 +254,11 @@ export default function ManagementOutlook({ data }) {
                     ))}
                 </details>
               )}
-              <Disclosure variant="flush" className="outlook-context" title="Read the outlook in context">
+              <Disclosure
+                variant="flush"
+                className="outlook-context"
+                title="Read the outlook in context"
+              >
                 {release.stated_release_date && (
                   <blockquote>{release.stated_release_date.quote}</blockquote>
                 )}
@@ -274,17 +278,30 @@ export default function ManagementOutlook({ data }) {
               </Disclosure>
             </section>
           ))}
-          <Disclosure variant="flush" className="outlook-limits" title="Release details and limits">
+          <Disclosure
+            variant="flush"
+            className="outlook-limits"
+            title="Release details and limits"
+          >
             <p className="fine">
-              First saved {stamp(release.available_at)}. SEC filing accepted {stamp(release.published_at)}. The stated release date comes from the release’s own dateline; SEC acceptance and first-saved time are separate dates.
+              First saved {stamp(release.available_at)}. SEC filing accepted{" "}
+              {stamp(release.published_at)}. The stated release date comes from
+              the release’s own dateline; SEC acceptance and first-saved time
+              are separate dates.
             </p>
             {data.limitations.map((line) => (
-              <p className="fine" key={line}>{readableNote(line)}</p>
+              <p className="fine" key={line}>
+                {readableNote(line)}
+              </p>
             ))}
             <p className="fine">
-              This covers a limited set of saved releases and reports. Earlier forecasts and results may be missing.
+              This covers a limited set of saved releases and reports. Earlier
+              forecasts and results may be missing.
             </p>
-            <SourceChip label="Open original earnings release" href={release.url} />
+            <SourceChip
+              label="Open original earnings release"
+              href={release.url}
+            />
           </Disclosure>
         </div>
       )}

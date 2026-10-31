@@ -1,10 +1,21 @@
 import TermHelp from "./TermHelp";
-import { plainSales, plainMargin, plainCash, plainForecast } from "../lib/plainTabs";
+import {
+  plainSales,
+  plainMargin,
+  plainCash,
+  plainForecast,
+} from "../lib/plainTabs";
 import "./PlainTabs.css";
 
 // The first thing anyone sees on the Financials tab: a few figures in plain
 // English. The charts and filings stay behind "Show full details".
-export default function PlainFinancials({ name, active, previous, management, annual }) {
+export default function PlainFinancials({
+  name,
+  active,
+  previous,
+  management,
+  annual,
+}) {
   const span = annual ? "last financial year" : "last 12 months";
   const sales = plainSales(active, previous, name);
   const cards = [
@@ -38,7 +49,8 @@ export default function PlainFinancials({ name, active, previous, management, an
       </p>
       {cards.length === 0 && (
         <p className="plain-empty">
-          No figures saved yet. Use Update at the top of the page to collect them.
+          No figures saved yet. Use Update at the top of the page to collect
+          them.
         </p>
       )}
       {cards.map((card) => (
@@ -46,12 +58,15 @@ export default function PlainFinancials({ name, active, previous, management, an
           <p className="plain-label">
             {card.label} <TermHelp term={card.term} />
           </p>
-          <p className={`plain-value${card.key === "forecast" ? " small" : ""}`}>
+          <p
+            className={`plain-value${card.key === "forecast" ? " small" : ""}`}
+          >
             {card.value}
             {card.change != null && Math.abs(card.change) >= 1 && (
               <span className={card.change > 0 ? "plain-up" : "plain-down"}>
                 {" "}
-                {card.change > 0 ? "▲" : "▼"} {Math.abs(card.change).toFixed(0)}%
+                {card.change > 0 ? "▲" : "▼"} {Math.abs(card.change).toFixed(0)}
+                %
               </span>
             )}
           </p>

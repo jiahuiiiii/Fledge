@@ -1,8 +1,13 @@
 import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { api } from "../api/client";
-import Select from "./Select";
-import Checkbox from "./Checkbox";
-import { Button, Card, Disclosure, SectionHeader } from "./ui";
+import {
+  Button,
+  Card,
+  Disclosure,
+  SectionHeader,
+  Select,
+  Checkbox,
+} from "./ui";
 import { day, money } from "../lib/financialStory";
 
 export default function FinancialRecovery({ instrumentId, onApplied }) {
@@ -119,7 +124,8 @@ export default function FinancialRecovery({ instrumentId, onApplied }) {
         const r = next.reading;
         const ids = (r?.result?.items || []).map((item) => item.id);
         if (!ids.length || r.withheld) continue;
-        if ([...ids].sort().join() === [...(r.accepted || [])].sort().join()) continue;
+        if ([...ids].sort().join() === [...(r.accepted || [])].sort().join())
+          continue;
         await api.reviewFinancialRecovery(instrumentId, r.id, {
           accepted: ids,
           expected_review: r.review_id,
@@ -136,7 +142,9 @@ export default function FinancialRecovery({ instrumentId, onApplied }) {
       await onApplied?.();
     } catch (failure) {
       if (token === generation.current)
-        setError(`${failure.message} Suggestions applied before this are saved.`);
+        setError(
+          `${failure.message} Suggestions applied before this are saved.`,
+        );
     } finally {
       if (token === generation.current) {
         setBusy("");
@@ -359,14 +367,24 @@ export default function FinancialRecovery({ instrumentId, onApplied }) {
                       <strong>Use every suggestion at once</strong>
                       <p>
                         Puts every suggested figure from{" "}
-                        {reviewed.length === 1 ? "this report" : `all ${reviewed.length} reports`} into
-                        your charts. Each keeps its calculation and original rows, and you can untick and
-                        save any report’s choices later. No AI is used.
+                        {reviewed.length === 1
+                          ? "this report"
+                          : `all ${reviewed.length} reports`}{" "}
+                        into your charts. Each keeps its calculation and
+                        original rows, and you can untick and save any report’s
+                        choices later. No AI is used.
                       </p>
                       {applyNote && <p role="status">{applyNote}</p>}
                     </div>
-                    <Button variant="primary" disabled={Boolean(busy)} onClick={applyAllReports}>
-                      Use all suggestions from {reviewed.length === 1 ? "this report" : `all ${reviewed.length} reports`}
+                    <Button
+                      variant="primary"
+                      disabled={Boolean(busy)}
+                      onClick={applyAllReports}
+                    >
+                      Use all suggestions from{" "}
+                      {reviewed.length === 1
+                        ? "this report"
+                        : `all ${reviewed.length} reports`}
                     </Button>
                   </Card>
                 )}

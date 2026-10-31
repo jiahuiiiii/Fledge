@@ -57,8 +57,8 @@ function Terms() {
           licensed financial adviser.
         </li>
         <li>
-          Your investor type is a description of how you said you invest. It
-          is not a recommendation.
+          Your investor type is a description of how you said you invest. It is
+          not a recommendation.
         </li>
         <li>
           Investing is risky. You can lose some or all of your money. Decisions
@@ -69,16 +69,16 @@ function Terms() {
       <p>
         Prices, news and summaries come from outside sources and from AI. They
         can be delayed, incomplete or wrong. News items and posts link to their
-        source so you can check them; AI summaries are built from those
-        sources and can still get things wrong.
+        source so you can check them; AI summaries are built from those sources
+        and can still get things wrong.
       </p>
       <h2>4. Your account</h2>
       <ul>
         <li>One account per person. Keep your password private.</li>
         <li>
-          When you sign up you get a one-time recovery code. Keep it safe: it
-          is the only way to reset a forgotten password yourself, and anyone
-          with your username and code can change your password.
+          When you sign up you get a one-time recovery code. Keep it safe: it is
+          the only way to reset a forgotten password yourself, and anyone with
+          your username and code can change your password.
         </li>
         <li>
           If you are under 18, use Fledge only with a parent or guardian’s
@@ -87,9 +87,9 @@ function Terms() {
       </ul>
       <h2>5. Fair use</h2>
       <p>
-        Do not misuse Fledge: no breaking or overloading it, copying its data
-        in bulk, using someone else’s account, or anything illegal. We may
-        pause or close accounts that do.
+        Do not misuse Fledge: no breaking or overloading it, copying its data in
+        bulk, using someone else’s account, or anything illegal. We may pause or
+        close accounts that do.
       </p>
       <h2>6. Your notes</h2>
       <p>
@@ -137,12 +137,12 @@ function Privacy() {
           also your trading style and how you would react to a fall.
         </li>
         <li>
-          <strong>What you save:</strong> companies you follow, questions,
-          views and notes you write, and alert settings.
+          <strong>What you save:</strong> companies you follow, questions, views
+          and notes you write, and alert settings.
         </li>
         <li>
-          <strong>Telegram (only if you connect it):</strong> your Telegram
-          chat ID and name, so we can send the alerts you asked for.
+          <strong>Telegram (only if you connect it):</strong> your Telegram chat
+          ID and name, so we can send the alerts you asked for.
         </li>
         <li>
           <strong>Security:</strong> a sign-in cookie and a count of failed
@@ -150,8 +150,8 @@ function Privacy() {
         </li>
       </ul>
       <p>
-        We do not ask for your NRIC, bank or brokerage details, and Fledge
-        never handles real money.
+        We do not ask for your NRIC, bank or brokerage details, and Fledge never
+        handles real money.
       </p>
       <h2>2. Why we use it</h2>
       <ul>
@@ -171,16 +171,16 @@ function Privacy() {
       <p>
         You agree to this notice when you create an account. You can withdraw
         your consent at any time by contacting us. Fledge cannot run an account
-        without this data, so withdrawing means we close your account and
-        delete your data.
+        without this data, so withdrawing means we close your account and delete
+        your data.
       </p>
       <h2>4. Who else sees it</h2>
       <ul>
         <li>
           <strong>AI services</strong> (such as OpenAI, Anthropic or DeepSeek,
-          depending on setup) receive the question you ask and the company
-          text needed to answer it, but not your username, email or password.
-          Please don’t type personal details into questions.
+          depending on setup) receive the question you ask and the company text
+          needed to answer it, but not your username, email or password. Please
+          don’t type personal details into questions.
         </li>
         <li>
           <strong>Market data services</strong> (such as Finnhub) receive only
@@ -193,8 +193,8 @@ function Privacy() {
       </ul>
       <p>
         Some of these services are based outside Singapore: OpenAI, Anthropic,
-        Finnhub and Telegram process data in the United States or elsewhere,
-        and DeepSeek in China. We send each one only what it needs.
+        Finnhub and Telegram process data in the United States or elsewhere, and
+        DeepSeek in China. We send each one only what it needs.
       </p>
       <h2>5. How we protect it</h2>
       <p>
@@ -206,8 +206,8 @@ function Privacy() {
       <h2>6. How long we keep it</h2>
       <p>
         We keep your data while your account is open. Ask us to delete your
-        account and we will delete your personal data, normally within 30
-        days, unless the law requires us to keep it.
+        account and we will delete your personal data, normally within 30 days,
+        unless the law requires us to keep it.
       </p>
       <h2>7. Seeing or correcting your data</h2>
       <p>
@@ -226,8 +226,8 @@ function Privacy() {
       </p>
       <h2>10. Changes</h2>
       <p>
-        If this notice changes in an important way, we will ask you to read
-        and accept it again.
+        If this notice changes in an important way, we will ask you to read and
+        accept it again.
       </p>
     </>
   );

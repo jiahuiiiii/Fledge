@@ -14,6 +14,9 @@ import {
   TabsList,
   TabsTrigger,
   ToneCard,
+  Modal,
+  Select,
+  Checkbox,
 } from "./ui";
 import { toneOf } from "../lib/tone";
 import { useTelegramGuard } from "./TelegramPrompt";
@@ -25,8 +28,6 @@ import {
   withheldAlertNote,
   withheldSourcesNote,
 } from "../lib/sourceCoverage";
-import Checkbox from "./Checkbox";
-import Select from "./Select";
 import SentimentLimits from "./SentimentLimits";
 import SentimentBasis from "./SentimentBasis";
 import SentimentPriceContext from "./SentimentPriceContext";
@@ -48,7 +49,6 @@ import { originalSample } from "../lib/originalSample";
 import { sourceHeadline } from "../lib/sourceHeadline";
 import "./NewsDiscussion.css";
 import { useEffect, useId, useState } from "react";
-import Modal from "./Modal";
 import EvidenceButton from "./EvidenceButton";
 import { stamp } from "./MarketResearch";
 import "./AlertEvidence.css";
@@ -87,7 +87,10 @@ export default function SentimentPanel({
   const platform = tab === "all" || tab === "news" ? null : tab;
   const [evidenceView, setEvidenceView] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const telegramGuard = useTelegramGuard({ onConnect: onConnectTelegram, what: "this watch" });
+  const telegramGuard = useTelegramGuard({
+    onConnect: onConnectTelegram,
+    what: "this watch",
+  });
   const a = data.sentiment,
     watch = data.news_watch;
   const activeQuestion =
@@ -204,8 +207,8 @@ export default function SentimentPanel({
       )}
       {oneDay && (
         <p className="fine">
-          Counting only sources published in the 24 hours before this reading
-          ({recentIds.size} of {a.sources.length}). Labels are the saved ones;
+          Counting only sources published in the 24 hours before this reading (
+          {recentIds.size} of {a.sources.length}). Labels are the saved ones;
           nothing was re-analysed.
         </p>
       )}
@@ -300,7 +303,8 @@ export default function SentimentPanel({
       )}
       <NewsFreshness data={data} />
       <p className="fine sentiment-reading-limit">
-        Tone describes what people and publishers said, not facts, investor consensus or future returns.
+        Tone describes what people and publishers said, not facts, investor
+        consensus or future returns.
       </p>
       <div className="sample-browse-controls">
         <SourceFilters selected={tab} onChange={setTab} showLabels />
@@ -319,7 +323,9 @@ export default function SentimentPanel({
         >
           Evidence
           {data.sentiment_inputs?.status === "changed" && (
-            <Badge title="Saved sources have changed since this reading">Sources changed</Badge>
+            <Badge title="Saved sources have changed since this reading">
+              Sources changed
+            </Badge>
           )}
         </Button>
       </div>
@@ -340,7 +346,12 @@ export default function SentimentPanel({
           {tab === "all" ? (
             <>
               <SourceToneSummary analysis={view} />
-              <Disclosure variant="flush" className="secondary-details" title="Source coverage" description="How sources are counted, what was unavailable and reading limits">
+              <Disclosure
+                variant="flush"
+                className="secondary-details"
+                title="Source coverage"
+                description="How sources are counted, what was unavailable and reading limits"
+              >
                 <AllSourceSummary
                   analysis={a}
                   providerStatus={data.provider_status}
@@ -348,17 +359,58 @@ export default function SentimentPanel({
                 />
                 <SourceCountingDetails analysis={a} />
                 <div className="coverage-notes">
-                  {a.repairs?.repaired > 0 && <p className="fine">{`${a.repairs.repaired} of ${a.repairs.total} labels needed repair: the AI's label and its evidence disagreed.`}</p>}
-                  {a.stale && <p className="fine">This reading uses a source sample captured over 24 hours ago; newer headlines may not be included.</p>}
-                  {a.earlier_method && <p className="fine">Saved with an earlier analysis method.</p>}
-                  {coverage && !coverage.complete && <p className="fine">{coverage.unanalysed > 0 ? "Some saved sources are outside this reading." : "Complete coverage of the saved sources is not established."}</p>}
-                  {a.coverage?.input_limits?.notice && <p className="fine">Some sources were omitted from the reading.</p>}
-                  {withheldSourcesNote(a) && <p className="fine">{withheldSourcesNote(a)}</p>}
-                  {watch?.enabled && <p className="fine">Watch on · next check {stamp(watch.next_check_at)}</p>}
+                  {a.repairs?.repaired > 0 && (
+                    <p className="fine">{`${a.repairs.repaired} of ${a.repairs.total} labels needed repair: the AI's label and its evidence disagreed.`}</p>
+                  )}
+                  {a.stale && (
+                    <p className="fine">
+                      This reading uses a source sample captured over 24 hours
+                      ago; newer headlines may not be included.
+                    </p>
+                  )}
+                  {a.earlier_method && (
+                    <p className="fine">
+                      Saved with an earlier analysis method.
+                    </p>
+                  )}
+                  {coverage && !coverage.complete && (
+                    <p className="fine">
+                      {coverage.unanalysed > 0
+                        ? "Some saved sources are outside this reading."
+                        : "Complete coverage of the saved sources is not established."}
+                    </p>
+                  )}
+                  {a.coverage?.input_limits?.notice && (
+                    <p className="fine">
+                      Some sources were omitted from the reading.
+                    </p>
+                  )}
+                  {withheldSourcesNote(a) && (
+                    <p className="fine">{withheldSourcesNote(a)}</p>
+                  )}
+                  {watch?.enabled && (
+                    <p className="fine">
+                      Watch on · next check {stamp(watch.next_check_at)}
+                    </p>
+                  )}
                 </div>
-                <NewsStatusDetails data={data} availability={availability} onCoverage={onCoverage} />
-                <p className="fine">Re-reading every saved source with the current model is a new paid reading; earlier readings stay in History.</p>
-                <Button variant="plain" size="sm" disabled={!!loadingRun?.active || availability.blocked} onClick={() => onAnalyze(days, { reread: true })}>Re-read everything · paid AI</Button>
+                <NewsStatusDetails
+                  data={data}
+                  availability={availability}
+                  onCoverage={onCoverage}
+                />
+                <p className="fine">
+                  Re-reading every saved source with the current model is a new
+                  paid reading; earlier readings stay in History.
+                </p>
+                <Button
+                  variant="plain"
+                  size="sm"
+                  disabled={!!loadingRun?.active || availability.blocked}
+                  onClick={() => onAnalyze(days, { reread: true })}
+                >
+                  Re-read everything · paid AI
+                </Button>
               </Disclosure>
               <ToneFilters
                 selected={toneFilter}
@@ -368,8 +420,17 @@ export default function SentimentPanel({
             </>
           ) : (
             <>
-              <ToneCard as="div" tone={toneOf(sample.tone)} className="sentiment-summary">
-                <strong className="ui-tone-card__status"><span className="ui-tone-card__dot" aria-hidden="true" />{sentimentSummaryParts(sample).label.replace(/^./, (c) => c.toUpperCase())}</strong>
+              <ToneCard
+                as="div"
+                tone={toneOf(sample.tone)}
+                className="sentiment-summary"
+              >
+                <strong className="ui-tone-card__status">
+                  <span className="ui-tone-card__dot" aria-hidden="true" />
+                  {sentimentSummaryParts(sample).label.replace(/^./, (c) =>
+                    c.toUpperCase(),
+                  )}
+                </strong>
                 <small className="tone-detail">
                   {sentimentSummaryParts(sample).detail}
                 </small>
@@ -382,8 +443,8 @@ export default function SentimentPanel({
               {channel !== "news" && newestPost && (
                 <p className="fine">
                   Newest {platform || "discussion"} post in this sample:{" "}
-                  {stamp(newestPost)}. Anything posted after that is not
-                  counted here.
+                  {stamp(newestPost)}. Anything posted after that is not counted
+                  here.
                 </p>
               )}
               <p className="fine sample-count-explanation">
@@ -443,7 +504,11 @@ export default function SentimentPanel({
                       {sourceHeadline(s) && (
                         <h3>
                           {s?.url ? (
-                            <a href={s.url} target="_blank" rel="noopener noreferrer">
+                            <a
+                              href={s.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
                               {sourceHeadline(s)}
                             </a>
                           ) : (
@@ -717,7 +782,10 @@ export default function SentimentPanel({
               checked={!!watch?.enabled}
               onChange={(e) => {
                 const enabled = e.target.checked;
-                if (enabled) telegramGuard.guard(() => onWatch(true, watch?.interval_minutes || 240));
+                if (enabled)
+                  telegramGuard.guard(() =>
+                    onWatch(true, watch?.interval_minutes || 240),
+                  );
                 else onWatch(false, watch?.interval_minutes || 240);
               }}
             />{" "}
@@ -758,12 +826,17 @@ export default function SentimentPanel({
                 <small> · always on</small>
               </label>
               {[
-                ["reasoning", "Changes linked to my saved reasoning", activeReasoning],
+                [
+                  "reasoning",
+                  "Changes linked to my saved reasoning",
+                  activeReasoning,
+                ],
                 ["question", "Answers to my saved question", activeQuestion],
               ].map(([focus, label, available]) => {
                 const on =
                   !!watch.match_idea &&
-                  (watch.idea_purpose === focus || watch.idea_purpose === "both");
+                  (watch.idea_purpose === focus ||
+                    watch.idea_purpose === "both");
                 return (
                   <label key={focus}>
                     <Checkbox
@@ -809,10 +882,10 @@ export default function SentimentPanel({
                   : "Reasoning checks look for support, challenges, specific risks and answers linked to your saved words. "}
               {watch.idea_purpose === "both"
                 ? "New eligible text uses two private AI requests, one per check."
-                : "New eligible text uses another private AI request."} Quiet results
-              stay in history. Changing focus or reasoning starts a quiet
-              baseline for future sources; numerical and event conditions stay
-              unchanged.
+                : "New eligible text uses another private AI request."}{" "}
+              Quiet results stay in history. Changing focus or reasoning starts
+              a quiet baseline for future sources; numerical and event
+              conditions stay unchanged.
             </p>
           )}
           {watch?.enabled && (
@@ -1033,7 +1106,11 @@ export default function SentimentPanel({
                 : "What is saved now, which matches the reading."
               : "Earlier readings and watch checks."}
         </p>
-        <Disclosure variant="flush" title="Source window and limits" className="sentiment-window-info">
+        <Disclosure
+          variant="flush"
+          title="Source window and limits"
+          className="sentiment-window-info"
+        >
           <p className="fine">
             Refresh &amp; analyse checks news and discussions, then analyses the
             available passages. News covers 7 days. Discussion searches use your

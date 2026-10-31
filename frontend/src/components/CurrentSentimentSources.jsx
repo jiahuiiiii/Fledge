@@ -114,8 +114,9 @@ export default function CurrentSentimentSources({
                   )}
                   {!!data.parents_changed && (
                     <p className="fine">
-                      Saved discussion context differs for {data.parents_changed}{" "}
-                      retained messages (availability or age, not only wording).
+                      Saved discussion context differs for{" "}
+                      {data.parents_changed} retained messages (availability or
+                      age, not only wording).
                     </p>
                   )}
                   {data.comparison_sources_changed && (
@@ -171,7 +172,13 @@ export default function CurrentSentimentSources({
             // list, just without a tone label.
             <div className="sentiment-items collected-source-list">
               {shown.map((s) => (
-                <Card as="article" variant="flush" className="source-story" key={s.id} data-source-id={s.id}>
+                <Card
+                  as="article"
+                  variant="flush"
+                  className="source-story"
+                  key={s.id}
+                  data-source-id={s.id}
+                >
                   <MetaRow className="sentiment-source-meta fine">
                     <SourceChip
                       label={s.source}
@@ -183,7 +190,11 @@ export default function CurrentSentimentSources({
                   {sourceHeadline(s) && (
                     <h3>
                       {s.url ? (
-                        <a href={s.url} target="_blank" rel="noopener noreferrer">
+                        <a
+                          href={s.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
                           {sourceHeadline(s)}
                         </a>
                       ) : (
@@ -191,7 +202,9 @@ export default function CurrentSentimentSources({
                       )}
                     </h3>
                   )}
-                  <p className="story-source-text original-source-text">{s.body}</p>
+                  <p className="story-source-text original-source-text">
+                    {s.body}
+                  </p>
                 </Card>
               ))}
             </div>
@@ -210,13 +223,24 @@ export default function CurrentSentimentSources({
                 {sourceHeadline(s) && <h3>{sourceHeadline(s)}</h3>}
                 {(s.in_saved_sample === false || s.has_parent_context) && (
                   <p className="fine">
-                    {s.in_saved_sample === false ? "Not in the saved sample" : ""}
-                    {s.in_saved_sample === false && s.has_parent_context ? " · " : ""}
-                    {s.has_parent_context ? "Saved parent context available" : ""}
+                    {s.in_saved_sample === false
+                      ? "Not in the saved sample"
+                      : ""}
+                    {s.in_saved_sample === false && s.has_parent_context
+                      ? " · "
+                      : ""}
+                    {s.has_parent_context
+                      ? "Saved parent context available"
+                      : ""}
                   </p>
                 )}
                 <p className="original-source-text">{s.body}</p>
-                <Button variant="tertiary" size="sm" className="source-link" onClick={() => onSource(s.id)}>
+                <Button
+                  variant="tertiary"
+                  size="sm"
+                  className="source-link"
+                  onClick={() => onSource(s.id)}
+                >
                   Inspect current source ↗
                 </Button>
               </article>

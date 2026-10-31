@@ -1,9 +1,8 @@
 import { formatTimestamp } from "../lib/dateTime";
+import { Modal, Checkbox, Button } from "./ui";
 import { modelAvailability } from "../lib/modelAvailability";
-import Checkbox from "./Checkbox";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
-import Modal from "./Modal";
 import SentimentContext from "./SentimentContext";
 import QuestionSelector, { questionDefaults } from "./QuestionSelector";
 const stamp = (value) => formatTimestamp(value, { fallback: "Not recorded" });
@@ -179,9 +178,10 @@ export default function ResearchQuestion({
           setNotice("");
         }}
         actions={
-          <button
+          <Button
+            variant="link"
             type="button"
-            className="text-button edit-question"
+            className="edit-question"
             disabled={busy || savingQuestion}
             onClick={() => {
               if (editing) {
@@ -197,7 +197,7 @@ export default function ResearchQuestion({
             }}
           >
             {editing ? "Cancel edit" : "Edit question"}
-          </button>
+          </Button>
         }
         editor={
           editing && (
@@ -240,15 +240,15 @@ export default function ResearchQuestion({
               />{" "}
               Include social discussion
             </label>
-            <button
-              className="primary"
+            <Button
+              variant="primary"
               type="submit"
               disabled={
                 busy || savingQuestion || disabled || question.trim().length < 3
               }
             >
               {busy ? "Working…" : "Answer this question"}
-            </button>
+            </Button>
           </div>
           <p className="fine question-privacy">
             AI analysis of saved sources · Private to your workspace
