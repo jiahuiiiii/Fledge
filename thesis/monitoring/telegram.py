@@ -106,9 +106,9 @@ def check_connection(owner):
             return status(owner)
         if not cfg.get("link_hash") or cfg["link_expires_at"] <= clock() or cfg.get("bot_fingerprint") != fingerprint(key):
             raise ValueError("The connection link expired. Create a new link and press Start in Telegram.")
-        from . import alert_feedback
-        if alert_feedback.enabled():
-            from .telegram_updates import receive
+        from .telegram_updates import polling, receive
+        # One consumer owns the update cursor whenever ratings or commands poll it.
+        if polling():
             receive(force=True)
             return status(owner)
         updates = transport.call(key, "getUpdates", dict(offset=cfg["update_offset"], limit=100, timeout=5, allowed_updates=["message"]))

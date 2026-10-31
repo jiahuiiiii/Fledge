@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
+import { Button } from "./ui";
 import CompanyDialog from "./CompanyDialog";
 import TelegramSettings from "./TelegramSettings";
 import { companionPromise } from "../lib/companion";
 import { useProfile } from "../lib/profile";
 import { api } from "../api/client";
-
 
 export default function EmptyWorkspace({ view, onChoose }) {
   const [adding, setAdding] = useState(false);
@@ -75,8 +75,7 @@ export default function EmptyWorkspace({ view, onChoose }) {
           <p className="fine personal-interests">
             You told us you’re interested in{" "}
             {personal.interests.map((item) => item.label).join(", ")}. Search
-            for a company in these areas, or anything else you’re curious
-            about.
+            for a company in these areas, or anything else you’re curious about.
           </p>
         )}
         {personal && (
@@ -90,9 +89,9 @@ export default function EmptyWorkspace({ view, onChoose }) {
             {notice}
           </p>
         )}
-        <button className="primary" onClick={() => setAdding(true)}>
+        <Button variant="primary" onClick={() => setAdding(true)}>
           Add your first company <span aria-hidden="true">＋</span>
-        </button>
+        </Button>
         <div className="empty-journey">
           <div>
             <strong>01 · Explore the evidence</strong>

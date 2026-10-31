@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Button } from "./ui";
 import { api } from "../api/client";
 import { TERMS_VERSION } from "../lib/terms";
 import { ForgotPasswordForm, RecoveryCodeScreen } from "./AccountSecurity";
@@ -47,9 +48,9 @@ function TermsGate({ onAccepted, onSignOut }) {
         </ul>
         <form onSubmit={accept}>
           <ConsentCheck checked={agree} onChange={setAgree} />
-          <button type="submit" className="primary" disabled={busy}>
+          <Button type="submit" variant="primary" disabled={busy}>
             {busy ? "Please wait…" : "Agree and continue"}
-          </button>
+          </Button>
         </form>
         {error && <p role="alert">{error}</p>}
         <button type="button" className="account-switch" onClick={onSignOut}>
@@ -438,9 +439,10 @@ export default function AccountGate({ children }) {
                 )}
               </>
             )}
-            <button
+            <Button
+              variant="primary"
               type="submit"
-              className="primary account-submit"
+              className="account-submit"
               disabled={busy || remaining > 0}
             >
               {busy
@@ -450,7 +452,7 @@ export default function AccountGate({ children }) {
                   : creating
                     ? "Create account"
                     : "Sign in"}
-            </button>
+            </Button>
             <p className="account-alt">
               {creating ? "Already have an account? " : "New to Fledge? "}
               <button
@@ -477,9 +479,9 @@ export default function AccountGate({ children }) {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
             />
-            <button
+            <Button
               type="submit"
-              className="primary"
+              variant="primary"
               disabled={busy || !session || remaining > 0}
             >
               {busy
@@ -487,7 +489,7 @@ export default function AccountGate({ children }) {
                 : remaining > 0
                   ? `Request another link in ${remaining}s`
                   : "Email me a sign-in link"}
-            </button>
+            </Button>
           </form>
         )}
         {message && <p role="status">{message}</p>}

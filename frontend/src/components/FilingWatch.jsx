@@ -1,5 +1,5 @@
 import { formatTimestamp } from "../lib/dateTime";
-import LoadingSkeleton from "./LoadingSkeleton";
+import { Skeleton as LoadingSkeleton } from "./ui";
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 

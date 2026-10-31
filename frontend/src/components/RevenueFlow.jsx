@@ -1,8 +1,7 @@
 import { readableNote } from "../lib/readingNotes";
 import { useEffect, useId, useRef, useState } from "react";
-import Modal from "./Modal";
 import FinancialEvidence from "./FinancialEvidence";
-import { FilterGroup, Tabs, TabsList, TabsTrigger } from "./ui";
+import { FilterGroup, Tabs, TabsList, TabsTrigger, Modal } from "./ui";
 import { activeSourceTab, availableSourceTabs } from "../lib/revenueSourceTabs";
 import { amount, day } from "./FinancialOverview";
 import { flowLayout, matchingBreakdowns, shortLabel } from "../lib/incomeFlow";
@@ -208,7 +207,11 @@ export default function RevenueFlow({
                 setEvidence(null);
               }}
             >
-              <TabsList variant="line" aria-label="Revenue sources" className="flow-source-tabs">
+              <TabsList
+                variant="line"
+                aria-label="Revenue sources"
+                className="flow-source-tabs"
+              >
                 {availableTabs.map(([key, label]) => (
                   <TabsTrigger key={key} value={key}>
                     {label}
@@ -226,7 +229,10 @@ export default function RevenueFlow({
                 setGeographyView(value);
                 setEvidence(null);
               }}
-              options={categoryMixes.map((row) => ({ value: row.view_label, label: row.view_label }))}
+              options={categoryMixes.map((row) => ({
+                value: row.view_label,
+                label: row.view_label,
+              }))}
             />
           )}
           {activeCategory !== "Total revenue" && (
@@ -400,7 +406,11 @@ export default function RevenueFlow({
           ))}
           {connectedSources && sourceFigures}
           {!graph && (
-            <div className="flow-figures" aria-label="Income statement figures" key={selected.id}>
+            <div
+              className="flow-figures"
+              aria-label="Income statement figures"
+              key={selected.id}
+            >
               {values.map((row) => (
                 <button
                   key={row.key}

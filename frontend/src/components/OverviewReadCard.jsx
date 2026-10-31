@@ -2,7 +2,12 @@ import { Button, Card } from "./ui";
 
 // One business topic: a reading sentence, up to two figures (each opens its
 // evidence) and a link to the tab that has the detail.
-export default function OverviewReadCard({ reading, figures, onView, destination }) {
+export default function OverviewReadCard({
+  reading,
+  figures,
+  onView,
+  destination,
+}) {
   return (
     <Card as="article" className="overview-read-card">
       <p>{reading}</p>
@@ -15,7 +20,12 @@ export default function OverviewReadCard({ reading, figures, onView, destination
             </>
           );
           return onOpen ? (
-            <button type="button" key={label} onClick={onOpen} aria-label={`${label}: ${value ?? "Unknown"}. Show evidence.`}>
+            <button
+              type="button"
+              key={label}
+              onClick={onOpen}
+              aria-label={`${label}: ${value ?? "Unknown"}. Show evidence.`}
+            >
               {body}
             </button>
           ) : (

@@ -256,6 +256,7 @@
   padding-top: var(--space-4);
 }
 .financial-insight > div {
+  flex: 1;
   min-width: 0;
 }
 .insight-mark {
@@ -294,6 +295,10 @@
 }
 .financial-insight button {
   margin-top: var(--space-2);
+}
+/* The heading is itself an evidence button; keep it level with the mark. */
+.financial-insight h3 button {
+  margin-top: 0;
 }
 .story-secondary,
 .financials-reported-details {
@@ -896,54 +901,206 @@ a.recovery-part:hover {
 }
 
 /* Trend tiles sit three across; the page stays one calm column otherwise. */
-.financials-story .financial-summary-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
-.financials-story .financial-summary-row .ui-trend-tile { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
-@media (max-width: 760px) { .financials-story .financial-summary-row { grid-template-columns: minmax(0, 1fr); } }
-.financials-story .ui-disclosure-group { margin-top: var(--space-3); }
+.financials-story .financial-summary-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.financials-story .financial-summary-row .ui-trend-tile {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+}
+@media (max-width: 760px) {
+  .financials-story .financial-summary-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.financials-story .ui-disclosure-group {
+  margin-top: var(--space-3);
+}
 
 /* Content inside the closing disclosures uses the same type scale as its header. */
-.financials-story .ui-disclosure__body :is(h2, h3, h4) { margin: 0 0 var(--space-2); color: var(--color-text); font-size: var(--text-base); font-weight: 600; line-height: 1.4; letter-spacing: 0; }
-.financials-story .ui-disclosure__body :is(p, li, td, th, dd, dt, label, summary) { font-size: var(--text-sm); line-height: 1.5; }
-.financials-story .ui-disclosure__body :is(strong, .financial-figure-link) { font-size: inherit; }
-.financials-story .ui-disclosure__body :is(.section-label) { font-size: var(--text-xs); }
+.financials-story .ui-disclosure__body :is(h2, h3, h4) {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text);
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+.financials-story
+  .ui-disclosure__body
+  :is(p, li, td, th, dd, dt, label, summary) {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.financials-story .ui-disclosure__body :is(strong, .financial-figure-link) {
+  font-size: inherit;
+}
+.financials-story .ui-disclosure__body :is(.section-label) {
+  font-size: var(--text-xs);
+}
 /* Reading-the-figures rows: the mark lines up with the first line of text. */
-.financial-insight { align-items: flex-start; }
-.insight-mark { flex: 0 0 24px; width: 24px; height: 24px; margin-top: 0; font-size: var(--text-sm); border-radius: 50%; }
-.app-shell .financial-insight h3 { margin: 0; font-size: var(--text-base); line-height: 24px; }
-.financial-insight p { font-size: var(--text-sm); margin: var(--space-1) 0 0; }
-.financial-insight .insight-basis { color: var(--color-muted); font-size: var(--text-xs); margin: 0; }
-.financial-insight > div > p { margin: 2px 0 0; }
-.financials-story .financial-insights { gap: var(--space-3); margin-top: var(--space-3); }
-.financials-story .financial-insight { padding-top: var(--space-3); }
-.financial-gap-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
-.financial-gap-list li { display: grid; gap: var(--space-1); padding-top: var(--space-3); border-top: 1px solid var(--color-surface-3); }
-.financial-gap-list li:first-child { padding-top: 0; border-top: 0; }
-.financial-gap-list strong { color: var(--color-text); font-size: var(--text-sm); }
-.financial-gap-list small, .financial-gap-list .fine { color: var(--color-muted); font-size: var(--text-xs); }
-.financial-gap-list p { margin: 0; font-size: var(--text-sm); line-height: 1.5; }
+.financial-insight {
+  align-items: flex-start;
+}
+.insight-mark {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  margin-top: 0;
+  font-size: var(--text-sm);
+  border-radius: 50%;
+}
+.app-shell .financial-insight h3 {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: 24px;
+}
+.financial-insight p {
+  font-size: var(--text-sm);
+  margin: var(--space-1) 0 0;
+}
+.financial-insight .insight-basis {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  margin: 0;
+}
+.financial-insight > div > p {
+  margin: 2px 0 0;
+}
+.financials-story .financial-insights {
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+.financials-story .financial-insight {
+  padding-top: var(--space-3);
+}
+.financial-gap-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.financial-gap-list li {
+  display: grid;
+  gap: var(--space-1);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-surface-3);
+}
+.financial-gap-list li:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.financial-gap-list strong {
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+.financial-gap-list small,
+.financial-gap-list .fine {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+.financial-gap-list p {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
 
 /* Fill missing figures: shared Cards and a readable type scale (13px minimum). */
-.financial-recovery-body { font-size: var(--text-sm); }
-.financial-recovery-body p, .financial-recovery-body .muted, .financial-recovery-body small { font-size: var(--text-sm); line-height: 1.55; color: var(--color-text-2); }
-.financial-recovery-body .muted { color: var(--color-muted); }
-.financial-recovery .recovery-apply-all { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-4); }
-.financial-recovery .recovery-apply-all > div { display: grid; gap: var(--space-1); flex: 1 1 320px; min-width: 0; }
-.financial-recovery .recovery-apply-all strong { color: var(--color-text); font-size: var(--text-base); font-weight: 600; }
-.financial-recovery .recovery-apply-all p { margin: 0; }
-.financial-recovery .recovery-checklist { border: 0; border-radius: var(--radius-md); background: var(--color-surface-2); }
-.financial-recovery .recovery-checklist-row + .recovery-checklist-row { border-top: 1px solid var(--color-surface-3); }
-.financial-recovery .recovery-checklist-copy > span, .financial-recovery .recovery-checklist-copy > small { font-size: var(--text-sm); }
-.financial-recovery .recovery-card { border: 0; background: var(--color-surface-2); }
-.financial-recovery .recovery-card.using { outline: 1px solid var(--color-accent-mid); }
-.financial-recovery .recovery-card-head > div > span { font-size: var(--text-sm); }
-.financial-recovery .recovery-card-head strong { font-size: var(--text-lg); color: var(--color-text); }
-.financial-recovery .recovery-card-head small { font-size: var(--text-sm); }
-.financial-recovery .recovery-use { border: 0; background: var(--color-surface-3); font-size: var(--text-sm); }
-.financial-recovery .recovery-part { border: 0; background: var(--color-surface-3); }
-.financial-recovery .recovery-part span { font-size: var(--text-sm); }
-.financial-recovery .recovery-part strong { font-size: var(--text-base); }
-.financial-recovery .recovery-part.total { background: var(--color-surface); outline: 1px solid var(--color-line-strong); }
-.financial-recovery .recovery-note { font-size: var(--text-sm); margin: 0; }
-.financial-recovery .recovery-rows { padding: 0; }
-.financial-recovery .recovery-rows table { font-size: var(--text-sm); }
-.financial-recovery .recovery-rows p { font-size: var(--text-xs); color: var(--color-muted); }
+.financial-recovery-body {
+  font-size: var(--text-sm);
+}
+.financial-recovery-body p,
+.financial-recovery-body .muted,
+.financial-recovery-body small {
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--color-text-2);
+}
+.financial-recovery-body .muted {
+  color: var(--color-muted);
+}
+.financial-recovery .recovery-apply-all {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.financial-recovery .recovery-apply-all > div {
+  display: grid;
+  gap: var(--space-1);
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.financial-recovery .recovery-apply-all strong {
+  color: var(--color-text);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+.financial-recovery .recovery-apply-all p {
+  margin: 0;
+}
+.financial-recovery .recovery-checklist {
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+.financial-recovery .recovery-checklist-row + .recovery-checklist-row {
+  border-top: 1px solid var(--color-surface-3);
+}
+.financial-recovery .recovery-checklist-copy > span,
+.financial-recovery .recovery-checklist-copy > small {
+  font-size: var(--text-sm);
+}
+.financial-recovery .recovery-card {
+  border: 0;
+  background: var(--color-surface-2);
+}
+.financial-recovery .recovery-card.using {
+  outline: 1px solid var(--color-accent-mid);
+}
+.financial-recovery .recovery-card-head > div > span {
+  font-size: var(--text-sm);
+}
+.financial-recovery .recovery-card-head strong {
+  font-size: var(--text-lg);
+  color: var(--color-text);
+}
+.financial-recovery .recovery-card-head small {
+  font-size: var(--text-sm);
+}
+.financial-recovery .recovery-use {
+  border: 0;
+  background: var(--color-surface-3);
+  font-size: var(--text-sm);
+}
+.financial-recovery .recovery-part {
+  border: 0;
+  background: var(--color-surface-3);
+}
+.financial-recovery .recovery-part span {
+  font-size: var(--text-sm);
+}
+.financial-recovery .recovery-part strong {
+  font-size: var(--text-base);
+}
+.financial-recovery .recovery-part.total {
+  background: var(--color-surface);
+  outline: 1px solid var(--color-line-strong);
+}
+.financial-recovery .recovery-note {
+  font-size: var(--text-sm);
+  margin: 0;
+}
+.financial-recovery .recovery-rows {
+  padding: 0;
+}
+.financial-recovery .recovery-rows table {
+  font-size: var(--text-sm);
+}
+.financial-recovery .recovery-rows p {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}

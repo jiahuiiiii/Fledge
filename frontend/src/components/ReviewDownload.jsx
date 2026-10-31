@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Button } from "./ui";
 
 export default function ReviewDownload({
   inline = false,
@@ -54,15 +55,15 @@ export default function ReviewDownload({
   if (inline)
     return (
       <>
-        <button
-          className="text-button"
+        <Button
+          variant="link"
           disabled={busy}
           onClick={download}
           aria-label="Download research record"
           title="Your idea, reasoning and source references as a printable page. Includes private notes; review before sharing."
         >
           {busy ? "Preparing…" : "Download"}
-        </button>
+        </Button>
         {error && (
           <p className="error" role="alert">
             {error}
@@ -72,9 +73,9 @@ export default function ReviewDownload({
     );
   return (
     <div className="review-download">
-      <button className="secondary" disabled={busy} onClick={download}>
+      <Button disabled={busy} onClick={download}>
         {busy ? "Preparing download…" : "Download research record"}
-      </button>
+      </Button>
       <p className="fine">
         {eventReview
           ? "This saved event evidence check"

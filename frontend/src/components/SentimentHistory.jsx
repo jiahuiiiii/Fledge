@@ -1,12 +1,10 @@
 import { formatTimestamp } from "../lib/dateTime";
-import LoadingSkeleton from "./LoadingSkeleton";
-import Select from "./Select";
+import { Modal, Select, Skeleton as LoadingSkeleton } from "./ui";
 import SentimentLimits from "./SentimentLimits";
 import SentimentBasis from "./SentimentBasis";
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { stamp } from "./MarketResearch";
-import Modal from "./Modal";
 
 const changes = {
   added: "Newly selected text",

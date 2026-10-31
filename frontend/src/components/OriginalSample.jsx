@@ -17,8 +17,12 @@ export default function OriginalSample({
       <SentimentLimits value={analysis.coverage?.input_limits} />
       <p className="evidence-counts">
         {sources.length} selected{" "}
-        {channel === "all" ? "sources" : channel === "news" ? "reports" : "posts"} ·
-        newest first · sources up to {stamp(analysis.cutoff)}.
+        {channel === "all"
+          ? "sources"
+          : channel === "news"
+            ? "reports"
+            : "posts"}{" "}
+        · newest first · sources up to {stamp(analysis.cutoff)}.
       </p>
       <Disclosure variant="flush" title="How to read this sample">
         <div className="evidence-fineprint">
@@ -56,7 +60,12 @@ export default function OriginalSample({
             </div>
             {sourceHeadline(s) && <h3>{sourceHeadline(s)}</h3>}
             <p className="original-source-text">{s.body}</p>
-            <Button variant="tertiary" size="sm" className="source-link" onClick={() => onSource(s.id)}>
+            <Button
+              variant="tertiary"
+              size="sm"
+              className="source-link"
+              onClick={() => onSource(s.id)}
+            >
               Inspect original source ↗
             </Button>
           </article>

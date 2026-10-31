@@ -28,6 +28,13 @@
   align-items: center;
   gap: var(--space-2);
 }
+.ui-preview__check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
 .ui-preview__rule {
   width: 100%;
   height: 1px;

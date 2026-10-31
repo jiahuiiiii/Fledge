@@ -1,6 +1,6 @@
 import { formatTimestamp } from "../lib/dateTime";
+import { Select } from "./ui";
 import { useId, useState } from "react";
-import Select from "./Select";
 import { Evidence, amount, day } from "./FinancialOverview";
 import "./FinancialPosition.css";
 

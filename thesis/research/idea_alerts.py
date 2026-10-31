@@ -5,6 +5,8 @@ Sentiment is deliberately excluded from the private relevance prompt.
 """
 
 import hashlib
+import threading
+import time
 from copy import deepcopy
 from collections import Counter
 from datetime import datetime, timezone
@@ -898,22 +900,41 @@ def generate(
         )
 
 
-def present(conn, owner, row):
-    analysis = one(
-        conn, "SELECT * FROM sentiment_analyses WHERE id=%s", (row["analysis_id"],)
+def present(conn, owner, row, *, analyses=None, publications=None, reviews=None, ideas=None):
+    # The optional maps let list_for() fetch these once for a whole page of
+    # checks instead of per check (the reads are the same either way). A caller
+    # that passes none keeps the original one-query-per-lookup behaviour.
+    analysis = (
+        analyses.get(str(row["analysis_id"]))
+        if analyses is not None
+        else one(
+            conn, "SELECT * FROM sentiment_analyses WHERE id=%s", (row["analysis_id"],)
+        )
     )
     visible = sentiment.present(conn, analysis)
     withheld = visible["withheld"]
-    idea = current_idea(conn, owner, row["instrument_id"])
-    publication = one(
-        conn,
-        "SELECT * FROM idea_alert_publications WHERE owner_id=%s AND check_id=%s",
-        (owner, row["id"]),
+    idea = (
+        ideas.get(str(row["instrument_id"]))
+        if ideas is not None
+        else current_idea(conn, owner, row["instrument_id"])
     )
-    review = one(
-        conn,
-        "SELECT action FROM idea_alert_reviews WHERE owner_id=%s AND check_id=%s",
-        (owner, row["id"]),
+    publication = (
+        publications.get(str(row["id"]))
+        if publications is not None
+        else one(
+            conn,
+            "SELECT * FROM idea_alert_publications WHERE owner_id=%s AND check_id=%s",
+            (owner, row["id"]),
+        )
+    )
+    review = (
+        reviews.get(str(row["id"]))
+        if reviews is not None
+        else one(
+            conn,
+            "SELECT action FROM idea_alert_reviews WHERE owner_id=%s AND check_id=%s",
+            (owner, row["id"]),
+        )
     )
     p = row["packet"]
     ids = {s["id"] for s in p["sources"]}
@@ -963,18 +984,116 @@ def present(conn, owner, row):
     return record
 
 
-def list_for(conn, owner, iid=None):
-    query = "SELECT * FROM idea_alert_checks WHERE owner_id=%s"
+def list_for(conn, owner, iid=None, pending=False):
+    # pending=True keeps only published, not-yet-reviewed checks — the default
+    # the workspace panel shows — so the expensive presentation runs on that
+    # small set instead of the whole (ever-growing) history.
+    query = "SELECT c.* FROM idea_alert_checks c"
+    where = ["c.owner_id=%s"]
     params = [owner]
-    if iid:
-        query += " AND instrument_id=%s"
-        params.append(iid)
-    return [
-        present(conn, owner, r)
-        for r in rows(
-            conn, query + " ORDER BY created_at DESC,id DESC LIMIT 100", params
+    if pending:
+        query += (
+            " JOIN idea_alert_publications p"
+            " ON p.owner_id=c.owner_id AND p.check_id=c.id"
+            " LEFT JOIN idea_alert_reviews r"
+            " ON r.owner_id=c.owner_id AND r.check_id=c.id"
         )
+        where.append("r.check_id IS NULL")
+    if iid:
+        where.append("c.instrument_id=%s")
+        params.append(iid)
+    checks = rows(
+        conn,
+        query
+        + " WHERE "
+        + " AND ".join(where)
+        + " ORDER BY c.created_at DESC,c.id DESC LIMIT 100",
+        params,
+    )
+    if not checks:
+        return []
+    # Batch the four reads present() would otherwise do for each check, so a
+    # page of 100 checks costs a handful of queries instead of several hundred
+    # serial round trips. Deduplicating analysis ids also avoids re-reading the
+    # same multi-MB sentiment rows when checks share an analysis.
+    analysis_ids = list({r["analysis_id"] for r in checks})
+    check_ids = [r["id"] for r in checks]
+    analyses = {
+        str(a["id"]): a
+        for a in rows(
+            conn,
+            "SELECT * FROM sentiment_analyses WHERE id=ANY(%s::uuid[])",
+            (analysis_ids,),
+        )
+    }
+    publications = {
+        str(p["check_id"]): p
+        for p in rows(
+            conn,
+            "SELECT * FROM idea_alert_publications WHERE owner_id=%s AND check_id=ANY(%s::uuid[])",
+            (owner, check_ids),
+        )
+    }
+    reviews = {
+        str(v["check_id"]): v
+        for v in rows(
+            conn,
+            "SELECT check_id,action FROM idea_alert_reviews WHERE owner_id=%s AND check_id=ANY(%s::uuid[])",
+            (owner, check_ids),
+        )
+    }
+    ideas = {
+        str(iid_): current_idea(conn, owner, iid_)
+        for iid_ in {r["instrument_id"] for r in checks}
+    }
+    return [
+        present(
+            conn,
+            owner,
+            r,
+            analyses=analyses,
+            publications=publications,
+            reviews=reviews,
+            ideas=ideas,
+        )
+        for r in checks
     ]
+
+
+# Presenting an owner's whole relevance history is heavy (one saved reading per
+# focus, so they accumulate) and runs on every page load. Worse, several of
+# these at once contend badly — three concurrent runs take ~14 s each, not 6.
+# So the owner-wide list is computed one-at-a-time and cached briefly: rapid
+# reloads share a single fresh result instead of stacking copies that choke the
+# database. The cache holds only this owner's own data and expires quickly, so a
+# withdrawal or access change shows within a few seconds.
+_LIST_CACHE_TTL = 20.0
+_list_cache = {}
+_list_cache_lock = threading.Lock()
+_list_owner_locks = {}
+
+
+def cached_list_for(owner, pending=False):
+    key = (owner, pending)
+    now = time.monotonic()
+    with _list_cache_lock:
+        hit = _list_cache.get(key)
+        if hit and hit[0] > now:
+            return hit[1]
+        lock = _list_owner_locks.setdefault(key, threading.Lock())
+    # Single-flight per (owner, view): concurrent callers wait for the one
+    # in-flight computation and then read its fresh result, rather than each
+    # running it.
+    with lock:
+        with _list_cache_lock:
+            hit = _list_cache.get(key)
+            if hit and hit[0] > time.monotonic():
+                return hit[1]
+        with transaction(owner, consistent=True) as conn:
+            result = list_for(conn, owner, pending=pending)
+        with _list_cache_lock:
+            _list_cache[key] = (time.monotonic() + _LIST_CACHE_TTL, result)
+        return result
 
 
 def review(owner, check_id, action):

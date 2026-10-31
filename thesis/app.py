@@ -157,7 +157,8 @@ async def lifespan(app):
 
     telegram_thread = threading.Thread(target=telegram_loop, daemon=True)
 
-    # Rating taps get their own quick loop so a slow send never delays a confirmation.
+    # Rating taps and Telegram commands get their own quick loop so a slow send
+    # never delays a confirmation; it idles unless one of them is turned on.
     def feedback_loop():
         from .monitoring.telegram_updates import poll_feedback, POLL_SECONDS
 
@@ -364,6 +365,18 @@ async def request_timing(request: Request, call_next):
             "Slow request %s %s: %.0f ms total, %.0f ms in %d database transactions (%d new connections)",
             request.method, request.url.path, total, stats["db_ms"], stats["transactions"], stats["new_connections"],
         )
+        # When per-statement timing is on (THESIS_SQL_TIMING_MS set), name the
+        # few query shapes that cost the most, with how many times each ran, so
+        # one slow request points straight at what to fix.
+        by_query = stats.get("by_query")
+        if by_query:
+            top = sorted(by_query.items(), key=lambda kv: kv[1][1], reverse=True)[:6]
+            summary = "; ".join(
+                f"{ms:.0f} ms x{count} {pattern}" for pattern, (count, ms) in top
+            )
+            logging.getLogger("thesis.timing").warning(
+                "  top queries for %s %s: %s", request.method, request.url.path, summary
+            )
     return response
 
 
@@ -667,6 +680,41 @@ def save_detail_mode(payload: DetailMode):
     return {"result": profile.set_mode(auth.current_owner(), payload.detail_mode)}
 
 
+class LayoutItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    i: str = Field(max_length=32)
+    x: int
+    y: int
+    w: int
+    h: int
+
+
+class WorkspaceLayout(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    lg: list[LayoutItem] | None = Field(default=None, max_length=16)
+    md: list[LayoutItem] | None = Field(default=None, max_length=16)
+    sm: list[LayoutItem] | None = Field(default=None, max_length=16)
+    hidden: list[str] = Field(default_factory=list, max_length=16)
+
+
+@app.get("/api/v1/layouts/{page}")
+def workspace_layout(page: str):
+    from . import workspace_layouts
+    return {"result": workspace_layouts.read(auth.current_owner(), page)}
+
+
+@app.put("/api/v1/layouts/{page}")
+def save_workspace_layout(page: str, payload: WorkspaceLayout):
+    from . import workspace_layouts
+    return {"result": workspace_layouts.save(auth.current_owner(), page, payload.model_dump())}
+
+
+@app.delete("/api/v1/layouts/{page}")
+def reset_workspace_layout(page: str):
+    from . import workspace_layouts
+    return {"result": workspace_layouts.reset(auth.current_owner(), page)}
+
+
 @app.get("/api/v1/home")
 def personal_home():
     from . import home
@@ -761,6 +809,18 @@ def company_alerts(instrument_id: UUID):
 @app.get("/api/v1/companies/{instrument_id}/workspace-financials")
 def workspace_financials(instrument_id: UUID):
     return {"result": service.financial_workspace(auth.current_owner(), str(instrument_id))}
+
+
+@app.get("/api/v1/idea-alerts")
+def idea_alerts_list(pending: bool = False):
+    """The saved relevance checks, fetched by the client after the workspace so
+    that presenting all of them never holds up the page. pending=true returns
+    just the published, unreviewed checks the panel shows by default (far fewer,
+    so far faster); the full history is fetched only when the user asks for it.
+    Computed one-at-a-time per owner and briefly cached so reloads don't stack."""
+    from .research import idea_alerts
+
+    return {"result": idea_alerts.cached_list_for(auth.current_owner(), pending=pending)}
 
 
 @app.get("/api/v1/research-review")
@@ -1592,6 +1652,13 @@ class TelegramDeliverySetting(BaseModel):
 def telegram_status():
     from .monitoring import telegram
     return {"result": telegram.status(auth.current_owner())}
+
+
+@app.get("/api/v1/telegram/commands/latest")
+def telegram_command_latest():
+    """The newest Telegram command that changed saved data, so the open app re-reads it."""
+    from .monitoring import telegram_commands
+    return {"result": telegram_commands.latest(auth.current_owner())}
 
 
 @app.post("/api/v1/telegram/connect")

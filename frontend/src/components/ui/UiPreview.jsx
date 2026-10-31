@@ -23,6 +23,10 @@ import {
   PlusIcon,
   SectionHeader,
   TrashIcon,
+  Field,
+  Toggle,
+  Select,
+  Checkbox,
 } from "./index";
 import "./UiPreview.css";
 
@@ -334,21 +338,85 @@ function SharedPickers() {
           onSelect={setPicked}
         />
         <p className="fine">Picked: {picked || "nothing yet"}</p>
-        <TrendTile title="Revenue growth" value="12.0%" caption="Sample period" points={[1, 3, 2, 5, null, 6]} onOpen={() => setOpen(true)} />
-        <SourceChip label="Example Wire" date="25 Oct 2026" href="https://example.com/" />
+        <TrendTile
+          title="Revenue growth"
+          value="12.0%"
+          caption="Sample period"
+          points={[1, 3, 2, 5, null, 6]}
+          onOpen={() => setOpen(true)}
+        />
+        <SourceChip
+          label="Example Wire"
+          date="25 Oct 2026"
+          href="https://example.com/"
+        />
       </div>
       <div className="ui-preview__section">
         <DisclosureGroup>
-          <Disclosure title="First detail"><p>Authored example.</p></Disclosure>
-          <Disclosure title="Second detail"><p>Authored example.</p></Disclosure>
+          <Disclosure title="First detail">
+            <p>Authored example.</p>
+          </Disclosure>
+          <Disclosure title="Second detail">
+            <p>Authored example.</p>
+          </Disclosure>
         </DisclosureGroup>
       </div>
       <EvidenceDialog
         open={open}
         onClose={() => setOpen(false)}
         title="Example evidence"
-        rows={[{ id: 1, label: "Revenue", value: "US$1.0bn", meta: "Year to 30 Jun 2026", href: "https://example.com/", sourceLabel: "Annual report" }]}
+        rows={[
+          {
+            id: 1,
+            label: "Revenue",
+            value: "US$1.0bn",
+            meta: "Year to 30 Jun 2026",
+            href: "https://example.com/",
+            sourceLabel: "Annual report",
+          },
+        ]}
       />
+    </div>
+  );
+}
+
+function FormControls() {
+  const [range, setRange] = useState("month");
+  const [alerts, setAlerts] = useState(true);
+  const [agreed, setAgreed] = useState(false);
+  return (
+    <div className="ui-preview__grid">
+      <div className="ui-preview__section">
+        <Field label="Reporting period" hint="Sample control, no data saved.">
+          <Select
+            value={range}
+            onChange={(event) => setRange(event.target.value)}
+            aria-label="Reporting period"
+          >
+            <option value="month">Past month</option>
+            <option value="quarter">Past quarter</option>
+            <option value="year">Past year</option>
+          </Select>
+        </Field>
+        <Field label="Watchlist name" error="This name is already in use.">
+          <input className="ui-input" defaultValue="Example list" />
+        </Field>
+      </div>
+      <div className="ui-preview__section">
+        <Toggle
+          checked={alerts}
+          onChange={setAlerts}
+          label="Price-move alerts"
+          description="Example toggle; changes nothing here."
+        />
+        <label className="ui-preview__check">
+          <Checkbox
+            checked={agreed}
+            onChange={(event) => setAgreed(event.target.checked)}
+          />
+          <span>Show an authored example row</span>
+        </label>
+      </div>
     </div>
   );
 }
@@ -358,6 +426,7 @@ const SECTIONS = [
   ["Badges", Badges],
   ["Section headers", Headers],
   ["Cards", Cards],
+  ["Form controls", FormControls],
   ["Put together", Example],
   ["Reading and evidence", ReadingParts],
   ["Pickers, trends and evidence", SharedPickers],

@@ -1,4 +1,5 @@
 import { formatTimestamp } from "../lib/dateTime";
+import { Button } from "./ui";
 const stamp = (value) =>
   formatTimestamp(value, { fallback: "Date unavailable" });
 
@@ -111,16 +112,13 @@ export default function IdeaEvidenceReview({
               Available in this workspace {stamp(source.available_at)}
             </p>
             <div className="evidence-source-actions">
-              <button className="text-button" onClick={() => onSource(id)}>
+              <Button variant="link" onClick={() => onSource(id)}>
                 Inspect this source ↗
-              </button>
+              </Button>
               {hasEarlier && (
-                <button
-                  className="text-button"
-                  onClick={() => onSource(replaced)}
-                >
+                <Button variant="link" onClick={() => onSource(replaced)}>
                   Compare earlier version ↗
-                </button>
+                </Button>
               )}
             </div>
           </>
@@ -147,9 +145,9 @@ export default function IdeaEvidenceReview({
             : emptyText}
         </p>
         {onOpen && (
-          <button className="text-button" onClick={onOpen}>
+          <Button variant="link" onClick={onOpen}>
             Compare evidence with my idea ↗
-          </button>
+          </Button>
         )}
       </section>
     );
@@ -253,9 +251,9 @@ export default function IdeaEvidenceReview({
                   <p>{point.text}</p>
                   <div className="evidence-source-actions">
                     {(point.citations || []).map((citation, i) => (
-                      <button
+                      <Button
                         key={i}
-                        className="text-button"
+                        variant="link"
                         disabled={
                           !allowed.has(citation.source_id) ||
                           !catalogue.has(citation.source_id)
@@ -265,7 +263,7 @@ export default function IdeaEvidenceReview({
                       >
                         {catalogue.get(citation.source_id)?.source || "Source"}{" "}
                         {i + 1} ↗
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </article>
@@ -278,8 +276,8 @@ export default function IdeaEvidenceReview({
           </>
         ) : onCompare ? (
           <>
-            <button
-              className="secondary"
+            <Button
+              variant="secondary"
               disabled={
                 busy || !!unavailableReason || !version.reasoning?.trim()
               }
@@ -288,7 +286,7 @@ export default function IdeaEvidenceReview({
               {busy
                 ? "Comparing the saved idea…"
                 : "Compare with my saved idea"}
-            </button>
+            </Button>
             <p className="fine">
               Optional AI interpretation of this saved reasoning and these exact
               sources. It does not edit your idea or change the numerical

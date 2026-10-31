@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Button } from "./ui";
 import { api } from "../api/client";
 import { formatTimestamp } from "../lib/dateTime";
 import { pctText, barWidth, toneLine, plainRead } from "../lib/portfolioRead";
@@ -17,7 +18,9 @@ function Bars({ ids, byId, moves, scale, onOpen }) {
       {ids.map((id) => {
         const c = byId[id];
         if (!c) return null;
-        const move = moves ? moves[id]?.change_percent : c.quote?.change_percent;
+        const move = moves
+          ? moves[id]?.change_percent
+          : c.quote?.change_percent;
         return (
           <li key={id}>
             <button type="button" onClick={() => onOpen?.(id)}>
@@ -26,17 +29,25 @@ function Bars({ ids, byId, moves, scale, onOpen }) {
               <span className="pr-track" aria-hidden="true">
                 <span className="pr-half down">
                   {move < 0 && (
-                    <span className="pr-bar down" style={{ width: barWidth(move, scale) }} />
+                    <span
+                      className="pr-bar down"
+                      style={{ width: barWidth(move, scale) }}
+                    />
                   )}
                 </span>
                 <span className="pr-zero" />
                 <span className="pr-half up">
                   {move > 0 && (
-                    <span className="pr-bar up" style={{ width: barWidth(move, scale) }} />
+                    <span
+                      className="pr-bar up"
+                      style={{ width: barWidth(move, scale) }}
+                    />
                   )}
                 </span>
               </span>
-              <span className={`pr-pct ${move < 0 ? "down" : move > 0 ? "up" : ""}`}>
+              <span
+                className={`pr-pct ${move < 0 ? "down" : move > 0 ? "up" : ""}`}
+              >
                 {pctText(move)}
               </span>
             </button>
@@ -81,7 +92,10 @@ export default function PortfolioRead({ onOpenCompany }) {
   // so its words and bars always agree even if prices refreshed since.
   const written = e?.prices;
   const writtenScale = written
-    ? Math.max(1, ...Object.values(written).map((p) => Math.abs(p.change_percent || 0)))
+    ? Math.max(
+        1,
+        ...Object.values(written).map((p) => Math.abs(p.change_percent || 0)),
+      )
     : scale;
   const lights = [
     ["TODAY", page.move],
@@ -146,101 +160,112 @@ export default function PortfolioRead({ onOpenCompany }) {
         </aside>
 
         <div className="pr-main">
-      {e ? (
-        <>
-          {(e.headline || e.drivers.length > 0) && (
-            <section className="bs-card">
-              <h4>What happened</h4>
-              {e.headline && <p className="bs-meaning">{plainRead(e.headline)}</p>}
-              <ul className="pr-drivers">
-                {e.drivers.map((d, i) => (
-                  <li key={i}>
-                    {plainRead(d.text)}
-                    <small className="bs-meta">
-                      {d.sources.map((s, j) => (
-                        <span key={s.id}>
-                          {j > 0 && " · "}
-                          {s.url ? (
-                            <a href={s.url} target="_blank" rel="noreferrer">
-                              {s.publisher || "Source"}
-                            </a>
-                          ) : (
-                            s.publisher || "Source"
-                          )}
-                        </span>
-                      ))}
-                    </small>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-          {e.groups.length > 0 && (
-            <section className="bs-card">
-              <h4>Why some moved more</h4>
-              <p className="bs-note">Moves when this was written</p>
-              {e.groups.map((g) => (
-                <div className="pr-group" key={g.label}>
-                  <span className="pr-group-label">{g.label}</span>
-                  <p className="pr-note">{plainRead(g.note)}</p>
-                  <Bars
-                    ids={g.company_ids}
-                    byId={byId}
-                    moves={written}
-                    scale={writtenScale}
-                    onOpen={onOpenCompany}
-                  />
-                </div>
-              ))}
-            </section>
-          )}
-          {e.takeaway && (
-            <section className="bs-card pr-takeaway">
-              <h4>For your list</h4>
-              <p>{plainRead(e.takeaway)}</p>
-            </section>
-          )}
-          <p className="bs-note">
-            Written by AI from your saved headlines on{" "}
-            {formatTimestamp(e.created_at)}; tap a source to check it.
-          </p>
-        </>
-      ) : (
-        <>
-          <section className="bs-card">
-            <h4>How each moved</h4>
-            <p className="bs-meaning">{toneLine(page.news_tone)}</p>
-            {page.groups.map((g) => (
-              <div className="pr-group" key={g.label}>
-                <span className="pr-group-label">{g.label}</span>
-                <Bars ids={g.company_ids} byId={byId} scale={scale} onOpen={onOpenCompany} />
-              </div>
-            ))}
-          </section>
-          <div className="pr-explain">
-            {page.ai.available ? (
-              <button
-                type="button"
-                className="primary"
-                onClick={explain}
-                disabled={busy}
-              >
-                {busy ? "Reading your list…" : "Explain my list"}
-              </button>
-            ) : (
+          {e ? (
+            <>
+              {(e.headline || e.drivers.length > 0) && (
+                <section className="bs-card">
+                  <h4>What happened</h4>
+                  {e.headline && (
+                    <p className="bs-meaning">{plainRead(e.headline)}</p>
+                  )}
+                  <ul className="pr-drivers">
+                    {e.drivers.map((d, i) => (
+                      <li key={i}>
+                        {plainRead(d.text)}
+                        <small className="bs-meta">
+                          {d.sources.map((s, j) => (
+                            <span key={s.id}>
+                              {j > 0 && " · "}
+                              {s.url ? (
+                                <a
+                                  href={s.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  {s.publisher || "Source"}
+                                </a>
+                              ) : (
+                                s.publisher || "Source"
+                              )}
+                            </span>
+                          ))}
+                        </small>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+              {e.groups.length > 0 && (
+                <section className="bs-card">
+                  <h4>Why some moved more</h4>
+                  <p className="bs-note">Moves when this was written</p>
+                  {e.groups.map((g) => (
+                    <div className="pr-group" key={g.label}>
+                      <span className="pr-group-label">{g.label}</span>
+                      <p className="pr-note">{plainRead(g.note)}</p>
+                      <Bars
+                        ids={g.company_ids}
+                        byId={byId}
+                        moves={written}
+                        scale={writtenScale}
+                        onOpen={onOpenCompany}
+                      />
+                    </div>
+                  ))}
+                </section>
+              )}
+              {e.takeaway && (
+                <section className="bs-card pr-takeaway">
+                  <h4>For your list</h4>
+                  <p>{plainRead(e.takeaway)}</p>
+                </section>
+              )}
               <p className="bs-note">
-                A written explanation of your list needs AI, which isn’t switched
-                on in this copy of Fledge.
+                Written by AI from your saved headlines on{" "}
+                {formatTimestamp(e.created_at)}; tap a source to check it.
               </p>
-            )}
-            {error && (
-              <p className="error" role="alert">
-                {error}
-              </p>
-            )}
-          </div>
-        </>
-      )}
+            </>
+          ) : (
+            <>
+              <section className="bs-card">
+                <h4>How each moved</h4>
+                <p className="bs-meaning">{toneLine(page.news_tone)}</p>
+                {page.groups.map((g) => (
+                  <div className="pr-group" key={g.label}>
+                    <span className="pr-group-label">{g.label}</span>
+                    <Bars
+                      ids={g.company_ids}
+                      byId={byId}
+                      scale={scale}
+                      onOpen={onOpenCompany}
+                    />
+                  </div>
+                ))}
+              </section>
+              <div className="pr-explain">
+                {page.ai.available ? (
+                  <Button
+                    variant="primary"
+                    type="button"
+                    onClick={explain}
+                    disabled={busy}
+                  >
+                    {busy ? "Reading your list…" : "Explain my list"}
+                  </Button>
+                ) : (
+                  <p className="bs-note">
+                    A written explanation of your list needs AI, which isn’t
+                    switched on in this copy of Fledge.
+                  </p>
+                )}
+                {error && (
+                  <p className="error" role="alert">
+                    {error}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
       <p className="bs-note">

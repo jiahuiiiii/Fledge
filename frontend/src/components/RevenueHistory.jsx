@@ -1,10 +1,8 @@
 import { formatTimestamp } from "../lib/dateTime";
+import { Modal, Select, Checkbox } from "./ui";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import FinancialHistory from "./FinancialHistory";
-import Modal from "./Modal";
-import Select from "./Select";
-import Checkbox from "./Checkbox";
 import { day, metric, number } from "../lib/financialStory";
 import { profitOptions, consistentProfitRows } from "../lib/profitHistory";
 import { requestUpdate } from "../lib/updateRequest";

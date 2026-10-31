@@ -1,4 +1,11 @@
-import { Badge, Button, Card, ChevronRightIcon, SectionHeader, ToneCard } from "./ui";
+import {
+  Badge,
+  Button,
+  Card,
+  ChevronRightIcon,
+  SectionHeader,
+  ToneCard,
+} from "./ui";
 import { toneOf } from "../lib/tone";
 import { dayLabel, platformName } from "../lib/beginnerSummary";
 
@@ -58,7 +65,9 @@ export function SignalLights({ name, lights, pointer, onSelect, pointerLink }) {
                   </span>
                 }
               />
-              <span className="bs-summary-status ui-tone-card__status">{light.status}</span>
+              <span className="bs-summary-status ui-tone-card__status">
+                {light.status}
+              </span>
             </ToneCard>
           </li>
         ))}
@@ -117,8 +126,13 @@ export function ToneHeadlineGroups({
   const byPlatform = (list) => {
     const counts = new Map();
     for (const item of list)
-      counts.set(item.platform || "reddit", (counts.get(item.platform || "reddit") || 0) + 1);
-    return [...counts].map(([name, n]) => `${platformName(name)} ${n}`).join(" · ");
+      counts.set(
+        item.platform || "reddit",
+        (counts.get(item.platform || "reddit") || 0) + 1,
+      );
+    return [...counts]
+      .map(([name, n]) => `${platformName(name)} ${n}`)
+      .join(" · ");
   };
   const group = (label, mood, list, limit = 3) =>
     list.length > 0 && (

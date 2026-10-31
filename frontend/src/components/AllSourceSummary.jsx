@@ -12,7 +12,15 @@ export function SourceToneSummary({ analysis }) {
   return (
     <div className="source-summary-list" aria-label="Saved tone by source">
       {samples.map((sample) => (
-        <ToneCard as="div" key={sample.scope} tone={sample.withheld != null ? "unknown" : toneOf(sample.sentimentSummary?.tone)}>
+        <ToneCard
+          as="div"
+          key={sample.scope}
+          tone={
+            sample.withheld != null
+              ? "unknown"
+              : toneOf(sample.sentimentSummary?.tone)
+          }
+        >
           <SourceLabel scope={sample.scope} />
           <strong className="ui-tone-card__status">
             <span className="ui-tone-card__dot" aria-hidden="true" />

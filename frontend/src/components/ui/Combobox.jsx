@@ -22,7 +22,12 @@ export default function Combobox({
   const needle = query.trim().toLowerCase();
   // filter={false}: the caller already searched (for example on the server).
   const shown = options
-    .filter((o) => !filter || !needle || `${o.label} ${o.hint || ""}`.toLowerCase().includes(needle))
+    .filter(
+      (o) =>
+        !filter ||
+        !needle ||
+        `${o.label} ${o.hint || ""}`.toLowerCase().includes(needle),
+    )
     .slice(0, 8);
   const listed = open && (filter || needle);
   useEffect(() => {
@@ -47,7 +52,9 @@ export default function Combobox({
         aria-expanded={!!listed}
         aria-controls={`${id}-list`}
         aria-autocomplete="list"
-        aria-activedescendant={listed && shown[active] ? `${id}-${active}` : undefined}
+        aria-activedescendant={
+          listed && shown[active] ? `${id}-${active}` : undefined
+        }
         autoComplete="off"
         disabled={disabled}
         placeholder={placeholder}
@@ -93,7 +100,14 @@ export default function Combobox({
               </li>
             ))
           ) : (
-            <li className="empty" role="option" aria-disabled="true" aria-selected="false">{emptyText}</li>
+            <li
+              className="empty"
+              role="option"
+              aria-disabled="true"
+              aria-selected="false"
+            >
+              {emptyText}
+            </li>
           )}
         </ul>
       )}

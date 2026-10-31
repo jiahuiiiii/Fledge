@@ -1,6 +1,6 @@
 import CompanyAvatar from "./CompanyAvatar";
+import { Skeleton as LoadingSkeleton } from "./ui";
 import { companyName, companyMatches } from "../lib/companyIdentity";
-import LoadingSkeleton from "./LoadingSkeleton";
 import { WorkspaceSidebar } from "./WorkspaceControls";
 
 export function CompanyAddButton({ className = "", ...props }) {

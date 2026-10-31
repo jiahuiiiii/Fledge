@@ -19,6 +19,12 @@ requests, permissions, selection, dates and mutations.
 | `StoryCard` | Exact supplied headline, metadata, optional tags, text and footer. `href` opens the original; `onOpen` opens an existing evidence dialog. It never invents a summary. Callers apply any bounded preview while retaining full evidence. |
 | `EmptyState` | A concise heading, explanation and optional existing actions. Keep loading, failed reads, withdrawn evidence and an actual empty result distinct. |
 | `Pagination` | One-based page display and previous/next controls. Callers retain their original zero-based page/cursor and availability cutoff. |
+| `Field` | A label, its control and an optional hint or error, wired together for assistive technology. Wrap one control; `Field` injects id, `aria-describedby`, `aria-invalid` and required state. The caller owns value, change and validation. |
+| `Toggle` | One on/off switch: a native checkbox with `role="switch"`, a styled track and an optional label/description. `onChange(checked, event)`. Use `compact` for the label-less form with an `aria-label`. For a choice among options use `FilterGroup` or `Tabs`, not a row of toggles. |
+| `Modal` | Portal dialog with Escape dismissal, focus trap and restored focus. Canonical version of the existing component. Callers own open state, title and actions. |
+| `Select` | Native `select` value/change/form semantics with an owned popup and full keyboard interaction, so the system menu never replaces the app's options. Pass `<option>` children. |
+| `Checkbox` | A native checkbox kept for keyboard, form and assistive-technology behaviour, with the app's check mark. Spread input props. |
+| `Skeleton` | Loading placeholder with `cards`, `workspace`, `financials`, `chart` and `idea` variants. Keep it distinct from empty and failed states. |
 
 Use quiet filled surfaces and compact headings. Do not add ornamental left-edge
 borders or duplicate status/cost explanations. Keep original text and dates,

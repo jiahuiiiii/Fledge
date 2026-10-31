@@ -638,9 +638,21 @@ def permitted_ids(conn, record):
     packet = record["packet"]
     cutoff = datetime.fromisoformat(packet["cutoff"])
     iid = record["instrument_id"]
-    return {str(d["id"]) for d in service.permitted_documents(conn, cutoff, iid)} | {
-        str(d["id"]) for d in social.documents(conn, iid, cutoff, packet.get("social_lookback_days", 7))
+    lookback = packet.get("social_lookback_days", 7)
+    # The permitted universe depends only on (instrument, cutoff, lookback) and
+    # is stable within a transaction's snapshot. Presenting many saved readings
+    # for one instrument repeats these two heavy scans per reading; memoize them
+    # per transaction so each distinct cutoff is computed once.
+    cache = getattr(conn, "_request_cache", None)
+    key = ("permitted_ids", str(iid), packet["cutoff"], lookback)
+    if cache is not None and key in cache:
+        return cache[key]
+    result = {str(d["id"]) for d in service.permitted_documents(conn, cutoff, iid)} | {
+        str(d["id"]) for d in social.documents(conn, iid, cutoff, lookback)
     }
+    if cache is not None:
+        cache[key] = result
+    return result
 
 
 def unavailable(conn, record):

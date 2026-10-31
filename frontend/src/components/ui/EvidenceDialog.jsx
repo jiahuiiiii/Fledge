@@ -16,7 +16,12 @@ export default function EvidenceDialog({
   empty = "No saved evidence to show.",
 }) {
   return (
-    <Modal open={open} onClose={onClose} title={title} className="evidence-dialog ui-evidence">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={title}
+      className="evidence-dialog ui-evidence"
+    >
       {intro && <p className="ui-evidence__intro">{intro}</p>}
       {rows.length ? (
         <ul className="ui-evidence__list">
@@ -28,9 +33,13 @@ export default function EvidenceDialog({
                   {row.value != null && <span>{row.value}</span>}
                 </div>
               )}
-              {row.meta && <small className="ui-evidence__meta">{row.meta}</small>}
+              {row.meta && (
+                <small className="ui-evidence__meta">{row.meta}</small>
+              )}
               {row.quote && <blockquote>{row.quote}</blockquote>}
-              {row.note && <small className="ui-evidence__meta">{row.note}</small>}
+              {row.note && (
+                <small className="ui-evidence__meta">{row.note}</small>
+              )}
               {(row.href || row.onOpen) && (
                 <SourceChip
                   label={row.sourceLabel || "Open source"}

@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
+import { Button } from "./ui";
 import { api } from "../api/client";
 import TermHelp from "./TermHelp";
 import { companyName } from "../lib/companyIdentity";
-import { reportedRow, peRows, comparisonExclusion } from "../lib/sectorPosition";
+import {
+  reportedRow,
+  peRows,
+  comparisonExclusion,
+} from "../lib/sectorPosition";
 import {
   compareVerdicts,
   formatGrowth,
@@ -19,7 +24,10 @@ function Bold({ text }) {
 
 // "Amazon.com, Inc." -> "Amazon", "MICROSOFT CORP" -> "Microsoft".
 export function shortName(name, symbol) {
-  let n = (name || symbol || "").replace(/,?\s+(inc|corp|corporation|co|ltd|plc|holdings|group|n\.?v|s\.?a)\.?$/i, "");
+  let n = (name || symbol || "").replace(
+    /,?\s+(inc|corp|corporation|co|ltd|plc|holdings|group|n\.?v|s\.?a)\.?$/i,
+    "",
+  );
   n = n.replace(/\.com$/i, "").trim();
   if (n === n.toUpperCase() && /[A-Z]{3}/.test(n))
     n = n.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
@@ -57,7 +65,12 @@ export function compareRows(data) {
   }));
 }
 
-export default function PlainCompare({ instrumentId, name, visible, onChoosePeers }) {
+export default function PlainCompare({
+  instrumentId,
+  name,
+  visible,
+  onChoosePeers,
+}) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -84,7 +97,9 @@ export default function PlainCompare({ instrumentId, name, visible, onChoosePeer
   const rows = data ? compareRows(data) : [];
   const peers = rows.slice(1);
   const verdicts = compareVerdicts(rows);
-  const hasFigures = peers.some((r) => r.growth != null || r.margin != null || r.pe != null);
+  const hasFigures = peers.some(
+    (r) => r.growth != null || r.margin != null || r.pe != null,
+  );
   return (
     <section className="plain-tab" aria-label="Comparison in plain English">
       <p className="plain-intro">
@@ -92,13 +107,15 @@ export default function PlainCompare({ instrumentId, name, visible, onChoosePeer
         numbers mean something.
       </p>
       {error && <p role="alert">{error}</p>}
-      {!data && !error && <p className="plain-empty">Loading similar companies…</p>}
+      {!data && !error && (
+        <p className="plain-empty">Loading similar companies…</p>
+      )}
       {data && !peers.length && (
         <div className="plain-empty">
           <p>No similar companies picked yet.</p>
-          <button type="button" className="primary" onClick={onChoosePeers}>
+          <Button variant="primary" onClick={onChoosePeers}>
             Pick companies to compare
-          </button>
+          </Button>
         </div>
       )}
       {data && peers.length > 0 && !hasFigures && (
@@ -106,9 +123,9 @@ export default function PlainCompare({ instrumentId, name, visible, onChoosePeer
           <p>
             Figures for {peers.map((p) => p.name).join(", ")} aren’t saved yet.
           </p>
-          <button type="button" className="primary" onClick={onChoosePeers}>
+          <Button variant="primary" onClick={onChoosePeers}>
             Get their figures
-          </button>
+          </Button>
         </div>
       )}
       {verdicts.map((v) => (
@@ -150,7 +167,11 @@ export default function PlainCompare({ instrumentId, name, visible, onChoosePeer
         </p>
       )}
       {peers.length > 0 && (
-        <button type="button" className="source-link plain-change" onClick={onChoosePeers}>
+        <button
+          type="button"
+          className="source-link plain-change"
+          onClick={onChoosePeers}
+        >
           Change companies →
         </button>
       )}

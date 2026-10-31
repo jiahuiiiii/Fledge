@@ -1,5 +1,5 @@
 import { formatTimestamp } from "../lib/dateTime";
-import Select from "./Select";
+import { Select, Button } from "./ui";
 import { useState } from "react";
 import {
   eventWindows,
@@ -71,13 +71,13 @@ export function EventEditor({ events = [], onChange }) {
         <fieldset className="event-definition" key={e.condition_id}>
           <legend>
             <span>Event {i + 1}</span>
-            <button
+            <Button
+              variant="link"
               type="button"
-              className="text-button"
               onClick={() => onChange(events.filter((_, j) => i !== j))}
             >
               Remove event {i + 1}
-            </button>
+            </Button>
           </legend>
           <label>
             What to watch for
@@ -219,13 +219,13 @@ export function EventEditor({ events = [], onChange }) {
         </fieldset>
       ))}
       {events.length < 3 && (
-        <button
+        <Button
+          variant="link"
           type="button"
-          className="text-button"
           onClick={() => onChange([...events, newEvent()])}
         >
           + Add event condition
-        </button>
+        </Button>
       )}
     </section>
   );
@@ -336,12 +336,12 @@ export default function EventAssessment({
                         }
                       </p>
                     ))}
-                    <button
-                      className="text-button"
+                    <Button
+                      variant="link"
                       onClick={() => onSource(c.source_id)}
                     >
                       Inspect event source {i + 1} ↗
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </>
@@ -405,8 +405,8 @@ export default function EventAssessment({
               older reports.
             </p>
           )}
-          <button
-            className="secondary"
+          <Button
+            variant="secondary"
             disabled={busy || !!unavailableReason}
             onClick={() =>
               onCheck(
@@ -419,7 +419,7 @@ export default function EventAssessment({
             }
           >
             {busy ? "Checking event evidence…" : "Check event evidence"}
-          </button>
+          </Button>
           <p className="fine">
             Explicit AI check of this saved revision and source snapshot. Uses
             the shared building budget. Automatic event checks are optional in

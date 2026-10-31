@@ -21,8 +21,7 @@ const sections = {
   },
   business: {
     label: "Overview",
-    description:
-      "See the price, current signals and the business at a glance.",
+    description: "See the price, current signals and the business at a glance.",
     icon: "M4 21V7h10v14M14 11h6v10M8 11h2m-2 4h2m-2 4h2M2 21h20",
   },
   valuation: {

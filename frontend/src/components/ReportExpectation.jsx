@@ -1,4 +1,5 @@
 import { reportStateLabels } from "../lib/reportExpectation";
+import { Button } from "./ui";
 
 export function ReportExpectationText({ condition, state }) {
   if (!condition.expected_period_end) return null;
@@ -72,13 +73,13 @@ export default function ReportExpectationEditor({
           review. No extra source or AI call is made by the date change.
         </small>
         {(condition.expected_period_end || condition.expected_report_by) && (
-          <button
-            className="text-button"
+          <Button
+            variant="link"
             type="button"
             onClick={() => onChange("clear", "")}
           >
             Clear reporting expectation
-          </button>
+          </Button>
         )}
       </div>
     </details>

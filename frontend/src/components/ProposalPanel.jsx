@@ -57,9 +57,14 @@ export function DefinitionText({ value, kind }) {
     </>
   );
 }
-const validNumber = (v) => String(v ?? "").trim() !== "" && Number.isFinite(Number(v));
+const validNumber = (v) =>
+  String(v ?? "").trim() !== "" && Number.isFinite(Number(v));
 const kindLabel = (p) =>
-  p.kind === "numeric" ? "Number to watch" : p.kind === "event" ? "Event to watch" : "Reword your question";
+  p.kind === "numeric"
+    ? "Number to watch"
+    : p.kind === "event"
+      ? "Event to watch"
+      : "Reword your question";
 
 export default function ProposalPanel({
   embedded = false,
@@ -80,10 +85,14 @@ export default function ProposalPanel({
   const usable = open.filter((p) => !p.source_unavailable);
   // A suggestion that only adds a check can start watching in one step.
   const watchable = (p) =>
-    onWatch && !p.source_unavailable && p.operation === "add" && p.kind !== "reasoning";
+    onWatch &&
+    !p.source_unavailable &&
+    p.operation === "add" &&
+    p.kind !== "reasoning";
   const valueOf = (p) => thresholds[p.id] ?? startingPoint(p)?.threshold ?? "";
   const ready = (p) => p.kind !== "numeric" || validNumber(valueOf(p));
-  const effective = (list) => Object.fromEntries(list.map((p) => [p.id, valueOf(p)]));
+  const effective = (list) =>
+    Object.fromEntries(list.map((p) => [p.id, valueOf(p)]));
   const addable = usable.filter(watchable);
   function card(p, { actions = false } = {}) {
     const field = p.kind === "numeric" ? "conditions" : "events";
@@ -98,7 +107,9 @@ export default function ProposalPanel({
       <article className="proposal-card" key={p.id}>
         <div className="row proposal-heading">
           <span className="section-label">
-            {actions ? kindLabel(p).toUpperCase() : `${p.status.toUpperCase()} · ${kindLabel(p).toUpperCase()}`}
+            {actions
+              ? kindLabel(p).toUpperCase()
+              : `${p.status.toUpperCase()} · ${kindLabel(p).toUpperCase()}`}
           </span>
         </div>
         <p className="proposal-rationale">{p.rationale}</p>
@@ -137,12 +148,9 @@ export default function ProposalPanel({
           <details className="proposal-source" key={i}>
             <summary>Supporting passage {i + 1}</summary>
             <blockquote>{c.quote}</blockquote>
-            <button
-              className="text-button"
-              onClick={() => onSource(c.source_id)}
-            >
+            <Button variant="link" onClick={() => onSource(c.source_id)}>
               Inspect suggestion source ↗
-            </button>
+            </Button>
           </details>
         ))}
         {actions && !p.source_unavailable && (
@@ -165,9 +173,9 @@ export default function ProposalPanel({
             )}
             {watchable(p) && p.kind === "numeric" && startingPoint(p) && (
               <small>
-                Latest reported: {startingPoint(p).value}% ({startingPoint(p).period}).{" "}
-                {startingPoint(p).threshold}% is a starting point just below it;
-                change it to your own.
+                Latest reported: {startingPoint(p).value}% (
+                {startingPoint(p).period}). {startingPoint(p).threshold}% is a
+                starting point just below it; change it to your own.
               </small>
             )}
             <div className="row">
@@ -187,16 +195,19 @@ export default function ProposalPanel({
                   disabled={busy || !p.candidate}
                   onClick={() => onReview([p])}
                 >
-                  {p.kind === "reasoning" ? "Use this wording" : "Review this change"}
+                  {p.kind === "reasoning"
+                    ? "Use this wording"
+                    : "Review this change"}
                 </Button>
               )}
-              <button
-                className="text-button proposal-reject"
+              <Button
+                variant="link"
+                className="proposal-reject"
                 disabled={busy}
                 onClick={() => onReject(p.id)}
               >
                 Not now
-              </button>
+              </Button>
             </div>
             <small>
               {watchable(p)
@@ -208,21 +219,19 @@ export default function ProposalPanel({
           </div>
         )}
         {!actions && p.status === "stale" && (
-          <button
-            className="text-button proposal-reject"
+          <Button
+            variant="link"
+            className="proposal-reject"
             disabled={busy}
             onClick={() => onReject(p.id)}
           >
             Dismiss
-          </button>
+          </Button>
         )}
         {!actions && p.status === "approved" && p.accepted_version_id && (
-          <button
-            className="text-button"
-            onClick={() => onOpen(p.accepted_version_id)}
-          >
+          <Button variant="link" onClick={() => onOpen(p.accepted_version_id)}>
             Open the accepted revision ↗
-          </button>
+          </Button>
         )}
       </article>
     );
