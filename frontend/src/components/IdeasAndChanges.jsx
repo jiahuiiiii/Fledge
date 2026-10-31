@@ -1,11 +1,16 @@
 import { formatTimestamp } from "../lib/dateTime";
-import Select from "./Select";
 import { resultLabel } from "../lib/conditionRoles";
 import { useState } from "react";
 import CompanyAvatar from "./CompanyAvatar";
 import { companyName } from "../lib/companyIdentity";
 import { useProfile } from "../lib/profile";
-import { Button, LightbulbIcon, RefreshIcon, SectionHeader } from "./ui";
+import {
+  Button,
+  LightbulbIcon,
+  RefreshIcon,
+  SectionHeader,
+  Select,
+} from "./ui";
 import ConfirmDialog from "./ConfirmDialog";
 import "./IdeasAndChanges.css";
 const metrics = {
@@ -74,58 +79,60 @@ export default function IdeasAndChanges({
           <div className="idea-collection">
             {ideas.map((c) => (
               <div key={c.id} className="idea-summary-wrap">
-              <button
-                className="idea-summary"
-                onClick={() => onOpen(c.id, "idea")}
-              >
-                <div className="saved-idea-head">
-                  <CompanyAvatar company={c} small />
-                  <div className="saved-idea-company">
-                    <strong title={c.name}>{companyName(c)}</strong>
-                    <span>{c.symbol}</span>
-                  </div>
-                  {!beginner && (
-                    <span className="status saved-idea-status">{c.status}</span>
-                  )}
-                </div>
-                <h3>{c.question || "Your saved idea"}</h3>
-                <p className="saved-idea-reasoning">
-                  {c.reasoning || "Draft with no reasoning yet."}
-                </p>
-                {!beginner && (
-                <div className="saved-idea-meta">
-                  <span
-                    className={
-                      c.unread
-                        ? "saved-idea-updates attention"
-                        : "saved-idea-updates muted"
-                    }
-                  >
-                    {c.unread
-                      ? `${c.unread} update${c.unread === 1 ? "" : "s"} awaiting review`
-                      : "No unreviewed updates"}
-                  </span>
-                  <span>
-                    Evidence cutoff {date(c.cutoff)} · Revision {c.revision}
-                  </span>
-                </div>
-                )}
-                <div className="saved-idea-footer">
-                  <span>Open view</span>
-                  <IdeaArrow />
-                </div>
-              </button>
-              {onRemove && (
-                <Button
-                  variant="plain"
-                  size="sm"
-                  className="idea-remove"
-                  aria-label={`Remove my ${c.symbol} view`}
-                  onClick={() => setRemoving(c)}
+                <button
+                  className="idea-summary"
+                  onClick={() => onOpen(c.id, "idea")}
                 >
-                  Remove
-                </Button>
-              )}
+                  <div className="saved-idea-head">
+                    <CompanyAvatar company={c} small />
+                    <div className="saved-idea-company">
+                      <strong title={c.name}>{companyName(c)}</strong>
+                      <span>{c.symbol}</span>
+                    </div>
+                    {!beginner && (
+                      <span className="status saved-idea-status">
+                        {c.status}
+                      </span>
+                    )}
+                  </div>
+                  <h3>{c.question || "Your saved idea"}</h3>
+                  <p className="saved-idea-reasoning">
+                    {c.reasoning || "Draft with no reasoning yet."}
+                  </p>
+                  {!beginner && (
+                    <div className="saved-idea-meta">
+                      <span
+                        className={
+                          c.unread
+                            ? "saved-idea-updates attention"
+                            : "saved-idea-updates muted"
+                        }
+                      >
+                        {c.unread
+                          ? `${c.unread} update${c.unread === 1 ? "" : "s"} awaiting review`
+                          : "No unreviewed updates"}
+                      </span>
+                      <span>
+                        Evidence cutoff {date(c.cutoff)} · Revision {c.revision}
+                      </span>
+                    </div>
+                  )}
+                  <div className="saved-idea-footer">
+                    <span>Open view</span>
+                    <IdeaArrow />
+                  </div>
+                </button>
+                {onRemove && (
+                  <Button
+                    variant="plain"
+                    size="sm"
+                    className="idea-remove"
+                    aria-label={`Remove my ${c.symbol} view`}
+                    onClick={() => setRemoving(c)}
+                  >
+                    Remove
+                  </Button>
+                )}
               </div>
             ))}
             <ConfirmDialog
@@ -177,23 +184,26 @@ export default function IdeasAndChanges({
               <div className="ideas-empty-actions">
                 {onCreate ? (
                   <>
-                    <button className="primary" onClick={onCreate}>
-                      {beginner ? "Write my view" : "Save my reasoning"} <IdeaArrow />
-                    </button>
+                    <Button variant="primary" onClick={onCreate}>
+                      {beginner ? "Write my view" : "Save my reasoning"}{" "}
+                      <IdeaArrow />
+                    </Button>
                     <button
                       className="ideas-research-link"
                       onClick={() => onOpen(selectedCompany.id, "workspace")}
                     >
-                      {beginner ? "See the summary first" : "Read company research"}
+                      {beginner
+                        ? "See the summary first"
+                        : "Read company research"}
                     </button>
                   </>
                 ) : (
-                  <button
-                    className="primary"
+                  <Button
+                    variant="primary"
                     onClick={() => onOpen("", "workspace")}
                   >
                     Choose a company <IdeaArrow />
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -257,7 +267,8 @@ function IdeaArrow() {
 
 export function ConditionChange({ change: c, onOpen }) {
   return (
-    <button
+    <Button
+      variant="link"
       className="change-summary"
       onClick={() => onOpen(c.instrument_id, "history", c.evaluation_id)}
     >
@@ -331,7 +342,7 @@ export function ConditionChange({ change: c, onOpen }) {
                     ? "Review new source evidence; a numerical condition may still be met."
                     : "Compare each figure with your saved condition."}
       </small>
-      <span className="text-button">
+      <span>
         {c.review_action === "reviewed"
           ? "Reviewed"
           : c.review_action === "unresolved"
@@ -339,6 +350,6 @@ export function ConditionChange({ change: c, onOpen }) {
             : "Review this change"}{" "}
         ↗
       </span>
-    </button>
+    </Button>
   );
 }

@@ -364,6 +364,18 @@ async def request_timing(request: Request, call_next):
             "Slow request %s %s: %.0f ms total, %.0f ms in %d database transactions (%d new connections)",
             request.method, request.url.path, total, stats["db_ms"], stats["transactions"], stats["new_connections"],
         )
+        # When per-statement timing is on (THESIS_SQL_TIMING_MS set), name the
+        # few query shapes that cost the most, with how many times each ran, so
+        # one slow request points straight at what to fix.
+        by_query = stats.get("by_query")
+        if by_query:
+            top = sorted(by_query.items(), key=lambda kv: kv[1][1], reverse=True)[:6]
+            summary = "; ".join(
+                f"{ms:.0f} ms x{count} {pattern}" for pattern, (count, ms) in top
+            )
+            logging.getLogger("thesis.timing").warning(
+                "  top queries for %s %s: %s", request.method, request.url.path, summary
+            )
     return response
 
 
@@ -761,6 +773,18 @@ def company_alerts(instrument_id: UUID):
 @app.get("/api/v1/companies/{instrument_id}/workspace-financials")
 def workspace_financials(instrument_id: UUID):
     return {"result": service.financial_workspace(auth.current_owner(), str(instrument_id))}
+
+
+@app.get("/api/v1/idea-alerts")
+def idea_alerts_list(pending: bool = False):
+    """The saved relevance checks, fetched by the client after the workspace so
+    that presenting all of them never holds up the page. pending=true returns
+    just the published, unreviewed checks the panel shows by default (far fewer,
+    so far faster); the full history is fetched only when the user asks for it.
+    Computed one-at-a-time per owner and briefly cached so reloads don't stack."""
+    from .research import idea_alerts
+
+    return {"result": idea_alerts.cached_list_for(auth.current_owner(), pending=pending)}
 
 
 @app.get("/api/v1/research-review")

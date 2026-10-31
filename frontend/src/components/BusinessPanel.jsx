@@ -3,9 +3,7 @@ import { readableNote } from "../lib/readingNotes";
 import { useEffect, useId, useRef, useState } from "react";
 import { api } from "../api/client";
 import { modelAvailability } from "../lib/modelAvailability";
-import Modal from "./Modal";
-import Select from "./Select";
-import { Badge, Button, Card } from "./ui";
+import { Badge, Button, Card, Modal, Select } from "./ui";
 
 const titles = {
   business: "What it does",
@@ -339,7 +337,14 @@ export default function BusinessPanel({
 // Competitors: what the filing itself says (with its source), then the
 // comparison companies from Compare & value. Peers are a comparison group, not
 // a claim about market overlap; the filing often names no competitors.
-function CompetitorsCard({ title, findings, instrumentId, visible, onEvidence, onCompare }) {
+function CompetitorsCard({
+  title,
+  findings,
+  instrumentId,
+  visible,
+  onEvidence,
+  onCompare,
+}) {
   const [position, setPosition] = useState(null);
   useEffect(() => {
     if (!visible) return;
@@ -353,28 +358,40 @@ function CompetitorsCard({ title, findings, instrumentId, visible, onEvidence, o
     };
   }, [instrumentId, visible]);
   const peers = position?.peers || [];
-  const names = Object.fromEntries((position?.members || []).map((m) => [m.symbol, m.name]));
+  const names = Object.fromEntries(
+    (position?.members || []).map((m) => [m.symbol, m.name]),
+  );
   const origin = {
     saved: "Your comparison companies",
     curated: "Suggested comparison companies",
     fmp: "Similar companies according to FMP (not a verified competitor list)",
   }[position?.suggestion_origin];
   return (
-    <Card as="article" variant="inset" className="brief-topic brief-competitors" data-topic="competition">
+    <Card
+      as="article"
+      variant="inset"
+      className="brief-topic brief-competitors"
+      data-topic="competition"
+    >
       <h3>{title}</h3>
       {findings.length ? (
         <ul>
           {findings.slice(0, 2).map((finding, i) => (
             <li key={i}>
               <p>{finding.text}</p>
-              <button className="brief-source" onClick={() => onEvidence(finding)}>
+              <button
+                className="brief-source"
+                onClick={() => onEvidence(finding)}
+              >
                 View source
               </button>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="brief-empty">The filing passages we read don’t name competitors.</p>
+        <p className="brief-empty">
+          The filing passages we read don’t name competitors.
+        </p>
       )}
       {peers.length > 0 ? (
         <div className="brief-peers">
@@ -394,7 +411,10 @@ function CompetitorsCard({ title, findings, instrumentId, visible, onEvidence, o
       )}
       {onCompare && (
         <Button variant="tertiary" size="sm" onClick={onCompare}>
-          {peers.length ? "Change comparison companies" : "Find comparison companies"} →
+          {peers.length
+            ? "Change comparison companies"
+            : "Find comparison companies"}{" "}
+          →
         </Button>
       )}
     </Card>

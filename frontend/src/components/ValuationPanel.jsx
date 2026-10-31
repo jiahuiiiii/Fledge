@@ -1,9 +1,7 @@
 import { formatTimestamp } from "../lib/dateTime";
-import Checkbox from "./Checkbox";
+import { Select, Checkbox, Skeleton as LoadingSkeleton, Button } from "./ui";
 import { readableLoad } from "../lib/loading";
-import LoadingSkeleton from "./LoadingSkeleton";
 import AnalystTargets from "./AnalystTargets";
-import Select from "./Select";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { requestUpdate } from "../lib/updateRequest";
@@ -461,8 +459,8 @@ export default function ValuationPanel({
         and uses no AI.
       </p>
       <div className="valuation-entry">
-        <button
-          className="primary"
+        <Button
+          variant="primary"
           type="button"
           disabled={!ready}
           aria-expanded={builderOpen}
@@ -474,7 +472,7 @@ export default function ValuationPanel({
           }}
         >
           {builderOpen ? "Close scenario builder" : "Build a scenario"}
-        </button>
+        </Button>
         {!builderOpen && (
           <button type="button" disabled={!ready} onClick={examples}>
             Try illustrative assumptions
@@ -976,13 +974,13 @@ export default function ValuationPanel({
                 </div>
               </details>
               <div className="valuation-actions">
-                <button
-                  className="primary"
+                <Button
+                  variant="primary"
                   disabled={!ready || sourceChanged}
                   type="submit"
                 >
                   {busy ? "Working…" : "Calculate scenarios"}
-                </button>
+                </Button>
                 {result && !result.saved && (
                   <button
                     type="button"

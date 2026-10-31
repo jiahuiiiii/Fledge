@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from thesis.db import one
 from thesis.providers.ledger import canonical
 from .citations import source_passages
+from . import withdrawals
 
 POLICY = "saved-parent-context-1"
 MAX_BYTES = 8000
@@ -36,9 +37,7 @@ def attach(conn, sources, cutoff, *, batch_limits=True):
         source["context_status"] = row["outcome"]
         if row["outcome"] != "available":
             continue
-        if one(
-            conn, "SELECT 1 FROM hn_withdrawals WHERE post_key=%s UNION SELECT 1 FROM social_withdrawals WHERE post_key=%s", (row["parent_key"],row["parent_key"])
-        ):
+        if withdrawals.is_withdrawn(conn, row["parent_key"]):
             source["context_status"] = "withdrawn"
             continue
         reddit = source.get("platform") == "reddit" and re.fullmatch(r"t[13]_[a-z0-9]+", row["parent_key"] or "")
@@ -97,21 +96,28 @@ def allowed(conn, source):
         return True
     # A derived reading consumes this exact immutable parent version. A later
     # different/failed check cannot silently substitute another context.
-    row = one(
-        conn,
-        "SELECT * FROM social_conversation_results WHERE id=%s AND post_id=%s",
-        (context["result_id"], source["id"]),
-    )
+    row = _conversation_result(conn, context["result_id"], source["id"])
     return bool(
         row
         and row["outcome"] == "available"
         and row["parent_key"] == context["parent_key"]
-        and not one(
-            conn,
-            "SELECT 1 FROM hn_withdrawals WHERE post_key=%s UNION SELECT 1 FROM social_withdrawals WHERE post_key=%s",
-            (context["parent_key"],context["parent_key"]),
-        )
+        and not withdrawals.is_withdrawn(conn, context["parent_key"])
     )
+
+
+def _conversation_result(conn, result_id, post_id):
+    # Conversation results are immutable, so within one transaction the same
+    # (result_id, post_id) pair — asked once per source for every saved reading
+    # on the page — is answered from cache instead of a fresh point query.
+    cache = getattr(conn, "_request_cache", None)
+    sql = "SELECT * FROM social_conversation_results WHERE id=%s AND post_id=%s"
+    if cache is None:
+        return one(conn, sql, (result_id, post_id))
+    store = cache.setdefault("conv_result", {})
+    key = (str(result_id), str(post_id))
+    if key not in store:
+        store[key] = one(conn, sql, (result_id, post_id))
+    return store[key]
 
 
 def changed_common_context(previous, current, channel, platform):

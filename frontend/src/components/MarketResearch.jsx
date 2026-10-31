@@ -227,9 +227,9 @@ export default function MarketResearch({
           <p className="fine">
             {heldCount} of these {heldCount === 1 ? "was" : "were"} sent for
             analysis, but the AI request was interrupted before an answer was
-            saved. The app does not resend a request that may already have
-            been charged, so {heldCount === 1 ? "it stays" : "they stay"} on
-            hold until you run Refresh &amp; analyse.
+            saved. The app does not resend a request that may already have been
+            charged, so {heldCount === 1 ? "it stays" : "they stay"} on hold
+            until you run Refresh &amp; analyse.
           </p>
         )}
         {!news.length && (
@@ -250,7 +250,9 @@ export default function MarketResearch({
                 <>
                   <span>{d.source}</span>
                   <time dateTime={d.published_at}>{stamp(d.published_at)}</time>
-                  {held.has(d.id) && <span>On hold · analysis interrupted</span>}
+                  {held.has(d.id) && (
+                    <span>On hold · analysis interrupted</span>
+                  )}
                 </>
               }
               footer={
@@ -347,13 +349,19 @@ export default function MarketResearch({
           <span className="ai-summary-head">
             <span className="ai-summary-title">
               {brief ? "Saved AI summary" : "Optional AI summary"}
-              {!brief && <small>Reads the saved headlines and snippets above</small>}
+              {!brief && (
+                <small>Reads the saved headlines and snippets above</small>
+              )}
             </span>
             {!brief && (
               <Button
                 size="sm"
                 variant="secondary"
-                disabled={busy || !(data.market_news_ids || []).length || availability.blocked}
+                disabled={
+                  busy ||
+                  !(data.market_news_ids || []).length ||
+                  availability.blocked
+                }
                 aria-describedby={
                   availability.blocked && availability.state !== "running"
                     ? "sentiment-disabled-reason"
@@ -399,7 +407,12 @@ export default function MarketResearch({
             </p>
             <div className="brief-points" id={`${viewId}-points`}>
               {visiblePoints.map((p, i) => (
-                <Card as="article" variant="inset" key={i} className={`brief-point ${p.kind}`}>
+                <Card
+                  as="article"
+                  variant="inset"
+                  key={i}
+                  className={`brief-point ${p.kind}`}
+                >
                   <Badge>
                     {p.kind === "reported"
                       ? "Reported"
@@ -410,15 +423,17 @@ export default function MarketResearch({
                   <h4>{p.title}</h4>
                   <p>{p.text}</p>
                   <div className="brief-citations">
-                    {uniqueCitations(p.citations, data.documents).map((c, j) => (
-                      <SourceChip
-                        key={c.source_id}
-                        label={`${c.doc?.source || "Source"} ${j + 1}`}
-                        onOpen={() => onSource(c.source_id)}
-                        title={c.quote}
-                        aria-label={`Inspect source ${j + 1}: ${c.doc?.title || "Source unavailable"}`}
-                      />
-                    ))}
+                    {uniqueCitations(p.citations, data.documents).map(
+                      (c, j) => (
+                        <SourceChip
+                          key={c.source_id}
+                          label={`${c.doc?.source || "Source"} ${j + 1}`}
+                          onOpen={() => onSource(c.source_id)}
+                          title={c.quote}
+                          aria-label={`Inspect source ${j + 1}: ${c.doc?.title || "Source unavailable"}`}
+                        />
+                      ),
+                    )}
                   </div>
                 </Card>
               ))}

@@ -40,11 +40,13 @@ export default function WorkspaceHeader({
       >
         fledge<span>↗</span>
       </a>
-      <nav aria-label="Workspace navigation" ref={navRef} className={`has-indicator${ready ? " is-ready" : ""}`}>
+      <nav
+        aria-label="Workspace navigation"
+        ref={navRef}
+        className={`has-indicator${ready ? " is-ready" : ""}`}
+      >
         {items.map(([key, label]) => {
-          const active =
-            view === key ||
-            (view === "idea" && key === "ideas");
+          const active = view === key || (view === "idea" && key === "ideas");
           return (
             <button
               key={key}
@@ -61,9 +63,7 @@ export default function WorkspaceHeader({
         })}
         <span className="topbar-indicator" aria-hidden="true" />
       </nav>
-      <div className="topbar-tools">
-        {account}
-      </div>
+      <div className="topbar-tools">{account}</div>
     </header>
   );
 }

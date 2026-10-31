@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Button } from "./ui";
 import { api } from "../api/client";
 import { INVESTOR_TYPES } from "../lib/investorTypes";
 import "./Onboarding.css";
@@ -29,7 +30,11 @@ export const START_QUESTIONS = [
       ["learn", "Understand a company", "Plain-English explanations"],
       ["check", "Check a stock idea", "The case for and against"],
       ["monitor", "Watch what I own", "Alerts when something changes"],
-      ["explore", "Not sure what to look at", "Help me find companies to start with"],
+      [
+        "explore",
+        "Not sure what to look at",
+        "Help me find companies to start with",
+      ],
     ],
   },
 ];
@@ -48,7 +53,8 @@ export const TYPE_QUESTIONS = [
   },
   {
     key: "drop_reaction",
-    title: "A stock you own (or would buy) falls 15% in a week. What do you do first?",
+    title:
+      "A stock you own (or would buy) falls 15% in a week. What do you do first?",
     hint: "No right answer. Pick what you would really do.",
     options: [
       ["hold", "Nothing, I’m in it for the long run"],
@@ -61,9 +67,7 @@ export const TYPE_QUESTIONS = [
 ];
 
 const label = (questions, key, value) =>
-  questions
-    .find((q) => q.key === key)
-    ?.options.find(([v]) => v === value)?.[1];
+  questions.find((q) => q.key === key)?.options.find(([v]) => v === value)?.[1];
 
 // One radio group: a single Tab stop, arrow keys move and select (WAI-ARIA).
 function Choice({ question, value, onPick }) {
@@ -243,13 +247,9 @@ export default function Onboarding({
             advice. You can retake it any time from Account.
           </p>
           <div className="onboarding-sticky">
-            <button
-              type="button"
-              className="primary"
-              onClick={() => onDone(saved)}
-            >
+            <Button variant="primary" onClick={() => onDone(saved)}>
               Done
-            </button>
+            </Button>
             {offerPro && (
               <button
                 type="button"
@@ -298,12 +298,18 @@ export default function Onboarding({
               type="checkbox"
               checked={!!answers.pro}
               onChange={(event) =>
-                setAnswers((current) => ({ ...current, pro: event.target.checked }))
+                setAnswers((current) => ({
+                  ...current,
+                  pro: event.target.checked,
+                }))
               }
             />
             <span>
               <strong>Turn on Pro tools now</strong>
-              <small>Financials, charts and every research tab. You can switch later in Account.</small>
+              <small>
+                Financials, charts and every research tab. You can switch later
+                in Account.
+              </small>
             </span>
           </label>
         )}
@@ -313,13 +319,9 @@ export default function Onboarding({
               {error}
             </p>
           )}
-          <button type="submit" className="primary" disabled={busy}>
-            {busy
-              ? "Saving…"
-              : stage === "type"
-                ? "See my type"
-                : "Continue"}
-          </button>
+          <Button type="submit" variant="primary" disabled={busy}>
+            {busy ? "Saving…" : stage === "type" ? "See my type" : "Continue"}
+          </Button>
           <button
             type="button"
             className="onboarding-skip"

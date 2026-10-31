@@ -2,7 +2,6 @@ import { formatTimestamp } from "../lib/dateTime";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { readableLoad } from "../lib/loading";
-import LoadingSkeleton from "./LoadingSkeleton";
 import CompanyAvatar from "./CompanyAvatar";
 import PriceChange from "./PriceChange";
 import { companyName, companyMatches } from "../lib/companyIdentity";
@@ -28,6 +27,7 @@ import {
   ChevronRightIcon,
   GridIcon,
   SectionHeader,
+  Skeleton as LoadingSkeleton,
 } from "./ui";
 import "./CompanyOverview.css";
 const stamp = (value) =>
@@ -550,7 +550,8 @@ export function AllHistory({
           )}
           <div className="idea-collection">
             {state.records.map((record) => (
-              <button
+              <Button
+                variant="link"
                 key={`${record.company.id}:${record.id}`}
                 className="idea-summary"
                 data-company={record.company.id}
@@ -563,10 +564,8 @@ export function AllHistory({
                   <span className="muted">{stamp(record.created_at)}</span>
                 </div>
                 <h3>{record.question}</h3>
-                <span className="text-button">
-                  Revision {record.revision} · Open saved record ↗
-                </span>
-              </button>
+                <span>Revision {record.revision} · Open saved record ↗</span>
+              </Button>
             ))}
           </div>
         </>

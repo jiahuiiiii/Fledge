@@ -9,8 +9,23 @@ import { Button, Card, Disclosure, SectionHeader } from "./ui";
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { latestPriceQuote, quoteMovement } from "../lib/priceRefresh";
-import { countLabel, countMood, groupByTone, newsMeaning, peopleMeaning, priceLine, worldForCompany, worldLight } from "../lib/beginnerSummary";
-import { PriceMoveLine, SignalLights, ToneHeadlineGroups, YourViewCard, WorldSignalCard } from "./OverviewShared";
+import {
+  countLabel,
+  countMood,
+  groupByTone,
+  newsMeaning,
+  peopleMeaning,
+  priceLine,
+  worldForCompany,
+  worldLight,
+} from "../lib/beginnerSummary";
+import {
+  PriceMoveLine,
+  SignalLights,
+  ToneHeadlineGroups,
+  YourViewCard,
+  WorldSignalCard,
+} from "./OverviewShared";
 import "./BeginnerSummary.css";
 import {
   currentGuidance,
@@ -67,56 +82,244 @@ export default function CompanySnapshot({
   );
   const [world, setWorld] = useState(null);
   const [briefOpen, setBriefOpen] = useState(false);
-  useEffect(() => { if (focusTopic) setBriefOpen(true); }, [focusTopic]);
+  useEffect(() => {
+    if (focusTopic) setBriefOpen(true);
+  }, [focusTopic]);
   useEffect(() => {
     if (!visible) return;
     let active = true;
-    api.worldNews().then(page => { if (active) setWorld(page); }).catch(() => { if (active) setWorld({ articles: [] }); });
-    return () => { active = false; };
+    api
+      .worldNews()
+      .then((page) => {
+        if (active) setWorld(page);
+      })
+      .catch(() => {
+        if (active) setWorld({ articles: [] });
+      });
+    return () => {
+      active = false;
+    };
   }, [visible, instrumentId]);
   const name = companyName(data.instrument);
   const latest = latestPriceQuote(data.market, priceHistory);
   const live = latest && quoteMovement(data.market, priceHistory);
-  const price = live ? priceLine({ price: Number(latest.price), change_percent: live.percent }) : priceLine(data.market?.quote?.quote);
+  const price = live
+    ? priceLine({ price: Number(latest.price), change_percent: live.percent })
+    : priceLine(data.market?.quote?.quote);
   const reading = data.sentiment?.withheld ? null : data.sentiment;
   const items = overviewNews(data);
-  const analysedNews = items.filter(item => item.kind === "news");
-  const news = analysedNews.length ? analysedNews : (data.documents || []).filter(d => d.title).map(d => ({ ...d, headline: d.title })).sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at));
+  const analysedNews = items.filter((item) => item.kind === "news");
+  const news = analysedNews.length
+    ? analysedNews
+    : (data.documents || [])
+        .filter((d) => d.title)
+        .map((d) => ({ ...d, headline: d.title }))
+        .sort(
+          (a, b) => Date.parse(b.published_at) - Date.parse(a.published_at),
+        );
   const newsGroups = groupByTone(news);
-  const postGroups = groupByTone(items.filter(item => item.kind === "social"));
+  const postGroups = groupByTone(
+    items.filter((item) => item.kind === "social"),
+  );
   const { linked } = worldForCompany(world, instrumentId, 2);
-  const links = linked.filter(item => item.link);
+  const links = linked.filter((item) => item.link);
   const worldState = worldLight(linked, name);
   const lights = [
-    { key: "news", title: "News", mood: countMood(newsGroups), status: countLabel(newsGroups) },
-    { key: "people", title: "People online", mood: countMood(postGroups), status: countLabel(postGroups, { good: "upbeat", bad: "worried", neutral: "neutral" }) },
-    { key: "world", title: "World", mood: worldState.mood, status: worldState.status },
+    {
+      key: "news",
+      title: "News",
+      mood: countMood(newsGroups),
+      status: countLabel(newsGroups),
+    },
+    {
+      key: "people",
+      title: "People online",
+      mood: countMood(postGroups),
+      status: countLabel(postGroups, {
+        good: "upbeat",
+        bad: "worried",
+        neutral: "neutral",
+      }),
+    },
+    {
+      key: "world",
+      title: "World",
+      mood: worldState.mood,
+      status: worldState.status,
+    },
   ];
-  const pointer = worldState.hurt ? worldState.reason : newsGroups.bad.length > newsGroups.good.length ? "There has been more bad news than good recently. Read both sides below." : null;
+  const pointer = worldState.hurt
+    ? worldState.reason
+    : newsGroups.bad.length > newsGroups.good.length
+      ? "There has been more bad news than good recently. Read both sides below."
+      : null;
   return (
     <section className="glance pro-overview" aria-label="Company overview">
       {!detailsOnly && <PriceMoveLine price={price} pro />}
       <SectionHeader level="section" as="h2" title="At a glance" />
-      {data.financials_pending ? <p className="glance-summary muted" role="status">{financialError || "Loading saved financials…"}{financialError && <Button variant="tertiary" onClick={onRetryFinancials}>Try again</Button>}</p> : sentences.length ?
-        <p className="glance-summary">{latestQuarter ? <span className="glance-growth"><span className="glance-growth-title"><strong>Revenue {latestQuarter.growth >= 0 ? "up" : "down"} {Math.abs(latestQuarter.growth).toFixed(1)}% · latest quarter vs a year earlier</strong><TermHelp term="revenue_growth" /></span><small>Quarter to {day(latestQuarter.current.end)} vs quarter to {day(latestQuarter.previous.end)}{growth && ` · fiscal year to ${day(growth.periodEnd)}: ${growth.growth >= 0 ? "+" : "−"}${Math.abs(growth.growth).toFixed(1)}%`}</small></span> : growth && <span className="glance-growth"><span className="glance-growth-title"><strong>Revenue {growth.growth >= 0 ? "grew" : "fell"} {Math.abs(growth.growth).toFixed(1)}% · last fiscal year</strong><TermHelp term="revenue_growth" /></span><small>Year ended {day(growth.periodEnd)} vs year ended {day(growth.previousEnd)}</small></span>}{sentences.slice(growth ? 1 : 0).join(" ")}</p> :
-        <p className="glance-summary muted">A short summary appears once filings and news are loaded. Use Update to load them.</p>}
+      {data.financials_pending ? (
+        <p className="glance-summary muted" role="status">
+          {financialError || "Loading saved financials…"}
+          {financialError && (
+            <Button variant="tertiary" onClick={onRetryFinancials}>
+              Try again
+            </Button>
+          )}
+        </p>
+      ) : sentences.length ? (
+        <p className="glance-summary">
+          {latestQuarter ? (
+            <span className="glance-growth">
+              <span className="glance-growth-title">
+                <strong>
+                  Revenue {latestQuarter.growth >= 0 ? "up" : "down"}{" "}
+                  {Math.abs(latestQuarter.growth).toFixed(1)}% · latest quarter
+                  vs a year earlier
+                </strong>
+                <TermHelp term="revenue_growth" />
+              </span>
+              <small>
+                Quarter to {day(latestQuarter.current.end)} vs quarter to{" "}
+                {day(latestQuarter.previous.end)}
+                {growth &&
+                  ` · fiscal year to ${day(growth.periodEnd)}: ${growth.growth >= 0 ? "+" : "−"}${Math.abs(growth.growth).toFixed(1)}%`}
+              </small>
+            </span>
+          ) : (
+            growth && (
+              <span className="glance-growth">
+                <span className="glance-growth-title">
+                  <strong>
+                    Revenue {growth.growth >= 0 ? "grew" : "fell"}{" "}
+                    {Math.abs(growth.growth).toFixed(1)}% · last fiscal year
+                  </strong>
+                  <TermHelp term="revenue_growth" />
+                </span>
+                <small>
+                  Year ended {day(growth.periodEnd)} vs year ended{" "}
+                  {day(growth.previousEnd)}
+                </small>
+              </span>
+            )
+          )}
+          {sentences.slice(growth ? 1 : 0).join(" ")}
+        </p>
+      ) : (
+        <p className="glance-summary muted">
+          A short summary appears once filings and news are loaded. Use Update
+          to load them.
+        </p>
+      )}
       <Freshness data={data} />
-      {!detailsOnly && <SignalLights name={name} lights={lights} pointer={pointer?.replace(/\s*Read (?:why|both sides) below\.?$/, "")} pointerLink={pointer ? { target: worldState.hurt ? "bs-world" : "bs-news", label: worldState.hurt ? "Read why" : "Read both sides" } : null} />}
-      {!detailsOnly && <>
-      <SectionHeader level="section" as="h2" title="What's being said" actions={<Button variant="tertiary" size="sm" onClick={() => onView("evidence")}>All news and posts →</Button>} />
-      <div className="pro-overview-headlines">
-        <Card id="bs-news" tabIndex={-1} aria-labelledby="bs-news-title"><SectionHeader level="card" as="h3" id="bs-news-title" title="News" /><p className="bs-meaning">{newsMeaning(newsGroups)}</p><ToneHeadlineGroups groups={newsGroups} onSource={onSource} reading={reading} includeUnrated /></Card>
-        <Card id="bs-people" tabIndex={-1} aria-labelledby="bs-people-title"><SectionHeader level="card" as="h3" id="bs-people-title" title="People online" /><p className="bs-meaning">{peopleMeaning(postGroups)}</p><ToneHeadlineGroups groups={postGroups} onSource={onSource} reading={reading} social includeUnrated /></Card>
-      </div>
-      <WorldSignalCard links={links} worldState={worldState} onWorld={onWorld} limit={2} />
-      <YourViewCard savedView={savedView} name={name} onSaveView={onSaveView} />
-      </>}
-      <LatestActivity data={data} instrumentId={instrumentId} onUpdates={onUpdates} onView={onView} onSource={onSource} />
-      {!data.financials_pending && <OverviewSections data={data} instrumentId={instrumentId} visible={visible} onView={onView} businessPanel={businessPanel} briefOpen={briefOpen} onBriefToggle={setBriefOpen} />}
-      <Disclosure title="Price chart · past year" description="Saved prices; choose Refresh prices inside for a newer check">
+      {!detailsOnly && (
+        <SignalLights
+          name={name}
+          lights={lights}
+          pointer={pointer?.replace(/\s*Read (?:why|both sides) below\.?$/, "")}
+          pointerLink={
+            pointer
+              ? {
+                  target: worldState.hurt ? "bs-world" : "bs-news",
+                  label: worldState.hurt ? "Read why" : "Read both sides",
+                }
+              : null
+          }
+        />
+      )}
+      {!detailsOnly && (
+        <>
+          <SectionHeader
+            level="section"
+            as="h2"
+            title="What's being said"
+            actions={
+              <Button
+                variant="tertiary"
+                size="sm"
+                onClick={() => onView("evidence")}
+              >
+                All news and posts →
+              </Button>
+            }
+          />
+          <div className="pro-overview-headlines">
+            <Card id="bs-news" tabIndex={-1} aria-labelledby="bs-news-title">
+              <SectionHeader
+                level="card"
+                as="h3"
+                id="bs-news-title"
+                title="News"
+              />
+              <p className="bs-meaning">{newsMeaning(newsGroups)}</p>
+              <ToneHeadlineGroups
+                groups={newsGroups}
+                onSource={onSource}
+                reading={reading}
+                includeUnrated
+              />
+            </Card>
+            <Card
+              id="bs-people"
+              tabIndex={-1}
+              aria-labelledby="bs-people-title"
+            >
+              <SectionHeader
+                level="card"
+                as="h3"
+                id="bs-people-title"
+                title="People online"
+              />
+              <p className="bs-meaning">{peopleMeaning(postGroups)}</p>
+              <ToneHeadlineGroups
+                groups={postGroups}
+                onSource={onSource}
+                reading={reading}
+                social
+                includeUnrated
+              />
+            </Card>
+          </div>
+          <WorldSignalCard
+            links={links}
+            worldState={worldState}
+            onWorld={onWorld}
+            limit={2}
+          />
+          <YourViewCard
+            savedView={savedView}
+            name={name}
+            onSaveView={onSaveView}
+          />
+        </>
+      )}
+      <LatestActivity
+        data={data}
+        instrumentId={instrumentId}
+        onUpdates={onUpdates}
+        onView={onView}
+        onSource={onSource}
+      />
+      {!data.financials_pending && (
+        <OverviewSections
+          data={data}
+          instrumentId={instrumentId}
+          visible={visible}
+          onView={onView}
+          businessPanel={businessPanel}
+          briefOpen={briefOpen}
+          onBriefToggle={setBriefOpen}
+        />
+      )}
+      <Disclosure
+        title="Price chart · past year"
+        description="Saved prices; choose Refresh prices inside for a newer check"
+      >
         {chart}
       </Disclosure>
-      <p className="bs-note">These readings help investigate the business, not whether to buy or sell.</p>
+      <p className="bs-note">
+        These readings help investigate the business, not whether to buy or
+        sell.
+      </p>
     </section>
   );
 }

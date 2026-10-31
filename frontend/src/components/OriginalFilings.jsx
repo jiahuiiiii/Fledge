@@ -1,7 +1,7 @@
 import { formatTimestamp } from "../lib/dateTime";
+import { Modal } from "./ui";
 import { useRef, useState, useEffect } from "react";
 import { api } from "../api/client";
-import Modal from "./Modal";
 
 const day = (value) => formatTimestamp(value, { fallback: "Not recorded" });
 

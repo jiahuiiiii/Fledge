@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { Modal, Select, Button } from "./ui";
 import { api } from "../api/client";
-import Select from "./Select";
-import Modal from "./Modal";
 import { starterQuestions } from "../lib/companion";
 
 export const questionDefaults = [
@@ -75,9 +74,10 @@ export default function QuestionSelector({
           </label>
           <div className="question-library-actions">
             {actions}
-            <button
+            <Button
+              variant="link"
               type="button"
-              className="text-button add-question"
+              className="add-question"
               disabled={busy || disabled}
               onClick={() => {
                 setDraft("");
@@ -86,7 +86,7 @@ export default function QuestionSelector({
               }}
             >
               <span aria-hidden="true">＋</span> Add question
-            </button>
+            </Button>
           </div>
         </div>
         {editor || (
@@ -165,13 +165,13 @@ export default function QuestionSelector({
             >
               Cancel
             </button>
-            <button
+            <Button
+              variant="primary"
               type="submit"
-              className="primary"
               disabled={busy || draft.trim().length < 3}
             >
               {busy ? "Saving…" : "Add question"}
-            </button>
+            </Button>
           </div>
         </form>
       </Modal>

@@ -1,5 +1,5 @@
 import { formatTimestamp } from "../lib/dateTime";
-import Select from "./Select";
+import { Select, Button } from "./ui";
 import { roleLabel } from "../lib/conditionRoles";
 import { useState } from "react";
 import { ageLabel } from "./ReportingAge";
@@ -191,8 +191,8 @@ export default function HistoryPanel({
             <>
               {renderComparison(chosen.comparison, chosen.version)}
               {chosen.comparison.evaluation_id && (
-                <button
-                  className="text-button"
+                <Button
+                  variant="link"
                   onClick={() => {
                     setSelected(chosen.comparison.evaluation_id);
                     const params = new URLSearchParams(location.search);
@@ -201,7 +201,7 @@ export default function HistoryPanel({
                   }}
                 >
                   Open the linked numerical assessment ↗
-                </button>
+                </Button>
               )}
             </>
           ) : chosen.evaluation ? (

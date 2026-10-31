@@ -529,7 +529,7 @@ input[type="checkbox"] {
   background: none;
   color: var(--color-accent-light);
 }
-.evidence-card .text-button {
+.evidence-card :is(.text-button, .ui-button--link) {
   font-size: var(--text-xs);
   white-space: nowrap;
 }
@@ -722,7 +722,7 @@ input[type="checkbox"] {
   gap: 12px;
   margin-top: 18px;
 }
-.review-actions .text-button {
+.review-actions :is(.text-button, .ui-button--link) {
   align-self: center;
 }
 .reviewed {
@@ -1382,7 +1382,7 @@ input[type="checkbox"] {
   .evidence-grid {
     grid-template-columns: 1fr;
   }
-  .evidence-card footer .text-button {
+  .evidence-card footer :is(.text-button, .ui-button--link) {
     font-size: var(--text-xs);
     min-height: 27px;
   }
@@ -1567,7 +1567,7 @@ input[type="checkbox"] {
   color: var(--muted);
   margin-top: 10px;
 }
-.change-summary .text-button {
+.change-summary :is(.text-button, .ui-button--link) {
   display: block;
   margin-top: 16px;
   color: var(--lime);
@@ -1917,7 +1917,7 @@ input[type="checkbox"] {
   gap: 9px 15px;
   margin-top: 9px;
 }
-.evidence-source-actions .text-button {
+.evidence-source-actions :is(.text-button, .ui-button--link) {
   text-align: left;
   justify-content: flex-start;
   font-size: var(--text-xs);
@@ -3314,7 +3314,7 @@ input[type="checkbox"] {
   min-width: 0;
   box-sizing: border-box;
 }
-.report-expectation-fields .text-button {
+.report-expectation-fields :is(.text-button, .ui-button--link) {
   justify-self: start;
 }
 
@@ -4048,7 +4048,7 @@ input[type="checkbox"] {
   padding-block: 4px;
 }
 .app-shell .source-link,
-.app-shell .text-button {
+.app-shell :is(.text-button, .ui-button--link) {
   font-size: var(--text-sm);
   min-height: 30px;
 }
@@ -4962,7 +4962,7 @@ input[type="checkbox"] {
   line-height: 1.6;
   color: var(--muted);
 }
-.company-directory-status .text-button {
+.company-directory-status :is(.text-button, .ui-button--link) {
   flex: 0 0 auto;
   font-size: var(--text-xs);
   min-height: 36px;
@@ -5043,7 +5043,8 @@ input[type="checkbox"] {
   max-width: 520px;
   margin: 0 auto 26px;
 }
-.empty-workspace > .primary {
+.empty-workspace > .primary,
+.empty-workspace > .ui-button--primary {
   justify-self: center;
   padding: 12px 22px;
 }
@@ -5655,7 +5656,7 @@ input[type="checkbox"] {
   font-size: var(--text-sm);
   line-height: 1.6;
 }
-.idea-dialog .idea-monitoring-body .text-button {
+.idea-dialog .idea-monitoring-body :is(.text-button, .ui-button--link) {
   justify-self: start;
   padding: 0;
   font-size: var(--text-sm);
@@ -5718,7 +5719,7 @@ input[type="checkbox"] {
 .idea-dialog .event-definition .event-dates label {
   min-width: 0;
 }
-.idea-dialog .event-definition legend .text-button {
+.idea-dialog .event-definition legend :is(.text-button, .ui-button--link) {
   font-size: var(--text-xs);
   font-weight: 500;
   letter-spacing: 0;
@@ -6321,7 +6322,7 @@ input[type="checkbox"] {
   justify-self: start;
   padding: 8px 0;
 }
-.idea-dialog .idea-monitoring-body > .text-button,
+.idea-dialog .idea-monitoring-body > :is(.text-button, .ui-button--link),
 .idea-dialog .event-editor > button {
   font-size: var(--text-base);
   min-height: 40px;
@@ -6330,7 +6331,8 @@ input[type="checkbox"] {
   max-width: none;
   margin-bottom: 20px;
 }
-.app-shell .reasoning-page > .primary {
+.app-shell .reasoning-page > .primary,
+.app-shell .reasoning-page > .ui-button--primary {
   margin-bottom: 8px;
 }
 /* Idea page, status first (owner feedback 20 Oct 2026): one clear status,
@@ -6409,7 +6411,7 @@ input[type="checkbox"] {
 .idea-actions {
   margin-top: 4px;
 }
-.app-shell :is(.idea-actions, .idea-tools) .text-button {
+.app-shell :is(.idea-actions, .idea-tools) :is(.text-button, .ui-button--link) {
   font-size: var(--text-sm);
   font-weight: 500;
   padding: 0;
@@ -7626,7 +7628,7 @@ details > summary:hover {
   flex-wrap: wrap;
   gap: var(--space-1) var(--space-4);
 }
-.question-library-actions .text-button {
+.question-library-actions :is(.text-button, .ui-button--link) {
   min-height: 40px;
   padding: 0;
   border: 0;
@@ -7636,7 +7638,8 @@ details > summary:hover {
   color: var(--color-accent);
   white-space: nowrap;
 }
-.question-library-actions .text-button:hover:not(:disabled) {
+.question-library-actions
+  :is(.text-button, .ui-button--link):hover:not(:disabled) {
   background: none;
   text-decoration: underline;
 }
@@ -7689,7 +7692,8 @@ details > summary:hover {
   font-size: var(--text-base);
   cursor: pointer;
 }
-.question-controls .primary {
+.question-controls .primary,
+.question-controls .ui-button--primary {
   min-height: 44px;
   padding: 0 var(--space-5);
 }
@@ -7771,7 +7775,7 @@ details > summary:hover {
   min-height: 44px;
   padding: 0 var(--space-5);
 }
-.idea-card-actions .text-button {
+.idea-card-actions :is(.text-button, .ui-button--link) {
   border: 0;
   background: none;
   padding: 0;
@@ -8427,7 +8431,7 @@ details > summary:hover {
 .overview-flow-link {
   margin: 0;
 }
-.sources-list > .text-button {
+.sources-list > :is(.text-button, .ui-button--link) {
   min-height: 44px;
   justify-self: start;
 }

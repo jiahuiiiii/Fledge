@@ -1,14 +1,20 @@
 import { readableNote, readingGap } from "../lib/readingNotes";
 import ReadingNotes from "./ReadingNotes";
-import LoadingSkeleton from "./LoadingSkeleton";
-import Select from "./Select";
-import Modal from "./Modal";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { stamp } from "./MarketResearch";
 import SentimentContext from "./SentimentContext";
 import { SourceLabel } from "./SourceFilters";
-import { Button, Card, Disclosure, SectionHeader, SourceChip } from "./ui";
+import {
+  Button,
+  Card,
+  Disclosure,
+  SectionHeader,
+  SourceChip,
+  Modal,
+  Select,
+  Skeleton as LoadingSkeleton,
+} from "./ui";
 import "./DiscussionThemes.css";
 const names = {
   all: "All sources",
@@ -413,7 +419,12 @@ export default function DiscussionThemes({
                     </p>
                   )}
                   {themes.map((t, i) => (
-                    <Card as="article" variant="inset" className="theme-card" key={i}>
+                    <Card
+                      as="article"
+                      variant="inset"
+                      className="theme-card"
+                      key={i}
+                    >
                       <header>
                         <h3>{t.title}</h3>
                         <div className="theme-card-meta">

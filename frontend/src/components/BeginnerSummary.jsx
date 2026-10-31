@@ -104,23 +104,41 @@ export default function BeginnerSummary({
       : (data.documents || [])
           .filter((d) => d.title)
           .map((d) => ({ ...d, headline: d.title }))
-          .sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at))
+          .sort(
+            (a, b) => Date.parse(b.published_at) - Date.parse(a.published_at),
+          )
   ).slice(0, 5);
   const { linked } = worldForCompany(world, instrumentId);
   const allPosts = items.filter((s) => s.kind === "social");
-  const newsGroups = groupByTone(news.length ? (analysedNews.length ? analysedNews : news) : []);
+  const newsGroups = groupByTone(
+    news.length ? (analysedNews.length ? analysedNews : news) : [],
+  );
   const postGroups = groupByTone(allPosts);
   const links = linked.filter((x) => x.link);
   const worldState = worldLight(linked, name);
   const lights = [
-    { key: "news", title: "News", mood: countMood(newsGroups), status: countLabel(newsGroups) },
+    {
+      key: "news",
+      title: "News",
+      mood: countMood(newsGroups),
+      status: countLabel(newsGroups),
+    },
     {
       key: "people",
       title: "People online",
       mood: countMood(postGroups),
-      status: countLabel(postGroups, { good: "upbeat", bad: "worried", neutral: "neutral" }),
+      status: countLabel(postGroups, {
+        good: "upbeat",
+        bad: "worried",
+        neutral: "neutral",
+      }),
     },
-    { key: "world", title: "World", mood: worldState.mood, status: worldState.status },
+    {
+      key: "world",
+      title: "World",
+      mood: worldState.mood,
+      status: worldState.status,
+    },
   ];
   const pointer = worldState.hurt
     ? worldState.reason
@@ -140,21 +158,35 @@ export default function BeginnerSummary({
       <SignalLights name={name} lights={lights} pointer={pointer} />
 
       <Card id="bs-news" tabIndex={-1} aria-labelledby="bs-news-title">
-        <SectionHeader level="card" as="h4" id="bs-news-title" title="News: what happened" />
+        <SectionHeader
+          level="card"
+          as="h4"
+          id="bs-news-title"
+          title="News: what happened"
+        />
         <p className="bs-meaning">{newsMeaning(newsGroups)}</p>
-        {onRate && !reading && (newsGroups.unrated.length > 0 || postGroups.unrated.length > 0) && (
-          <div className="bs-rate">
-            <Button variant="primary" onClick={onRate} disabled={!!rating}>
-              {rating === "running"
-                ? "Rating… about a minute"
-                : rating
-                  ? "Getting the latest posts first…"
-                  : "Rate with AI"}
-            </Button>
-            <small>Fledge reads the news and posts and marks each good, bad or mixed.</small>
-          </div>
-        )}
-        <ToneHeadlineGroups groups={newsGroups} onSource={onSource} reading={reading} />
+        {onRate &&
+          !reading &&
+          (newsGroups.unrated.length > 0 || postGroups.unrated.length > 0) && (
+            <div className="bs-rate">
+              <Button variant="primary" onClick={onRate} disabled={!!rating}>
+                {rating === "running"
+                  ? "Rating… about a minute"
+                  : rating
+                    ? "Getting the latest posts first…"
+                    : "Rate with AI"}
+              </Button>
+              <small>
+                Fledge reads the news and posts and marks each good, bad or
+                mixed.
+              </small>
+            </div>
+          )}
+        <ToneHeadlineGroups
+          groups={newsGroups}
+          onSource={onSource}
+          reading={reading}
+        />
         {!news.length && onUpdate && (
           <p>
             <Button variant="tertiary" size="inline" onClick={onUpdate}>
@@ -199,10 +231,19 @@ export default function BeginnerSummary({
               .join(" · ")}
           </p>
         )}
-        <ToneHeadlineGroups groups={postGroups} onSource={onSource} reading={reading} social />
+        <ToneHeadlineGroups
+          groups={postGroups}
+          onSource={onSource}
+          reading={reading}
+          social
+        />
       </Card>
 
-      <WorldSignalCard links={links} worldState={worldState} onWorld={onWorld} />
+      <WorldSignalCard
+        links={links}
+        worldState={worldState}
+        onWorld={onWorld}
+      />
       <YourViewCard savedView={savedView} name={name} onSaveView={onSaveView} />
 
       <p className="bs-note">

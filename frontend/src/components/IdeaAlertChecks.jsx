@@ -1,5 +1,4 @@
-import { Button } from "./ui";
-import Select from "./Select";
+import { Button, Select } from "./ui";
 import { useState } from "react";
 import { stamp } from "./MarketResearch";
 import SentimentContext from "./SentimentContext";

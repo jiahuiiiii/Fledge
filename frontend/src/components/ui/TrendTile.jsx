@@ -38,8 +38,24 @@ export default function TrendTile({
       className={`ui-trend-tile ui-trend-tile--${tone} ${className}`}
       {...(onOpen ? { type: "button", onClick: onOpen } : {})}
     >
-      <svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label={`${title} trend`} preserveAspectRatio="none">
-        {path ? <path d={path} fill="none" strokeWidth="2" vectorEffect="non-scaling-stroke" /> : <text x="0" y="26">No history</text>}
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        role="img"
+        aria-label={`${title} trend`}
+        preserveAspectRatio="none"
+      >
+        {path ? (
+          <path
+            d={path}
+            fill="none"
+            strokeWidth="2"
+            vectorEffect="non-scaling-stroke"
+          />
+        ) : (
+          <text x="0" y="26">
+            No history
+          </text>
+        )}
       </svg>
       <span className="ui-trend-tile__text">
         <small>{title}</small>

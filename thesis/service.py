@@ -736,7 +736,10 @@ def state(owner, instrument_id=INSTRUMENT, *, include_financials=True):
             provider_status=source_hub.status(conn, instrument_id),
             news_watch=watch_lanes.present(conn, owner, instrument_id),
             research_alerts=news_watch.list_alerts(conn, owner, previous=False, details=False),
-            idea_alerts=idea_alerts.list_for(conn, owner),
+            # idea_alerts is fetched by the client from /api/v1/idea-alerts after
+            # the page renders: presenting every saved relevance check (now one per
+            # focus, so they accumulate) is the slowest part of the workspace and
+            # nothing above the fold needs it. Kept out of the critical read.
             idea_watch_state=one(
                 conn,
                 "SELECT * FROM idea_watch_state WHERE owner_id=%s AND instrument_id=%s",

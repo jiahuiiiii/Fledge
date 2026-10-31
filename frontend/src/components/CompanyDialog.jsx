@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import Modal from "./Modal";
-import LoadingSkeleton from "./LoadingSkeleton";
+import { Modal, Skeleton as LoadingSkeleton, Button } from "./ui";
 import { api } from "../api/client";
 import { companyName } from "../lib/companyIdentity";
 import { needsListingUpdate } from "../lib/companyDirectory";
@@ -241,9 +240,8 @@ export default function CompanyDialog({
             <div className="company-search-empty">
               <strong>No matching companies</strong>
               <p>
-                Fledge covers US-listed companies for now, such as Apple
-                (AAPL). Singapore (SGX) and other non-US shares aren’t covered
-                yet.
+                Fledge covers US-listed companies for now, such as Apple (AAPL).
+                Singapore (SGX) and other non-US shares aren’t covered yet.
               </p>
             </div>
           )}
@@ -259,14 +257,14 @@ export default function CompanyDialog({
                   : "Company identities from SEC · coverage varies by source"}
           </span>
           {(listing === "failed" || !result?.retrieved_at) && (
-            <button
+            <Button
+              variant="link"
               type="button"
-              className="text-button"
               onClick={update}
               disabled={!!busy || listing === "updating"}
             >
               {result?.retrieved_at ? "Try again" : "Load full list"}
-            </button>
+            </Button>
           )}
         </div>
         {(visible.length > 0 || hidden.length > 0) && (

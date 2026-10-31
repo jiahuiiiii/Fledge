@@ -362,6 +362,9 @@ export const api = {
       `/workspace?include_financials=${includeFinancials}${instrument_id ? `&instrument_id=${encodeURIComponent(instrument_id)}` : ""}`,
       { signal },
     ),
+  // Loaded separately from the workspace so presenting every saved relevance
+  // check never delays the page.
+  ideaAlerts: ({ signal } = {}) => request("/idea-alerts", { signal }),
   save: (body, instrument_id) =>
     request("/idea", {
       method: "POST",
