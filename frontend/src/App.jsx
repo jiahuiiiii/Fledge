@@ -59,6 +59,8 @@ import ResearchNavigation, {
   researchTabs,
 } from "./components/ResearchNavigation";
 import BeginnerSummary from "./components/BeginnerSummary";
+import { WorkspaceProvider } from "./components/workspace/WorkspaceContext";
+import WidgetBoard from "./components/workspace/WidgetBoard";
 import SocialConversation from "./components/SocialConversation";
 import UpdateInbox from "./components/UpdateInbox";
 import IdeasAndChanges from "./components/IdeasAndChanges";
@@ -67,7 +69,6 @@ import FinancialPerformance from "./components/FinancialPerformance";
 import OriginalFilings from "./components/OriginalFilings";
 const FinancialsPage = lazy(() => import("./components/FinancialsPage"));
 const SectorPosition = lazy(() => import("./components/SectorPosition"));
-const CompanyOverview = lazy(() => import("./components/CompanyOverview"));
 const AllHistory = lazy(() =>
   import("./components/CompanyOverview").then((module) => ({
     default: module.AllHistory,
@@ -100,8 +101,6 @@ import ReviewDownload from "./components/ReviewDownload";
 import ReportingAge, { ageLabel } from "./components/ReportingAge";
 import IdeaEvidenceReview from "./components/IdeaEvidenceReview";
 import Onboarding from "./components/Onboarding";
-import PortfolioRead from "./components/PortfolioRead";
-import PersonalHome from "./components/PersonalHome";
 import AccountPage from "./components/AccountPage";
 import WorkspaceHeader from "./components/WorkspaceHeader";
 import {
@@ -1179,47 +1178,47 @@ function CompanyWorkspace({
   useEffect(() => setCompareAll(false), [selectedCompanyId]);
   const showOverview = view === "workspace" && tab === "summary" && fullDetails;
   const summaryPanel = (active) => (
-    <BeginnerSummary
+    <WorkspaceProvider
       key={`summary-${instrumentId}`}
-      practice={recordedCompany}
-      data={data}
-      instrumentId={instrumentId}
-      visible={view === "workspace" && active}
-      savedView={current}
-      onSaveView={() => {
-        openEditor();
-        if (!current) {
-          const plain = `What do I think about ${data.instrument.name}, and why?`;
-          setEditor({
-            ...formFor(null, plain),
-            question: plain,
+      value={{
+        practice: recordedCompany,
+        data: data,
+        instrumentId: instrumentId,
+        visible: view === "workspace" && active,
+        savedView: current,
+        onSaveView: () => {
+          openEditor();
+          if (!current) {
+            const plain = `What do I think about ${data.instrument.name}, and why?`;
+            setEditor({
+              ...formFor(null, plain),
+              question: plain,
+            });
+          }
+        },
+        onView: (next) => {
+          setTab(next);
+          requestAnimationFrame(() => {
+            window.scrollTo(0, 0);
+            document
+              .querySelectorAll(".main-workspace, .workspace-grid")
+              .forEach((el) => el.scrollTo?.(0, 0));
           });
-        }
-      }}
-      onView={(next) => {
-        setTab(next);
-        requestAnimationFrame(() => {
-          window.scrollTo(0, 0);
-          document
-            .querySelectorAll(".main-workspace, .workspace-grid")
-            .forEach((el) => el.scrollTo?.(0, 0));
-        });
-      }}
-      onSource={setSource}
-      onWorld={() => setView("world")}
-      onUpdate={isRecorded ? undefined : updateNow}
-      onRate={
-        isRecorded
+        },
+        onSource: setSource,
+        onWorld: () => setView("world"),
+        onUpdate: isRecorded ? undefined : updateNow,
+        onRate: isRecorded
           ? undefined
-          : () => startLoading({ analyze: true, lookback_days: 7 })
-      }
-      rating={
-        loadingRun?.active
+          : () => startLoading({ analyze: true, lookback_days: 7 }),
+        rating: loadingRun?.active
           ? loadingRun.steps.find((s) => s.key === "analysis")?.status || false
-          : false
-      }
-      priceHistory={priceRead?.data}
-    />
+          : false,
+        priceHistory: priceRead?.data,
+      }}
+    >
+      <BeginnerSummary />
+    </WorkspaceProvider>
   );
   if (!data)
     return (
@@ -3025,20 +3024,21 @@ function CompanyWorkspace({
                       <LoadingSkeleton label="Loading your companies…" />
                     }
                   >
-                    <PersonalHome
-                      onAddCompany={() => setAddingCompany(true)}
-                      onOpenCompany={(id) => onChoose(id)}
-                      practice={
-                        visibleCompanies.find(
-                          (c) => c.id === INSTRUMENT_DEMO,
-                        ) || visibleCompanies.find((c) => c.mode === "recorded")
-                      }
-                    />
-                    <PortfolioRead onOpenCompany={(id) => onChoose(id)} />
-                    <CompanyOverview
-                      catalogue={visibleCompanies}
-                      onOpen={onChoose}
-                    />
+                    <WorkspaceProvider
+                      value={{
+                        catalogue: visibleCompanies,
+                        practice:
+                          visibleCompanies.find(
+                            (c) => c.id === INSTRUMENT_DEMO,
+                          ) ||
+                          visibleCompanies.find((c) => c.mode === "recorded"),
+                        onAddCompany: () => setAddingCompany(true),
+                        onOpenCompany: (id) => onChoose(id),
+                        onOpen: onChoose,
+                      }}
+                    >
+                      <WidgetBoard page="home" />
+                    </WorkspaceProvider>
                   </Suspense>
                 ) : !selectedCompanyId && view === "history" ? null : view ===
                   "workspace" ? null : ["ideas", "updates", "world"].includes(

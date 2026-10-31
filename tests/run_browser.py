@@ -58,6 +58,7 @@ journeys = {
     "--themes",
     "--valuation",
     "--watch-history",
+    "--workspace-widgets",
 }
 if len(sys.argv) > 2 or any(arg not in journeys for arg in sys.argv[1:]):
     raise SystemExit(
@@ -314,7 +315,7 @@ try:
     result = subprocess.run(
         [
             os.environ.get("THESIS_NODE", "node"),
-            "tests/browser_pro_cleanup.cjs" if "--pro-cleanup" in sys.argv else "tests/browser_responsive.cjs" if "--responsive" in sys.argv else "tests/browser_financial_recovery.cjs" if "--financial-recovery" in sys.argv else "tests/browser_topic_homes.cjs" if "--topic-homes" in sys.argv else "tests/browser_companion.cjs" if "--companion" in sys.argv else "tests/browser_reading_flow.cjs" if "--reading-flow" in sys.argv else "tests/browser_sentiment_guards.cjs" if "--sentiment-guards" in sys.argv else "tests/browser_content_first.cjs" if "--content-first" in sys.argv else "tests/browser_company_overview.cjs" if "--company-overview" in sys.argv else "tests/browser_news_discussion.cjs" if "--news-discussion" in sys.argv else "tests/browser_ideas.cjs" if "--ideas" in sys.argv else "tests/browser_sector_position.cjs" if "--sector-position" in sys.argv else "tests/browser_financials.cjs" if "--financials" in sys.argv else "tests/browser_business.cjs" if "--business" in sys.argv else "tests/browser_research_design.cjs" if "--research-design" in sys.argv else "tests/browser_source_filters.cjs" if "--source-filters" in sys.argv else "tests/browser_retained_watch.cjs" if "--watch-continuity" in sys.argv else "tests/browser_sentiment_limits.cjs" if "--sentiment-limits" in sys.argv else "tests/browser_report_expectations.cjs" if "--report-expectations" in sys.argv else (
+            "tests/browser_workspace_widgets.cjs" if "--workspace-widgets" in sys.argv else "tests/browser_pro_cleanup.cjs" if "--pro-cleanup" in sys.argv else "tests/browser_responsive.cjs" if "--responsive" in sys.argv else "tests/browser_financial_recovery.cjs" if "--financial-recovery" in sys.argv else "tests/browser_topic_homes.cjs" if "--topic-homes" in sys.argv else "tests/browser_companion.cjs" if "--companion" in sys.argv else "tests/browser_reading_flow.cjs" if "--reading-flow" in sys.argv else "tests/browser_sentiment_guards.cjs" if "--sentiment-guards" in sys.argv else "tests/browser_content_first.cjs" if "--content-first" in sys.argv else "tests/browser_company_overview.cjs" if "--company-overview" in sys.argv else "tests/browser_news_discussion.cjs" if "--news-discussion" in sys.argv else "tests/browser_ideas.cjs" if "--ideas" in sys.argv else "tests/browser_sector_position.cjs" if "--sector-position" in sys.argv else "tests/browser_financials.cjs" if "--financials" in sys.argv else "tests/browser_business.cjs" if "--business" in sys.argv else "tests/browser_research_design.cjs" if "--research-design" in sys.argv else "tests/browser_source_filters.cjs" if "--source-filters" in sys.argv else "tests/browser_retained_watch.cjs" if "--watch-continuity" in sys.argv else "tests/browser_sentiment_limits.cjs" if "--sentiment-limits" in sys.argv else "tests/browser_report_expectations.cjs" if "--report-expectations" in sys.argv else (
                 (
                     "tests/browser_recurring_events.cjs"
                     if "--recurring-events" in sys.argv
