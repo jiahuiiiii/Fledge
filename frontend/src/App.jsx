@@ -12,6 +12,7 @@ import CompanySidebar, { CompanyAddButton } from "./components/CompanySidebar";
 import CompanyDialog from "./components/CompanyDialog";
 import { companyName } from "./lib/companyIdentity";
 import { mentionsCompany } from "./lib/companyHeadlines";
+import { useTelegramCommandSync } from "./lib/useTelegramCommandSync";
 import { UPDATE_EVENT, requestUpdate } from "./lib/updateRequest";
 import RemovalNotice from "./components/RemovalNotice";
 import RetainedView from "./components/RetainedView";
@@ -324,6 +325,7 @@ export default function App() {
   );
 }
 function ResearchApp({ accountControls, session }) {
+  useTelegramCommandSync();
   const companyVisibilityKey = `${hiddenCompaniesKey}:${session.account_id || "local"}`;
   const [destination, setDestination] = useState(readDestination);
   const lastResearch = useRef(
@@ -1015,7 +1017,9 @@ function CompanyWorkspace({
   useEffect(() => {
     if (companyLoading || !data || data.idea_alerts) return;
     const merge = (alerts) =>
-      setData((old) => (!old || old.idea_alerts ? old : { ...old, idea_alerts: alerts }));
+      setData((old) =>
+        !old || old.idea_alerts ? old : { ...old, idea_alerts: alerts },
+      );
     // Already fetched this session: reuse it, no second 6s query.
     if (ideaAlertsRef.current) {
       merge(ideaAlertsRef.current);

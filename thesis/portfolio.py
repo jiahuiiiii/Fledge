@@ -420,9 +420,8 @@ def parse(call, listed, sources):
     return dict(headline=headline, drivers=drivers, groups=groups, takeaway=takeaway, dropped=dropped)
 
 
-def explain(owner, *, transport=None, now=None):
-    """One AI request that explains the list from saved material, with citations."""
-    now = now or datetime.now(timezone.utc)
+def prepare(owner, now):
+    """The list, its saved material and the one AI request that would explain it."""
     with transaction(owner, consistent=True) as conn:
         listed = companies(conn, owner)
         for c in listed:
@@ -436,14 +435,27 @@ def explain(owner, *, transport=None, now=None):
     content, sources = packet(listed, articles, links)
     body = request_for(content)
     identity = hashlib.sha256(ledger.canonical(body).encode()).hexdigest()
+    return listed, sources, body, f"portfolio:{owner}:{identity}"
+
+
+def explain(owner, *, transport=None, now=None, on_saved=None):
+    """One AI request that explains the list from saved material, with citations.
+
+    on_saved(conn, read_id) runs inside the transaction that saves the result,
+    so a caller's own record (a Telegram command) is published with it."""
+    now = now or datetime.now(timezone.utc)
+    listed, sources, body, request_key = prepare(owner, now)
     # The same list and saved material reuse the earlier answer instead of paying again.
-    call = ledger.execute(f"portfolio:{owner}:{identity}", PROMPT_VERSION, body,
+    call = ledger.execute(request_key, PROMPT_VERSION, body,
                           transport=transport, owner=owner)
     result = dict(parse(call, listed, sources), prices=price_snapshot(listed))
+    read_id = uuid4()
     with transaction(owner) as conn:
         conn.execute(
             """INSERT INTO portfolio_reads(id,owner_id,call_id,created_at,company_ids,result)
                VALUES(%s,%s,%s,%s,%s,%s)""",
-            (uuid4(), owner, call["id"], now, [c["id"] for c in listed], Jsonb(result)),
+            (read_id, owner, call["id"], now, [c["id"] for c in listed], Jsonb(result)),
         )
+        if on_saved:
+            on_saved(conn, read_id)
     return build(owner, now=now)

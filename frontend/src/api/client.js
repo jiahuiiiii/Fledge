@@ -158,6 +158,9 @@ export const api = {
   startResearchLoading: (id, body = {}) =>
     request(`/companies/${id}/loading`, { method: "POST", body }),
   telegram: () => request("/telegram"),
+  // Newest Telegram command that changed saved data ({enabled, latest}).
+  telegramCommandLatest: ({ signal } = {}) =>
+    request("/telegram/commands/latest", { signal }),
   telegramConnect: () => request("/telegram/connect", { method: "POST" }),
   telegramCheck: () => request("/telegram/check", { method: "POST" }),
   telegramDelivery: (enabled) =>
@@ -174,7 +177,8 @@ export const api = {
     request(`/scheduled-reviews/${id}?page=${page}`),
   seeReview: (id) =>
     request(`/scheduled-reviews/${id}/seen`, { method: "POST" }),
-  alertPreviousSample: (id) => request(`/research-alerts/${id}/previous-sample`),
+  alertPreviousSample: (id) =>
+    request(`/research-alerts/${id}/previous-sample`),
   conversation: (id, collect = false) =>
     request(`/social-sources/${id}/conversation`, {
       method: collect ? "POST" : "GET",

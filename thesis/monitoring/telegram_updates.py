@@ -1,8 +1,10 @@
-"""One durable bot update cursor for connection and private alert-rating clicks.
+"""One durable bot update cursor for connection, alert-rating clicks and commands.
 
 Only the cursor/times are global. Raw Telegram messages, names and identifiers
 are not retained here. Rating rows remain private to their alert's account.
-No source or AI calls; feedback polling is off until explicitly enabled.
+No source or AI calls here; polling is off until alert ratings or Telegram
+commands (telegram_commands.py) are explicitly enabled. Commands are recorded
+in this transaction and answered only after it commits.
 """
 from datetime import timedelta
 # Taps are checked often so a rating is confirmed within a couple of seconds.
@@ -10,7 +12,7 @@ POLL_SECONDS = 1.5
 import re
 from uuid import UUID
 from thesis.db import transaction,one,rows
-from . import telegram_transport as transport,alert_feedback
+from . import telegram_transport as transport,alert_feedback,telegram_commands
 
 
 def private_sender(message,sender):
@@ -96,7 +98,8 @@ def receive(*,force=False):
     from . import telegram as T
     key=transport.token()
     if not key:return False
-    fingerprint=T.fingerprint(key);now=T.clock();acknowledgements=[];edits=[]
+    fingerprint=T.fingerprint(key);now=T.clock();acknowledgements=[];edits=[];commands=[]
+    commanding=telegram_commands.enabled()
     with transaction(admin=True) as conn:
         if not one(conn,'SELECT pg_try_advisory_xact_lock(hashtextextended(%s,0)) locked',
                    ('telegram-updates:'+fingerprint,))['locked']:return False
@@ -121,6 +124,9 @@ def receive(*,force=False):
             if update['update_id'] in seen:continue
             seen.add(update['update_id'])
             connect_message(conn,update.get('message'),fingerprint,now)
+            if commanding:
+                intent=telegram_commands.intake(conn,update,fingerprint,now)
+                if intent:commands.append(intent)
             callback=update.get('callback_query')
             if callback:
                 result=rating_callback(conn,callback,fingerprint,update['update_id'],edits)
@@ -133,6 +139,9 @@ def receive(*,force=False):
             (new_offset,now+timedelta(seconds=POLL_SECONDS),now if new_offset!=offset else state['last_update_at'],fingerprint))
         conn.execute('UPDATE telegram_settings SET update_offset=greatest(update_offset,%s) WHERE bot_fingerprint=%s',
                      (new_offset,fingerprint))
+    # Commands are durable rows now; each reply is sent at most once.
+    for intent in commands:
+        telegram_commands.respond(key,intent)
     # A failed callback acknowledgement does not undo or repeat a saved vote.
     for query_id,text in acknowledgements:
         try:transport.call(key,'answerCallbackQuery',dict(callback_query_id=query_id,text=text,cache_time=0))
@@ -145,6 +154,13 @@ def receive(*,force=False):
     return bool(valid)
 
 
+def polling():
+    """Whether anything needs the bot's updates read continuously."""
+    return alert_feedback.enabled() or telegram_commands.enabled()
+
+
 def poll_feedback():
-    if not alert_feedback.enabled():return False
-    return receive()
+    if not polling():return False
+    received=receive()
+    if telegram_commands.enabled():telegram_commands.sweep()
+    return received

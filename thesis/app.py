@@ -157,7 +157,8 @@ async def lifespan(app):
 
     telegram_thread = threading.Thread(target=telegram_loop, daemon=True)
 
-    # Rating taps get their own quick loop so a slow send never delays a confirmation.
+    # Rating taps and Telegram commands get their own quick loop so a slow send
+    # never delays a confirmation; it idles unless one of them is turned on.
     def feedback_loop():
         from .monitoring.telegram_updates import poll_feedback, POLL_SECONDS
 
@@ -1616,6 +1617,13 @@ class TelegramDeliverySetting(BaseModel):
 def telegram_status():
     from .monitoring import telegram
     return {"result": telegram.status(auth.current_owner())}
+
+
+@app.get("/api/v1/telegram/commands/latest")
+def telegram_command_latest():
+    """The newest Telegram command that changed saved data, so the open app re-reads it."""
+    from .monitoring import telegram_commands
+    return {"result": telegram_commands.latest(auth.current_owner())}
 
 
 @app.post("/api/v1/telegram/connect")
