@@ -1,0 +1,162 @@
+/* Arrangeable overview and home pages (WidgetBoard). Reading mode looks like
+   the plain page; edit mode adds a bar with a grip and keyboard controls. */
+.ws-board {
+  position: relative;
+  min-width: 0;
+}
+.ws-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-2);
+}
+.ws-board.editing .ws-toolbar {
+  justify-content: space-between;
+  padding: var(--space-3);
+  border: 1px dashed var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.ws-hint {
+  flex: 1 1 260px;
+  margin: 0;
+  color: var(--color-text-2);
+  font-size: var(--text-sm);
+}
+.ws-catalog,
+.ws-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.ws-save-error {
+  flex-basis: 100%;
+  color: var(--color-negative);
+  text-align: right;
+}
+.ws-empty {
+  margin: var(--space-4) 0;
+  color: var(--color-text-2);
+}
+
+/* One column on phones and narrow boards; same gap as the page had. */
+.ws-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* A widget's own outer margins would add to the grid gap. */
+.ws-frame {
+  display: flow-root;
+  min-width: 0;
+}
+.ws-body > * {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.ws-item {
+  min-width: 0;
+}
+.ws-grid .react-grid-item.react-grid-placeholder {
+  background: var(--color-accent, #3b6cf6);
+  opacity: 0.12;
+  border-radius: var(--radius-lg);
+}
+
+/* Edit mode */
+.ws-frame.editing {
+  border: 1px dashed var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.ws-frame.editing .ws-body {
+  padding: 0 var(--space-2) var(--space-2);
+  opacity: 0.85;
+}
+.ws-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+  user-select: none;
+}
+.ws-grid.editing .ws-bar {
+  cursor: grab;
+}
+.ws-grid.editing .react-draggable-dragging .ws-bar {
+  cursor: grabbing;
+}
+.ws-grip {
+  color: var(--color-text-2);
+}
+.ws-bar strong {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-tools {
+  display: flex;
+  gap: 2px;
+}
+.ws-tools button {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.ws-tools button:hover {
+  border-color: var(--color-text-2);
+}
+.ws-tools button:focus-visible {
+  outline: 2px solid var(--color-accent, #3b6cf6);
+  outline-offset: 1px;
+}
+/* Width handle: a full-height strip on the right edge, easier to grab. */
+.ws-grid.editing .react-resizable-handle-e {
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 100%;
+  margin: 0;
+  transform: none;
+  background: none;
+  cursor: ew-resize;
+}
+.ws-grid.editing .react-resizable-handle-e::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 3px;
+  width: 4px;
+  height: 32px;
+  margin-top: -16px;
+  border-radius: 2px;
+  background: var(--color-line);
+}
+.ws-error {
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+}
+.ws-error p {
+  margin: 0 0 var(--space-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ws-grid .react-grid-item,
+  .ws-grid .react-grid-item.cssTransforms {
+    transition: none;
+  }
+}

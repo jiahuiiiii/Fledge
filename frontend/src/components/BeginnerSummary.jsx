@@ -11,44 +11,28 @@ import {
   groupByTone,
   newsMeaning,
   peopleMeaning,
-  plainTone,
   priceLine,
   socialTones,
   worldForCompany,
   worldLight,
 } from "../lib/beginnerSummary";
-import { Button, Card, ChevronRightIcon, SectionHeader } from "./ui";
-import {
-  PriceMoveLine,
-  SignalLights,
-  ToneHeadlineGroups,
-  WorldSignalCard,
-  YourViewCard,
-} from "./OverviewShared";
+import { useWorkspace, WorkspaceProvider } from "./workspace/WorkspaceContext";
+import WidgetBoard from "./workspace/WidgetBoard";
 import "./BeginnerSummary.css";
 
 // Beginner summary, "Signals" layout: the price, three lights (News, People
 // online, World) readable in seconds, one-line reasons, a merged list of what
 // happened, and the user's own view. No charts. Everything rewords saved
-// readings; Fledge never says buy or sell.
+// readings; Fledge never says buy or sell. The blocks are widgets
+// (workspace/SummaryWidgets.jsx) the user can arrange; this component builds
+// the shared model they read. Inputs and actions come from WorkspaceContext.
 // One automatic world check per company per page load of the app.
 const worldChecked = new Set();
 
-export default function BeginnerSummary({
-  data,
-  instrumentId,
-  visible,
-  savedView,
-  onSaveView,
-  onView,
-  onSource,
-  onWorld,
-  onUpdate,
-  onRate,
-  rating = false,
-  priceHistory = null,
-  practice = false,
-}) {
+export default function BeginnerSummary() {
+  const workspace = useWorkspace();
+  const { data, instrumentId, visible, practice = false } = workspace;
+  const priceHistory = workspace.priceHistory ?? null;
   const [world, setWorld] = useState(null);
   const { mode, setDetailMode } = useProfile();
   useEffect(() => {
@@ -146,109 +130,36 @@ export default function BeginnerSummary({
       ? "There has been more bad news than good recently. Read both sides below."
       : null;
 
+  const summary = {
+    name,
+    price,
+    reading,
+    social,
+    news,
+    newsGroups,
+    postGroups,
+    links,
+    worldState,
+    lights,
+    pointer,
+    newsMeaning: newsMeaning(newsGroups),
+    peopleMeaning: peopleMeaning(postGroups),
+  };
+
   return (
-    <div className="beginner-summary signals">
-      {practice && (
-        <p className="bs-practice">
-          <strong>Practice company, not real.</strong> Sample news and posts
-          that show how Fledge works.
+    <WorkspaceProvider value={{ ...workspace, summary }}>
+      <div className="beginner-summary signals">
+        {practice && (
+          <p className="bs-practice">
+            <strong>Practice company, not real.</strong> Sample news and posts
+            that show how Fledge works.
+          </p>
+        )}
+        <WidgetBoard page="overview" />
+        <p className="bs-note">
+          The News, Financials and Compare tabs go deeper.
         </p>
-      )}
-      {price?.move && <PriceMoveLine price={price} />}
-      <SignalLights name={name} lights={lights} pointer={pointer} />
-
-      <Card id="bs-news" tabIndex={-1} aria-labelledby="bs-news-title">
-        <SectionHeader
-          level="card"
-          as="h4"
-          id="bs-news-title"
-          title="News: what happened"
-        />
-        <p className="bs-meaning">{newsMeaning(newsGroups)}</p>
-        {onRate &&
-          !reading &&
-          (newsGroups.unrated.length > 0 || postGroups.unrated.length > 0) && (
-            <div className="bs-rate">
-              <Button variant="primary" onClick={onRate} disabled={!!rating}>
-                {rating === "running"
-                  ? "Rating… about a minute"
-                  : rating
-                    ? "Getting the latest posts first…"
-                    : "Rate with AI"}
-              </Button>
-              <small>
-                Fledge reads the news and posts and marks each good, bad or
-                mixed.
-              </small>
-            </div>
-          )}
-        <ToneHeadlineGroups
-          groups={newsGroups}
-          onSource={onSource}
-          reading={reading}
-        />
-        {!news.length && onUpdate && (
-          <p>
-            <Button variant="tertiary" size="inline" onClick={onUpdate}>
-              Get the latest news
-            </Button>
-          </p>
-        )}
-        <div className="bs-actions">
-          <Button
-            variant="tertiary"
-            size="sm"
-            iconEnd={<ChevronRightIcon />}
-            onClick={() => onView?.("evidence")}
-          >
-            All news & posts
-          </Button>
-          {!practice && onRate && (
-            <Button
-              variant="tertiary"
-              size="sm"
-              iconEnd={<ChevronRightIcon />}
-              onClick={() => onView?.("evidence")}
-            >
-              Turn on news alerts
-            </Button>
-          )}
-        </div>
-      </Card>
-
-      <Card id="bs-people" tabIndex={-1} aria-labelledby="bs-people-title">
-        <SectionHeader
-          level="card"
-          as="h4"
-          id="bs-people-title"
-          title="What people online are saying"
-        />
-        <p className="bs-meaning">{peopleMeaning(postGroups)}</p>
-        {social.length > 0 && (
-          <p className="bs-muted bs-platforms">
-            {social
-              .map((s) => `${s.platform}: ${plainTone(s.tone).toLowerCase()}`)
-              .join(" · ")}
-          </p>
-        )}
-        <ToneHeadlineGroups
-          groups={postGroups}
-          onSource={onSource}
-          reading={reading}
-          social
-        />
-      </Card>
-
-      <WorldSignalCard
-        links={links}
-        worldState={worldState}
-        onWorld={onWorld}
-      />
-      <YourViewCard savedView={savedView} name={name} onSaveView={onSaveView} />
-
-      <p className="bs-note">
-        The News, Financials and Compare tabs go deeper.
-      </p>
-    </div>
+      </div>
+    </WorkspaceProvider>
   );
 }

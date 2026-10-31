@@ -174,7 +174,8 @@ export const api = {
     request(`/scheduled-reviews/${id}?page=${page}`),
   seeReview: (id) =>
     request(`/scheduled-reviews/${id}/seen`, { method: "POST" }),
-  alertPreviousSample: (id) => request(`/research-alerts/${id}/previous-sample`),
+  alertPreviousSample: (id) =>
+    request(`/research-alerts/${id}/previous-sample`),
   conversation: (id, collect = false) =>
     request(`/social-sources/${id}/conversation`, {
       method: collect ? "POST" : "GET",
@@ -352,6 +353,11 @@ export const api = {
   // Light reads for the home cards: every saved quote, then per-company
   // news tone and (Pro) the two trailing filing figures.
   homeCards: ({ signal } = {}) => request("/home-cards", { signal }),
+  // Saved widget arrangement for the overview or home page ({lg, md, sm, hidden}).
+  layout: (page, { signal } = {}) => request(`/layouts/${page}`, { signal }),
+  saveLayout: (page, body) =>
+    request(`/layouts/${page}`, { method: "PUT", body }),
+  resetLayout: (page) => request(`/layouts/${page}`, { method: "DELETE" }),
   // This company's alerts with details; the company read has status only.
   companyAlerts: (id, { signal } = {}) =>
     request(`/companies/${id}/alerts`, { signal }),

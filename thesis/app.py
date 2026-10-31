@@ -679,6 +679,41 @@ def save_detail_mode(payload: DetailMode):
     return {"result": profile.set_mode(auth.current_owner(), payload.detail_mode)}
 
 
+class LayoutItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    i: str = Field(max_length=32)
+    x: int
+    y: int
+    w: int
+    h: int
+
+
+class WorkspaceLayout(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    lg: list[LayoutItem] | None = Field(default=None, max_length=16)
+    md: list[LayoutItem] | None = Field(default=None, max_length=16)
+    sm: list[LayoutItem] | None = Field(default=None, max_length=16)
+    hidden: list[str] = Field(default_factory=list, max_length=16)
+
+
+@app.get("/api/v1/layouts/{page}")
+def workspace_layout(page: str):
+    from . import workspace_layouts
+    return {"result": workspace_layouts.read(auth.current_owner(), page)}
+
+
+@app.put("/api/v1/layouts/{page}")
+def save_workspace_layout(page: str, payload: WorkspaceLayout):
+    from . import workspace_layouts
+    return {"result": workspace_layouts.save(auth.current_owner(), page, payload.model_dump())}
+
+
+@app.delete("/api/v1/layouts/{page}")
+def reset_workspace_layout(page: str):
+    from . import workspace_layouts
+    return {"result": workspace_layouts.reset(auth.current_owner(), page)}
+
+
 @app.get("/api/v1/home")
 def personal_home():
     from . import home
