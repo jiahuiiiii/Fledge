@@ -205,16 +205,35 @@
   }
 }
 
-/* Wide screens: name | price | buttons on one row. The price block takes the
-   spare width and wraps inside itself, so a long quote (close + after-hours
-   lines) never pushes the buttons underneath it. */
-@media (min-width: 901px) {
-  .app-shell .company-header { flex-wrap: nowrap; }
-  .app-shell .company-header .market-quote.compact { flex: 1 1 0; min-width: 0; }
-  .app-shell .company-header .market-quote.compact small { white-space: normal; }
-  .app-shell .company-header .company-actions { flex: none; margin-left: auto; }
+/* The header's own width decides its layout, not the window's: an open
+   company list or a tablet leaves much less room than the window suggests.
+   Name, price and buttons share one row only when the header has room for
+   all three without squeezing the price (a long name, the close and the
+   after-hours line take about 1,200 px). Below that the buttons get their own
+   row, so the price lines never wrap into a narrow column. */
+.app-shell .company-header {
+  container: company-header / inline-size;
 }
-/* Tablet widths: buttons drop to their own row, right-aligned. */
-@media (min-width: 601px) and (max-width: 900px) {
-  .app-shell .company-header .company-actions { flex: 1 0 100%; justify-content: flex-end; }
+@container company-header (min-width: 1200px) {
+  .app-shell .company-header .market-quote.compact { flex: 1 1 auto; min-width: 0; }
+  .app-shell .company-header .company-actions { flex: none; margin-left: auto; flex-wrap: nowrap; }
+}
+@media (min-width: 601px) {
+  @container company-header (max-width: 1199.98px) {
+    .app-shell .company-header .market-quote.compact { flex: 0 1 auto; }
+    .app-shell .company-header .company-actions {
+      flex: 1 0 100%;
+      margin-left: 0;
+      justify-content: flex-start;
+    }
+  }
+  /* Too narrow for name and price side by side: the price gets its own row,
+     without the divider that only makes sense beside the name. */
+  @container company-header (max-width: 759.98px) {
+    .app-shell .company-header .market-quote.compact {
+      flex: 1 0 100%;
+      padding-left: 0;
+      border-left: 0;
+    }
+  }
 }
