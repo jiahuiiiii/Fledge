@@ -81,6 +81,19 @@ def latest(owner, iid):
         return explain_source_counts(conn, explain_saved_failure(conn, run))
 
 
+def activity(owner, iid):
+    """A cheap change token for the open company page: the latest run's id,
+    last step write and active flag, plus how many of the owner's evaluation
+    jobs are waiting. Two indexed single-row reads; no documents are read."""
+    with transaction(owner) as conn:
+        run = one(conn, 'SELECT id,active,updated_at FROM research_loads WHERE instrument_id=%s '
+                        'ORDER BY created_at DESC,id DESC LIMIT 1', (iid,))
+        jobs = one(conn, "SELECT count(*) n FROM jobs WHERE owner_id=%s AND status IN ('pending','running')",
+                   (owner,))['n']
+    run_part = f"{run['id']}:{run['updated_at'].isoformat()}:{int(run['active'])}" if run else '-'
+    return f'{run_part}|{jobs}', jobs
+
+
 def explain_source_counts(conn, run):
     """Read-time wording and permitted saved coverage; never rewrite the journal."""
     if not run:

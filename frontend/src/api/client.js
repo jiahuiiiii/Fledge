@@ -163,6 +163,13 @@ export const api = {
       body: { question },
     }),
   researchLoading: (id) => request(`/companies/${id}/loading`),
+  // Long poll: the server holds this for up to `wait` seconds and answers as
+  // soon as the run or pending work differs from the `since` token.
+  researchActivity: (id, { since = "", wait = 0, signal } = {}) =>
+    request(
+      `/companies/${id}/activity?since=${encodeURIComponent(since)}&wait=${wait}`,
+      { signal },
+    ),
   startResearchLoading: (id, body = {}) =>
     request(`/companies/${id}/loading`, { method: "POST", body }),
   telegram: () => request("/telegram"),

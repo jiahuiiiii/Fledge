@@ -772,12 +772,10 @@ function CompanyWorkspace({
       showToast(loadingError);
     }
   }, [loadingError, updatePressed]);
-  // When no update is running the progress is checked every 15 s instead of
-  // every 1.5 s; starting an update checks quickly again.
-  const loadingIdleUntil = useRef(0);
+  // Starting an update changes the run, which answers the waiting activity
+  // long poll below straight away.
   async function startLoading(options = {}) {
     const token = scope;
-    loadingIdleUntil.current = 0;
     setLoadingError("");
     try {
       const run = await api.startResearchLoading(instrumentId, options);
@@ -806,47 +804,96 @@ function CompanyWorkspace({
     )
       return;
     startLoading({ initial: true });
-    let stopped = false,
-      reading = false;
-    const timer = setInterval(async () => {
-      if (stopped || reading || document.hidden) return;
-      if (Date.now() < loadingIdleUntil.current) return;
-      reading = true;
-      try {
-        const [run, status] = await Promise.all([
-          api.researchLoading(instrumentId),
-          api.modelStatus(),
-        ]);
-        if (stopped || activeScope.current !== scope) return;
-        loadingIdleUntil.current = run?.active ? 0 : Date.now() + 15000;
-        setModelStatus(status);
-        setLoadingRun(run);
-        setLoadingError("");
-        const revision = JSON.stringify([
-          run?.id,
-          run?.steps?.map((s) => s.status),
-        ]);
-        if (revision !== lastLoadingRevision.current) {
-          lastLoadingRevision.current = revision;
-          // Re-read the company when the run finishes, and at most every 20 s
-          // while it runs, instead of after every step (each was a full read).
-          if (!run?.active || Date.now() - lastLoadingRead.current > 20000) {
-            lastLoadingRead.current = Date.now();
-            await refresh();
+    // One long poll instead of asking every 1.5 s: the server holds each
+    // request (up to 25 s) and answers as soon as the run or the pending
+    // evaluation work changes, so an idle page makes about two cheap requests
+    // a minute and a running update is still shown within about a second.
+    const controller = new AbortController();
+    let stopped = false;
+    let since = "";
+    let jobs = null;
+    const visible = () =>
+      new Promise((resolve) => {
+        if (!document.hidden) return resolve();
+        const show = () => {
+          if (document.hidden) return;
+          document.removeEventListener("visibilitychange", show);
+          resolve();
+        };
+        document.addEventListener("visibilitychange", show);
+        controller.signal.addEventListener("abort", resolve);
+      });
+    const pause = (ms) =>
+      new Promise((resolve) => {
+        const timer = setTimeout(resolve, ms);
+        controller.signal.addEventListener("abort", () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+    (async () => {
+      let failures = 0;
+      while (!stopped) {
+        await visible();
+        if (stopped) return;
+        try {
+          const answer = await api.researchActivity(instrumentId, {
+            since,
+            wait: since ? 25 : 0,
+            signal: controller.signal,
+          });
+          if (stopped || activeScope.current !== scope) return;
+          failures = 0;
+          setLoadingError("");
+          since = answer.token;
+          const jobCount = answer.token.split("|").pop();
+          const jobsChanged = jobs !== null && jobCount !== jobs;
+          jobs = jobCount;
+          if (!answer.changed) continue;
+          let reread = false;
+          const run = answer.run;
+          if (run !== undefined) {
+            setLoadingRun(run);
+            const revision = JSON.stringify([
+              run?.id,
+              run?.steps?.map((step) => step.status),
+            ]);
+            if (revision !== lastLoadingRevision.current) {
+              lastLoadingRevision.current = revision;
+              api
+                .modelStatus()
+                .then((status) => {
+                  if (!stopped && activeScope.current === scope)
+                    setModelStatus(status);
+                })
+                .catch(() => {});
+              // Re-read the company when the run finishes, and at most every
+              // 20 s while it runs, instead of after every step.
+              if (!run?.active || Date.now() - lastLoadingRead.current > 20000)
+                reread = true;
+            }
           }
+          if (reread || jobsChanged) {
+            lastLoadingRead.current = Date.now();
+            // Evaluation results land in the company read; financials are
+            // only included again once nothing is pending.
+            await refresh({ light: answer.pending_work && !reread });
+          }
+        } catch (e) {
+          if (stopped || e.name === "AbortError") return;
+          if (activeScope.current === scope)
+            setLoadingError(
+              "Cannot reach the local app. Progress will reconnect when it is running.",
+            );
+          // Back off 2 s, 4 s, 8 s … up to 30 s while the server is away.
+          failures += 1;
+          await pause(Math.min(30000, 1000 * 2 ** failures));
         }
-      } catch (e) {
-        if (!stopped && activeScope.current === scope)
-          setLoadingError(
-            "Cannot reach the local app. Progress will reconnect when it is running.",
-          );
-      } finally {
-        reading = false;
       }
-    }, 1500);
+    })();
     return () => {
       stopped = true;
-      clearInterval(timer);
+      controller.abort();
     };
   }, [scope, companyLoading, !!data?.instrument, selectedCompanyId]);
   function chooseCompany(id) {
@@ -1146,7 +1193,9 @@ function CompanyWorkspace({
             setError(e.message);
         });
     };
-    const id = setInterval(refreshVisible, pending ? 2000 : 30000);
+    // Pending evaluation work is followed by the activity long poll above,
+    // so this is only the slow background re-read.
+    const id = setInterval(refreshVisible, 30000);
     window.addEventListener("focus", refreshVisible);
     return () => {
       clearInterval(id);

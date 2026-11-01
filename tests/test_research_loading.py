@@ -202,3 +202,50 @@ def test_rating_asked_during_first_check_joins_that_run(owner):
     seen=[]
     while loading.work_once(owner,lambda run,key: seen.append(key) or {}): pass
     assert seen[-1]=='analysis' and set(seen)==set(loading.LABELS)
+
+
+def test_activity_long_poll_answers_on_change_and_waits_otherwise(owner, monkeypatch):
+    """The company page's long poll: an immediate first answer, a held request
+    while nothing changes (no run sent), and an early answer with the full run
+    as soon as a run starts."""
+    import threading
+    import time
+    from fastapi.testclient import TestClient
+    from thesis import app as app_module
+    from thesis.config import OWNER
+    iid = prepare(OWNER)
+    monkeypatch.setattr(app_module, 'ACTIVITY_CHECK_SECONDS', 0.05)
+    client = TestClient(app_module.app)
+    client.get('/api/v1/session')
+    path = f'/api/v1/companies/{iid}/activity'
+    first = client.get(path).json()['result']
+    assert first['changed'] and first['run'] is None and first['pending_work'] is False
+    started = time.monotonic()
+    same = client.get(path, params={'since': first['token'], 'wait': 1}).json()['result']
+    assert time.monotonic() - started >= 0.9
+    assert not same['changed'] and same['run'] is None and same['token'] == first['token']
+    threading.Timer(0.3, lambda: loading.start(OWNER, iid, initial=True)).start()
+    started = time.monotonic()
+    moved = client.get(path, params={'since': first['token'], 'wait': 25}).json()['result']
+    assert time.monotonic() - started < 5
+    assert moved['changed'] and moved['run']['active'] and moved['token'] != first['token']
+    # Each committed step moves the token, so progress is never missed.
+    loading.work_once(OWNER, lambda run, key: {})
+    step = client.get(path, params={'since': moved['token']}).json()['result']
+    assert step['changed'] and step['token'] != moved['token']
+
+
+def test_activity_wait_is_capped(owner, monkeypatch):
+    from fastapi.testclient import TestClient
+    from thesis import app as app_module
+    from thesis.config import OWNER
+    iid = prepare(OWNER)
+    checks = []
+    monkeypatch.setattr(app_module, 'ACTIVITY_WAIT_MAX', 0)
+    real = loading.activity
+    monkeypatch.setattr(loading, 'activity', lambda *a: checks.append(1) or real(*a))
+    client = TestClient(app_module.app)
+    client.get('/api/v1/session')
+    token = client.get(f'/api/v1/companies/{iid}/activity').json()['result']['token']
+    answer = client.get(f'/api/v1/companies/{iid}/activity', params={'since': token, 'wait': 600}).json()['result']
+    assert not answer['changed'] and len(checks) == 2
