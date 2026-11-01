@@ -43,8 +43,24 @@ function TelegramIcon() {
   );
 }
 
-export default function TelegramSettings({ wrap }) {
-  const [open, setOpen] = useState(false);
+// With `open`/`onClose` the modal is opened by the caller (e.g. straight from
+// "Connect Telegram" when turning on a watch) and has no Manage button of its
+// own. onClose(linked) says whether a chat is connected when it closes;
+// `continueLabel` adds a button that closes it once the chat is connected.
+export default function TelegramSettings({
+  wrap,
+  open: openProp,
+  onClose,
+  continueLabel,
+}) {
+  const controlled = openProp !== undefined;
+  const [openState, setOpenState] = useState(false);
+  const open = controlled ? openProp : openState;
+  const setOpen = (next) => {
+    if (controlled) {
+      if (!next) onClose?.(!!data?.linked);
+    } else setOpenState(next);
+  };
   const [data, setData] = useState(null);
   const [link, setLink] = useState(null);
   const [busy, setBusy] = useState("");
@@ -116,7 +132,7 @@ export default function TelegramSettings({ wrap }) {
   }
 
   if (!configured) return null;
-  const trigger = (
+  const trigger = controlled ? null : (
     <Button
       variant="secondary"
       aria-label="Telegram alerts"
@@ -128,7 +144,7 @@ export default function TelegramSettings({ wrap }) {
   );
   return (
     <>
-      {wrap ? wrap(trigger) : trigger}
+      {trigger && (wrap ? wrap(trigger) : trigger)}
       <Modal
         open={open}
         onClose={() => !busy && setOpen(false)}
@@ -236,6 +252,15 @@ export default function TelegramSettings({ wrap }) {
                     </span>
                   </label>
                   <div className="telegram-actions">
+                    {continueLabel && (
+                      <Button
+                        variant="primary"
+                        disabled={!!busy}
+                        onClick={() => setOpen(false)}
+                      >
+                        {continueLabel}
+                      </Button>
+                    )}
                     <button
                       disabled={!!busy || data.token_changed}
                       onClick={() =>
