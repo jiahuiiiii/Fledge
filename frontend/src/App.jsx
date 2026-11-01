@@ -725,10 +725,7 @@ function CompanyWorkspace({
   const updatedAt =
     loadingRun && !loadingRun.active ? loadingRun.updated_at || null : null;
   const [setupId, setSetupId] = useState(null);
-  const telegramGuard = useTelegramGuard({
-    onConnect: () => onChoose(selectedCompanyId, "account"),
-    what: "this watch",
-  });
+  const telegramGuard = useTelegramGuard({ what: "this watch" });
   // Update data: no dialog. The button greys out while it runs and a toast
   // says it started and when it finished.
   function updateNow() {
@@ -1000,15 +997,23 @@ function CompanyWorkspace({
           );
       },
     );
+    return () => controller.abort();
+  }, [scope, companyLoading, updatedAt]);
+  // AI availability is owner-wide and cheap, so it is read at once instead of
+  // after the company read: the setup dialog's "Analyse the news" choice
+  // depends on it while the first collection is still running.
+  useEffect(() => {
+    if (!selectedCompanyId) return;
+    const controller = new AbortController();
     api
-      .modelStatus(options)
+      .modelStatus({ signal: controller.signal })
       .then((result) => {
         if (!controller.signal.aborted && activeScope.current === scope)
           setModelStatus(result);
       })
       .catch(() => {});
     return () => controller.abort();
-  }, [scope, companyLoading, updatedAt]);
+  }, [scope, updatedAt]);
   // Keep the open company's price current while the tab is visible.
   useEffect(() => {
     if (
@@ -2602,9 +2607,6 @@ function CompanyWorkspace({
                             <SentimentPanel
                               key={instrumentId}
                               onThemeSource={setSource}
-                              onConnectTelegram={() =>
-                                onChoose(instrumentId, "account")
-                              }
                               onThemesChange={async () => {
                                 const status = await api.modelStatus();
                                 if (activeScope.current === scope)
@@ -3941,7 +3943,7 @@ function CompanyWorkspace({
             : "this company"
         }
         progress={setupProgress(loadingRun, companyLoading)}
-        aiBlocked={modelAvailability(modelStatus, "briefing_enabled").blocked}
+        ai={modelAvailability(modelStatus, "briefing_enabled")}
         onSkip={() => setSetupId(null)}
         onStart={async ({ analyse, watch }) => {
           setSetupId(null);
@@ -3957,7 +3959,14 @@ function CompanyWorkspace({
         onConnectTelegram={({ analyse }) => {
           setSetupId(null);
           if (analyse) startLoading({ analyze: true, lookback_days: 7 });
-          onChoose(selectedCompanyId, "account");
+          // Telegram setup opens right here; the watch turns on once a chat
+          // is connected (or, if it is closed without one, after asking).
+          telegramGuard.connect(() =>
+            act(
+              () => api.newsWatch(instrumentId, true, 240),
+              "Watching this company for changes.",
+            ),
+          );
         }}
       />
       <CompanyDialog

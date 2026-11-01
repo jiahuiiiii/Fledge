@@ -98,7 +98,7 @@ export default function NewCompanySetup({
   open,
   name,
   progress = { stage: "opening", stages: [] },
-  aiBlocked,
+  ai = { state: "unknown" },
   onSkip,
   onStart,
   onConnectTelegram,
@@ -116,6 +116,17 @@ export default function NewCompanySetup({
   const needsTelegram =
     telegram.ready && telegram.configured && !telegram.linked;
   const ready = progress.stage === "ready";
+  // Only AI switched off rules the choice out. While availability is still
+  // being checked, or another analysis is running, it can be chosen now: the
+  // analysis waits for the news to be collected and for its turn.
+  const aiOff = ai.state === "disabled";
+  const analyseNote = aiOff
+    ? "AI analysis is switched off in this workspace, so this can’t be chosen. The news still shows, without labels."
+    : !ready
+      ? "You can choose this now. It starts by itself once the news has been collected."
+      : ai.state === "running"
+        ? "Another analysis is running; this one starts when it finishes."
+        : null;
   return (
     <Modal
       open={open}
@@ -132,18 +143,30 @@ export default function NewCompanySetup({
         </p>
         <Card variant="inset" as="label" className="company-setup__option">
           <Checkbox
-            checked={analyse && !aiBlocked}
-            disabled={aiBlocked}
+            checked={analyse && !aiOff}
+            disabled={aiOff}
+            aria-describedby={
+              analyseNote ? "company-setup-analyse-note" : undefined
+            }
             onChange={(e) => setAnalyse(e.target.checked)}
           />
           <span>
-            <strong>Analyse the news now</strong>
+            <strong>
+              {ready ? "Analyse the news now" : "Analyse the news"}
+            </strong>
             <small>
               Reads the news and posts with AI and labels each one positive,
               negative, mixed or neutral, so the tone shows up. This can take a
               few minutes and uses your AI allowance.
-              {aiBlocked && " AI analysis is switched off right now."}
             </small>
+            {analyseNote && (
+              <small
+                id="company-setup-analyse-note"
+                className={`company-setup__note${aiOff ? "" : " is-info"}`}
+              >
+                {analyseNote}
+              </small>
+            )}
           </span>
         </Card>
         <Card variant="inset" as="label" className="company-setup__option">
@@ -168,16 +191,14 @@ export default function NewCompanySetup({
         <div className="company-setup__actions">
           <Button
             variant="primary"
-            onClick={() => onStart({ analyse: analyse && !aiBlocked, watch })}
+            onClick={() => onStart({ analyse: analyse && !aiOff, watch })}
           >
-            {analyse && !aiBlocked ? "Start" : watch ? "Turn on watch" : "Done"}
+            {analyse && !aiOff ? "Start" : watch ? "Turn on watch" : "Done"}
           </Button>
           {watch && needsTelegram && (
             <Button
               variant="secondary"
-              onClick={() =>
-                onConnectTelegram({ analyse: analyse && !aiBlocked })
-              }
+              onClick={() => onConnectTelegram({ analyse: analyse && !aiOff })}
             >
               Connect Telegram first
             </Button>

@@ -320,6 +320,7 @@
 .company-setup__option strong { color: var(--color-text); font-size: var(--text-base); font-weight: 600; }
 .company-setup__option small { color: var(--color-muted); font-size: var(--text-sm); line-height: 1.5; }
 .company-setup__option .company-setup__note { color: var(--color-caution-light); }
+.company-setup__option .company-setup__note.is-info { color: var(--color-text-2); }
 /* Setup loading screen: the bird in the middle, three stages under it, then a tip. */
 .company-setup__hero { display: grid; justify-items: center; align-content: start; gap: var(--space-3); padding: var(--space-4) var(--space-4) var(--space-5); border-radius: var(--radius-md); background: var(--color-accent-soft); text-align: center; }
 .company-setup__hero .fledge-loader { width: min(180px, 52vw); height: auto; }
