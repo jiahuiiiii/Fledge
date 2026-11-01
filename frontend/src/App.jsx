@@ -24,7 +24,9 @@ import {
   parseHiddenCompanies,
 } from "./lib/companyVisibility";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { api } from "./api/client";
+import { api, currentAccount } from "./api/client";
+import { companyCache, keepFinancials } from "./lib/companyCache";
+import { setupProgress } from "./lib/setupProgress";
 // After a full-page step (questions, result) the app comes back: start at the
 // top and put focus on the page heading so screen readers announce it.
 function focusMainHeading() {
@@ -770,6 +772,8 @@ function CompanyWorkspace({
       showToast(loadingError);
     }
   }, [loadingError, updatePressed]);
+  // Starting an update changes the run, which answers the waiting activity
+  // long poll below straight away.
   async function startLoading(options = {}) {
     const token = scope;
     setLoadingError("");
@@ -800,45 +804,96 @@ function CompanyWorkspace({
     )
       return;
     startLoading({ initial: true });
-    let stopped = false,
-      reading = false;
-    const timer = setInterval(async () => {
-      if (stopped || reading || document.hidden) return;
-      reading = true;
-      try {
-        const [run, status] = await Promise.all([
-          api.researchLoading(instrumentId),
-          api.modelStatus(),
-        ]);
-        if (stopped || activeScope.current !== scope) return;
-        setModelStatus(status);
-        setLoadingRun(run);
-        setLoadingError("");
-        const revision = JSON.stringify([
-          run?.id,
-          run?.steps?.map((s) => s.status),
-        ]);
-        if (revision !== lastLoadingRevision.current) {
-          lastLoadingRevision.current = revision;
-          // Re-read the company when the run finishes, and at most every 20 s
-          // while it runs, instead of after every step (each was a full read).
-          if (!run?.active || Date.now() - lastLoadingRead.current > 20000) {
-            lastLoadingRead.current = Date.now();
-            await refresh();
+    // One long poll instead of asking every 1.5 s: the server holds each
+    // request (up to 25 s) and answers as soon as the run or the pending
+    // evaluation work changes, so an idle page makes about two cheap requests
+    // a minute and a running update is still shown within about a second.
+    const controller = new AbortController();
+    let stopped = false;
+    let since = "";
+    let jobs = null;
+    const visible = () =>
+      new Promise((resolve) => {
+        if (!document.hidden) return resolve();
+        const show = () => {
+          if (document.hidden) return;
+          document.removeEventListener("visibilitychange", show);
+          resolve();
+        };
+        document.addEventListener("visibilitychange", show);
+        controller.signal.addEventListener("abort", resolve);
+      });
+    const pause = (ms) =>
+      new Promise((resolve) => {
+        const timer = setTimeout(resolve, ms);
+        controller.signal.addEventListener("abort", () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+    (async () => {
+      let failures = 0;
+      while (!stopped) {
+        await visible();
+        if (stopped) return;
+        try {
+          const answer = await api.researchActivity(instrumentId, {
+            since,
+            wait: since ? 25 : 0,
+            signal: controller.signal,
+          });
+          if (stopped || activeScope.current !== scope) return;
+          failures = 0;
+          setLoadingError("");
+          since = answer.token;
+          const jobCount = answer.token.split("|").pop();
+          const jobsChanged = jobs !== null && jobCount !== jobs;
+          jobs = jobCount;
+          if (!answer.changed) continue;
+          let reread = false;
+          const run = answer.run;
+          if (run !== undefined) {
+            setLoadingRun(run);
+            const revision = JSON.stringify([
+              run?.id,
+              run?.steps?.map((step) => step.status),
+            ]);
+            if (revision !== lastLoadingRevision.current) {
+              lastLoadingRevision.current = revision;
+              api
+                .modelStatus()
+                .then((status) => {
+                  if (!stopped && activeScope.current === scope)
+                    setModelStatus(status);
+                })
+                .catch(() => {});
+              // Re-read the company when the run finishes, and at most every
+              // 20 s while it runs, instead of after every step.
+              if (!run?.active || Date.now() - lastLoadingRead.current > 20000)
+                reread = true;
+            }
           }
+          if (reread || jobsChanged) {
+            lastLoadingRead.current = Date.now();
+            // Evaluation results land in the company read; financials are
+            // only included again once nothing is pending.
+            await refresh({ light: answer.pending_work && !reread });
+          }
+        } catch (e) {
+          if (stopped || e.name === "AbortError") return;
+          if (activeScope.current === scope)
+            setLoadingError(
+              "Cannot reach the local app. Progress will reconnect when it is running.",
+            );
+          // Back off 2 s, 4 s, 8 s … up to 30 s while the server is away.
+          failures += 1;
+          await pause(Math.min(30000, 1000 * 2 ** failures));
         }
-      } catch (e) {
-        if (!stopped && activeScope.current === scope)
-          setLoadingError(
-            "Cannot reach the local app. Progress will reconnect when it is running.",
-          );
-      } finally {
-        reading = false;
       }
-    }, 1500);
+    })();
     return () => {
       stopped = true;
-      clearInterval(timer);
+      controller.abort();
     };
   }, [scope, companyLoading, !!data?.instrument, selectedCompanyId]);
   function chooseCompany(id) {
@@ -893,26 +948,12 @@ function CompanyWorkspace({
       }),
     );
   }
-  // After saving a view the filings have not changed, so skip the slow
-  // financial part of the read and keep the figures already on screen.
-  async function readWithoutFinancials() {
-    const kept = data;
-    const next = await workspaceLane.current.read(scope, (signal) =>
+  // After saving a view, or while polling, the filings have not changed, so
+  // skip the slow financial part of the read and keep the figures on screen.
+  function readWithoutFinancials() {
+    return workspaceLane.current.read(scope, (signal) =>
       api.workspace(instrumentId, { signal, includeFinancials: false }),
     );
-    if (
-      kept &&
-      !kept.financials_pending &&
-      kept.instrument?.id === next?.instrument?.id
-    )
-      return {
-        ...next,
-        financial_depth: kept.financial_depth,
-        income_flow: kept.income_flow,
-        segment_revenue: kept.segment_revenue,
-        financials_pending: false,
-      };
-    return next;
   }
   async function refresh({ fresh = false, light = false } = {}) {
     if (activeScope.current !== scope) return;
@@ -922,7 +963,7 @@ function CompanyWorkspace({
       companyLoading ? 280 : 0,
     );
     if (activeScope.current === scope) {
-      setData(next);
+      setData(light ? (old) => keepFinancials(old, next) : next);
       if (loadedScope !== scope)
         setQuestion(
           next.question_library?.selected_question ||
@@ -1053,10 +1094,27 @@ function CompanyWorkspace({
         setLoadError(e.message);
     });
   }
+  // Remember the last read of each company opened in this tab, so switching
+  // back shows it at once instead of a loading page.
+  useEffect(() => {
+    if (companyLoading || !data || data.instrument?.id !== instrumentId) return;
+    companyCache.put(currentAccount(), instrumentId, { data });
+  }, [data, companyLoading]);
+  useEffect(() => {
+    if (
+      companyLoading ||
+      !priceRead?.data ||
+      priceRead.data.symbol !== data?.instrument?.symbol
+    )
+      return;
+    companyCache.put(currentAccount(), instrumentId, { priceRead });
+  }, [priceRead, companyLoading]);
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
-    setPriceRead(null);
+    const account = currentAccount();
+    const cached = companyCache.get(account, instrumentId);
+    setPriceRead(cached?.priceRead || null);
     setFinancialError("");
     setLoadError("");
     setError("");
@@ -1074,26 +1132,39 @@ function CompanyWorkspace({
     setProposalStale(false);
     setAddingCompany(false);
     setModelStatus(null);
-    api
-      .session({ signal: controller.signal })
-      .then(() => (active ? readableLoad(readCompany(true)) : null))
+    const firstQuestion = (d) =>
+      d.question_library?.selected_question ||
+      d.versions[0]?.question ||
+      d.research_action?.question ||
+      questionDefault;
+    if (cached?.data) {
+      setData(cached.data);
+      setLoadedScope(scope);
+      setQuestion(firstQuestion(cached.data));
+    }
+    // With a known account the session check and the company read go out
+    // together (the read carries the account, so a changed sign-in is refused).
+    const read = account
+      ? Promise.all([
+          api.session({ signal: controller.signal }),
+          readCompany(true),
+        ]).then(([, packet]) => packet)
+      : api
+          .session({ signal: controller.signal })
+          .then(() => (active ? readCompany(true) : null));
+    readableLoad(read, cached?.data ? 0 : 280)
       .then((packet) => {
         if (active && packet && activeScope.current === scope) {
-          const d = packet;
-          setData(d);
+          setData((old) => keepFinancials(old, packet));
           setLoadedScope(scope);
-          setQuestion(
-            d.question_library?.selected_question ||
-              d.versions[0]?.question ||
-              d.research_action?.question ||
-              questionDefault,
-          );
+          if (!cached?.data) setQuestion(firstQuestion(packet));
         }
       })
-      .catch(
-        (e) =>
-          active && activeScope.current === scope && setLoadError(e.message),
-      );
+      .catch((e) => {
+        if (!active || activeScope.current !== scope) return;
+        if (!cached?.data) setLoadError(e.message);
+        else if (e.name !== "AbortError") setError(e.message);
+      });
     return () => {
       active = false;
       controller.abort();
@@ -1117,12 +1188,14 @@ function CompanyWorkspace({
     if (!data || companyLoading) return;
     const refreshVisible = () => {
       if (!document.hidden)
-        refresh().catch((e) => {
+        refresh({ light: pending }).catch((e) => {
           if (e.name !== "AbortError" && activeScope.current === scope)
             setError(e.message);
         });
     };
-    const id = setInterval(refreshVisible, pending ? 700 : 30000);
+    // Pending evaluation work is followed by the activity long poll above,
+    // so this is only the slow background re-read.
+    const id = setInterval(refreshVisible, 30000);
     window.addEventListener("focus", refreshVisible);
     return () => {
       clearInterval(id);
@@ -2965,7 +3038,11 @@ function CompanyWorkspace({
                 </>
               </RetainedView>
               <div
-                className="workspace-page"
+                className={`workspace-page${
+                  !selectedCompanyId && ["workspace", "idea"].includes(view)
+                    ? " is-home"
+                    : ""
+                }`}
                 hidden={view === "workspace" && !!selectedCompanyId}
               >
                 <RetainedView active={["ideas", "updates"].includes(view)}>
@@ -3857,13 +3934,13 @@ function CompanyWorkspace({
       </Modal>
       {telegramGuard.prompt}
       <NewCompanySetup
-        open={
-          !!setupId &&
-          setupId === selectedCompanyId &&
-          !companyLoading &&
-          !isRecorded
+        open={!!setupId && setupId === selectedCompanyId && !isRecorded}
+        name={
+          displayInstrument.symbol
+            ? companyName(displayInstrument)
+            : "this company"
         }
-        name={data?.instrument ? companyName(data.instrument) : "this company"}
+        progress={setupProgress(loadingRun, companyLoading)}
         aiBlocked={modelAvailability(modelStatus, "briefing_enabled").blocked}
         onSkip={() => setSetupId(null)}
         onStart={async ({ analyse, watch }) => {

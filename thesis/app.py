@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import asyncio
 from datetime import datetime
 from pathlib import Path
 import secrets
@@ -8,7 +9,7 @@ import logging
 import os
 import re
 from uuid import UUID
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, RedirectResponse
 from starlette.concurrency import run_in_threadpool
 from fastapi.staticfiles import StaticFiles
@@ -1722,7 +1723,37 @@ def research_loading(instrument_id: UUID):
     return {"result": latest(auth.current_owner(), str(instrument_id))}
 
 
+ACTIVITY_WAIT_MAX = 25
+ACTIVITY_CHECK_SECONDS = 1.0
+
+
+@app.get("/api/v1/companies/{instrument_id}/activity")
+async def research_activity(instrument_id: UUID, since: str = "", wait: int = 0):
+    """Long poll for the open company page, instead of the browser asking every
+    second or two. Answers at once when anything changed since the client's
+    token (or it has none); otherwise holds the request for up to `wait`
+    seconds, checking a cheap token on the server, and answers when it changes
+    or the time runs out. The full run is sent only when it changed."""
+    from .research.loading import activity, latest
+    owner = auth.current_owner()
+    iid = str(instrument_id)
+    deadline = time.monotonic() + max(0, min(wait, ACTIVITY_WAIT_MAX))
+    while True:
+        token, jobs = await run_in_threadpool(activity, owner, iid)
+        if token != since or time.monotonic() >= deadline:
+            break
+        await asyncio.sleep(ACTIVITY_CHECK_SECONDS)
+    changed = token != since
+    run = await run_in_threadpool(latest, owner, iid) if changed else None
+    return {"result": dict(token=token, changed=changed, run=run, pending_work=jobs > 0)}
+
+
 @app.post("/api/v1/companies/{instrument_id}/loading")
-def start_research_loading(instrument_id: UUID, payload: ResearchLoadSettings):
+def start_research_loading(instrument_id: UUID, payload: ResearchLoadSettings, response: Response):
     from .research.loading import start
-    return {"result": start(auth.current_owner(), str(instrument_id), **payload.model_dump())}
+    run = start(auth.current_owner(), str(instrument_id), **payload.model_dump())
+    # The workers do the run after this answer: 202 Accepted while it is still
+    # going; 200 when the answer is an earlier run that has already finished.
+    if run and run.get("active"):
+        response.status_code = 202
+    return {"result": run}

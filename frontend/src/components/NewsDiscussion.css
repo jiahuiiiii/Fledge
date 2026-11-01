@@ -320,4 +320,30 @@
 .company-setup__option strong { color: var(--color-text); font-size: var(--text-base); font-weight: 600; }
 .company-setup__option small { color: var(--color-muted); font-size: var(--text-sm); line-height: 1.5; }
 .company-setup__option .company-setup__note { color: var(--color-caution-light); }
+/* Setup loading screen: the bird in the middle, three stages under it, then a tip. */
+.company-setup__hero { display: grid; justify-items: center; align-content: start; gap: var(--space-3); padding: var(--space-4) var(--space-4) var(--space-5); border-radius: var(--radius-md); background: var(--color-accent-soft); text-align: center; }
+.company-setup__hero .fledge-loader { width: min(180px, 52vw); height: auto; }
+.company-setup__status { display: grid; gap: 2px; }
+.company-setup__status strong { color: var(--color-text); font-size: var(--text-lg); font-weight: 650; }
+.company-setup__status small { color: var(--color-muted); font-size: var(--text-sm); }
+.company-setup__stages { display: grid; gap: var(--space-2); width: min(100%, 340px); margin: 0; padding: 0; list-style: none; text-align: left; }
+.company-setup__stages li { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); color: var(--color-muted); font-size: var(--text-sm); }
+.company-setup__stages li > :first-child { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--color-line-strong); box-sizing: border-box; }
+.company-setup__stages li small { color: var(--color-faint); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.company-setup__stages li.is-working { color: var(--color-text); }
+.company-setup__stages li.is-working > :first-child { border-color: var(--color-accent); border-top-color: transparent; }
+.company-setup__stages li.is-done { color: var(--color-text-2); }
+.company-setup__stages li.is-done > svg { border: 0; background: var(--color-accent); fill: none; stroke: var(--color-on-accent); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; padding: 2px; }
+.company-setup__stages li.is-done small { color: var(--color-accent); }
+.company-setup__tip { display: grid; gap: 2px; width: min(100%, 380px); margin: var(--space-2) 0 0; padding-top: var(--space-3); border-top: 1px solid color-mix(in srgb, var(--color-accent) 18%, transparent); color: var(--color-text-2); font-size: var(--text-sm); line-height: 1.5; }
+.company-setup__body p.company-setup__tip { margin-top: var(--space-2); }
+.company-setup__tip > span:first-child { color: var(--color-accent); font-size: var(--text-xs); font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; }
+.company-setup__lead { color: var(--color-muted); }
+@media (prefers-reduced-motion: no-preference) {
+  .company-setup__stages li.is-working > :first-child { animation: setup-spin 0.9s linear infinite; }
+  .company-setup__tip-text { animation: setup-tip 0.4s ease-out; }
+}
+@keyframes setup-spin { to { transform: rotate(360deg); } }
+@keyframes setup-tip { from { opacity: 0; transform: translateY(4px); } }
+@media (max-width: 420px) { .company-setup__hero { padding: var(--space-3) var(--space-3) var(--space-4); } }
 .company-setup__actions, .telegram-prompt__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }

@@ -48,14 +48,19 @@ let browser;
         return { scroll: document.documentElement.scrollWidth - limit, wide };
       });
       if (overflow.scroll > 0 || overflow.wide.length) problems.push(`${name}@${width}: scroll +${overflow.scroll} ${overflow.wide.join(" | ")}`);
-      if (width >= 1024) {
+      if (width >= 768) {
+        // Buttons sit beside the price only when the header itself is at least
+        // 1,200 px wide; narrower (tablets, open company list) they get their
+        // own row instead of squeezing the price into a narrow wrapped column.
         const header = await page.evaluate(() => {
-          const q = document.querySelector(".company-header .market-quote"), a = document.querySelector(".company-header .company-actions");
-          if (!a) return null;
-          const ar = a.getBoundingClientRect(), qr = q?.getBoundingClientRect();
-          return { sameRow: !qr || ar.top < qr.bottom - 4, beside: !qr || ar.left >= qr.right - 4 };
+          const h = document.querySelector(".company-header"), q = h?.querySelector(".market-quote"), a = h?.querySelector(".company-actions");
+          if (!a || !q) return null;
+          const ar = a.getBoundingClientRect(), qr = q.getBoundingClientRect();
+          return { wide: h.getBoundingClientRect().width >= 1200, beside: ar.top < qr.bottom - 4 && ar.left >= qr.right - 4, below: ar.top >= qr.bottom - 4, quoteWidth: qr.width };
         });
-        if (header && !(header.sameRow && header.beside)) problems.push(`header buttons not beside the price at ${width} on ${name}`);
+        if (header && header.wide && !header.beside) problems.push(`header buttons not beside the price at ${width} on ${name}`);
+        if (header && !header.wide && !header.below) problems.push(`header buttons squeeze the price at ${width} on ${name}`);
+        if (header && header.quoteWidth < 280) problems.push(`price block only ${Math.round(header.quoteWidth)} px wide at ${width} on ${name}`);
       }
       if (width === 390 || width === 1440) await shot(`${name}-${width}`);
     }

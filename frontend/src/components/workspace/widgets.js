@@ -35,6 +35,9 @@ import {
 } from "./HomeWidgets";
 
 const real = (context) => !context.recorded;
+// Before the first company is added, the home shows only the welcome card and
+// its "Add a company" button, not empty company sections.
+const hasCompanies = (context) => context.catalogue?.length > 0;
 const PRO = ["data"];
 
 const full = (y, h) => ({
@@ -156,6 +159,7 @@ export const WIDGETS = {
       title: "Your list today",
       component: HomePortfolio,
       minW: 4,
+      when: hasCompanies,
       default: full(40, 160),
     },
     {
@@ -163,6 +167,7 @@ export const WIDGETS = {
       title: "Your companies",
       component: HomeCompanies,
       minW: 4,
+      when: hasCompanies,
       default: full(200, 200),
     },
     {

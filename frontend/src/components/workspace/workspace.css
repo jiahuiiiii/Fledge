@@ -346,3 +346,9 @@ a.ws-record-title:focus-visible {
 .ws-watch p {
   margin: 0 0 var(--space-2);
 }
+
+/* Inside a widget the widget's own width is the limit, so blocks drop the
+   page-width caps they had before (e.g. "Your list today" at 1180 px). */
+.ws-frame .portfolio-read {
+  max-width: none;
+}
