@@ -362,9 +362,18 @@ async def request_timing(request: Request, call_next):
         f'connect;dur={stats["db_open_ms"]:.0f};desc="{stats["new_connections"]} new connections"'
     )
     if total >= SLOW_REQUEST_MS:
+        # Load and thread count tell a heavy request apart from one that sat
+        # waiting for the CPU: a small database share with a load above the
+        # CPU count means background work (or another process) had the machine.
+        try:
+            load = os.getloadavg()[0]
+        except OSError:
+            load = float("nan")
         logging.getLogger("thesis.timing").warning(
-            "Slow request %s %s: %.0f ms total, %.0f ms in %d database transactions (%d new connections)",
+            "Slow request %s %s: %.0f ms total, %.0f ms in %d database transactions (%d new connections); "
+            "load %.1f on %d CPUs, %d threads",
             request.method, request.url.path, total, stats["db_ms"], stats["transactions"], stats["new_connections"],
+            load, os.cpu_count() or 0, threading.active_count(),
         )
         # When per-statement timing is on (THESIS_SQL_TIMING_MS set), name the
         # few query shapes that cost the most, with how many times each ran, so
