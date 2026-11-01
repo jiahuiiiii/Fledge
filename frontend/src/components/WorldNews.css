@@ -61,3 +61,22 @@
     padding: var(--space-4);
   }
 }
+/* The heading, actions, status and topic filters stay in view while the
+   headlines scroll beneath them. Wider screens only: on phones the screen is
+   too short to give this much of it to a fixed header. */
+.app-shell .world-news-head {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+@media (min-width: 741px) and (min-height: 560px) {
+  .app-shell .world-news-head {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    margin: calc(-1 * var(--space-5)) calc(-1 * var(--workspace-gutter)) 0;
+    padding: var(--space-5) var(--workspace-gutter) var(--space-3);
+    background: var(--color-bg);
+    box-shadow: 0 1px 0 var(--color-line);
+  }
+}

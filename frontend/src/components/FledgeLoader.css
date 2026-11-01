@@ -1,0 +1,203 @@
+.fledge-loader {
+  display: block;
+  overflow: visible;
+}
+.fledge-loader * {
+  transform-box: fill-box;
+}
+.fledge-loader__branch {
+  fill: none;
+  stroke: var(--color-gold-mid);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.fledge-loader__leaf {
+  fill: var(--color-accent-mid);
+}
+.fledge-loader__shadow {
+  fill: var(--color-shadow);
+  opacity: 0.6;
+  transform-origin: center;
+}
+.fledge-loader__body {
+  fill: var(--color-accent);
+}
+.fledge-loader__belly {
+  fill: var(--color-accent-light);
+}
+.fledge-loader__tail,
+.fledge-loader__wing path {
+  fill: var(--color-accent-mid);
+}
+.fledge-loader__tuft {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.fledge-loader__feet {
+  fill: none;
+  stroke: var(--color-caution);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.fledge-loader__beak {
+  fill: var(--color-caution);
+}
+.fledge-loader__cheek {
+  fill: var(--color-negative);
+  opacity: 0.45;
+}
+.fledge-loader__eye circle {
+  fill: var(--color-bg);
+}
+.fledge-loader__eye .fledge-loader__glint {
+  fill: var(--color-white);
+}
+.fledge-loader__eye {
+  transform-origin: center;
+}
+.fledge-loader__happy {
+  fill: none;
+  stroke: var(--color-bg);
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0;
+}
+.fledge-loader__sparks path {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+.fledge-loader__bird {
+  transform-origin: 50% 100%;
+}
+.fledge-loader__wing {
+  transform-origin: 20% 30%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fledge-loader__bird {
+    animation: fledge-hop 1.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+  .fledge-loader__shadow {
+    animation: fledge-shadow 1.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+  .fledge-loader__wing {
+    animation: fledge-flap 1.2s ease-in-out infinite;
+  }
+  .fledge-loader__eye {
+    animation: fledge-blink 3.6s step-end infinite;
+  }
+  .fledge-loader__sparks path {
+    animation: fledge-spark 2.4s ease-out infinite;
+  }
+  .fledge-loader__sparks path + path {
+    animation-delay: 1.2s;
+  }
+  .fledge-loader.is-done .fledge-loader__bird {
+    animation: fledge-cheer 1.6s ease-in-out infinite;
+  }
+  .fledge-loader.is-done .fledge-loader__shadow {
+    animation: none;
+  }
+  .fledge-loader.is-done .fledge-loader__wing {
+    animation: fledge-flap 0.4s ease-in-out 3;
+  }
+}
+
+.fledge-loader.is-done .fledge-loader__eye {
+  opacity: 0;
+  animation: none;
+}
+.fledge-loader.is-done .fledge-loader__happy {
+  opacity: 1;
+}
+.fledge-loader.is-done .fledge-loader__sparks path {
+  opacity: 1;
+}
+
+@keyframes fledge-hop {
+  0%,
+  100% {
+    transform: translateY(0) scale(1.06, 0.94);
+  }
+  18% {
+    transform: translateY(-2px) scale(0.95, 1.06);
+  }
+  45% {
+    transform: translateY(-14px) scale(1, 1);
+  }
+  72% {
+    transform: translateY(-2px) scale(0.98, 1.02);
+  }
+  85% {
+    transform: translateY(0) scale(1.08, 0.92);
+  }
+}
+@keyframes fledge-shadow {
+  0%,
+  100% {
+    transform: scaleX(1);
+    opacity: 0.6;
+  }
+  45% {
+    transform: scaleX(0.6);
+    opacity: 0.3;
+  }
+}
+@keyframes fledge-flap {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  30% {
+    transform: rotate(-28deg);
+  }
+  55% {
+    transform: rotate(8deg);
+  }
+}
+@keyframes fledge-blink {
+  0%,
+  92% {
+    transform: scaleY(1);
+  }
+  94% {
+    transform: scaleY(0.1);
+  }
+  97% {
+    transform: scaleY(1);
+  }
+}
+@keyframes fledge-spark {
+  0% {
+    opacity: 0;
+    transform: translate(-6px, 6px);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(6px, -8px);
+  }
+}
+@keyframes fledge-cheer {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-4px) rotate(-4deg);
+  }
+  50% {
+    transform: translateY(0) rotate(0deg);
+  }
+  75% {
+    transform: translateY(-4px) rotate(4deg);
+  }
+}

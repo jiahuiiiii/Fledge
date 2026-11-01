@@ -8,7 +8,7 @@ import logging
 import os
 import re
 from uuid import UUID
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, RedirectResponse
 from starlette.concurrency import run_in_threadpool
 from fastapi.staticfiles import StaticFiles
@@ -1723,6 +1723,11 @@ def research_loading(instrument_id: UUID):
 
 
 @app.post("/api/v1/companies/{instrument_id}/loading")
-def start_research_loading(instrument_id: UUID, payload: ResearchLoadSettings):
+def start_research_loading(instrument_id: UUID, payload: ResearchLoadSettings, response: Response):
     from .research.loading import start
-    return {"result": start(auth.current_owner(), str(instrument_id), **payload.model_dump())}
+    run = start(auth.current_owner(), str(instrument_id), **payload.model_dump())
+    # The workers do the run after this answer: 202 Accepted while it is still
+    # going; 200 when the answer is an earlier run that has already finished.
+    if run and run.get("active"):
+        response.status_code = 202
+    return {"result": run}

@@ -28,6 +28,11 @@
   max-width: var(--page-width);
   padding-top: var(--space-5);
 }
+/* The home is a board of cards, so it uses the whole width beside the company
+   rail; reading pages keep the line-length cap above. */
+.app-shell .workspace-page.is-home {
+  max-width: none;
+}
 .notebook-intro {
   margin: 0;
   color: var(--color-muted);

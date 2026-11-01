@@ -29,6 +29,7 @@ import {
   Checkbox,
 } from "./index";
 import "./UiPreview.css";
+import { SetupHero } from "../NewCompanySetup";
 
 // Preview of the shared UI parts, opened at /?ui-preview. Sample text only:
 // it calls no API and shows no saved research.
@@ -421,7 +422,55 @@ function FormControls() {
   );
 }
 
+function CompanySetupStages() {
+  const stage = (id, label, done, total, state) => ({
+    id,
+    label,
+    done,
+    total,
+    state,
+  });
+  const examples = [
+    { stage: "opening", stages: [] },
+    {
+      stage: "collecting",
+      stages: [
+        stage("basics", "Price and company details", 4, 4, "done"),
+        stage("filings", "Filings and financials", 1, 2, "working"),
+        stage("news", "News and discussions", 0, 5, "waiting"),
+      ],
+    },
+    {
+      stage: "ready",
+      stages: [
+        stage("basics", "Price and company details", 4, 4, "done"),
+        stage("filings", "Filings and financials", 2, 2, "done"),
+        stage("news", "News and discussions", 5, 5, "done"),
+      ],
+    },
+  ];
+  return (
+    <div
+      style={{
+        display: "grid",
+        gap: 12,
+        gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))",
+      }}
+    >
+      {examples.map((progress, index) => (
+        <SetupHero
+          key={progress.stage}
+          progress={progress}
+          name="Example Co"
+          tipIndex={index}
+        />
+      ))}
+    </div>
+  );
+}
+
 const SECTIONS = [
+  ["Adding a company", CompanySetupStages],
   ["Buttons", ButtonBoard],
   ["Badges", Badges],
   ["Section headers", Headers],

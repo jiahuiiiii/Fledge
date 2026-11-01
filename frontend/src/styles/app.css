@@ -26,6 +26,15 @@
 * {
   box-sizing: border-box;
 }
+/* One scrollbar style everywhere. Windows always shows scrollbars, so the
+   page, dialogs and the main panel must match (the colour is inherited). */
+html {
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+html,
+.modal {
+  scrollbar-width: thin;
+}
 body {
   margin: 0;
 }
@@ -5115,13 +5124,16 @@ input[type="checkbox"] {
   }
 }
 
-.company-modal {
-  margin: min(14vh, 110px) auto auto;
+/* Centred like every other dialog. The results area keeps one height (as
+   far as the screen allows), so the dialog doesn't jump as results arrive. */
+.modal.company-modal {
+  margin: auto;
+  max-height: calc(100dvh - 48px);
 }
 .company-search-results {
-  height: auto;
-  min-height: 144px;
-  max-height: 310px;
+  height: clamp(144px, calc(100dvh - 440px), 310px);
+  min-height: 0;
+  max-height: none;
 }
 .company-search-field input:focus {
   outline: none;
@@ -5129,21 +5141,11 @@ input[type="checkbox"] {
   box-shadow: 0 0 0 1px var(--color-accent-mid);
 }
 @media (max-width: 600px) {
-  .company-modal {
-    margin: 20px auto auto;
+  .modal.company-modal {
+    max-height: calc(100dvh - 16px);
   }
   .company-search-results {
-    height: auto;
-    max-height: 280px;
-  }
-}
-/* Keep expanded sidebar management inside the viewport below the anchored top. */
-.company-modal {
-  max-height: calc(100dvh - min(14vh, 110px) - 24px);
-}
-@media (max-width: 600px) {
-  .company-modal {
-    max-height: calc(100dvh - 40px);
+    height: clamp(144px, calc(100dvh - 380px), 280px);
   }
 }
 

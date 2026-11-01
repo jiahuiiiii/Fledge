@@ -1,7 +1,15 @@
 // Adapted from Kestrel src/api/client.js; same cookie/error/result contract.
 // Managed identities are verified by the server; provider tokens stay there.
+import { companyCache } from "../lib/companyCache.js";
+
 const BASE = "/api/v1";
 let accountId = null;
+// The signed-in account from the last session read (null before it).
+export const currentAccount = () => accountId;
+function setAccount(next) {
+  if (next !== accountId) companyCache.clear();
+  accountId = next;
+}
 export class ApiError extends Error {
   constructor(status, message, body, code = null) {
     super(message);
@@ -32,7 +40,7 @@ async function request(path, { method = "GET", body, signal } = {}) {
     responseAccount &&
     responseAccount !== accountId
   ) {
-    accountId = null;
+    setAccount(null);
     window.dispatchEvent(new Event("thesis:account-changed"));
     throw new ApiError(
       409,
@@ -71,8 +79,8 @@ async function request(path, { method = "GET", body, signal } = {}) {
       ? parsed.result
       : parsed;
   if (path === "/session")
-    accountId = result?.authenticated ? result.account_id : null;
-  if (path === "/auth/logout") accountId = null;
+    setAccount(result?.authenticated ? result.account_id : null);
+  if (path === "/auth/logout") setAccount(null);
   return result;
 }
 export const api = {

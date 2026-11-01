@@ -65,6 +65,11 @@ test("heights follow content in whole rows", () => {
     fitted.map((i) => i.h),
     [4, 7, 8],
   );
+  // Measured empty: one row, not the default height left as a blank gap.
+  assert.deepEqual(
+    fitHeights(defaultLayout(SPEC, "lg"), { a: 0 }).map((i) => i.h),
+    [1, 8, 8],
+  );
 });
 
 test("keyboard moves swap places in reading order and stay on the page", () => {

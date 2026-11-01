@@ -305,3 +305,40 @@
 .onboarding-pro small {
   color: var(--color-text-2);
 }
+/* Wider screens: the card fits the window. Logo, title and the Continue
+   buttons stay put and only the questions scroll inside the card, instead of
+   the whole page. Phones keep the page scroll with the sticky buttons, since
+   a fixed header and footer would leave little room for the questions. */
+@media (min-width: 601px) {
+  .account-page.onboarding-page {
+    height: 100dvh;
+    min-height: 0;
+  }
+  .account-card.onboarding {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100dvh - 48px);
+    overflow: hidden;
+  }
+  .account-card.onboarding > :not(.onboarding-body) {
+    flex: none;
+  }
+  .onboarding-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    /* Room for focus outlines without clipping them. */
+    margin-inline: -6px;
+    padding-inline: 6px;
+  }
+  .onboarding-body > :last-child {
+    margin-bottom: 4px;
+  }
+  .onboarding-sticky {
+    position: static;
+    margin-top: 0;
+    box-shadow: 0 -1px 0 var(--color-line);
+  }
+}

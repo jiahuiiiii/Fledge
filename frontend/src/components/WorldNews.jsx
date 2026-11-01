@@ -102,90 +102,95 @@ export default function WorldNews({ active, onOpenCompany }) {
       className="world-news reading-page"
       aria-labelledby="world-news-title"
     >
-      <SectionHeader
-        level="page"
-        as="h2"
-        id="world-news-title"
-        icon={<GlobeIcon />}
-        title="World news"
-        description="Rates, trade, energy and events that may affect your companies."
-      />
-      <div className="reading-page-actions">
-        <Button
-          icon={<RefreshIcon />}
-          onClick={refresh}
-          disabled={!!busy || !page?.configured || !page?.can_refresh}
-          title={
-            page && !page.can_refresh
-              ? "World news refreshes are ten minutes apart."
-              : undefined
-          }
-        >
-          {busy === "refresh" ? "Refreshing…" : "Refresh"}
-        </Button>
-        {!(beginner && blocker) && (
+      {/* Everything above the headlines stays in view while they scroll
+          (not on phones, where the screen is too short to spare). */}
+      <div className="world-news-head">
+        <SectionHeader
+          level="page"
+          as="h2"
+          id="world-news-title"
+          icon={<GlobeIcon />}
+          title="World news"
+          description="Rates, trade, energy and events that may affect your companies."
+        />
+        <div className="reading-page-actions">
           <Button
-            variant="plain"
-            onClick={check}
-            disabled={!!busy || !!blocker}
-            aria-describedby={blocker ? "world-check-blocker" : undefined}
+            icon={<RefreshIcon />}
+            onClick={refresh}
+            disabled={!!busy || !page?.configured || !page?.can_refresh}
+            title={
+              page && !page.can_refresh
+                ? "World news refreshes are ten minutes apart."
+                : undefined
+            }
           >
-            {busy === "check" ? "Checking…" : "Check against my watchlist"}
+            {busy === "refresh" ? "Refreshing…" : "Refresh"}
           </Button>
+          {!(beginner && blocker) && (
+            <Button
+              variant="plain"
+              onClick={check}
+              disabled={!!busy || !!blocker}
+              aria-describedby={blocker ? "world-check-blocker" : undefined}
+            >
+              {busy === "check" ? "Checking…" : "Check against my watchlist"}
+            </Button>
+          )}
+        </div>
+        {page && (
+          <MetaRow className="world-news-status">
+            {page.checked_at && (
+              <span>
+                Finnhub · past 3 days · updated{" "}
+                {formatTimestamp(page.checked_at)}
+              </span>
+            )}
+            {page.check && !beginner && (
+              <span>
+                Watchlist checked {formatTimestamp(page.check.checked_at)}
+              </span>
+            )}
+          </MetaRow>
+        )}
+        {!beginner && blocker && page && (
+          <p id="world-check-blocker" className="reading-page-note">
+            {blocker.startsWith("needs AI")
+              ? "Watchlist checks are unavailable while AI is off."
+              : blocker}
+          </p>
+        )}
+        {page && !page.configured && page.articles.length > 0 && (
+          <Card variant="inset" role="status">
+            Showing saved headlines. New headlines are unavailable.
+          </Card>
+        )}
+        {page?.error && (
+          <Card variant="inset" role="status">
+            The last refresh failed: {page.error} Earlier headlines are kept.
+          </Card>
+        )}
+        {message && (
+          <Card variant="inset" role="alert">
+            {message}
+          </Card>
+        )}
+        {page?.articles.length > 0 && (
+          <FilterGroup
+            className="world-news-filters"
+            label="Filter headlines"
+            value={filter}
+            onValueChange={setFilter}
+            options={[
+              { value: "all", label: "All", count: page.articles.length },
+              { value: "mine", label: "About my companies", count: mineCount },
+              ...themeCounts(page.articles, page.themes).map((option) => ({
+                ...option,
+                value: option.id,
+              })),
+            ]}
+          />
         )}
       </div>
-      {page && (
-        <MetaRow className="world-news-status">
-          {page.checked_at && (
-            <span>
-              Finnhub · past 3 days · updated {formatTimestamp(page.checked_at)}
-            </span>
-          )}
-          {page.check && !beginner && (
-            <span>
-              Watchlist checked {formatTimestamp(page.check.checked_at)}
-            </span>
-          )}
-        </MetaRow>
-      )}
-      {!beginner && blocker && page && (
-        <p id="world-check-blocker" className="reading-page-note">
-          {blocker.startsWith("needs AI")
-            ? "Watchlist checks are unavailable while AI is off."
-            : blocker}
-        </p>
-      )}
-      {page && !page.configured && page.articles.length > 0 && (
-        <Card variant="inset" role="status">
-          Showing saved headlines. New headlines are unavailable.
-        </Card>
-      )}
-      {page?.error && (
-        <Card variant="inset" role="status">
-          The last refresh failed: {page.error} Earlier headlines are kept.
-        </Card>
-      )}
-      {message && (
-        <Card variant="inset" role="alert">
-          {message}
-        </Card>
-      )}
-      {page?.articles.length > 0 && (
-        <FilterGroup
-          className="world-news-filters"
-          label="Filter headlines"
-          value={filter}
-          onValueChange={setFilter}
-          options={[
-            { value: "all", label: "All", count: page.articles.length },
-            { value: "mine", label: "About my companies", count: mineCount },
-            ...themeCounts(page.articles, page.themes).map((option) => ({
-              ...option,
-              value: option.id,
-            })),
-          ]}
-        />
-      )}
       {!page ? (
         message ? (
           <EmptyState

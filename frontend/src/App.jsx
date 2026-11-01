@@ -24,7 +24,9 @@ import {
   parseHiddenCompanies,
 } from "./lib/companyVisibility";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { api } from "./api/client";
+import { api, currentAccount } from "./api/client";
+import { companyCache, keepFinancials } from "./lib/companyCache";
+import { setupProgress } from "./lib/setupProgress";
 // After a full-page step (questions, result) the app comes back: start at the
 // top and put focus on the page heading so screen readers announce it.
 function focusMainHeading() {
@@ -770,8 +772,12 @@ function CompanyWorkspace({
       showToast(loadingError);
     }
   }, [loadingError, updatePressed]);
+  // When no update is running the progress is checked every 15 s instead of
+  // every 1.5 s; starting an update checks quickly again.
+  const loadingIdleUntil = useRef(0);
   async function startLoading(options = {}) {
     const token = scope;
+    loadingIdleUntil.current = 0;
     setLoadingError("");
     try {
       const run = await api.startResearchLoading(instrumentId, options);
@@ -804,6 +810,7 @@ function CompanyWorkspace({
       reading = false;
     const timer = setInterval(async () => {
       if (stopped || reading || document.hidden) return;
+      if (Date.now() < loadingIdleUntil.current) return;
       reading = true;
       try {
         const [run, status] = await Promise.all([
@@ -811,6 +818,7 @@ function CompanyWorkspace({
           api.modelStatus(),
         ]);
         if (stopped || activeScope.current !== scope) return;
+        loadingIdleUntil.current = run?.active ? 0 : Date.now() + 15000;
         setModelStatus(status);
         setLoadingRun(run);
         setLoadingError("");
@@ -893,26 +901,12 @@ function CompanyWorkspace({
       }),
     );
   }
-  // After saving a view the filings have not changed, so skip the slow
-  // financial part of the read and keep the figures already on screen.
-  async function readWithoutFinancials() {
-    const kept = data;
-    const next = await workspaceLane.current.read(scope, (signal) =>
+  // After saving a view, or while polling, the filings have not changed, so
+  // skip the slow financial part of the read and keep the figures on screen.
+  function readWithoutFinancials() {
+    return workspaceLane.current.read(scope, (signal) =>
       api.workspace(instrumentId, { signal, includeFinancials: false }),
     );
-    if (
-      kept &&
-      !kept.financials_pending &&
-      kept.instrument?.id === next?.instrument?.id
-    )
-      return {
-        ...next,
-        financial_depth: kept.financial_depth,
-        income_flow: kept.income_flow,
-        segment_revenue: kept.segment_revenue,
-        financials_pending: false,
-      };
-    return next;
   }
   async function refresh({ fresh = false, light = false } = {}) {
     if (activeScope.current !== scope) return;
@@ -922,7 +916,7 @@ function CompanyWorkspace({
       companyLoading ? 280 : 0,
     );
     if (activeScope.current === scope) {
-      setData(next);
+      setData(light ? (old) => keepFinancials(old, next) : next);
       if (loadedScope !== scope)
         setQuestion(
           next.question_library?.selected_question ||
@@ -1053,10 +1047,27 @@ function CompanyWorkspace({
         setLoadError(e.message);
     });
   }
+  // Remember the last read of each company opened in this tab, so switching
+  // back shows it at once instead of a loading page.
+  useEffect(() => {
+    if (companyLoading || !data || data.instrument?.id !== instrumentId) return;
+    companyCache.put(currentAccount(), instrumentId, { data });
+  }, [data, companyLoading]);
+  useEffect(() => {
+    if (
+      companyLoading ||
+      !priceRead?.data ||
+      priceRead.data.symbol !== data?.instrument?.symbol
+    )
+      return;
+    companyCache.put(currentAccount(), instrumentId, { priceRead });
+  }, [priceRead, companyLoading]);
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
-    setPriceRead(null);
+    const account = currentAccount();
+    const cached = companyCache.get(account, instrumentId);
+    setPriceRead(cached?.priceRead || null);
     setFinancialError("");
     setLoadError("");
     setError("");
@@ -1074,26 +1085,39 @@ function CompanyWorkspace({
     setProposalStale(false);
     setAddingCompany(false);
     setModelStatus(null);
-    api
-      .session({ signal: controller.signal })
-      .then(() => (active ? readableLoad(readCompany(true)) : null))
+    const firstQuestion = (d) =>
+      d.question_library?.selected_question ||
+      d.versions[0]?.question ||
+      d.research_action?.question ||
+      questionDefault;
+    if (cached?.data) {
+      setData(cached.data);
+      setLoadedScope(scope);
+      setQuestion(firstQuestion(cached.data));
+    }
+    // With a known account the session check and the company read go out
+    // together (the read carries the account, so a changed sign-in is refused).
+    const read = account
+      ? Promise.all([
+          api.session({ signal: controller.signal }),
+          readCompany(true),
+        ]).then(([, packet]) => packet)
+      : api
+          .session({ signal: controller.signal })
+          .then(() => (active ? readCompany(true) : null));
+    readableLoad(read, cached?.data ? 0 : 280)
       .then((packet) => {
         if (active && packet && activeScope.current === scope) {
-          const d = packet;
-          setData(d);
+          setData((old) => keepFinancials(old, packet));
           setLoadedScope(scope);
-          setQuestion(
-            d.question_library?.selected_question ||
-              d.versions[0]?.question ||
-              d.research_action?.question ||
-              questionDefault,
-          );
+          if (!cached?.data) setQuestion(firstQuestion(packet));
         }
       })
-      .catch(
-        (e) =>
-          active && activeScope.current === scope && setLoadError(e.message),
-      );
+      .catch((e) => {
+        if (!active || activeScope.current !== scope) return;
+        if (!cached?.data) setLoadError(e.message);
+        else if (e.name !== "AbortError") setError(e.message);
+      });
     return () => {
       active = false;
       controller.abort();
@@ -1117,12 +1141,12 @@ function CompanyWorkspace({
     if (!data || companyLoading) return;
     const refreshVisible = () => {
       if (!document.hidden)
-        refresh().catch((e) => {
+        refresh({ light: pending }).catch((e) => {
           if (e.name !== "AbortError" && activeScope.current === scope)
             setError(e.message);
         });
     };
-    const id = setInterval(refreshVisible, pending ? 700 : 30000);
+    const id = setInterval(refreshVisible, pending ? 2000 : 30000);
     window.addEventListener("focus", refreshVisible);
     return () => {
       clearInterval(id);
@@ -2965,7 +2989,11 @@ function CompanyWorkspace({
                 </>
               </RetainedView>
               <div
-                className="workspace-page"
+                className={`workspace-page${
+                  !selectedCompanyId && ["workspace", "idea"].includes(view)
+                    ? " is-home"
+                    : ""
+                }`}
                 hidden={view === "workspace" && !!selectedCompanyId}
               >
                 <RetainedView active={["ideas", "updates"].includes(view)}>
@@ -3857,13 +3885,13 @@ function CompanyWorkspace({
       </Modal>
       {telegramGuard.prompt}
       <NewCompanySetup
-        open={
-          !!setupId &&
-          setupId === selectedCompanyId &&
-          !companyLoading &&
-          !isRecorded
+        open={!!setupId && setupId === selectedCompanyId && !isRecorded}
+        name={
+          displayInstrument.symbol
+            ? companyName(displayInstrument)
+            : "this company"
         }
-        name={data?.instrument ? companyName(data.instrument) : "this company"}
+        progress={setupProgress(loadingRun, companyLoading)}
         aiBlocked={modelAvailability(modelStatus, "briefing_enabled").blocked}
         onSkip={() => setSetupId(null)}
         onStart={async ({ analyse, watch }) => {

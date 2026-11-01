@@ -233,7 +233,7 @@ export default function Onboarding({
       saved.detail_mode !== "data" &&
       onTurnOnPro;
     return (
-      <main className="account-page">
+      <main className="account-page onboarding-page">
         <section className="account-card onboarding">
           <a className="brand" href="/" aria-label="Fledge home">
             fledge<span aria-hidden="true">↗</span>
@@ -241,11 +241,13 @@ export default function Onboarding({
           <h1 ref={heading} tabIndex={-1} className="sr-only">
             Your investor type
           </h1>
-          <InvestorTypeCard type={saved.investor_type} answers={saved} />
-          <p className="fine">
-            This describes how you said you invest. It is a starting point, not
-            advice. You can retake it any time from Account.
-          </p>
+          <div className="onboarding-body">
+            <InvestorTypeCard type={saved.investor_type} answers={saved} />
+            <p className="fine">
+              This describes how you said you invest. It is a starting point,
+              not advice. You can retake it any time from Account.
+            </p>
+          </div>
           <div className="onboarding-sticky">
             <Button variant="primary" onClick={() => onDone(saved)}>
               Done
@@ -269,7 +271,7 @@ export default function Onboarding({
 
   return (
     // A sign-up step (full page), not a pop-up over the workspace.
-    <main className="account-page">
+    <main className="account-page onboarding-page">
       <form className="account-card onboarding" onSubmit={submit} noValidate>
         <a className="brand" href="/" aria-label="Fledge home">
           fledge<span aria-hidden="true">↗</span>
@@ -284,35 +286,45 @@ export default function Onboarding({
             ? `${questions.length} questions, about ${questions.length * 10} seconds.`
             : "So Fledge explains things at the right level. About 10 seconds."}
         </p>
-        {questions.map((question) => (
-          <Choice
-            key={question.key}
-            question={question}
-            value={answers[question.key]}
-            onPick={pick(question.key)}
-          />
-        ))}
-        {stage !== "type" && answers.experience === "active" && onTurnOnPro && (
-          <label className="onboarding-pro">
-            <input
-              type="checkbox"
-              checked={!!answers.pro}
-              onChange={(event) =>
-                setAnswers((current) => ({
-                  ...current,
-                  pro: event.target.checked,
-                }))
-              }
+        {/* Logo, title and buttons stay put; only the questions scroll
+            (on screens wider than a phone). */}
+        <div className="onboarding-body">
+          {questions.map((question) => (
+            <Choice
+              key={question.key}
+              question={question}
+              value={answers[question.key]}
+              onPick={pick(question.key)}
             />
-            <span>
-              <strong>Turn on Pro tools now</strong>
-              <small>
-                Financials, charts and every research tab. You can switch later
-                in Account.
-              </small>
-            </span>
-          </label>
-        )}
+          ))}
+          {stage !== "type" &&
+            answers.experience === "active" &&
+            onTurnOnPro && (
+              <label className="onboarding-pro">
+                <input
+                  type="checkbox"
+                  checked={!!answers.pro}
+                  onChange={(event) =>
+                    setAnswers((current) => ({
+                      ...current,
+                      pro: event.target.checked,
+                    }))
+                  }
+                />
+                <span>
+                  <strong>Turn on Pro tools now</strong>
+                  <small>
+                    Financials, charts and every research tab. You can switch
+                    later in Account.
+                  </small>
+                </span>
+              </label>
+            )}
+          <p className="fine">
+            Your answers stay private to your account. Fledge never picks stocks
+            for you.
+          </p>
+        </div>
         <div className="onboarding-sticky">
           {error && (
             <p className="error" role="alert">
@@ -331,10 +343,6 @@ export default function Onboarding({
             {stage === "type" ? "Not now" : "Skip, show me the app"}
           </button>
         </div>
-        <p className="fine">
-          Your answers stay private to your account. Fledge never picks stocks
-          for you.
-        </p>
       </form>
     </main>
   );

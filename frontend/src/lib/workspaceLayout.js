@@ -98,9 +98,13 @@ export const rowsFor = (px) =>
   );
 
 // Heights follow content so nothing is cut off; only width is chosen by hand.
+// A widget measured at 0 px (it has nothing to show) shrinks to one row
+// instead of keeping its default height as an empty gap.
 export const fitHeights = (layout, heights) =>
   layout.map((item) =>
-    heights[item.i] > 0 ? { ...item, h: rowsFor(heights[item.i]) } : item,
+    Number.isFinite(heights[item.i]) && heights[item.i] >= 0
+      ? { ...item, h: rowsFor(heights[item.i]) }
+      : item,
   );
 
 // Reading order: top to bottom, then left to right.
