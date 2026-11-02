@@ -1385,8 +1385,8 @@ def export_idea_alert(check_id: UUID):
 
 @app.get("/api/v1/model-status")
 def model_status():
-    from .providers.ledger import snapshot
-    from .providers.settings import live_key, REASONING_MODEL
+    from .providers.ledger import snapshot, key_rejected
+    from .providers.settings import live_key, MODEL, REASONING_MODEL
 
     try:
         live_key()
@@ -1403,6 +1403,9 @@ def model_status():
             enabled=enabled,
             comparison_enabled=comparison_enabled,
             briefing_enabled=comparison_enabled,
+            # The provider rejected the configured key (HTTP 401) and it has
+            # not been changed: AI requests are paused until it is.
+            key_rejected=key_rejected(MODEL) or key_rejected(REASONING_MODEL),
             budget=snapshot(),
         )
     }

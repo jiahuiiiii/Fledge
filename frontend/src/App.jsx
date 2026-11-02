@@ -1,4 +1,5 @@
 import { formatTimestamp, formatReportingAgeExplanation } from "./lib/dateTime";
+import { updateOutcome } from "./lib/updateOutcome";
 import {
   useWorkspaceLayout,
   WorkspaceSidebar,
@@ -755,11 +756,8 @@ function CompanyWorkspace({
     if (updatePressed !== "running") return;
     setUpdatePressed(false);
     hideToast(`update-${instrumentId}`);
-    const failed = (loadingRun.steps || []).every((s) => s.status === "failed");
     showToast(
-      failed
-        ? `Couldn’t update ${companyName(data?.instrument)} right now. Saved data is still shown; try again later.`
-        : `${companyName(data?.instrument)} is up to date. Anything new is on the Summary.`,
+      updateOutcome(loadingRun.steps || [], companyName(data?.instrument)),
       { id: `update-done-${instrumentId}` },
     );
   }, [loadingRun?.active, updatePressed]);
@@ -1360,6 +1358,16 @@ function CompanyWorkspace({
         rating: loadingRun?.active
           ? loadingRun.steps.find((s) => s.key === "analysis")?.status || false
           : false,
+        // Why the last rating did not finish, shown under the Rate button
+        // instead of the button silently resetting.
+        ratingNote: (() => {
+          const step =
+            !loadingRun?.active &&
+            loadingRun?.steps?.find((s) => s.key === "analysis");
+          return step && ["failed", "blocked", "partial"].includes(step.status)
+            ? step.message || "The rating did not finish. Try again."
+            : null;
+        })(),
         priceHistory: priceRead?.data,
         // For the optional widgets (chart, activity, business, glance,
         // targets, watch); the same values the Overview details receive.

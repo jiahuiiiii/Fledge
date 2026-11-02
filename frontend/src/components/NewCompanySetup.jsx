@@ -119,9 +119,11 @@ export default function NewCompanySetup({
   // Only AI switched off rules the choice out. While availability is still
   // being checked, or another analysis is running, it can be chosen now: the
   // analysis waits for the news to be collected and for its turn.
-  const aiOff = ai.state === "disabled";
+  const aiOff = ai.state === "disabled" || ai.state === "key_rejected";
   const analyseNote = aiOff
-    ? "AI analysis is switched off in this workspace, so this can’t be chosen. The news still shows, without labels."
+    ? ai.state === "key_rejected"
+      ? "The AI provider rejected the API key, so this can’t be chosen until a valid key is in .env. The news still shows, without labels."
+      : "AI analysis is switched off in this workspace, so this can’t be chosen. The news still shows, without labels."
     : !ready
       ? "You can choose this now. It starts by itself once the news has been collected."
       : ai.state === "running"

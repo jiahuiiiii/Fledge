@@ -13,6 +13,13 @@ export function modelAvailability(status, capability = "enabled") {
         "AI analysis is switched off for this workspace. Saved research and source updates remain available.",
       detail: "AI is disabled or its connection has not been configured.",
     };
+  if (status.key_rejected)
+    return {
+      blocked: true,
+      state: "key_rejected",
+      message:
+        "The AI provider rejected the API key. Put a valid key in the .env file; AI analysis is paused until then. Saved research stays available.",
+    };
   if (status.budget?.running > 0)
     return {
       blocked: true,

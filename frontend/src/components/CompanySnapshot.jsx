@@ -13,6 +13,7 @@ import {
   countLabel,
   countMood,
   groupByTone,
+  lastRatedLabel,
   newsMeaning,
   peopleMeaning,
   priceLine,
@@ -191,6 +192,7 @@ export default function CompanySnapshot({
   const postGroups = groupByTone(
     items.filter((item) => item.kind === "social"),
   );
+  const lastRated = reading ? lastRatedLabel(reading.cutoff) : null;
   const { linked } = worldForCompany(world, instrumentId, 2);
   const links = linked.filter((item) => item.link);
   const worldState = worldLight(linked, name);
@@ -199,7 +201,7 @@ export default function CompanySnapshot({
       key: "news",
       title: "News",
       mood: countMood(newsGroups),
-      status: countLabel(newsGroups),
+      status: countLabel(newsGroups, { lastRated }),
     },
     {
       key: "people",
@@ -209,6 +211,7 @@ export default function CompanySnapshot({
         good: "upbeat",
         bad: "worried",
         neutral: "neutral",
+        lastRated,
       }),
     },
     {
@@ -270,7 +273,7 @@ export default function CompanySnapshot({
                 id="bs-news-title"
                 title="News"
               />
-              <p className="bs-meaning">{newsMeaning(newsGroups)}</p>
+              <p className="bs-meaning">{newsMeaning(newsGroups, lastRated)}</p>
               <ToneHeadlineGroups
                 groups={newsGroups}
                 onSource={onSource}
@@ -289,7 +292,9 @@ export default function CompanySnapshot({
                 id="bs-people-title"
                 title="People online"
               />
-              <p className="bs-meaning">{peopleMeaning(postGroups)}</p>
+              <p className="bs-meaning">
+                {peopleMeaning(postGroups, lastRated)}
+              </p>
               <ToneHeadlineGroups
                 groups={postGroups}
                 onSource={onSource}

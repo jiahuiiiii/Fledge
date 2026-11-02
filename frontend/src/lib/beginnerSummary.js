@@ -33,7 +33,8 @@ const ITEM_TONE = {
 export const itemTone = (tone) => ITEM_TONE[tone] || null;
 
 const PLATFORM = { reddit: "Reddit", hackernews: "Hacker News", x: "X" };
-export const platformName = (platform) => PLATFORM[platform || "reddit"] || platform;
+export const platformName = (platform) =>
+  PLATFORM[platform || "reddit"] || platform;
 
 // Price move in words, e.g. "up 1.2% today".
 export function priceLine(quote) {
@@ -44,7 +45,8 @@ export function priceLine(quote) {
   })}`;
   if (quote.change_percent == null) return { price, move: null, mood: "none" };
   const pct = Math.abs(Number(quote.change_percent)).toFixed(1);
-  if (Number(pct) === 0) return { price, move: "flat since the last close", mood: "none" };
+  if (Number(pct) === 0)
+    return { price, move: "flat since the last close", mood: "none" };
   const up = quote.change_percent > 0;
   return {
     price,
@@ -128,14 +130,22 @@ export function oneLine({ newsTone, newsCount = 0, social = [], links = [] }) {
     parts.push(
       total === 1
         ? `1 world headline ${world[0].replace(/^1 /, "")}`
-        : lead + (world.length > 1 ? `${world.slice(0, -1).join(", ")} and ${world.at(-1)}` : world[0]),
+        : lead +
+            (world.length > 1
+              ? `${world.slice(0, -1).join(", ")} and ${world.at(-1)}`
+              : world[0]),
     );
   }
   // A closing pointer, never a buy/sell call: where to look first.
   const worrying = newsMood === "bad" || hurt > 0;
-  const calm = !worrying && (newsMood === "good" || newsMood === "none" && !newsCount) && parts.length > 1;
-  if (worrying) parts.push("Worth reading the headlines below before you decide anything");
-  else if (calm && NEWS_LINE[newsMood]) parts.push("Nothing in the saved news looks worrying right now");
+  const calm =
+    !worrying &&
+    (newsMood === "good" || (newsMood === "none" && !newsCount)) &&
+    parts.length > 1;
+  if (worrying)
+    parts.push("Worth reading the headlines below before you decide anything");
+  else if (calm && NEWS_LINE[newsMood])
+    parts.push("Nothing in the saved news looks worrying right now");
   return parts.map((p) => p[0].toUpperCase() + p.slice(1) + ".").join(" ");
 }
 
@@ -150,9 +160,19 @@ function combinedMood(tones = []) {
 }
 
 // News light from the saved news reading (or saved updates when unread).
-export function newsLight({ tone, counts, analysed = 0, newsCount = 0, latest }) {
+export function newsLight({
+  tone,
+  counts,
+  analysed = 0,
+  newsCount = 0,
+  latest,
+}) {
   const mood = analysed ? toneMood(tone) : "none";
-  const status = analysed ? plainTone(tone) : newsCount ? "Not read yet" : "No news yet";
+  const status = analysed
+    ? plainTone(tone)
+    : newsCount
+      ? "Not read yet"
+      : "No news yet";
   const usable = ["positive", "negative", "mixed", "neutral"].reduce(
     (n, k) => n + (counts?.[k] || 0),
     0,
@@ -164,7 +184,8 @@ export function newsLight({ tone, counts, analysed = 0, newsCount = 0, latest })
     reason = `${counts.negative || 0} of ${usable} recent articles sound worried.`;
   else if (analysed && mood === "mixed")
     reason = "Recent articles pull in both directions.";
-  else if (analysed) reason = "Too few clear articles to tell which way news leans.";
+  else if (analysed)
+    reason = "Too few clear articles to tell which way news leans.";
   else if (newsCount)
     reason = `${plural(newsCount, "saved update")}, not read by AI yet.`;
   else reason = "No company news saved yet.";
@@ -203,9 +224,14 @@ export function worldLight(linked = [], name = "this company") {
     ]
       .filter(Boolean)
       .join(", ");
-    const mood = help && hurt ? "mixed" : hurt ? "bad" : help ? "good" : "mixed";
+    const mood =
+      help && hurt ? "mixed" : hurt ? "bad" : help ? "good" : "mixed";
     return {
-      key: "world", title: "World", mood, status, hurt,
+      key: "world",
+      title: "World",
+      mood,
+      status,
+      hurt,
       reason: hurt
         ? `${hurt === 1 ? "One world event" : `${hurt} world events`} could hurt ${name}. Read why below.`
         : `No linked world event looks likely to hurt ${name}.`,
@@ -213,11 +239,19 @@ export function worldLight(linked = [], name = "this company") {
   }
   if (linked.length)
     return {
-      key: "world", title: "World", mood: "none", status: "In the news", hurt: 0,
+      key: "world",
+      title: "World",
+      mood: "none",
+      status: "In the news",
+      hurt: 0,
       reason: `“${linked[0].article.headline}” names ${name}.`,
     };
   return {
-    key: "world", title: "World", mood: "none", status: "Nothing linked", hurt: 0,
+    key: "world",
+    title: "World",
+    mood: "none",
+    status: "Nothing linked",
+    hurt: 0,
     reason: `No recent world headline is linked to ${name} yet.`,
   };
 }
@@ -228,19 +262,49 @@ export function dayLabel(value, now = Date.now()) {
   if (!Number.isFinite(t)) return "";
   const day = (ms) =>
     new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Singapore" }).format(ms);
-  const diff = Math.round((Date.parse(day(now)) - Date.parse(day(t))) / 86400e3);
+  const diff = Math.round(
+    (Date.parse(day(now)) - Date.parse(day(t))) / 86400e3,
+  );
   if (diff <= 0) return "Today";
   if (diff === 1) return "Yesterday";
-  const fmt = diff < 7 ? { weekday: "short" } : { day: "numeric", month: "short" };
-  return new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Singapore", ...fmt }).format(t);
+  const fmt =
+    diff < 7 ? { weekday: "short" } : { day: "numeric", month: "short" };
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Singapore",
+    ...fmt,
+  }).format(t);
 }
 
 // Newest company news, posts and linked world headlines, merged by date.
-export function whatHappened({ news = [], posts = [], world = [], limit = 6, now = Date.now() }) {
+export function whatHappened({
+  news = [],
+  posts = [],
+  world = [],
+  limit = 6,
+  now = Date.now(),
+}) {
   const rows = [
-    ...news.map((s) => ({ id: `n-${s.id}`, kind: "news", text: s.headline, at: s.published_at, item: s })),
-    ...posts.map((s) => ({ id: `p-${s.id}`, kind: "post", text: s.headline, at: s.published_at, item: s })),
-    ...world.map((x) => ({ id: `w-${x.article.id}`, kind: "world", text: x.article.headline, at: x.article.published_at, url: x.article.url })),
+    ...news.map((s) => ({
+      id: `n-${s.id}`,
+      kind: "news",
+      text: s.headline,
+      at: s.published_at,
+      item: s,
+    })),
+    ...posts.map((s) => ({
+      id: `p-${s.id}`,
+      kind: "post",
+      text: s.headline,
+      at: s.published_at,
+      item: s,
+    })),
+    ...world.map((x) => ({
+      id: `w-${x.article.id}`,
+      kind: "world",
+      text: x.article.headline,
+      at: x.article.published_at,
+      url: x.article.url,
+    })),
   ].filter((r) => r.text && Number.isFinite(Date.parse(r.at)));
   return rows
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
@@ -264,8 +328,24 @@ export function groupByTone(items = []) {
   return groups;
 }
 
+// "17 Oct": when the saved AI reading was made (Singapore time).
+export function lastRatedLabel(cutoff) {
+  const when = Date.parse(cutoff);
+  if (!Number.isFinite(when)) return null;
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    timeZone: "Asia/Singapore",
+  }).format(when);
+}
+
 // "2 good, 1 bad, 3 just facts" — counts instead of a vague mood word.
-export function countLabel(groups, { good = "good", bad = "bad", neutral = "neutral" } = {}) {
+// `lastRated` ("17 Oct"): an older reading exists that these items are newer
+// than, so say when it was rather than only "not rated yet".
+export function countLabel(
+  groups,
+  { good = "good", bad = "bad", neutral = "neutral", lastRated = null } = {},
+) {
   const parts = [
     groups.good.length && `${groups.good.length} ${good}`,
     groups.bad.length && `${groups.bad.length} ${bad}`,
@@ -273,7 +353,10 @@ export function countLabel(groups, { good = "good", bad = "bad", neutral = "neut
     groups.neutral.length && `${groups.neutral.length} ${neutral}`,
   ].filter(Boolean);
   if (parts.length) return parts.join(", ");
-  if (groups.unrated.length) return `${groups.unrated.length} new, not rated yet`;
+  if (groups.unrated.length)
+    return lastRated
+      ? `${groups.unrated.length} new since the last rating (${lastRated})`
+      : `${groups.unrated.length} new, not rated yet`;
   return "Nothing saved yet";
 }
 
@@ -288,11 +371,10 @@ export function countMood(groups) {
 }
 
 // What the mix of headlines means, in words a beginner can act on safely.
-export function newsMeaning(groups) {
+export function newsMeaning(groups, lastRated = null) {
   const good = groups.good.length;
   const bad = groups.bad.length;
-  if (good && bad)
-    return "There is good and bad news. Read both sides below.";
+  if (good && bad) return "There is good and bad news. Read both sides below.";
   if (bad)
     return "The recent news is bad for the company. Read why below; bad news doesn’t always mean the price falls.";
   if (good)
@@ -300,24 +382,33 @@ export function newsMeaning(groups) {
   if (groups.mixed.length || groups.neutral.length)
     return "The recent news mostly reports what happened, without clearly good or bad news for the company.";
   if (groups.unrated.length)
-    return "Fledge hasn’t rated these yet. Read the headlines and judge for yourself.";
+    return lastRated
+      ? `These are newer than Fledge’s last rating on ${lastRated}. Rate them, or read the headlines and judge for yourself.`
+      : "Fledge hasn’t rated these yet. Read the headlines and judge for yourself.";
   return "No company news is saved yet.";
 }
 
-export function peopleMeaning(groups) {
+export function peopleMeaning(groups, lastRated = null) {
   const up = groups.good.length;
   const down = groups.bad.length;
   const both = groups.mixed.length;
   const tail = " Online posts are opinions, not facts.";
   if (up && down)
-    return (up > down
-      ? "Most posts are upbeat, but some are worried."
-      : down > up
-        ? "Most posts are worried, but some are upbeat."
-        : "Posts are split between upbeat and worried.") + tail;
+    return (
+      (up > down
+        ? "Most posts are upbeat, but some are worried."
+        : down > up
+          ? "Most posts are worried, but some are upbeat."
+          : "Posts are split between upbeat and worried.") + tail
+    );
   if (down) return "Posts sound worried." + tail;
   if (up) return "Posts sound upbeat. Online hype can be wrong.";
   if (both) return "Posts see both good and bad sides." + tail;
-  if (groups.unrated.length) return "These posts haven’t been rated yet." + tail;
+  if (groups.unrated.length)
+    return (
+      (lastRated
+        ? `These posts are newer than Fledge’s last rating on ${lastRated}.`
+        : "These posts haven’t been rated yet.") + tail
+    );
   return "No posts about this company are saved yet.";
 }

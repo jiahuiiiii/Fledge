@@ -139,3 +139,17 @@ test("groups headlines by tone and labels them with counts", () => {
   assert.match(peopleMeaning(groupByTone([{ tone: "positive" }])), /hype can be wrong/);
   assert.match(peopleMeaning(groupByTone([{ tone: "positive" }, { tone: "positive" }, { tone: "negative" }])), /^Most posts are upbeat, but some are worried/);
 });
+
+test("an older reading is named instead of a bare 'not rated yet'", async () => {
+  const { lastRatedLabel } = await import("./beginnerSummary.js");
+  const unrated = groupByTone([{ tone: null }, { tone: null }]);
+  const date = lastRatedLabel("2026-10-17T01:14:35.105366+00:00");
+  assert.equal(date, "17 Oct");
+  assert.equal(countLabel(unrated, { lastRated: date }), "2 new since the last rating (17 Oct)");
+  assert.match(newsMeaning(unrated, date), /newer than Fledge’s last rating on 17 Oct/);
+  assert.match(peopleMeaning(unrated, date), /newer than Fledge’s last rating on 17 Oct.*opinions, not facts/);
+  // Rated items are counted as before; without an older reading nothing changes.
+  assert.equal(countLabel(groupByTone([{ tone: "positive" }, { tone: null }]), { lastRated: date }), "1 good");
+  assert.equal(countLabel(unrated), "2 new, not rated yet");
+  assert.equal(lastRatedLabel("not a date"), null);
+});

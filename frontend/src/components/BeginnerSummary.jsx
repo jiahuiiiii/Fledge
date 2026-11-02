@@ -7,6 +7,7 @@ import { overviewNews } from "../lib/overviewSections";
 import { sourceCoverage } from "../lib/sourceCoverage";
 import {
   countLabel,
+  lastRatedLabel,
   countMood,
   groupByTone,
   newsMeaning,
@@ -98,6 +99,11 @@ export default function BeginnerSummary() {
     news.length ? (analysedNews.length ? analysedNews : news) : [],
   );
   const postGroups = groupByTone(allPosts);
+  // An older reading exists, but none of (or not all of) the current items are
+  // in it: say when it was and offer to rate the newer ones.
+  const lastRated = reading ? lastRatedLabel(reading.cutoff) : null;
+  const ratingStale =
+    !!reading && newsGroups.unrated.length + postGroups.unrated.length > 0;
   const links = linked.filter((x) => x.link);
   const worldState = worldLight(linked, name);
   const lights = [
@@ -105,7 +111,7 @@ export default function BeginnerSummary() {
       key: "news",
       title: "News",
       mood: countMood(newsGroups),
-      status: countLabel(newsGroups),
+      status: countLabel(newsGroups, { lastRated }),
     },
     {
       key: "people",
@@ -115,6 +121,7 @@ export default function BeginnerSummary() {
         good: "upbeat",
         bad: "worried",
         neutral: "neutral",
+        lastRated,
       }),
     },
     {
@@ -142,8 +149,10 @@ export default function BeginnerSummary() {
     worldState,
     lights,
     pointer,
-    newsMeaning: newsMeaning(newsGroups),
-    peopleMeaning: peopleMeaning(postGroups),
+    newsMeaning: newsMeaning(newsGroups, lastRated),
+    peopleMeaning: peopleMeaning(postGroups, lastRated),
+    lastRated,
+    ratingStale,
   };
 
   return (
