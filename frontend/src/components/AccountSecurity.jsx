@@ -1,6 +1,7 @@
 import { Button, Modal } from "./ui";
 import { useState } from "react";
 import { api } from "../api/client";
+import PasswordInput from "./PasswordInput";
 
 // A recovery code is shown once, right after it is made. The server keeps
 // only a hash, so nobody (including us) can show it again.
@@ -141,9 +142,8 @@ export function ForgotPasswordForm({ onDone, onBack }) {
       </div>
       <div className="account-field">
         <label htmlFor="reset-password">New password</label>
-        <input
+        <PasswordInput
           id="reset-password"
-          type="password"
           autoComplete="new-password"
           maxLength={128}
           placeholder="At least 8 characters"
@@ -286,9 +286,8 @@ export function AccountSecurityDialog({
             )}
             <div className="account-field">
               <label htmlFor="security-current">Current password</label>
-              <input
+              <PasswordInput
                 id="security-current"
-                type="password"
                 autoComplete="current-password"
                 maxLength={128}
                 value={current}
@@ -297,9 +296,8 @@ export function AccountSecurityDialog({
             </div>
             <div className="account-field">
               <label htmlFor="security-new">New password</label>
-              <input
+              <PasswordInput
                 id="security-new"
-                type="password"
                 autoComplete="new-password"
                 maxLength={128}
                 placeholder="At least 8 characters"

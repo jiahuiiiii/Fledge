@@ -674,6 +674,7 @@ class InvestorProfile(BaseModel):
     interests: list[str] = Field(default_factory=list, max_length=9)
     horizon: str | None = Field(default=None, max_length=16)
     goal: str = Field(max_length=16)
+    goals: list[str] | None = Field(default=None, max_length=5)
     detail_mode: str | None = Field(default=None, max_length=16)
     trade_frequency: str | None = Field(default=None, max_length=16)
     drop_reaction: str | None = Field(default=None, max_length=16)

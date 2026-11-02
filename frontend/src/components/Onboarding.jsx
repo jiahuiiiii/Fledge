@@ -25,6 +25,8 @@ export const START_QUESTIONS = [
   {
     key: "goal",
     title: "What do you want from Fledge?",
+    hint: "Pick all that apply.",
+    multi: true,
     options: [
       ["news", "Keep up with news", "What’s happening and why"],
       ["learn", "Understand a company", "Plain-English explanations"],
@@ -68,6 +70,51 @@ export const TYPE_QUESTIONS = [
 
 const label = (questions, key, value) =>
   questions.find((q) => q.key === key)?.options.find(([v]) => v === value)?.[1];
+
+// A question with several answers: checkboxes, each its own Tab stop.
+function MultiChoice({ question, value = [], onPick }) {
+  const id = `q-${question.key}`;
+  const toggle = (key) =>
+    onPick(
+      value.includes(key) ? value.filter((v) => v !== key) : [...value, key],
+    );
+  return (
+    <fieldset
+      className="onboarding-question"
+      role="group"
+      aria-labelledby={id}
+      id={`${id}-group`}
+    >
+      <legend id={id} tabIndex={-1}>
+        {question.title}
+      </legend>
+      {question.hint && <p className="fine">{question.hint}</p>}
+      <div className="onboarding-options">
+        {question.options.map(([key, text, detail]) => {
+          const selected = value.includes(key);
+          return (
+            <button
+              type="button"
+              key={key}
+              role="checkbox"
+              aria-checked={selected}
+              className={selected ? "selected" : ""}
+              onClick={() => toggle(key)}
+            >
+              <span className="onboarding-check" aria-hidden="true">
+                {selected ? "✓" : ""}
+              </span>
+              <span className="onboarding-text">
+                <strong>{text}</strong>
+                {detail && <span>{detail}</span>}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
 
 // One radio group: a single Tab stop, arrow keys move and select (WAI-ARIA).
 function Choice({ question, value, onPick }) {
@@ -176,6 +223,9 @@ export default function Onboarding({
         "drop_reaction",
       ])
         if (profile[key]) start[key] = profile[key];
+    // Earlier answers may hold one goal or several.
+    if (profile?.completed)
+      start.goal = profile.goals?.length ? profile.goals : [profile.goal];
     return start;
   });
   const [saved, setSaved] = useState(null);
@@ -187,7 +237,9 @@ export default function Onboarding({
     heading.current?.focus();
     window.scrollTo(0, 0);
   }, [saved]);
-  const ready = questions.every((q) => answers[q.key]);
+  const answered = (q) =>
+    q.multi ? answers[q.key]?.length > 0 : !!answers[q.key];
+  const ready = questions.every(answered);
   const pick = (key) => (value) =>
     setAnswers((current) => ({ ...current, [key]: value }));
 
@@ -195,7 +247,7 @@ export default function Onboarding({
     event.preventDefault();
     if (!ready) {
       // Take people to the question they missed, not just a message below.
-      const missing = questions.find((q) => !answers[q.key]);
+      const missing = questions.find((q) => !answered(q));
       setError(`Pick an answer for “${missing.title}”`);
       const legend = document.getElementById(`q-${missing.key}`);
       legend?.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -207,7 +259,12 @@ export default function Onboarding({
     try {
       const body = {
         experience: answers.experience || profile?.experience || "new",
-        goal: answers.goal || profile?.goal || "learn",
+        goals: answers.goal?.length
+          ? answers.goal
+          : profile?.goals?.length
+            ? profile.goals
+            : [profile?.goal || "learn"],
+        goal: (answers.goal?.[0] ?? profile?.goal) || "learn",
         interests: (profile?.interests || []).filter((i) => i !== "unsure"),
         trade_frequency: answers.trade_frequency ?? null,
         drop_reaction: answers.drop_reaction ?? null,
@@ -289,14 +346,23 @@ export default function Onboarding({
         {/* Logo, title and buttons stay put; only the questions scroll
             (on screens wider than a phone). */}
         <div className="onboarding-body">
-          {questions.map((question) => (
-            <Choice
-              key={question.key}
-              question={question}
-              value={answers[question.key]}
-              onPick={pick(question.key)}
-            />
-          ))}
+          {questions.map((question) =>
+            question.multi ? (
+              <MultiChoice
+                key={question.key}
+                question={question}
+                value={answers[question.key]}
+                onPick={pick(question.key)}
+              />
+            ) : (
+              <Choice
+                key={question.key}
+                question={question}
+                value={answers[question.key]}
+                onPick={pick(question.key)}
+              />
+            ),
+          )}
           {stage !== "type" &&
             answers.experience === "active" &&
             onTurnOnPro && (

@@ -75,7 +75,7 @@
 .telegram-setup :is(p, ol) {
   margin: 0;
 }
-.telegram-settings a {
+.telegram-settings a:not(.ui-button) {
   color: var(--color-accent-light);
 }
 .telegram-settings code {

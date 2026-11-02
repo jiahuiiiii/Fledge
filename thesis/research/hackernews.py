@@ -14,6 +14,7 @@ import httpx
 from thesis.db import transaction, one, rows
 from .catalogue import COMPANIES, mentions, company_search_name
 from .social import plain_summary
+from .language import looks_english
 
 RECRUITMENT = re.compile(
     r"r[ée]sum[ée]|willing to relocate|looking for (?:work|a job)|(?:remote|onsite).{0,80}(?:full[ -]time|founding engineer)|we(?:’|'|&#x27;)?re hiring",
@@ -100,6 +101,7 @@ def parse_item(raw, key, symbol, now, *, lookback_days=7, company_name=None, ver
         or not body
         or len(body) > 12000
         or RECRUITMENT.search(body)
+        or not looks_english(body)
         or not (mentions(body, symbol, company_name) or (
             verified_parent and str(raw.get('parent')) == verified_parent['parent_key'][3:]
             and mentions(verified_parent['title'] + ' ' + verified_parent['body'], symbol, company_name)

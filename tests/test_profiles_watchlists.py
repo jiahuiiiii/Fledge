@@ -146,6 +146,19 @@ def test_not_sure_what_to_look_at_gets_a_starting_point(owner):
     assert 'product you use' in page['next_step']['label']
 
 
+def test_several_goals_can_be_saved_and_the_first_stays_the_main_one(owner):
+    who = account()
+    saved = profile.save(who, 'stocks', goals=['monitor', 'news'])
+    assert saved['goals'] == ['monitor', 'news']
+    assert saved['goal'] == 'monitor'
+    assert profile.get(who)['goals'] == ['monitor', 'news']
+    # An older single-goal save still works and reads back as one goal.
+    assert profile.save(who, 'stocks', goal='learn')['goals'] == ['learn']
+    for bad in (['news', 'news'], ['news', 'trade']):
+        with pytest.raises(ValueError):
+            profile.save(who, 'stocks', goals=bad)
+
+
 def test_removing_a_company_turns_its_watch_off(owner, monkeypatch):
     monkeypatch.setattr(news_watch.sentiment.market_brief, 'company_for', lambda iid: True)
     ids = companies(6)

@@ -31,6 +31,7 @@ def public(row):
         'interests': list(row['interests']),
         'horizon': row['horizon'],
         'goal': row['goal'],
+        'goals': list(row['goals']) or [row['goal']],
         'trade_frequency': row['trade_frequency'],
         'drop_reaction': row['drop_reaction'],
         'investor_type': classify(row),
@@ -50,8 +51,13 @@ HORIZON_FROM_FREQUENCY = {'daily': 'short', 'weekly': 'short', 'monthly': 'long'
 
 
 def save(owner, experience, interests=(), horizon=None, goal='learn', detail_mode=None,
-         trade_frequency=None, drop_reaction=None):
+         trade_frequency=None, drop_reaction=None, goals=None):
     interests = list(interests)
+    # Several goals may be chosen; `goal` keeps the first one.
+    goals = list(goals) if goals else [goal]
+    if (not goals or len(set(goals)) != len(goals) or any(g not in GOALS for g in goals)):
+        raise ValueError('Answer each question before continuing.')
+    goal = goals[0]
     horizon = horizon or HORIZON_FROM_FREQUENCY.get(trade_frequency, 'unsure')
     if experience not in EXPERIENCE or horizon not in HORIZONS or goal not in GOALS:
         raise ValueError('Answer each question before continuing.')
@@ -67,14 +73,14 @@ def save(owner, experience, interests=(), horizon=None, goal='learn', detail_mod
     if mode not in MODES:
         raise ValueError('Choose how much detail to show.')
     with transaction(owner) as conn:
-        row = one(conn, '''INSERT INTO investor_profiles(owner_id,experience,interests,horizon,goal,detail_mode,
+        row = one(conn, '''INSERT INTO investor_profiles(owner_id,experience,interests,horizon,goal,goals,detail_mode,
             trade_frequency,drop_reaction)
-            VALUES(%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)
             ON CONFLICT(owner_id) DO UPDATE SET experience=EXCLUDED.experience,interests=EXCLUDED.interests,
-            horizon=EXCLUDED.horizon,goal=EXCLUDED.goal,
+            horizon=EXCLUDED.horizon,goal=EXCLUDED.goal,goals=EXCLUDED.goals,
             detail_mode=COALESCE(%s,investor_profiles.detail_mode),
             trade_frequency=EXCLUDED.trade_frequency,drop_reaction=EXCLUDED.drop_reaction,updated_at=now()
-            RETURNING *''', (owner, experience, interests, horizon, goal, mode, trade_frequency, drop_reaction,
+            RETURNING *''', (owner, experience, interests, horizon, goal, goals, mode, trade_frequency, drop_reaction,
                   detail_mode))
     return public(row)
 

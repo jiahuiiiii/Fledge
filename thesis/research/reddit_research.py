@@ -13,6 +13,7 @@ from uuid import uuid4, uuid5, NAMESPACE_URL
 import httpx
 from thesis.db import transaction, one, rows
 from thesis.service import Conflict
+from .language import looks_english
 from . import social
 from .catalogue import company_search_name, mentions
 from .social_threads import save
@@ -139,7 +140,7 @@ def replies(raw, post, now, days):
         except (ValueError,OverflowError,OSError):
             continue
         body=child['body'].strip()
-        if not body or len(body)>12000 or not max(now-timedelta(days=days),post['published_at'])<=published<=now or child.get('author')=='AutoModerator':
+        if not body or len(body)>12000 or not max(now-timedelta(days=days),post['published_at'])<=published<=now or child.get('author')=='AutoModerator' or not looks_english(body):
             continue
         title='Reddit comment'
         result.append(dict(post_key=key,feed=post['feed'],title=title,body=body,
