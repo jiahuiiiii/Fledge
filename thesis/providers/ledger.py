@@ -538,6 +538,9 @@ def _key_hash(key):
 def key_rejected(model):
     """True when the key configured for this model was rejected (401) and
     has not been changed since."""
+    with _rejected_lock:
+        if not _rejected_keys:
+            return False  # Nothing rejected: no need to read any key.
     try:
         from .settings import live_key
         key = live_key(model)
