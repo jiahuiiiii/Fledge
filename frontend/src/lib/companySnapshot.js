@@ -149,7 +149,7 @@ const check = (label, value) => ({
   state: value == null ? "unknown" : value ? "pass" : "fail",
 });
 
-export function snapshot(data) {
+export function snapshot(data, today = new Date().toISOString().slice(0, 10)) {
   const depth = data?.financial_depth;
   const growth = annualGrowth(depth);
   const revenue = trailing(depth, "revenue");
@@ -180,8 +180,7 @@ export function snapshot(data) {
       `Saved management guidance is ${range} of revenue for ${period}.` +
         (!outlook.unit ? " Currency is not specified by the source." : "") +
         (!outlook.periodEnd ? " Exact ending date is not stated." : "") +
-        (outlook.periodEnd &&
-        outlook.periodEnd < new Date().toISOString().slice(0, 10)
+        (outlook.periodEnd && outlook.periodEnd < today
           ? " This forecast period has ended."
           : ""),
     );
