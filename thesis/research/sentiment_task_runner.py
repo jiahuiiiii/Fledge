@@ -233,7 +233,7 @@ def run(packet, reused=None, *, transport=None, progress=None, prefilter=None, s
                               skipped=len(skip),call_ids=[str(c['id']) for c in quick])
         else:
             report('Quick relevance check · '+str(len(fresh))+' new sources')
-            _,skip,quick_record,quick=relevance_prefilter.run(sub,transport=transport)
+            _,skip,quick_record,quick=relevance_prefilter.run(sub,transport=transport,retry=retry_failed)
             skip=set(skip)
         calls+=quick
         for source in fresh:
