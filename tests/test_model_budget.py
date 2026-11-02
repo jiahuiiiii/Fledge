@@ -893,3 +893,51 @@ def test_depth_transport_timeout_keeps_full_hold_and_never_retries(monkeypatch):
         ledger.execute('depth-timeout', 'test', value)
     # An explicit second attempt is now sent again; no automatic retry happens.
     assert posts == [1, 1] and ledger.snapshot()['unresolved'] == 2
+
+
+def test_rejected_key_pauses_calls_until_it_changes(monkeypatch):
+    # A 401 means the configured key is wrong for every request, so after one the
+    # ledger stops sending with it: no reserve, no HTTP, nothing charged, until a
+    # different key reaches .env. The doomed first call is retained, not retried.
+    import importlib
+    adapter = importlib.import_module('thesis.providers.openai')
+    config = importlib.import_module('thesis.providers.settings')
+    import thesis.wake as wake
+    posts = []
+
+    class RejectingClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def post(self, *args, **kwargs):
+            posts.append(1)
+            return adapter.httpx.Response(401, json={'error': 'invalid key'})
+
+    monkeypatch.setattr(wake, 'settled', lambda: True)
+    monkeypatch.setattr(config, 'live_key', lambda _: 'rejected-key')
+    monkeypatch.setattr(adapter, 'live_key', lambda _: 'rejected-key')
+    monkeypatch.setattr(adapter.httpx, 'Client', RejectingClient)
+    ledger.forget_rejected_keys()
+    try:
+        assert not ledger.key_rejected(MODEL)
+        # The first live call hits the 401 and records the rejection.
+        with pytest.raises(ledger.KeyRejected):
+            ledger.execute('rejected-first', 'test', body())
+        assert ledger.key_rejected(MODEL)
+        assert posts == [1] and ledger.snapshot()['unresolved'] == 1
+        # A second call with the same key is refused before any HTTP is sent.
+        with pytest.raises(ledger.KeyRejected):
+            ledger.execute('rejected-second', 'test', body())
+        assert posts == [1] and ledger.snapshot()['unresolved'] == 1
+        # Putting a different key in .env clears the block; calls can resume.
+        monkeypatch.setattr(config, 'live_key', lambda _: 'fresh-key')
+        monkeypatch.setattr(adapter, 'live_key', lambda _: 'fresh-key')
+        assert not ledger.key_rejected(MODEL)
+    finally:
+        ledger.forget_rejected_keys()

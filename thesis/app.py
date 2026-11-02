@@ -209,11 +209,28 @@ async def lifespan(app):
             owner = next(iter(auth.background_owners()), None)
             if owner is None:
                 return
+            # Saved AI readings first: alerts and the company read need them,
+            # and decoding one is the slow part of a first open.
+            from .research import sentiment
+            with transaction(owner) as conn:
+                warm = sentiment.warm_ids(conn, owner)
+            for start in range(0, len(warm), 4):
+                if stop.wait(0.5):
+                    return
+                # Stop at three quarters full: past that, each new reading
+                # would push out one just warmed.
+                if sentiment.reading_cache_filled() >= 0.75:
+                    break
+                with transaction(owner) as conn:
+                    sentiment.readings(conn, warm[start:start + 4])
             with transaction(owner) as conn:
                 companies = [str(r["instrument_id"]) for r in rows(conn,
                     "SELECT DISTINCT instrument_id FROM disclosure_documents WHERE source_id='sec-disclosures'")]
             for iid in companies:
-                if stop.is_set():
+                # Pause between companies: this shares the Python interpreter
+                # with page requests, and a back-to-back run of every company
+                # made pages opened just after a restart wait seconds.
+                if stop.wait(1.0):
                     return
                 service.financial_workspace(owner, iid)
                 with transaction(owner, consistent=True) as conn:
@@ -362,9 +379,18 @@ async def request_timing(request: Request, call_next):
         f'connect;dur={stats["db_open_ms"]:.0f};desc="{stats["new_connections"]} new connections"'
     )
     if total >= SLOW_REQUEST_MS:
+        # Load and thread count tell a heavy request apart from one that sat
+        # waiting for the CPU: a small database share with a load above the
+        # CPU count means background work (or another process) had the machine.
+        try:
+            load = os.getloadavg()[0]
+        except OSError:
+            load = float("nan")
         logging.getLogger("thesis.timing").warning(
-            "Slow request %s %s: %.0f ms total, %.0f ms in %d database transactions (%d new connections)",
+            "Slow request %s %s: %.0f ms total, %.0f ms in %d database transactions (%d new connections); "
+            "load %.1f on %d CPUs, %d threads",
             request.method, request.url.path, total, stats["db_ms"], stats["transactions"], stats["new_connections"],
+            load, os.cpu_count() or 0, threading.active_count(),
         )
         # When per-statement timing is on (THESIS_SQL_TIMING_MS set), name the
         # few query shapes that cost the most, with how many times each ran, so
@@ -772,12 +798,28 @@ def remove_from_watchlist(instrument_id: UUID):
 
 
 @app.get("/api/v1/workspace")
-def workspace(instrument_id: UUID = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"), include_financials: bool = True):
+def workspace(instrument_id: UUID = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"), include_financials: bool = True, known: str = "", shared: bool = False):
+    """The company read. With `shared=1` (sent only by pages that can put
+    them back), repeated source texts are sent once in `source_texts`; a page
+    opened before this change gets every text in place. The answer carries a
+    `revision`; a re-read that passes the revision it already has as `known`
+    gets `{"unchanged": true}` when nothing changed, instead of the whole
+    company again."""
+    from fastapi.encoders import jsonable_encoder
+    from .workspace_payload import share_texts, revision
+
     result = service.state(auth.current_owner(), str(instrument_id), include_financials=include_financials)
     from .db import transaction, one
     with transaction() as conn:
         result["workspace_reset_at"] = one(conn, "SELECT reset_at FROM workspace_settings WHERE singleton")["reset_at"]
-    return {"result": result}
+    result = jsonable_encoder(result)
+    if shared:
+        result = share_texts(result)
+    current = revision(result)
+    if known and known == current:
+        return {"result": {"unchanged": True, "revision": current}}
+    result["revision"] = current
+    return JSONResponse({"result": result})
 
 
 @app.get("/api/v1/home-cards")
@@ -1343,8 +1385,8 @@ def export_idea_alert(check_id: UUID):
 
 @app.get("/api/v1/model-status")
 def model_status():
-    from .providers.ledger import snapshot
-    from .providers.settings import live_key, REASONING_MODEL
+    from .providers.ledger import snapshot, key_rejected
+    from .providers.settings import live_key, MODEL, REASONING_MODEL
 
     try:
         live_key()
@@ -1361,6 +1403,9 @@ def model_status():
             enabled=enabled,
             comparison_enabled=comparison_enabled,
             briefing_enabled=comparison_enabled,
+            # The provider rejected the configured key (HTTP 401) and it has
+            # not been changed: AI requests are paused until it is.
+            key_rejected=key_rejected(MODEL) or key_rejected(REASONING_MODEL),
             budget=snapshot(),
         )
     }
@@ -1725,6 +1770,10 @@ def research_loading(instrument_id: UUID):
 
 ACTIVITY_WAIT_MAX = 25
 ACTIVITY_CHECK_SECONDS = 1.0
+# The saved-data part of the token has no index behind its article lookup, so
+# it is re-checked on every fifth check (about every 5 s); update progress
+# and evaluation jobs stay at every check.
+ACTIVITY_DATA_EVERY = 5
 
 
 @app.get("/api/v1/companies/{instrument_id}/activity")
@@ -1738,8 +1787,11 @@ async def research_activity(instrument_id: UUID, since: str = "", wait: int = 0)
     owner = auth.current_owner()
     iid = str(instrument_id)
     deadline = time.monotonic() + max(0, min(wait, ACTIVITY_WAIT_MAX))
+    saved, checks = None, 0
     while True:
-        token, jobs = await run_in_threadpool(activity, owner, iid)
+        reuse = saved if checks % ACTIVITY_DATA_EVERY else None
+        token, jobs, saved = await run_in_threadpool(activity, owner, iid, reuse)
+        checks += 1
         if token != since or time.monotonic() >= deadline:
             break
         await asyncio.sleep(ACTIVITY_CHECK_SECONDS)

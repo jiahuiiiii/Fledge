@@ -89,6 +89,33 @@ def test_repeat_reuses_settled_quick_check_and_unknown_charge_blocks(owner):
             B.run(other, transport=lambda _: pytest.fail("retry"), prefilter=True)
 
 
+def test_explicit_retry_redispatches_a_held_quick_check(owner):
+    # A quick check whose attempt never settled must not block the manual rating
+    # forever. A scheduled run keeps holding it, but the owner's explicit retry
+    # (the Rate button, retry_failed=True) redispatches it and finishes.
+    p = packet()
+    first = p["sources"][0]["label"]
+
+    def broken(body):
+        raise TimeoutError()
+    with patch.object(B, "check_access"):
+        with pytest.raises(ledger.BudgetBlocked):
+            B.run(p, transport=broken, prefilter=True)
+        # No explicit retry: the uncertain charge is still held, never resent.
+        with pytest.raises(ledger.BudgetBlocked):
+            B.run(p, transport=lambda _: pytest.fail("auto retry"), prefilter=True)
+        # Explicit retry redispatches the stuck quick check and completes.
+        transport, seen = quick({first: "unrelated"})
+        result, _ = B.run(p, transport=transport, prefilter=True, retry_failed=True)
+    assert seen["quick"] >= 1 and result["prefilter"]["skipped"] == 1
+    # The old attempt stays recorded as unresolved for review; the resend settled
+    # under a redispatch key, so a later run reuses it without paying again.
+    assert ledger.snapshot()["unresolved"] >= 1
+    with patch.object(B, "check_access"):
+        again, _ = B.run(p, transport=lambda _: pytest.fail("duplicate after redispatch"), prefilter=True)
+    assert again["prefilter"]["skipped"] == 1
+
+
 def leave_allowance(nano):
     """Represent earlier spending only in the disposable test ledger."""
     with transaction(admin=True) as c:

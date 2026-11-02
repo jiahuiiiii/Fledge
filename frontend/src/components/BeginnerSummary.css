@@ -376,6 +376,9 @@
   color: var(--color-text-2);
   font-size: var(--text-sm);
 }
+.bs-rate .bs-rate-note {
+  color: var(--color-caution-light);
+}
 
 /* Tone groups use quiet surfaces and labelled, coloured headings. */
 .bs-group.tone-good,

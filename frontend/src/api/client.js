@@ -1,6 +1,7 @@
 // Adapted from Kestrel src/api/client.js; same cookie/error/result contract.
 // Managed identities are verified by the server; provider tokens stay there.
 import { companyCache } from "../lib/companyCache.js";
+import { expandSharedTexts } from "../lib/sharedTexts.js";
 
 const BASE = "/api/v1";
 let accountId = null;
@@ -381,11 +382,18 @@ export const api = {
     request(`/companies/${id}/alerts`, { signal }),
   homeCard: (id, { figures = true, signal } = {}) =>
     request(`/companies/${id}/home-card?figures=${figures}`, { signal }),
-  workspace: (instrument_id, { includeFinancials = true, signal } = {}) =>
+  // `known`: the revision of the copy already on screen; an unchanged company
+  // answers `{unchanged: true}` instead of everything again. `shared=1`: this
+  // page puts repeated source texts back (expandSharedTexts), so the server
+  // may send each once.
+  workspace: (
+    instrument_id,
+    { includeFinancials = true, signal, known } = {},
+  ) =>
     request(
-      `/workspace?include_financials=${includeFinancials}${instrument_id ? `&instrument_id=${encodeURIComponent(instrument_id)}` : ""}`,
+      `/workspace?shared=1&include_financials=${includeFinancials}${instrument_id ? `&instrument_id=${encodeURIComponent(instrument_id)}` : ""}${known ? `&known=${encodeURIComponent(known)}` : ""}`,
       { signal },
-    ),
+    ).then(expandSharedTexts),
   // Loaded separately from the workspace so presenting every saved relevance
   // check never delays the page.
   ideaAlerts: ({ signal } = {}) => request("/idea-alerts", { signal }),

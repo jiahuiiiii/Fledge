@@ -64,6 +64,18 @@ def test_api_answers_carry_server_timing():
     assert header.startswith("total;dur=") and "db;dur=" in header
 
 
+def test_slow_request_log_names_database_share_and_machine_load(monkeypatch, caplog):
+    from fastapi.testclient import TestClient
+    from thesis import app as app_module
+
+    monkeypatch.setattr(app_module, "SLOW_REQUEST_MS", 0)
+    with caplog.at_level("WARNING", logger="thesis.timing"):
+        TestClient(app_module.app).get("/api/v1/session")
+    line = next(r.getMessage() for r in caplog.records if r.getMessage().startswith("Slow request"))
+    assert "ms in" in line and "database transactions" in line
+    assert " CPUs, " in line and line.endswith(" threads")
+
+
 def test_idle_worker_pass_skips_accounts_without_work(owner, monkeypatch):
     from thesis import service
     touched = []

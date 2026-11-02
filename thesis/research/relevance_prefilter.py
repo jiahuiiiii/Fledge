@@ -131,8 +131,15 @@ def labels(call, body):
     return found
 
 
-def run(packet, *, transport=None):
-    """Return (kept_ids, skipped_ids, record, calls). Raises BudgetBlocked on unknown charges."""
+def run(packet, *, transport=None, retry=False):
+    """Return (kept_ids, skipped_ids, record, calls). Raises BudgetBlocked on unknown charges.
+
+    `retry` is an explicit, owner-initiated re-run (the manual rating button). It
+    lets a quick check whose earlier attempt never settled be sent again: the
+    ledger redispatches under a new key and keeps the old unresolved charge for
+    review. Scheduled runs pass retry=False and still hold such sources, so an
+    uncertain charge is never resent automatically.
+    """
     from . import parallel
     bodies = plan(packet)
     by_label = {s["label"]: s["id"] for s in packet["sources"]}
@@ -144,7 +151,7 @@ def run(packet, *, transport=None):
                 body["text"]["format"]["schema"]["properties"]["items"]["items"]["properties"]["label"]["enum"]]
         with transaction() as conn:
             saved = ledger.find(conn, key)
-        if saved is None and has_attempt(key):
+        if saved is None and has_attempt(key) and not retry:
             raise HeldSources("An earlier quick relevance check has no settled response. No automatic retry; its charge needs review.", held)
         call = saved or ledger.execute(key, "sentiment:" + POLICY, body, transport=transport)
         if call["status"] != "settled":

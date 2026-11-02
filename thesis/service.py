@@ -55,6 +55,14 @@ def stage_info(conn, instrument_id=INSTRUMENT):
     )
 
 
+# Which saved documents a reader may see for a company as of a cutoff. Shared
+# by the full read and the ids-only check so the two can never disagree.
+PERMITTED_WHERE = (
+    "WHERE d.instrument_id=%s AND s.entitlement IN ('fictional','sec-public','finnhub-pitch','public-news')"
+    " AND v.available_at<=%s"
+)
+
+
 def permitted_documents(conn, cutoff, instrument_id=INSTRUMENT):
     return rows(
         conn,
@@ -62,9 +70,22 @@ def permitted_documents(conn, cutoff, instrument_id=INSTRUMENT):
        FROM document_versions v JOIN documents d ON d.id=v.document_id JOIN sources s ON s.id=d.source_id
        LEFT JOIN document_lineage l ON l.document_version_id=v.id
        LEFT JOIN market_articles m ON m.document_version_id=v.id
-       WHERE d.instrument_id=%s AND s.entitlement IN ('fictional','sec-public','finnhub-pitch','public-news') AND v.available_at<=%s ORDER BY v.available_at,v.id""",
+       """ + PERMITTED_WHERE + " ORDER BY v.available_at,v.id",
         (instrument_id, cutoff),
     )
+
+
+def permitted_document_ids(conn, cutoff, instrument_id=INSTRUMENT):
+    """The ids permitted_documents would return, without reading any text."""
+    return {
+        str(r["id"])
+        for r in rows(
+            conn,
+            "SELECT v.id FROM document_versions v JOIN documents d ON d.id=v.document_id"
+            " JOIN sources s ON s.id=d.source_id " + PERMITTED_WHERE,
+            (instrument_id, cutoff),
+        )
+    }
 
 
 def version_instrument(conn, owner, version_id):
@@ -552,50 +573,65 @@ def history(conn, owner, thesis_id):
         (owner, thesis_id),
     )
     from .research.idea_review import public_result
+    from .research.event_review import public_result as event_public_result
 
-    for version in versions:
-        from .research.event_review import public_result as event_public_result
+    # Each kind of record for every version in one query, grouped back by
+    # version; each version's rows keep the order its own query had.
+    version_ids = [v["id"] for v in versions]
 
-        version["events"] = rows(
-            conn,
-            "SELECT * FROM version_events WHERE owner_id=%s AND version_id=%s ORDER BY condition_id",
-            (owner, version["id"]),
-        )
-        version["event_reviews"] = [
-            event_public_result(r)
-            for r in rows(
-                conn,
-                "SELECT r.*,EXISTS(SELECT 1 FROM event_review_activations a WHERE a.owner_id=r.owner_id AND a.review_id=r.id) activated FROM event_evidence_reviews r WHERE owner_id=%s AND version_id=%s ORDER BY created_at DESC,id",
-                (owner, version["id"]),
-            )
-        ]
-        version["evidence_reviews"] = [
-            public_result(r)
-            for r in rows(
-                conn,
-                "SELECT * FROM idea_evidence_reviews WHERE owner_id=%s AND version_id=%s ORDER BY created_at DESC,id",
-                (owner, version["id"]),
-            )
-        ]
-        version["conditions"] = rows(
-            conn,
-            "SELECT * FROM version_conditions WHERE owner_id=%s AND version_id=%s ORDER BY metric",
-            (owner, version["id"]),
-        )
-        version["evaluations"] = rows(
-            conn,
-            """SELECT e.*,r.action review_action,r.created_at reviewed_at FROM evaluations e
+    def by_version(sql):
+        grouped = {}
+        if version_ids:
+            for r in rows(conn, sql, (owner, version_ids)):
+                grouped.setdefault(str(r["version_id"]), []).append(r)
+        return grouped
+
+    events = by_version(
+        "SELECT * FROM version_events WHERE owner_id=%s AND version_id=ANY(%s::uuid[]) ORDER BY version_id,condition_id"
+    )
+    event_reviews = by_version(
+        "SELECT r.*,EXISTS(SELECT 1 FROM event_review_activations a WHERE a.owner_id=r.owner_id AND a.review_id=r.id) activated FROM event_evidence_reviews r WHERE owner_id=%s AND version_id=ANY(%s::uuid[]) ORDER BY version_id,created_at DESC,id"
+    )
+    evidence_reviews = by_version(
+        "SELECT * FROM idea_evidence_reviews WHERE owner_id=%s AND version_id=ANY(%s::uuid[]) ORDER BY version_id,created_at DESC,id"
+    )
+    conditions = by_version(
+        "SELECT * FROM version_conditions WHERE owner_id=%s AND version_id=ANY(%s::uuid[]) ORDER BY version_id,metric"
+    )
+    evaluations = by_version(
+        """SELECT e.*,r.action review_action,r.created_at reviewed_at FROM evaluations e
            LEFT JOIN review_events r ON r.evaluation_id=e.id AND r.owner_id=e.owner_id
            LEFT JOIN jobs j ON j.owner_id=e.owner_id AND j.fingerprint=e.fingerprint
-           WHERE e.owner_id=%s AND e.version_id=%s ORDER BY j.queue_order DESC NULLS LAST,e.manifest->>'cutoff' DESC,e.created_at DESC""",
-            (owner, version["id"]),
-        )
+           WHERE e.owner_id=%s AND e.version_id=ANY(%s::uuid[]) ORDER BY e.version_id,j.queue_order DESC NULLS LAST,e.manifest->>'cutoff' DESC,e.created_at DESC"""
+    )
+    # Every evaluation's results in two queries; each evaluation's rows keep
+    # the order the per-evaluation queries had.
+    evaluation_ids = [e["id"] for group in evaluations.values() for e in group]
+    event_rows, condition_rows = {}, {}
+    if evaluation_ids:
+        for r in rows(
+            conn,
+            "SELECT r.*,c.description,c.evidence_requirement,c.role,c.window_start,c.deadline,c.date_basis FROM event_results r JOIN version_events c USING(owner_id,version_id,condition_id) WHERE r.owner_id=%s AND r.evaluation_id=ANY(%s::uuid[]) ORDER BY r.evaluation_id,c.condition_id",
+            (owner, evaluation_ids),
+        ):
+            event_rows.setdefault(str(r["evaluation_id"]), []).append(r)
+        for r in rows(
+            conn,
+            """SELECT r.*,c.metric,c.operator,c.threshold,c.unit,c.basis,c.period_type,c.max_report_age_days,c.role,c.expected_period_end,c.expected_report_by FROM condition_results r
+          JOIN version_conditions c USING(owner_id,version_id,condition_id) WHERE r.owner_id=%s AND r.evaluation_id=ANY(%s::uuid[]) ORDER BY r.evaluation_id,c.metric""",
+            (owner, evaluation_ids),
+        ):
+            condition_rows.setdefault(str(r["evaluation_id"]), []).append(r)
+
+    for version in versions:
+        key = str(version["id"])
+        version["events"] = events.get(key, [])
+        version["event_reviews"] = [event_public_result(r) for r in event_reviews.get(key, [])]
+        version["evidence_reviews"] = [public_result(r) for r in evidence_reviews.get(key, [])]
+        version["conditions"] = conditions.get(key, [])
+        version["evaluations"] = evaluations.get(key, [])
         for evaluation in version["evaluations"]:
-            evaluation["event_results"] = rows(
-                conn,
-                "SELECT r.*,c.description,c.evidence_requirement,c.role,c.window_start,c.deadline,c.date_basis FROM event_results r JOIN version_events c USING(owner_id,version_id,condition_id) WHERE r.owner_id=%s AND r.evaluation_id=%s ORDER BY c.condition_id",
-                (owner, evaluation["id"]),
-            )
+            evaluation["event_results"] = event_rows.get(str(evaluation["id"]), [])
             by_event = {
                 x["condition_id"]: x
                 for x in evaluation["manifest"].get("event_windows", [])
@@ -606,12 +642,7 @@ def history(conn, owner, thesis_id):
                 )
                 if selected_window:
                     point["window"] = selected_window
-            evaluation["results"] = rows(
-                conn,
-                """SELECT r.*,c.metric,c.operator,c.threshold,c.unit,c.basis,c.period_type,c.max_report_age_days,c.role,c.expected_period_end,c.expected_report_by FROM condition_results r
-              JOIN version_conditions c USING(owner_id,version_id,condition_id) WHERE r.owner_id=%s AND r.evaluation_id=%s ORDER BY c.metric""",
-                (owner, evaluation["id"]),
-            )
+            evaluation["results"] = condition_rows.get(str(evaluation["id"]), [])
     return versions
 
 
@@ -920,10 +951,7 @@ def finish_job(owner, job):
         instrument_id = version_instrument(conn, owner, current["version_id"])
         if manifest.get("instrument_id", instrument_id) != instrument_id:
             raise ValueError("Evaluation company changed")
-        permitted = {
-            str(d["id"])
-            for d in permitted_documents(conn, manifest["cutoff"], instrument_id)
-        }
+        permitted = permitted_document_ids(conn, manifest["cutoff"], instrument_id)
         if not set(manifest["document_ids"]).issubset(permitted):
             raise ValueError("Source access denied")
         conditions = rows(

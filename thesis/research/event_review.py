@@ -319,14 +319,9 @@ def scoped_point(point, allowed):
 
 
 def readable(conn, record):
-    from thesis.service import permitted_documents
+    from thesis.service import permitted_document_ids
 
-    allowed = {
-        str(d["id"])
-        for d in permitted_documents(
-            conn, record["packet"]["cutoff"], record["packet"]["instrument_id"]
-        )
-    }
+    allowed = permitted_document_ids(conn, record["packet"]["cutoff"], record["packet"]["instrument_id"])
     activated = (
         bool(
             one(

@@ -23,11 +23,7 @@ def current(conn, iid, now=None):
     now = now or datetime.now(timezone.utc)
     if not sentiment.market_brief.company_for(iid):
         return None
-    latest = one(
-        conn,
-        sentiment.LATEST_SQL,
-        (iid,),
-    )
+    latest = sentiment.latest_record(conn, iid)
     visible = sentiment.present(conn, latest)
     baseline = latest if visible and not visible["withheld"] else None
     days = latest["packet"].get("social_lookback_days", 7) if latest else 7

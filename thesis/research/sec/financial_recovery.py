@@ -4,6 +4,7 @@ The model selects supplied input IDs, never numerical answers. Code checks
 periods, units, scope and arithmetic. A person must review the meaning before
 the result can fill a gap in their financial research view. No automatic calls.
 """
+from . import saved_payload
 from copy import deepcopy
 from collections import Counter
 from datetime import date
@@ -18,7 +19,7 @@ from thesis.providers.settings import MODEL
 from .normalize import REVENUE, filing_rows
 from .performance import collect, select, decimal_text
 from .disclosure_text import archive_url
-from .filing_facts import read, attach
+from .filing_facts import read, attach, cached_attach, load_raw
 
 METHOD='financial-cell-recovery-2'
 TARGETS={
@@ -80,11 +81,14 @@ def allowed(conn):
 
 def prepare(conn,iid,document_id=None):
     if not allowed(conn):raise ValueError('Original filing access is unavailable.')
-    saved=one(conn,'SELECT p.payload,c.cik,k.checked_at FROM sec_payload_current k JOIN source_payloads p ON p.id=k.payload_id JOIN sec_companies c ON c.instrument_id=k.instrument_id WHERE k.instrument_id=%s',(iid,))
+    saved=saved_payload.current(conn,iid)
     if not saved:raise ValueError('Update data to collect the company’s filings first.')
     filings=filing_rows(saved['payload']['submissions'],saved['checked_at'])
     urls={archive_url(saved['cik'],f['accessionNumber'],f['primaryDocument']):f for f in filings}
-    documents=rows(conn,"SELECT DISTINCT ON (url) id,instrument_id,url,form,published_at,available_at,content_hash,raw_html FROM disclosure_documents WHERE instrument_id=%s AND source_id='sec-disclosures' AND form IN ('10-K','10-Q') ORDER BY url,available_at DESC",(iid,))
+    # Hash the originals in the database: they are large, and only the one
+    # being opened is read in full (below); the rest come from the
+    # parsed-filing cache, which loads them only when it has to re-parse.
+    documents=rows(conn,"SELECT DISTINCT ON (url) id,instrument_id,url,form,published_at,available_at,content_hash,encode(sha256(raw_html),'hex') raw_sha FROM disclosure_documents WHERE instrument_id=%s AND source_id='sec-disclosures' AND form IN ('10-K','10-Q') ORDER BY url,available_at DESC",(iid,))
     documents=sorted([d for d in documents if d['url'] in urls],key=lambda d:d['published_at'],reverse=True)
     if not documents:raise ValueError('No supported original financial statement has been saved yet.')
     gaps=chart_gaps(conn,iid)
@@ -94,9 +98,10 @@ def prepare(conn,iid,document_id=None):
     # Open on the newest report whose charts actually have a gap.
     doc=next((d for d in documents if str(d['id'])==str(document_id)),None) if document_id else next((d for d in documents if hinted(d)),documents[0])
     if not doc:raise ValueError('The selected saved filing is unavailable.')
+    doc=dict(doc,raw_html=one(conn,"SELECT raw_html FROM disclosure_documents WHERE id=%s",(doc['id'],))['raw_html'])
     if hashlib.sha256(bytes(doc['raw_html'])).hexdigest()!=doc['content_hash']:raise ValueError('The original filing could not be verified.')
     filing=urls[doc['url']];kind='annual' if doc['form']=='10-K' else 'quarter'
-    bundle=attach(saved['payload'],documents,saved['cik'],saved['checked_at'])
+    bundle=cached_attach(saved['payload'],documents,saved['cik'],saved['checked_at'],load_raw(conn),bundle_key=saved['id'])
     missing=[]
     for key,(label,tags) in TARGETS.items():
         group='Balance sheet' if key in BALANCE else 'Cash generation' if key in ('operating_cash','capital_spending') else 'Business performance'

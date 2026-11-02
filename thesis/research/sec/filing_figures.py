@@ -57,12 +57,12 @@ def owner_of(conn):
 
 
 def basis(conn, iid):
-    """Every input financial_depth.present() reads, as one hash."""
-    from . import amendments, filing_facts, financial_depth, financial_recovery, income_flow, segment_revenue
+    """Every input the saved kinds (depth, income flow, segments, story) read, as one hash."""
+    from . import amendments, filing_facts, financial_depth, financial_recovery, financial_story, income_flow, segment_revenue
 
     parts = dict(
         versions=[VERSION, financial_depth.METHOD, filing_facts.METHOD, amendments.METHOD, financial_recovery.METHOD,
-                  income_flow.METHOD, segment_revenue.METHOD],
+                  income_flow.METHOD, segment_revenue.METHOD, financial_story.METHOD],
         sources=rows(conn, "SELECT id,entitlement FROM sources WHERE id IN ('sec-companyfacts','sec-disclosures') ORDER BY id"),
         payload=one(conn, """SELECT k.payload_id,k.checked_at,p.retrieved_at,c.cik FROM sec_payload_current k
             JOIN source_payloads p ON p.id=k.payload_id AND p.instrument_id=k.instrument_id

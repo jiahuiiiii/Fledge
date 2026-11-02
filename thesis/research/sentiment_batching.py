@@ -298,7 +298,7 @@ def run(packet, *, transport=None, progress=None, retry_failed=False, prefilter=
         if progress:
             progress(dict(completed=0, total=0, source_counts=[], failed=None,
                           message=f"Quick relevance check · {len(packet['sources'])} sources"))
-        kept, skipped, record, quick = relevance_prefilter.run(packet, transport=transport)
+        kept, skipped, record, quick = relevance_prefilter.run(packet, transport=transport, retry=retry_failed)
         keep = set(kept)
         packet = dict(packet, sources=[s for s in packet["sources"] if s["id"] in keep])
     if packet["sources"]:

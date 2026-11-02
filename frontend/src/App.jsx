@@ -1,4 +1,5 @@
 import { formatTimestamp, formatReportingAgeExplanation } from "./lib/dateTime";
+import { updateOutcome } from "./lib/updateOutcome";
 import {
   useWorkspaceLayout,
   WorkspaceSidebar,
@@ -725,10 +726,7 @@ function CompanyWorkspace({
   const updatedAt =
     loadingRun && !loadingRun.active ? loadingRun.updated_at || null : null;
   const [setupId, setSetupId] = useState(null);
-  const telegramGuard = useTelegramGuard({
-    onConnect: () => onChoose(selectedCompanyId, "account"),
-    what: "this watch",
-  });
+  const telegramGuard = useTelegramGuard({ what: "this watch" });
   // Update data: no dialog. The button greys out while it runs and a toast
   // says it started and when it finished.
   function updateNow() {
@@ -758,11 +756,8 @@ function CompanyWorkspace({
     if (updatePressed !== "running") return;
     setUpdatePressed(false);
     hideToast(`update-${instrumentId}`);
-    const failed = (loadingRun.steps || []).every((s) => s.status === "failed");
     showToast(
-      failed
-        ? `Couldn’t update ${companyName(data?.instrument)} right now. Saved data is still shown; try again later.`
-        : `${companyName(data?.instrument)} is up to date. Anything new is on the Summary.`,
+      updateOutcome(loadingRun.steps || [], companyName(data?.instrument)),
       { id: `update-done-${instrumentId}` },
     );
   }, [loadingRun?.active, updatePressed]);
@@ -812,6 +807,7 @@ function CompanyWorkspace({
     let stopped = false;
     let since = "";
     let jobs = null;
+    let saved = null;
     const visible = () =>
       new Promise((resolve) => {
         if (!document.hidden) return resolve();
@@ -846,9 +842,14 @@ function CompanyWorkspace({
           failures = 0;
           setLoadingError("");
           since = answer.token;
-          const jobCount = answer.token.split("|").pop();
+          // Token: run | new saved data (articles, AI reading, alerts) | jobs.
+          const parts = answer.token.split("|");
+          const jobCount = parts.at(-1);
+          const savedData = parts.length > 2 ? parts[1] : "";
           const jobsChanged = jobs !== null && jobCount !== jobs;
+          const dataChanged = saved !== null && savedData !== saved;
           jobs = jobCount;
+          saved = savedData;
           if (!answer.changed) continue;
           let reread = false;
           const run = answer.run;
@@ -873,11 +874,14 @@ function CompanyWorkspace({
                 reread = true;
             }
           }
-          if (reread || jobsChanged) {
+          if (reread || jobsChanged || dataChanged) {
             lastLoadingRead.current = Date.now();
-            // Evaluation results land in the company read; financials are
-            // only included again once nothing is pending.
-            await refresh({ light: answer.pending_work && !reread });
+            // Evaluation results and new articles, readings or alerts land in
+            // the company read; financials are only read again when a run
+            // finished or evaluation work just ended.
+            await refresh({
+              light: !reread && (answer.pending_work || !jobsChanged),
+            });
           }
         } catch (e) {
           if (stopped || e.name === "AbortError") return;
@@ -940,10 +944,19 @@ function CompanyWorkspace({
   const includeFinancials = useRef(false);
   includeFinancials.current =
     !companyLoading && !data?.financials_pending && needsFinancials;
-  async function readCompany(initial = false) {
+  // The copy on screen and its revision: a re-read sends the revision, and an
+  // unchanged company answers `{unchanged: true}` instead of everything again.
+  const dataRef = useRef(data);
+  dataRef.current = data;
+  const onScreenRevision = () =>
+    dataRef.current?.instrument?.id === instrumentId
+      ? dataRef.current.revision
+      : undefined;
+  async function readCompany(initial = false, known = onScreenRevision()) {
     return workspaceLane.current.read(scope, (signal) =>
       api.workspace(instrumentId, {
         signal,
+        known,
         includeFinancials: !initial && includeFinancials.current,
       }),
     );
@@ -952,7 +965,11 @@ function CompanyWorkspace({
   // skip the slow financial part of the read and keep the figures on screen.
   function readWithoutFinancials() {
     return workspaceLane.current.read(scope, (signal) =>
-      api.workspace(instrumentId, { signal, includeFinancials: false }),
+      api.workspace(instrumentId, {
+        signal,
+        known: onScreenRevision(),
+        includeFinancials: false,
+      }),
     );
   }
   async function refresh({ fresh = false, light = false } = {}) {
@@ -962,6 +979,14 @@ function CompanyWorkspace({
       light ? readWithoutFinancials() : readCompany(),
       companyLoading ? 280 : 0,
     );
+    // Nothing changed since the copy on screen: keep it as it is.
+    if (next?.unchanged) {
+      if (activeScope.current === scope) {
+        setLoadedScope(scope);
+        setLoadError("");
+      }
+      return dataRef.current;
+    }
     if (activeScope.current === scope) {
       setData(light ? (old) => keepFinancials(old, next) : next);
       if (loadedScope !== scope)
@@ -1000,15 +1025,23 @@ function CompanyWorkspace({
           );
       },
     );
+    return () => controller.abort();
+  }, [scope, companyLoading, updatedAt]);
+  // AI availability is owner-wide and cheap, so it is read at once instead of
+  // after the company read: the setup dialog's "Analyse the news" choice
+  // depends on it while the first collection is still running.
+  useEffect(() => {
+    if (!selectedCompanyId) return;
+    const controller = new AbortController();
     api
-      .modelStatus(options)
+      .modelStatus({ signal: controller.signal })
       .then((result) => {
         if (!controller.signal.aborted && activeScope.current === scope)
           setModelStatus(result);
       })
       .catch(() => {});
     return () => controller.abort();
-  }, [scope, companyLoading, updatedAt]);
+  }, [scope, updatedAt]);
   // Keep the open company's price current while the tab is visible.
   useEffect(() => {
     if (
@@ -1147,14 +1180,18 @@ function CompanyWorkspace({
     const read = account
       ? Promise.all([
           api.session({ signal: controller.signal }),
-          readCompany(true),
+          readCompany(true, cached?.data?.revision),
         ]).then(([, packet]) => packet)
       : api
           .session({ signal: controller.signal })
-          .then(() => (active ? readCompany(true) : null));
+          .then(() =>
+            active ? readCompany(true, cached?.data?.revision) : null,
+          );
     readableLoad(read, cached?.data ? 0 : 280)
       .then((packet) => {
         if (active && packet && activeScope.current === scope) {
+          // The cached copy shown at once is still current.
+          if (packet.unchanged) return setLoadedScope(scope);
           setData((old) => keepFinancials(old, packet));
           setLoadedScope(scope);
           if (!cached?.data) setQuestion(firstQuestion(packet));
@@ -1193,9 +1230,10 @@ function CompanyWorkspace({
             setError(e.message);
         });
     };
-    // Pending evaluation work is followed by the activity long poll above,
-    // so this is only the slow background re-read.
-    const id = setInterval(refreshVisible, 30000);
+    // New articles, readings, alerts and evaluation work wake the activity
+    // long poll above, so this is only a slow safety net. Re-reads send the
+    // on-screen revision, so an unchanged company costs a few bytes.
+    const id = setInterval(refreshVisible, 120000);
     window.addEventListener("focus", refreshVisible);
     return () => {
       clearInterval(id);
@@ -1320,6 +1358,16 @@ function CompanyWorkspace({
         rating: loadingRun?.active
           ? loadingRun.steps.find((s) => s.key === "analysis")?.status || false
           : false,
+        // Why the last rating did not finish, shown under the Rate button
+        // instead of the button silently resetting.
+        ratingNote: (() => {
+          const step =
+            !loadingRun?.active &&
+            loadingRun?.steps?.find((s) => s.key === "analysis");
+          return step && ["failed", "blocked", "partial"].includes(step.status)
+            ? step.message || "The rating did not finish. Try again."
+            : null;
+        })(),
         priceHistory: priceRead?.data,
         // For the optional widgets (chart, activity, business, glance,
         // targets, watch); the same values the Overview details receive.
@@ -2602,9 +2650,6 @@ function CompanyWorkspace({
                             <SentimentPanel
                               key={instrumentId}
                               onThemeSource={setSource}
-                              onConnectTelegram={() =>
-                                onChoose(instrumentId, "account")
-                              }
                               onThemesChange={async () => {
                                 const status = await api.modelStatus();
                                 if (activeScope.current === scope)
@@ -3941,7 +3986,7 @@ function CompanyWorkspace({
             : "this company"
         }
         progress={setupProgress(loadingRun, companyLoading)}
-        aiBlocked={modelAvailability(modelStatus, "briefing_enabled").blocked}
+        ai={modelAvailability(modelStatus, "briefing_enabled")}
         onSkip={() => setSetupId(null)}
         onStart={async ({ analyse, watch }) => {
           setSetupId(null);
@@ -3957,7 +4002,14 @@ function CompanyWorkspace({
         onConnectTelegram={({ analyse }) => {
           setSetupId(null);
           if (analyse) startLoading({ analyze: true, lookback_days: 7 });
-          onChoose(selectedCompanyId, "account");
+          // Telegram setup opens right here; the watch turns on once a chat
+          // is connected (or, if it is closed without one, after asking).
+          telegramGuard.connect(() =>
+            act(
+              () => api.newsWatch(instrumentId, true, 240),
+              "Watching this company for changes.",
+            ),
+          );
         }}
       />
       <CompanyDialog

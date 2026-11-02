@@ -54,11 +54,7 @@ def finish(
     # A supplied scheduler clock is used in tests; never persist negative elapsed time.
     completed = max(completed, check["started_at"])
     if analysis_id:
-        analysis = one(
-            conn,
-            "SELECT * FROM sentiment_analyses WHERE id=%s AND instrument_id=%s",
-            (analysis_id, check["instrument_id"]),
-        )
+        analysis = sentiment.reading(conn, analysis_id, check["instrument_id"])
         if not analysis:
             raise ValueError("Scheduled check analysis belongs to a different company.")
         p = analysis["packet"]
@@ -154,11 +150,7 @@ def present(conn, owner, check, result, now):
     details = result["details"] if result else {}
     withheld = False
     if result and result["analysis_id"]:
-        a = one(
-            conn,
-            "SELECT * FROM sentiment_analyses WHERE id=%s",
-            (result["analysis_id"],),
-        )
+        a = sentiment.reading(conn, result["analysis_id"])
         withheld = not a or sentiment.present(conn, a)["withheld"]
     count = (
         (details.get("company_alerts", 0) + details.get("idea_alerts", 0))

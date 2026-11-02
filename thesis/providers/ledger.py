@@ -1,6 +1,7 @@
 """Durable global reservations; provider call identity is independent of job leases."""
 
 import hashlib
+import threading
 import json
 from dataclasses import dataclass
 from uuid import uuid4
@@ -516,8 +517,44 @@ def unresolved(call, code, *, owner=None):
         )
 
 
+# A rejected key (HTTP 401) answers every request the same way until it is
+# replaced. Remember which key was rejected, per provider, as a short hash
+# (never the key), and stop sending with it: a scheduled check would otherwise
+# record one doomed call after another (607 on the owner's data before the
+# key was noticed). A different key in .env is tried at once; a restart
+# forgets. Nothing is reserved or sent while it is blocked.
+_rejected_keys = {}
+_rejected_lock = threading.Lock()
+
+
+class KeyRejected(BudgetBlocked):
+    pass
+
+
+def _key_hash(key):
+    return hashlib.sha256(key.encode()).hexdigest()[:16]
+
+
+def key_rejected(model):
+    """True when the key configured for this model was rejected (401) and
+    has not been changed since."""
+    try:
+        from .settings import live_key
+        key = live_key(model)
+    except Exception:
+        return False
+    with _rejected_lock:
+        return _rejected_keys.get(provider_for(model)) == _key_hash(key)
+
+
+def forget_rejected_keys():
+    with _rejected_lock:
+        _rejected_keys.clear()
+
+
 def execute(request_key, purpose, body, *, transport=None, owner=None):
     live = transport is None
+    key_hash = None
     if live:
         from .settings import live_key
 
@@ -529,7 +566,13 @@ def execute(request_key, purpose, body, *, transport=None, owner=None):
         else:
             from .openai import send
 
-        live_key(body.get("model"))  # Configuration failures never reserve a call.
+        key_hash = _key_hash(live_key(body.get("model")))  # Configuration failures never reserve a call.
+        with _rejected_lock:
+            if _rejected_keys.get(provider) == key_hash:
+                raise KeyRejected(
+                    f"The {provider} API key was rejected (HTTP 401). Put a valid key in .env; "
+                    "nothing was sent."
+                )
         from thesis import wake
         # A request sent before the connection returns is cut off and can never be resent.
         if not wake.settled():
@@ -546,6 +589,13 @@ def execute(request_key, purpose, body, *, transport=None, owner=None):
         # or retry automatically. A hard kill leaves 'dispatched' with the same block.
         code = getattr(exc, "code", "interrupted_or_invalid_usage")
         unresolved(call, code, owner=owner)
+        if live and code == "http_401":
+            with _rejected_lock:
+                _rejected_keys[provider] = key_hash
+            raise KeyRejected(
+                f"The {provider} API key was rejected (HTTP 401). Put a valid key in .env; "
+                "further AI requests are paused until it changes."
+            ) from None
         raise BudgetBlocked(
             "The AI request failed before a result was saved. Try again."
         ) from None

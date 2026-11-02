@@ -436,12 +436,7 @@ def present(conn, owner, record):
         (record["instrument_id"],),
     )
     base = record["packet"]["base"]
-    allowed = {
-        str(d["id"])
-        for d in service.permitted_documents(
-            conn, record["packet"]["cutoff"], record["instrument_id"]
-        )
-    }
+    allowed = service.permitted_document_ids(conn, record["packet"]["cutoff"], record["instrument_id"])
     unavailable = any(c["source_id"] not in allowed for c in record["citations"])
     status = (
         decision["action"]
@@ -543,12 +538,7 @@ def generate(owner, payload, *, transport=None):
             saved.append(present(conn, owner, record))
         from thesis import service
 
-        still_allowed = {
-            str(d["id"])
-            for d in service.permitted_documents(
-                conn, packet["cutoff"], packet["instrument_id"]
-            )
-        }
+        still_allowed = service.permitted_document_ids(conn, packet["cutoff"], packet["instrument_id"])
         explanation = (
             result["explanation"]
             if all(s["id"] in still_allowed for s in packet["sources"])

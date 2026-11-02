@@ -29,8 +29,16 @@ export function SummarySignals() {
 }
 
 export function SummaryNews() {
-  const { summary, onRate, onUpdate, onSource, onView, rating, practice } =
-    useWorkspace();
+  const {
+    summary,
+    onRate,
+    onUpdate,
+    onSource,
+    onView,
+    rating,
+    ratingNote,
+    practice,
+  } = useWorkspace();
   const { newsGroups, postGroups, news, reading } = summary;
   return (
     <Card id="bs-news" tabIndex={-1} aria-labelledby="bs-news-title">
@@ -42,7 +50,7 @@ export function SummaryNews() {
       />
       <p className="bs-meaning">{summary.newsMeaning}</p>
       {onRate &&
-        !reading &&
+        (!reading || summary.ratingStale) &&
         (newsGroups.unrated.length > 0 || postGroups.unrated.length > 0) && (
           <div className="bs-rate">
             <Button variant="primary" onClick={onRate} disabled={!!rating}>
@@ -50,10 +58,19 @@ export function SummaryNews() {
                 ? "Rating… about a minute"
                 : rating
                   ? "Getting the latest posts first…"
-                  : "Rate with AI"}
+                  : reading
+                    ? "Rate the newer items"
+                    : "Rate with AI"}
             </Button>
+            {ratingNote && (
+              <small className="bs-rate-note" role="status">
+                {ratingNote}
+              </small>
+            )}
             <small>
-              Fledge reads the news and posts and marks each good, bad or mixed.
+              {reading && summary.lastRated
+                ? `Last rated ${summary.lastRated}. Fledge reads the newer news and posts and marks each good, bad or mixed.`
+                : "Fledge reads the news and posts and marks each good, bad or mixed."}
             </small>
           </div>
         )}

@@ -6,6 +6,9 @@ omits trading direction and synthetic sentiment precision; code counts labels.
 
 import hashlib
 import json
+import pickle
+import threading
+from collections import OrderedDict
 from copy import deepcopy
 from collections import Counter
 from datetime import datetime, timezone, timedelta
@@ -647,9 +650,9 @@ def permitted_ids(conn, record):
     key = ("permitted_ids", str(iid), packet["cutoff"], lookback)
     if cache is not None and key in cache:
         return cache[key]
-    result = {str(d["id"]) for d in service.permitted_documents(conn, cutoff, iid)} | {
-        str(d["id"]) for d in social.documents(conn, iid, cutoff, lookback)
-    }
+    # Ids only: the same rules as the full reads, without transferring and
+    # decoding every article and post body once per reading.
+    result = service.permitted_document_ids(conn, cutoff, iid) | social.document_ids(conn, iid, cutoff, lookback)
     if cache is not None:
         cache[key] = result
     return result
@@ -659,6 +662,7 @@ def unavailable(conn, record):
     """Saved source and thread-message ids the current access no longer permits."""
     p = record["packet"]
     allowed = permitted_ids(conn, record)
+    sentiment_context.prefetch(conn, p["sources"] + p.get("comparison_sources", []))
     hidden = {
         s["id"]
         for s in p["sources"] + p.get("comparison_sources", [])
@@ -943,15 +947,108 @@ LATEST_SQL = (
     "SELECT * FROM sentiment_analyses WHERE instrument_id=%s"
     " ORDER BY cutoff DESC,created_at DESC,id DESC LIMIT 1"
 )
+LATEST_ID_SQL = LATEST_SQL.replace("SELECT *", "SELECT id", 1)
+
+# Saved readings never change: the `immutable` trigger refuses UPDATE and
+# DELETE on sentiment_analyses. A reading holds every source text it read
+# (often megabytes), and decoding it was most of the time of the alerts and
+# company reads, so a decoded row is kept in memory and reused. Only the
+# stored row is kept: present() still applies the current source access and
+# withdrawals on every read. Each caller gets its own copy (unpickled), so no
+# caller can change what another sees.
+# Saved readings run to several MB each on real data; 256 MB holds roughly
+# the last 50-100. THESIS_READING_CACHE_MB changes it (e.g. on a small server).
+def _cache_megabytes():
+    import os
+    try:
+        return max(16, int(os.environ.get("THESIS_READING_CACHE_MB", "256")))
+    except ValueError:
+        return 256
+
+
+READING_CACHE_BYTES = _cache_megabytes() * 1024 * 1024
+_readings = OrderedDict()
+_reading_bytes = 0
+_reading_lock = threading.Lock()
+
+
+def reading_cache_filled():
+    """Share of the reading cache in use (0-1); the startup warm-up stops
+    early so it never evicts what it just loaded."""
+    return _reading_bytes / READING_CACHE_BYTES
+
+
+def clear_reading_cache():
+    global _reading_bytes
+    with _reading_lock:
+        _readings.clear()
+        _reading_bytes = 0
+
+
+def _remember(key, blob):
+    global _reading_bytes
+    if len(blob) > READING_CACHE_BYTES // 4:
+        return
+    with _reading_lock:
+        if key in _readings:
+            return
+        _readings[key] = blob
+        _reading_bytes += len(blob)
+        while _reading_bytes > READING_CACHE_BYTES and _readings:
+            _, removed = _readings.popitem(last=False)
+            _reading_bytes -= len(removed)
+
+
+def readings(conn, ids, instrument_id=None):
+    """Saved readings by id ({id: row}); unknown ids, or ids of another
+    company when `instrument_id` is given, are left out."""
+    wanted = list(dict.fromkeys(str(i) for i in ids if i))
+    blobs = {}
+    with _reading_lock:
+        for key in wanted:
+            blob = _readings.get(key)
+            if blob is not None:
+                _readings.move_to_end(key)
+                blobs[key] = blob
+    missing = [key for key in wanted if key not in blobs]
+    if missing:
+        for row in rows(conn, "SELECT * FROM sentiment_analyses WHERE id=ANY(%s::uuid[])", (missing,)):
+            key = str(row["id"])
+            blobs[key] = pickle.dumps(row, pickle.HIGHEST_PROTOCOL)
+            _remember(key, blobs[key])
+    found = {key: pickle.loads(blobs[key]) for key in wanted if key in blobs}
+    if instrument_id is not None:
+        found = {k: r for k, r in found.items() if str(r["instrument_id"]) == str(instrument_id)}
+    return found
+
+
+def reading(conn, identity, instrument_id=None):
+    """One saved reading, or None (also when it belongs to another company)."""
+    if not identity:
+        return None
+    return readings(conn, [identity], instrument_id).get(str(identity))
+
+
+def warm_ids(conn, owner, limit=120):
+    """Readings worth decoding after a restart, most important first (the
+    warm-up stops when the cache is three quarters full): each company's
+    latest reading (the company read needs it), then readings the owner's
+    newest alerts and idea checks point to."""
+    latest = [r["id"] for r in rows(
+        conn, "SELECT DISTINCT ON (instrument_id) id FROM sentiment_analyses ORDER BY instrument_id,cutoff DESC,created_at DESC,id DESC")]
+    alerts = [i for r in rows(
+        conn, "SELECT current_id,previous_id FROM research_alerts WHERE owner_id=%s ORDER BY created_at DESC,id DESC LIMIT 60", (owner,))
+        for i in (r["current_id"], r["previous_id"])]
+    checks = [r["analysis_id"] for r in rows(
+        conn, "SELECT analysis_id FROM idea_alert_checks WHERE owner_id=%s ORDER BY created_at DESC,id DESC LIMIT 60", (owner,))]
+    return list(dict.fromkeys(str(i) for i in latest + alerts + checks if i))[:limit]
+
+
+def latest_record(conn, iid):
+    """The company's newest saved reading (same order as LATEST_SQL)."""
+    row = one(conn, LATEST_ID_SQL, (iid,))
+    return reading(conn, row["id"]) if row else None
 
 
 def latest(conn, iid):
-    return present(
-        conn,
-        one(
-            conn,
-            LATEST_SQL,
-            (iid,),
-        ),
-        partial=True,
-    )
+    return present(conn, latest_record(conn, iid), partial=True)

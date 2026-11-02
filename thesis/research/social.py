@@ -237,10 +237,34 @@ def refresh(*, fetcher=None, now=None, lookback_days=7):
     }
 
 
+# Which saved posts a reader may see: enabled feeds, nothing withdrawn, the
+# newest version of each post in the window. Shared by the full read and the
+# ids-only check so the two can never disagree.
+DOCUMENTS_FROM = (
+    " FROM social_posts p JOIN social_feeds f ON f.feed=p.feed AND f.enabled LEFT JOIN social_discovery d ON d.post_id=p.id"
+    " WHERE NOT EXISTS(SELECT 1 FROM hn_withdrawals w WHERE w.post_key IN (p.post_key,d.thread_key) AND p.platform='hackernews')"
+    " AND NOT EXISTS(SELECT 1 FROM social_withdrawals w WHERE w.post_key IN (p.post_key,d.thread_key))"
+    " AND p.instrument_id=%s AND p.available_at<=%s AND p.published_at<=%s AND p.published_at>=%s"
+    " ORDER BY p.post_key,p.available_at DESC,p.id DESC"
+)
+
+
+def document_ids(conn, iid, cutoff, lookback_days=7):
+    """The ids documents() would return, without reading any post text."""
+    return {
+        str(r["id"])
+        for r in rows(
+            conn,
+            "SELECT DISTINCT ON (p.post_key) p.id" + DOCUMENTS_FROM,
+            (iid, cutoff, cutoff, cutoff - timedelta(days=lookback_days)),
+        )
+    }
+
+
 def documents(conn, iid, cutoff, lookback_days=7):
     data = rows(
         conn,
-        "SELECT DISTINCT ON (p.post_key) p.*,d.thread_key,d.kind AS social_kind,d.match_basis,d.method AS discovery_method FROM social_posts p JOIN social_feeds f ON f.feed=p.feed AND f.enabled LEFT JOIN social_discovery d ON d.post_id=p.id WHERE NOT EXISTS(SELECT 1 FROM hn_withdrawals w WHERE w.post_key IN (p.post_key,d.thread_key) AND p.platform='hackernews') AND NOT EXISTS(SELECT 1 FROM social_withdrawals w WHERE w.post_key IN (p.post_key,d.thread_key)) AND p.instrument_id=%s AND p.available_at<=%s AND p.published_at<=%s AND p.published_at>=%s ORDER BY p.post_key,p.available_at DESC,p.id DESC",
+        "SELECT DISTINCT ON (p.post_key) p.*,d.thread_key,d.kind AS social_kind,d.match_basis,d.method AS discovery_method" + DOCUMENTS_FROM,
         (iid, cutoff, cutoff, cutoff - timedelta(days=lookback_days)),
     )
     for value in data:

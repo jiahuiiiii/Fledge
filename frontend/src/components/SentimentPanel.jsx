@@ -67,7 +67,6 @@ export default function SentimentPanel({
   onThemeSource,
   onCoverage,
   onThemesChange,
-  onConnectTelegram,
 }) {
   const [days, setDays] = useState(
     data.sentiment?.social_lookback_days || loadingRun?.lookback_days || 7,
@@ -87,10 +86,7 @@ export default function SentimentPanel({
   const platform = tab === "all" || tab === "news" ? null : tab;
   const [evidenceView, setEvidenceView] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const telegramGuard = useTelegramGuard({
-    onConnect: onConnectTelegram,
-    what: "this watch",
-  });
+  const telegramGuard = useTelegramGuard({ what: "this watch" });
   const a = data.sentiment,
     watch = data.news_watch;
   const activeQuestion =
