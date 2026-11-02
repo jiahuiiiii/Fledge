@@ -193,6 +193,13 @@ def normalize_story(bundle, cik, now,resolver=None):
 def present(conn, iid):
     if not one(conn, "SELECT 1 FROM sources WHERE id='sec-companyfacts' AND entitlement='sec-public'"):
         return dict(status='unavailable', reason='Structured filing source access is unavailable.', method=METHOD)
+    # Saved per account and exact inputs like the other filing figures, so a
+    # restart does not re-parse every original filing to draw the charts.
+    from .filing_figures import cached
+    return cached(conn, iid, 'story', build)
+
+
+def build(conn, iid):
     saved = saved_payload.current(conn, iid)
     if not saved:
         return dict(status='empty', reason='Collect company filings to see financial history.', method=METHOD)

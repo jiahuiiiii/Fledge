@@ -573,62 +573,63 @@ def history(conn, owner, thesis_id):
         (owner, thesis_id),
     )
     from .research.idea_review import public_result
+    from .research.event_review import public_result as event_public_result
 
-    for version in versions:
-        from .research.event_review import public_result as event_public_result
+    # Each kind of record for every version in one query, grouped back by
+    # version; each version's rows keep the order its own query had.
+    version_ids = [v["id"] for v in versions]
 
-        version["events"] = rows(
-            conn,
-            "SELECT * FROM version_events WHERE owner_id=%s AND version_id=%s ORDER BY condition_id",
-            (owner, version["id"]),
-        )
-        version["event_reviews"] = [
-            event_public_result(r)
-            for r in rows(
-                conn,
-                "SELECT r.*,EXISTS(SELECT 1 FROM event_review_activations a WHERE a.owner_id=r.owner_id AND a.review_id=r.id) activated FROM event_evidence_reviews r WHERE owner_id=%s AND version_id=%s ORDER BY created_at DESC,id",
-                (owner, version["id"]),
-            )
-        ]
-        version["evidence_reviews"] = [
-            public_result(r)
-            for r in rows(
-                conn,
-                "SELECT * FROM idea_evidence_reviews WHERE owner_id=%s AND version_id=%s ORDER BY created_at DESC,id",
-                (owner, version["id"]),
-            )
-        ]
-        version["conditions"] = rows(
-            conn,
-            "SELECT * FROM version_conditions WHERE owner_id=%s AND version_id=%s ORDER BY metric",
-            (owner, version["id"]),
-        )
-        version["evaluations"] = rows(
-            conn,
-            """SELECT e.*,r.action review_action,r.created_at reviewed_at FROM evaluations e
+    def by_version(sql):
+        grouped = {}
+        if version_ids:
+            for r in rows(conn, sql, (owner, version_ids)):
+                grouped.setdefault(str(r["version_id"]), []).append(r)
+        return grouped
+
+    events = by_version(
+        "SELECT * FROM version_events WHERE owner_id=%s AND version_id=ANY(%s::uuid[]) ORDER BY version_id,condition_id"
+    )
+    event_reviews = by_version(
+        "SELECT r.*,EXISTS(SELECT 1 FROM event_review_activations a WHERE a.owner_id=r.owner_id AND a.review_id=r.id) activated FROM event_evidence_reviews r WHERE owner_id=%s AND version_id=ANY(%s::uuid[]) ORDER BY version_id,created_at DESC,id"
+    )
+    evidence_reviews = by_version(
+        "SELECT * FROM idea_evidence_reviews WHERE owner_id=%s AND version_id=ANY(%s::uuid[]) ORDER BY version_id,created_at DESC,id"
+    )
+    conditions = by_version(
+        "SELECT * FROM version_conditions WHERE owner_id=%s AND version_id=ANY(%s::uuid[]) ORDER BY version_id,metric"
+    )
+    evaluations = by_version(
+        """SELECT e.*,r.action review_action,r.created_at reviewed_at FROM evaluations e
            LEFT JOIN review_events r ON r.evaluation_id=e.id AND r.owner_id=e.owner_id
            LEFT JOIN jobs j ON j.owner_id=e.owner_id AND j.fingerprint=e.fingerprint
-           WHERE e.owner_id=%s AND e.version_id=%s ORDER BY j.queue_order DESC NULLS LAST,e.manifest->>'cutoff' DESC,e.created_at DESC""",
-            (owner, version["id"]),
-        )
-        # Every evaluation's results in two queries, not two per evaluation;
-        # each evaluation's rows keep the order the per-evaluation queries had.
-        evaluation_ids = [e["id"] for e in version["evaluations"]]
-        event_rows, condition_rows = {}, {}
-        if evaluation_ids:
-            for r in rows(
-                conn,
-                "SELECT r.*,c.description,c.evidence_requirement,c.role,c.window_start,c.deadline,c.date_basis FROM event_results r JOIN version_events c USING(owner_id,version_id,condition_id) WHERE r.owner_id=%s AND r.evaluation_id=ANY(%s::uuid[]) ORDER BY r.evaluation_id,c.condition_id",
-                (owner, evaluation_ids),
-            ):
-                event_rows.setdefault(str(r["evaluation_id"]), []).append(r)
-            for r in rows(
-                conn,
-                """SELECT r.*,c.metric,c.operator,c.threshold,c.unit,c.basis,c.period_type,c.max_report_age_days,c.role,c.expected_period_end,c.expected_report_by FROM condition_results r
-              JOIN version_conditions c USING(owner_id,version_id,condition_id) WHERE r.owner_id=%s AND r.evaluation_id=ANY(%s::uuid[]) ORDER BY r.evaluation_id,c.metric""",
-                (owner, evaluation_ids),
-            ):
-                condition_rows.setdefault(str(r["evaluation_id"]), []).append(r)
+           WHERE e.owner_id=%s AND e.version_id=ANY(%s::uuid[]) ORDER BY e.version_id,j.queue_order DESC NULLS LAST,e.manifest->>'cutoff' DESC,e.created_at DESC"""
+    )
+    # Every evaluation's results in two queries; each evaluation's rows keep
+    # the order the per-evaluation queries had.
+    evaluation_ids = [e["id"] for group in evaluations.values() for e in group]
+    event_rows, condition_rows = {}, {}
+    if evaluation_ids:
+        for r in rows(
+            conn,
+            "SELECT r.*,c.description,c.evidence_requirement,c.role,c.window_start,c.deadline,c.date_basis FROM event_results r JOIN version_events c USING(owner_id,version_id,condition_id) WHERE r.owner_id=%s AND r.evaluation_id=ANY(%s::uuid[]) ORDER BY r.evaluation_id,c.condition_id",
+            (owner, evaluation_ids),
+        ):
+            event_rows.setdefault(str(r["evaluation_id"]), []).append(r)
+        for r in rows(
+            conn,
+            """SELECT r.*,c.metric,c.operator,c.threshold,c.unit,c.basis,c.period_type,c.max_report_age_days,c.role,c.expected_period_end,c.expected_report_by FROM condition_results r
+          JOIN version_conditions c USING(owner_id,version_id,condition_id) WHERE r.owner_id=%s AND r.evaluation_id=ANY(%s::uuid[]) ORDER BY r.evaluation_id,c.metric""",
+            (owner, evaluation_ids),
+        ):
+            condition_rows.setdefault(str(r["evaluation_id"]), []).append(r)
+
+    for version in versions:
+        key = str(version["id"])
+        version["events"] = events.get(key, [])
+        version["event_reviews"] = [event_public_result(r) for r in event_reviews.get(key, [])]
+        version["evidence_reviews"] = [public_result(r) for r in evidence_reviews.get(key, [])]
+        version["conditions"] = conditions.get(key, [])
+        version["evaluations"] = evaluations.get(key, [])
         for evaluation in version["evaluations"]:
             evaluation["event_results"] = event_rows.get(str(evaluation["id"]), [])
             by_event = {

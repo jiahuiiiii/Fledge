@@ -90,11 +90,11 @@ def test_ids_only_permission_checks_match_the_full_reads(owner):
             assert str(posts[0]["id"]) not in after
 
 
-def test_warm_up_list_ends_with_each_companys_latest_reading(owner):
+def test_warm_up_list_starts_with_each_companys_latest_reading(owner):
     iid, first = original(owner)
     later = variant(iid, first["id"], minutes=5)
     with transaction() as c:
         ids = sentiment.warm_ids(c, owner)
-        assert ids[-1] == later and first["id"] not in ids  # latest per company only, loaded last
+        assert ids[0] == later and first["id"] not in ids  # latest per company only, loaded first
         assert len(ids) == len(set(ids))
         assert sentiment.warm_ids(c, owner, limit=0) == []

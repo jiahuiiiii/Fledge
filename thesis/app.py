@@ -217,6 +217,10 @@ async def lifespan(app):
             for start in range(0, len(warm), 4):
                 if stop.wait(0.5):
                     return
+                # Stop at three quarters full: past that, each new reading
+                # would push out one just warmed.
+                if sentiment.reading_cache_filled() >= 0.75:
+                    break
                 with transaction(owner) as conn:
                     sentiment.readings(conn, warm[start:start + 4])
             with transaction(owner) as conn:

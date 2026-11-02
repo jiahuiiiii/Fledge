@@ -6,7 +6,7 @@ import pytest
 
 from thesis.db import one, transaction
 from thesis.research.sec import disclosures, filing_figures as FF, financial_depth as D, financial_recovery as R
-from thesis.research.sec import income_flow as IF, segment_revenue as SR
+from thesis.research.sec import income_flow as IF, segment_revenue as SR, financial_story as FS
 from thesis.research.sec.service import add_company
 from test_disclosures import disclosure_scope, metadata, reset_attempt  # noqa: F401  (fixture)
 from test_financial_recovery import response, setup, source
@@ -33,8 +33,10 @@ def builds(monkeypatch):
 
 def test_saved_figures_equal_a_fresh_build_and_are_reused(owner, disclosure_scope, builds):
     iid, _ = setup(owner)
+    # setup() opens the recovery checklist, which saves the financial story.
+    before = saved(owner, iid)
     first = read(owner, iid)
-    assert first["status"] == "available" and builds == [iid] and saved(owner, iid) == 1
+    assert first["status"] == "available" and builds == [iid] and saved(owner, iid) == before + 1
     again = read(owner, iid)
     assert builds == [iid] and again == first
     with transaction(owner, consistent=True) as c:
@@ -112,8 +114,9 @@ def test_reviewed_figures_stay_with_their_account(owner, disclosure_scope, clean
 
 def test_reads_without_an_account_are_never_saved(owner, disclosure_scope, builds):
     iid, _ = setup(owner)
+    before = saved(owner, iid)
     assert read(None, iid)["status"] == "available" and read(None, iid)["status"] == "available"
-    assert builds == [iid, iid] and saved(owner, iid) == 0
+    assert builds == [iid, iid] and saved(owner, iid) == before
 
 
 def test_unfinished_figures_are_not_saved_and_saved_rows_are_immutable(owner, disclosure_scope):
@@ -138,7 +141,8 @@ def test_dates_and_decimals_anywhere_read_back_equal():
     assert FF.decode(json.loads(json.dumps(FF.encode(value)))) == value
 
 
-KINDS = {"income_flow": (IF, lambda c, i: IF.present(c, i)), "segment_revenue": (SR, lambda c, i: SR.present(c, i))}
+KINDS = {"income_flow": (IF, lambda c, i: IF.present(c, i)), "segment_revenue": (SR, lambda c, i: SR.present(c, i)),
+         "story": (FS, lambda c, i: FS.present(c, i))}
 
 
 @pytest.fixture(params=sorted(KINDS))

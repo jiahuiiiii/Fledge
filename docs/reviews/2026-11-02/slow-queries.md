@@ -91,8 +91,9 @@ financial recovery 18.0 s. What was left, and what changed:
 - **First opens.** After a restart, a background warm-up decodes (in
   batches of four, half a second apart) the readings the owner's newest idea
   checks and alerts point to and each company's latest reading
-  (`sentiment.warm_ids`; most important last so the cache keeps them), then
-  continues with the existing financial warm-up.
+  (`sentiment.warm_ids`), then continues with the existing financial
+  warm-up. (Round three reorders this list and stops it before the cache
+  fills; see below.)
 - **Ids-only permission checks** where only ids were used: proposal
   scoping (two places), event-review readability, evaluation input checks
   and the review digest. The company read ran 15 full article reads for
@@ -117,3 +118,40 @@ Second-round tests (disposable PostgreSQL 16): full suite 3,024 passed,
 108 skipped, the same 7 environment failures as before; new
 `test_warm_up_list_ends_with_each_companys_latest_reading`. Not yet
 measured on the owner's data.
+
+## Third round
+
+Owner's run after the second round: company read mostly 1.6–1.9 s (one
+3.4 s), alerts 6.8 s, financial recovery 7.9 s, financial story up to
+4.6 s; the owner reported the Financials tab still slow.
+
+- **Financial story saved across restarts.** It was the one Financials
+  view not stored in `filing_figures`, so every restart re-parsed the raw
+  10-K/10-Q HTML to draw the charts (and the recovery checklist's gap check
+  did too, through it). It now uses the same per-account, exact-input store
+  (`cached(conn, iid, 'story', build)`); its access check still runs first on
+  every read. `financial_story.METHOD` joined the store's version list, so
+  every saved figure rebuilds once after this change. The saved-figure tests
+  are parametrized over the story too (saved and reused, rebuilt on every
+  input change including withdrawn access, one row per kind). Two tests
+  that counted every saved row now count rows added by the read under test:
+  their setup opens the recovery checklist, which saves the story.
+- **Reading cache sized for real data.** Saved readings are several MB each
+  on the owner's data, so 128 MB held about 30–40 and the warm-up (up to
+  120) evicted its own work. Default now 256 MB, set with
+  `THESIS_READING_CACHE_MB`; the warm-up loads the most important first
+  (each company's latest reading, then the owner's alerts and idea checks)
+  and stops at three quarters full.
+- **Idea version history in about 7 queries** instead of 5 per version plus
+  2 per version for results: events, event reviews, evidence reviews,
+  conditions and evaluations each load for every version at once, ordered
+  by version and then by the previous key, and are grouped back.
+
+Not changed: the recovery checklist still parses its own filing set once per
+process (in the background; it does not hold the charts). Alerts still check
+social permissions once per reading (about 65 ms each).
+
+Third-round tests (disposable PostgreSQL 16): full suite 3,031 passed, 108
+skipped, the same 7 environment failures; frontend 264 passed, 1 failed
+(the date-dependent `companySnapshot` test noted earlier). Not yet measured
+on the owner's data.

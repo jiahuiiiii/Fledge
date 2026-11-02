@@ -956,10 +956,26 @@ LATEST_ID_SQL = LATEST_SQL.replace("SELECT *", "SELECT id", 1)
 # stored row is kept: present() still applies the current source access and
 # withdrawals on every read. Each caller gets its own copy (unpickled), so no
 # caller can change what another sees.
-READING_CACHE_BYTES = 128 * 1024 * 1024
+# Saved readings run to several MB each on real data; 256 MB holds roughly
+# the last 50-100. THESIS_READING_CACHE_MB changes it (e.g. on a small server).
+def _cache_megabytes():
+    import os
+    try:
+        return max(16, int(os.environ.get("THESIS_READING_CACHE_MB", "256")))
+    except ValueError:
+        return 256
+
+
+READING_CACHE_BYTES = _cache_megabytes() * 1024 * 1024
 _readings = OrderedDict()
 _reading_bytes = 0
 _reading_lock = threading.Lock()
+
+
+def reading_cache_filled():
+    """Share of the reading cache in use (0-1); the startup warm-up stops
+    early so it never evicts what it just loaded."""
+    return _reading_bytes / READING_CACHE_BYTES
 
 
 def clear_reading_cache():
@@ -1014,18 +1030,18 @@ def reading(conn, identity, instrument_id=None):
 
 
 def warm_ids(conn, owner, limit=120):
-    """Readings worth decoding after a restart, least important first (the
-    cache drops the least recently used): readings the owner's newest idea
-    checks and alerts point to, then each company's latest reading."""
-    checks = [r["analysis_id"] for r in rows(
-        conn, "SELECT analysis_id FROM idea_alert_checks WHERE owner_id=%s ORDER BY created_at DESC,id DESC LIMIT 60", (owner,))]
+    """Readings worth decoding after a restart, most important first (the
+    warm-up stops when the cache is three quarters full): each company's
+    latest reading (the company read needs it), then readings the owner's
+    newest alerts and idea checks point to."""
+    latest = [r["id"] for r in rows(
+        conn, "SELECT DISTINCT ON (instrument_id) id FROM sentiment_analyses ORDER BY instrument_id,cutoff DESC,created_at DESC,id DESC")]
     alerts = [i for r in rows(
         conn, "SELECT current_id,previous_id FROM research_alerts WHERE owner_id=%s ORDER BY created_at DESC,id DESC LIMIT 60", (owner,))
         for i in (r["current_id"], r["previous_id"])]
-    latest = [r["id"] for r in rows(
-        conn, "SELECT DISTINCT ON (instrument_id) id FROM sentiment_analyses ORDER BY instrument_id,cutoff DESC,created_at DESC,id DESC")]
-    ordered = list(dict.fromkeys(str(i) for i in reversed(latest + alerts + checks) if i))
-    return list(reversed(ordered[:limit]))
+    checks = [r["analysis_id"] for r in rows(
+        conn, "SELECT analysis_id FROM idea_alert_checks WHERE owner_id=%s ORDER BY created_at DESC,id DESC LIMIT 60", (owner,))]
+    return list(dict.fromkeys(str(i) for i in latest + alerts + checks if i))[:limit]
 
 
 def latest_record(conn, iid):
