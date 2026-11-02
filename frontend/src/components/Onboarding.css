@@ -342,3 +342,7 @@
     box-shadow: 0 -1px 0 var(--color-line);
   }
 }
+/* Several answers allowed: square tick boxes instead of round radio dots. */
+.onboarding-options button[role="checkbox"] .onboarding-check {
+  border-radius: 6px;
+}

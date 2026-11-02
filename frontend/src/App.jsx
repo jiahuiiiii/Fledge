@@ -1557,6 +1557,12 @@ function CompanyWorkspace({
       doc(id) ||
       data.sentiment?.sources?.find((s) => s.id === id) ||
       data.sentiment_inputs?.sources?.find((s) => s.id === id);
+    // A news headline goes straight to the article; the preview dialog only
+    // repeated the headline and snippet. Filings and posts still open it.
+    if (found?.kind === "news" && /^https?:\/\//i.test(found.url || "")) {
+      window.open(found.url, "_blank", "noopener,noreferrer");
+      return;
+    }
     if (found) setSource(found);
   };
   const openEditor = () => {

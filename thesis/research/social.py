@@ -13,6 +13,7 @@ import httpx
 from thesis.db import transaction, rows, one
 from .sec.service import COMPANIES
 from .catalogue import mentions as company_mentioned
+from .language import looks_english
 
 LEGACY_FEEDS = ("stocks", "investing", "wallstreetbets")
 GENERAL_FEEDS = LEGACY_FEEDS + ("stockmarket", "valueinvesting", "securityanalysis")
@@ -82,6 +83,7 @@ def parse_feed(content, feed, now, lookback_days=7):
                 or not title
                 or len(title) > 600
                 or len(body) > 12000
+                or not looks_english(title + " " + body)
                 or posted.tzinfo is None
                 or not now - timedelta(days=lookback_days) <= posted <= now
             ):

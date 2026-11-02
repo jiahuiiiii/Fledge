@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "./ui";
 import { api } from "../api/client";
+import PasswordInput from "./PasswordInput";
 import { TERMS_VERSION } from "../lib/terms";
 import { ForgotPasswordForm, RecoveryCodeScreen } from "./AccountSecurity";
 import "./AccountGate.css";
@@ -390,9 +391,8 @@ export default function AccountGate({ children }) {
             </div>
             <div className="account-field">
               <label htmlFor="account-password">Password</label>
-              <input
+              <PasswordInput
                 id="account-password"
-                type="password"
                 autoComplete={creating ? "new-password" : "current-password"}
                 maxLength={128}
                 placeholder={creating ? "At least 8 characters" : ""}
