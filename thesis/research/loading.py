@@ -81,17 +81,40 @@ def latest(owner, iid):
         return explain_source_counts(conn, explain_saved_failure(conn, run))
 
 
-def activity(owner, iid):
-    """A cheap change token for the open company page: the latest run's id,
-    last step write and active flag, plus how many of the owner's evaluation
-    jobs are waiting. Two indexed single-row reads; no documents are read."""
+def activity(owner, iid, saved=None):
+    """A cheap change token for the open company page, in three parts:
+    the latest run (id, last step write, active flag) | new saved data |
+    how many of the owner's evaluation jobs are waiting. Returns
+    (token, jobs, saved data part).
+
+    The saved-data part covers what the company page shows that background
+    work can change: the newest article or filing and the newest Reddit or
+    Hacker News post for the company, its latest AI reading, the owner's
+    newest alert, how many posts have been withdrawn and which discussion
+    feeds are on. It is the costly part (no index serves the article
+    lookup), so a caller can pass the last value as `saved` to skip it on
+    most checks. Aggregates only; no text is read."""
     with transaction(owner) as conn:
         run = one(conn, 'SELECT id,active,updated_at FROM research_loads WHERE instrument_id=%s '
                         'ORDER BY created_at DESC,id DESC LIMIT 1', (iid,))
         jobs = one(conn, "SELECT count(*) n FROM jobs WHERE owner_id=%s AND status IN ('pending','running')",
                    (owner,))['n']
+        if saved is None:
+            data = one(conn, """SELECT
+                (SELECT max(v.available_at) FROM document_versions v JOIN documents d ON d.id=v.document_id
+                  WHERE d.instrument_id=%s AND v.available_at<=now()) documents,
+                (SELECT max(available_at) FROM social_posts WHERE instrument_id=%s AND available_at<=now()) posts,
+                (SELECT id FROM sentiment_analyses WHERE instrument_id=%s
+                  ORDER BY cutoff DESC,created_at DESC,id DESC LIMIT 1) reading,
+                (SELECT max(created_at) FROM research_alerts WHERE owner_id=%s) alerts,
+                (SELECT count(*) FROM social_withdrawals) + (SELECT count(*) FROM hn_withdrawals) withdrawn,
+                (SELECT string_agg(feed, ',' ORDER BY feed) FROM social_feeds WHERE enabled) feeds""",
+                       (iid, iid, iid, owner))
+            saved = ':'.join(
+                '' if data[k] is None else (data[k].isoformat() if hasattr(data[k], 'isoformat') else str(data[k]))
+                for k in ('documents', 'posts', 'reading', 'alerts', 'withdrawn', 'feeds')).replace('|', '')
     run_part = f"{run['id']}:{run['updated_at'].isoformat()}:{int(run['active'])}" if run else '-'
-    return f'{run_part}|{jobs}', jobs
+    return f'{run_part}|{saved}|{jobs}', jobs, saved
 
 
 def explain_source_counts(conn, run):

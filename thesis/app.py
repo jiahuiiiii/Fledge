@@ -781,12 +781,28 @@ def remove_from_watchlist(instrument_id: UUID):
 
 
 @app.get("/api/v1/workspace")
-def workspace(instrument_id: UUID = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"), include_financials: bool = True):
+def workspace(instrument_id: UUID = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"), include_financials: bool = True, known: str = "", shared: bool = False):
+    """The company read. With `shared=1` (sent only by pages that can put
+    them back), repeated source texts are sent once in `source_texts`; a page
+    opened before this change gets every text in place. The answer carries a
+    `revision`; a re-read that passes the revision it already has as `known`
+    gets `{"unchanged": true}` when nothing changed, instead of the whole
+    company again."""
+    from fastapi.encoders import jsonable_encoder
+    from .workspace_payload import share_texts, revision
+
     result = service.state(auth.current_owner(), str(instrument_id), include_financials=include_financials)
     from .db import transaction, one
     with transaction() as conn:
         result["workspace_reset_at"] = one(conn, "SELECT reset_at FROM workspace_settings WHERE singleton")["reset_at"]
-    return {"result": result}
+    result = jsonable_encoder(result)
+    if shared:
+        result = share_texts(result)
+    current = revision(result)
+    if known and known == current:
+        return {"result": {"unchanged": True, "revision": current}}
+    result["revision"] = current
+    return JSONResponse({"result": result})
 
 
 @app.get("/api/v1/home-cards")
@@ -1734,6 +1750,10 @@ def research_loading(instrument_id: UUID):
 
 ACTIVITY_WAIT_MAX = 25
 ACTIVITY_CHECK_SECONDS = 1.0
+# The saved-data part of the token has no index behind its article lookup, so
+# it is re-checked on every fifth check (about every 5 s); update progress
+# and evaluation jobs stay at every check.
+ACTIVITY_DATA_EVERY = 5
 
 
 @app.get("/api/v1/companies/{instrument_id}/activity")
@@ -1747,8 +1767,11 @@ async def research_activity(instrument_id: UUID, since: str = "", wait: int = 0)
     owner = auth.current_owner()
     iid = str(instrument_id)
     deadline = time.monotonic() + max(0, min(wait, ACTIVITY_WAIT_MAX))
+    saved, checks = None, 0
     while True:
-        token, jobs = await run_in_threadpool(activity, owner, iid)
+        reuse = saved if checks % ACTIVITY_DATA_EVERY else None
+        token, jobs, saved = await run_in_threadpool(activity, owner, iid, reuse)
+        checks += 1
         if token != since or time.monotonic() >= deadline:
             break
         await asyncio.sleep(ACTIVITY_CHECK_SECONDS)

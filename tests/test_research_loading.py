@@ -249,3 +249,44 @@ def test_activity_wait_is_capped(owner, monkeypatch):
     token = client.get(f'/api/v1/companies/{iid}/activity').json()['result']['token']
     answer = client.get(f'/api/v1/companies/{iid}/activity', params={'since': token, 'wait': 600}).json()['result']
     assert not answer['changed'] and len(checks) == 2
+
+
+def test_activity_token_moves_when_new_company_data_is_saved(owner):
+    """New saved articles and withdrawals wake the company page's long poll,
+    so it can re-read on change instead of on a timer."""
+    from datetime import datetime, timezone
+    from test_market import news, commit
+    from thesis.config import OWNER
+    iid = prepare(OWNER)
+    token, jobs, saved = loading.activity(OWNER, iid)
+    run_part, data_part, job_part = token.split('|')
+    assert run_part == '-' and job_part == '0' == str(jobs) and data_part == saved
+    assert loading.activity(OWNER, iid)[0] == token
+    commit(iid, [news(id=91, headline='Microsoft opens a new data centre', url='https://example.test/91')])
+    moved, _, moved_saved = loading.activity(OWNER, iid)
+    assert moved != token and moved_saved != saved
+    # A withdrawn post must leave an open page too, not only new content.
+    with transaction(admin=True) as conn:
+        conn.execute('INSERT INTO social_withdrawals VALUES(%s,%s)', ('t3_withdrawn_example', datetime.now(timezone.utc)))
+    assert loading.activity(OWNER, iid)[2] != moved_saved
+    # Passing the last saved part skips that lookup and keeps the token.
+    assert loading.activity(OWNER, iid, moved_saved)[0].split('|')[1] == moved_saved
+
+
+def test_activity_long_poll_checks_saved_data_every_fifth_check(owner, monkeypatch):
+    from fastapi.testclient import TestClient
+    from thesis import app as app_module
+    from thesis.config import OWNER
+    iid = prepare(OWNER)
+    calls = []
+    real = loading.activity
+    monkeypatch.setattr(loading, 'activity', lambda owner, iid, saved=None: calls.append(saved is None) or real(owner, iid, saved))
+    monkeypatch.setattr(app_module, 'ACTIVITY_CHECK_SECONDS', 0.01)
+    client = TestClient(app_module.app)
+    client.get('/api/v1/session')
+    path = f'/api/v1/companies/{iid}/activity'
+    token = client.get(path).json()['result']['token']
+    calls.clear()
+    client.get(path, params={'since': token, 'wait': 1})
+    assert len(calls) > 10
+    assert calls[:11] == [True, False, False, False, False] * 2 + [True]
