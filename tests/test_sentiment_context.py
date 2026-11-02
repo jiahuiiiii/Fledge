@@ -244,6 +244,8 @@ def test_context_count_and_bytes_are_bounded_without_truncating(monkeypatch):
         )
 
     monkeypatch.setattr(C, "one", row)
+    # attach() reads every post's latest check in one batched query.
+    monkeypatch.setattr(C, "rows", lambda _, query, args: [dict(row(_, query, args), post_id=p) for p in args[0]])
     # Withdrawal lookups now run through the shared (cached) helper, not C.one.
     monkeypatch.setattr(C.withdrawals, "is_withdrawn", lambda conn, key: False)
     sources = [dict(id=str(uuid4()), platform="hackernews") for _ in range(8)]

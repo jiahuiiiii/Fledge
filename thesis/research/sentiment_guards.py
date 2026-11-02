@@ -107,12 +107,21 @@ def reference(snapshot, source, company):
 def attach(conn, iid, sources, company):
     """Read only. No fetch, new clock, model input, or price-vintage stitching."""
     permitted = price_history.allowed(conn)
+    # Many posts share the same latest snapshot, and each snapshot carries its
+    # whole price series: find the snapshot id per post (index only), then
+    # read each distinct snapshot once.
+    loaded = {}
     for source in sources:
         if source["channel"] != "social" or not any(MONEY.search(p["quote"]) for p in source["passages"]):
             continue
         snapshot = None
         if permitted and source.get("timestamp_basis") != "feed_updated":
-            snapshot = one(conn, "SELECT id,symbol,series,retrieved_at FROM price_history_snapshots WHERE instrument_id=%s AND retrieved_at<=%s ORDER BY retrieved_at DESC,id DESC LIMIT 1", (iid, source["published_at"]))
+            found = one(conn, "SELECT id FROM price_history_snapshots WHERE instrument_id=%s AND retrieved_at<=%s ORDER BY retrieved_at DESC,id DESC LIMIT 1", (iid, source["published_at"]))
+            if found:
+                key = str(found["id"])
+                if key not in loaded:
+                    loaded[key] = one(conn, "SELECT id,symbol,series,retrieved_at FROM price_history_snapshots WHERE id=%s", (found["id"],))
+                snapshot = loaded[key]
         source["price_reference"] = (reference(snapshot, source, company) if permitted
                                      else dict(status="price_access_unavailable"))
 

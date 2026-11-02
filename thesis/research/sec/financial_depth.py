@@ -3,6 +3,7 @@
 These are research calculations, never new monitoring metrics. Missing concepts,
 incompatible fiscal dates and incomplete borrowing components remain unknown.
 """
+from . import saved_payload
 from datetime import date, timedelta
 from decimal import Decimal,localcontext
 from .normalize import filing_rows,REVENUE,annual_form
@@ -224,12 +225,12 @@ def present(conn,iid):
 
 
 def build(conn,iid):
-    saved=one(conn,'SELECT p.id,p.payload,p.retrieved_at,c.cik,k.checked_at FROM sec_payload_current k JOIN source_payloads p ON p.id=k.payload_id AND p.instrument_id=k.instrument_id JOIN sec_companies c ON c.instrument_id=k.instrument_id WHERE k.instrument_id=%s',(iid,))
+    saved=saved_payload.current(conn,iid)
     if not saved:return dict(status='empty',reason='Refresh filings to prepare trailing results and borrowing information.')
     from .amendments import retained_resolver
     try:
         from .filing_facts import enrich
-        saved['payload']=enrich(conn,iid,saved['payload'],saved['cik'],saved['checked_at'])
+        saved['payload']=enrich(conn,iid,saved['payload'],saved['cik'],saved['checked_at'],payload_id=saved['id'])
         resolver=retained_resolver(conn,iid,saved['payload'],saved['cik'],saved['checked_at'])
         values=normalize_depth(saved['payload'],saved['cik'],saved['checked_at'],resolver)
     except ValueError:return dict(status='unavailable',reason='Retained SEC facts could not be normalized for these additional measures. The existing financial reports remain available.')

@@ -56,11 +56,7 @@ def scope(source):
 
 
 def analysis(conn, iid, aid):
-    value = one(
-        conn,
-        "SELECT * FROM sentiment_analyses WHERE instrument_id=%s AND id=%s",
-        (iid, aid),
-    )
+    value = sentiment.reading(conn, aid, iid)
     if not value:
         raise Missing("This source sample does not belong to the selected company.")
     return value

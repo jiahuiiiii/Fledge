@@ -55,6 +55,14 @@ def stage_info(conn, instrument_id=INSTRUMENT):
     )
 
 
+# Which saved documents a reader may see for a company as of a cutoff. Shared
+# by the full read and the ids-only check so the two can never disagree.
+PERMITTED_WHERE = (
+    "WHERE d.instrument_id=%s AND s.entitlement IN ('fictional','sec-public','finnhub-pitch','public-news')"
+    " AND v.available_at<=%s"
+)
+
+
 def permitted_documents(conn, cutoff, instrument_id=INSTRUMENT):
     return rows(
         conn,
@@ -62,9 +70,22 @@ def permitted_documents(conn, cutoff, instrument_id=INSTRUMENT):
        FROM document_versions v JOIN documents d ON d.id=v.document_id JOIN sources s ON s.id=d.source_id
        LEFT JOIN document_lineage l ON l.document_version_id=v.id
        LEFT JOIN market_articles m ON m.document_version_id=v.id
-       WHERE d.instrument_id=%s AND s.entitlement IN ('fictional','sec-public','finnhub-pitch','public-news') AND v.available_at<=%s ORDER BY v.available_at,v.id""",
+       """ + PERMITTED_WHERE + " ORDER BY v.available_at,v.id",
         (instrument_id, cutoff),
     )
+
+
+def permitted_document_ids(conn, cutoff, instrument_id=INSTRUMENT):
+    """The ids permitted_documents would return, without reading any text."""
+    return {
+        str(r["id"])
+        for r in rows(
+            conn,
+            "SELECT v.id FROM document_versions v JOIN documents d ON d.id=v.document_id"
+            " JOIN sources s ON s.id=d.source_id " + PERMITTED_WHERE,
+            (instrument_id, cutoff),
+        )
+    }
 
 
 def version_instrument(conn, owner, version_id):

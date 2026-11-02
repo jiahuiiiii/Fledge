@@ -146,11 +146,7 @@ def current_idea(conn, owner, iid):
 
 
 def latest_analysis(conn, iid):
-    return one(
-        conn,
-        sentiment.LATEST_SQL,
-        (iid,),
-    )
+    return sentiment.latest_record(conn, iid)
 
 
 def remember(conn, owner, version, sources):
@@ -229,11 +225,7 @@ def prepare(
             "Your saved idea changed. Reopen its current revision before checking."
         )
     analysis = (
-        one(
-            conn,
-            "SELECT * FROM sentiment_analyses WHERE id=%s AND instrument_id=%s",
-            (analysis_id, iid),
-        )
+        sentiment.reading(conn, analysis_id, iid)
         if analysis_id
         else latest_analysis(conn, iid)
     )
@@ -907,9 +899,7 @@ def present(conn, owner, row, *, analyses=None, publications=None, reviews=None,
     analysis = (
         analyses.get(str(row["analysis_id"]))
         if analyses is not None
-        else one(
-            conn, "SELECT * FROM sentiment_analyses WHERE id=%s", (row["analysis_id"],)
-        )
+        else sentiment.reading(conn, row["analysis_id"])
     )
     visible = sentiment.present(conn, analysis)
     withheld = visible["withheld"]
@@ -1018,14 +1008,7 @@ def list_for(conn, owner, iid=None, pending=False):
     # same multi-MB sentiment rows when checks share an analysis.
     analysis_ids = list({r["analysis_id"] for r in checks})
     check_ids = [r["id"] for r in checks]
-    analyses = {
-        str(a["id"]): a
-        for a in rows(
-            conn,
-            "SELECT * FROM sentiment_analyses WHERE id=ANY(%s::uuid[])",
-            (analysis_ids,),
-        )
-    }
+    analyses = sentiment.readings(conn, analysis_ids)
     publications = {
         str(p["check_id"]): p
         for p in rows(

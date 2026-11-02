@@ -213,7 +213,10 @@ async def lifespan(app):
                 companies = [str(r["instrument_id"]) for r in rows(conn,
                     "SELECT DISTINCT instrument_id FROM disclosure_documents WHERE source_id='sec-disclosures'")]
             for iid in companies:
-                if stop.is_set():
+                # Pause between companies: this shares the Python interpreter
+                # with page requests, and a back-to-back run of every company
+                # made pages opened just after a restart wait seconds.
+                if stop.wait(1.0):
                     return
                 service.financial_workspace(owner, iid)
                 with transaction(owner, consistent=True) as conn:

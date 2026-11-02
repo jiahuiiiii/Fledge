@@ -4,6 +4,7 @@ The model selects supplied input IDs, never numerical answers. Code checks
 periods, units, scope and arithmetic. A person must review the meaning before
 the result can fill a gap in their financial research view. No automatic calls.
 """
+from . import saved_payload
 from copy import deepcopy
 from collections import Counter
 from datetime import date
@@ -80,7 +81,7 @@ def allowed(conn):
 
 def prepare(conn,iid,document_id=None):
     if not allowed(conn):raise ValueError('Original filing access is unavailable.')
-    saved=one(conn,'SELECT p.payload,c.cik,k.checked_at FROM sec_payload_current k JOIN source_payloads p ON p.id=k.payload_id JOIN sec_companies c ON c.instrument_id=k.instrument_id WHERE k.instrument_id=%s',(iid,))
+    saved=saved_payload.current(conn,iid)
     if not saved:raise ValueError('Update data to collect the company’s filings first.')
     filings=filing_rows(saved['payload']['submissions'],saved['checked_at'])
     urls={archive_url(saved['cik'],f['accessionNumber'],f['primaryDocument']):f for f in filings}

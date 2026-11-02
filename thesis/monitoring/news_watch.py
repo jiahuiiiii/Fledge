@@ -82,11 +82,7 @@ def configure(
                 raise ValueError(
                     f"You can watch up to {LIMIT} companies. Turn off another watch first."
                 )
-        baseline = one(
-            c,
-            sentiment.LATEST_SQL,
-            (iid,),
-        )
+        baseline = sentiment.latest_record(c, iid)
         c.execute(
             "INSERT INTO news_watches(owner_id,instrument_id,enabled,interval_minutes,next_check_at,baseline_id) VALUES(%s,%s,%s,%s,%s,%s) ON CONFLICT(owner_id,instrument_id) DO UPDATE SET enabled=excluded.enabled,interval_minutes=excluded.interval_minutes,next_check_at=excluded.next_check_at,baseline_id=COALESCE(news_watches.baseline_id,excluded.baseline_id),claim_token=NULL,lease_until=NULL,error=NULL",
             (
@@ -316,11 +312,7 @@ def publish(owner, iid, analysis_id, *, claim_token=None, now=None):
         )
         if not watch_lanes.active(c, owner, iid, claim_token, now, watch=watch):
             return 0
-        current = one(
-            c,
-            "SELECT * FROM sentiment_analyses WHERE id=%s AND instrument_id=%s",
-            (analysis_id, iid),
-        )
+        current = sentiment.reading(c, analysis_id, iid)
         if not current:
             raise ValueError("Sentiment analysis does not match this company.")
         if current["packet"].get("social_lookback_days", 7) != 7:
@@ -330,11 +322,7 @@ def publish(owner, iid, analysis_id, *, claim_token=None, now=None):
         if current["packet"].get("held_sources"):
             return 0
         previous = (
-            one(
-                c,
-                "SELECT * FROM sentiment_analyses WHERE id=%s AND instrument_id=%s",
-                (watch["baseline_id"], iid),
-            )
+            sentiment.reading(c, watch["baseline_id"], iid)
             if watch["baseline_id"]
             else None
         )
@@ -472,7 +460,7 @@ def list_alerts(conn, owner, ids=None, *, previous=True, detail_instrument=None,
     detailed = [a for a in data if not status_only(a)]
     # Consecutive alerts share readings; build each one once for this request.
     wanted = list({str(a[k]) for a in detailed for k in ("current_id", "previous_id")})
-    records = {str(r["id"]): r for r in rows(conn, "SELECT * FROM sentiment_analyses WHERE id=ANY(%s::uuid[])", (wanted,))} if wanted else {}
+    records = sentiment.readings(conn, wanted) if wanted else {}
     presented = {}
 
     def shown(identity):

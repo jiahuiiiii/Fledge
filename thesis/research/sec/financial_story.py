@@ -2,6 +2,7 @@
 
 This presentation does not rewrite performance, monitoring or saved AI results.
 """
+from . import saved_payload
 from decimal import Decimal, localcontext
 from thesis.db import one
 from .normalize import filing_rows, REVENUE, annual_form
@@ -192,13 +193,13 @@ def normalize_story(bundle, cik, now,resolver=None):
 def present(conn, iid):
     if not one(conn, "SELECT 1 FROM sources WHERE id='sec-companyfacts' AND entitlement='sec-public'"):
         return dict(status='unavailable', reason='Structured filing source access is unavailable.', method=METHOD)
-    saved = one(conn, 'SELECT p.id,p.payload,p.retrieved_at,c.cik,k.checked_at FROM sec_payload_current k JOIN source_payloads p ON p.id=k.payload_id AND p.instrument_id=k.instrument_id JOIN sec_companies c ON c.instrument_id=k.instrument_id WHERE k.instrument_id=%s', (iid,))
+    saved = saved_payload.current(conn, iid)
     if not saved:
         return dict(status='empty', reason='Collect company filings to see financial history.', method=METHOD)
     from .amendments import retained_resolver
     try:
         from .filing_facts import enrich
-        saved['payload']=enrich(conn,iid,saved['payload'],saved['cik'],saved['checked_at'])
+        saved['payload']=enrich(conn,iid,saved['payload'],saved['cik'],saved['checked_at'],payload_id=saved['id'])
         resolver=retained_resolver(conn,iid,saved['payload'],saved['cik'],saved['checked_at'])
         result = normalize_story(saved['payload'], saved['cik'], saved['checked_at'],resolver)
     except (ValueError, KeyError, TypeError, OverflowError):

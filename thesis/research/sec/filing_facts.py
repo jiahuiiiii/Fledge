@@ -266,7 +266,7 @@ def fingerprint(document):
     return hashlib.sha256(bytes(document['raw_html'])).digest()
 
 
-def cached_attach(bundle, documents, cik, now, load=None):
+def cached_attach(bundle, documents, cik, now, load=None, bundle_key=None):
     """Cache only deterministic public extraction, never access or owner reviews.
 
     Fingerprint actual bytes as well as saved hashes so damaged/changed originals
@@ -276,7 +276,12 @@ def cached_attach(bundle, documents, cik, now, load=None):
     independent copy (downstream readers attach evidence to facts).
     """
     global _overlay_bytes
-    digest = hashlib.sha256(json.dumps(bundle, sort_keys=True, separators=(',', ':')).encode())
+    # A saved payload's id names its exact, unchangeable content (source_payloads
+    # rows are immutable), so it stands in for hashing megabytes of JSON on
+    # every read. Without one, the bundle itself is hashed as before.
+    digest = hashlib.sha256(
+        ('saved-payload:' + str(bundle_key)).encode() if bundle_key is not None
+        else json.dumps(bundle, sort_keys=True, separators=(',', ':')).encode())
     digest.update(str((METHOD, cik, now)).encode())
     for document in documents:
         digest.update(json.dumps({k: str(v) for k, v in document.items() if k not in ('raw_html', 'raw_sha')}, sort_keys=True).encode())
@@ -311,10 +316,10 @@ def load_raw(conn):
     return load
 
 
-def enrich(conn,iid,bundle,cik,now):
+def enrich(conn,iid,bundle,cik,now,payload_id=None):
     if not one(conn,"SELECT 1 FROM sources WHERE id='sec-disclosures' AND entitlement='sec-public'"): return bundle
     # Hash in the database: the originals are large and rarely need re-reading.
     documents=rows(conn,"SELECT DISTINCT ON (url) id,url,form,content_hash,encode(sha256(raw_html),'hex') raw_sha FROM disclosure_documents WHERE instrument_id=%s AND source_id='sec-disclosures' AND form IN ('10-K','10-Q','10-K/A','10-Q/A') ORDER BY url,available_at DESC",(iid,))
-    result=cached_attach(bundle,documents,cik,now,load_raw(conn))
+    result=cached_attach(bundle,documents,cik,now,load_raw(conn),bundle_key=payload_id)
     from .financial_recovery import apply_reviewed
     return apply_reviewed(conn,iid,result,documents)

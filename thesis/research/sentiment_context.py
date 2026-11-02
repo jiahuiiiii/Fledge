@@ -2,8 +2,11 @@
 
 import hashlib
 import re
+import threading
+from collections import OrderedDict
 from datetime import datetime, timedelta
-from thesis.db import one
+from uuid import UUID
+from thesis.db import one, rows
 from thesis.providers.ledger import canonical
 from .citations import source_passages
 from . import withdrawals
@@ -18,20 +21,36 @@ MAX_AGE = timedelta(hours=24)
 MAX_REDDIT_AGE = timedelta(days=7)
 
 
+def _uuids(values):
+    found = []
+    for value in values:
+        try:
+            found.append(str(UUID(str(value))))
+        except ValueError:
+            pass
+    return list(dict.fromkeys(found))
+
+
 def attach(conn, sources, cutoff, *, batch_limits=True):
     used_bytes = count = 0
+    # Every post's latest saved parent check, in one query rather than one per post.
+    posts = _uuids(s["id"] for s in sources if s.get("platform") in {"hackernews", "reddit"})
+    latest = {
+        str(r["post_id"]): r
+        for r in rows(
+            conn,
+            """SELECT r.* FROM social_conversation_state s
+            JOIN social_conversation_results r ON r.id=s.latest_result_id
+            WHERE s.post_id=ANY(%s::uuid[]) AND r.checked_at<=%s""",
+            (posts, cutoff),
+        )
+    } if posts else {}
     for source in sources:
         if source.get("platform") not in {"hackernews", "reddit"}:
             continue
         source.pop("conversation", None)
         source["context_status"] = "not_saved"
-        row = one(
-            conn,
-            """SELECT r.* FROM social_conversation_state s
-            JOIN social_conversation_results r ON r.id=s.latest_result_id
-            WHERE s.post_id=%s AND r.checked_at<=%s""",
-            (source["id"], cutoff),
-        )
+        row = latest.get(str(source["id"]))
         if not row:
             continue
         source["context_status"] = row["outcome"]
@@ -105,19 +124,54 @@ def allowed(conn, source):
     )
 
 
+# Conversation results never change (the `immutable` trigger refuses UPDATE
+# and DELETE) and are shared, not per account, so a found row is kept for
+# later requests. Withdrawal checks still run on every use. Bounded by count;
+# rows are only read, never changed, by callers.
+RESULT_CACHE_ROWS = 20000
+_results = OrderedDict()
+_results_lock = threading.Lock()
+
+
+def clear_result_cache():
+    with _results_lock:
+        _results.clear()
+
+
+def _keep(row):
+    with _results_lock:
+        _results[(str(row["id"]), str(row["post_id"]))] = row
+        while len(_results) > RESULT_CACHE_ROWS:
+            _results.popitem(last=False)
+
+
+def prefetch(conn, sources):
+    """Load, in one query, the saved parent checks these sources' readings
+    used and that are not in memory yet."""
+    wanted = {
+        (str(s["conversation"]["result_id"]), str(s["id"]))
+        for s in sources
+        if s.get("conversation") and s["conversation"].get("result_id")
+    }
+    with _results_lock:
+        missing = [k for k in wanted if k not in _results]
+    ids = _uuids(r for r, _ in missing)
+    if ids:
+        for row in rows(conn, "SELECT * FROM social_conversation_results WHERE id=ANY(%s::uuid[])", (ids,)):
+            _keep(row)
+
+
 def _conversation_result(conn, result_id, post_id):
-    # Conversation results are immutable, so within one transaction the same
-    # (result_id, post_id) pair — asked once per source for every saved reading
-    # on the page — is answered from cache instead of a fresh point query.
-    cache = getattr(conn, "_request_cache", None)
-    sql = "SELECT * FROM social_conversation_results WHERE id=%s AND post_id=%s"
-    if cache is None:
-        return one(conn, sql, (result_id, post_id))
-    store = cache.setdefault("conv_result", {})
     key = (str(result_id), str(post_id))
-    if key not in store:
-        store[key] = one(conn, sql, (result_id, post_id))
-    return store[key]
+    with _results_lock:
+        row = _results.get(key)
+        if row is not None:
+            _results.move_to_end(key)
+            return row
+    row = one(conn, "SELECT * FROM social_conversation_results WHERE id=%s AND post_id=%s", (result_id, post_id))
+    if row:
+        _keep(row)
+    return row
 
 
 def changed_common_context(previous, current, channel, platform):

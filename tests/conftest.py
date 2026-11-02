@@ -45,6 +45,13 @@ def owner(db):
     with transaction(admin=True) as conn:
         conn.execute("TRUNCATE accounts,instruments,sources,demo_state,hn_withdrawals,social_withdrawals CASCADE")
         conn.execute("INSERT INTO demo_state VALUES(true,0)")
+    # Saved readings are cached in memory by id; the rows were just removed.
+    from thesis.research.sentiment import clear_reading_cache
+    from thesis.research.sentiment_context import clear_result_cache
+    from thesis.research.sec import saved_payload
+    clear_reading_cache()
+    clear_result_cache()
+    saved_payload.clear()
     seed()
     value = str(uuid4())
     with transaction(admin=True) as conn:

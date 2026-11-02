@@ -35,6 +35,8 @@ def test_each_reading_is_presented_once_and_unused_sources_are_dropped(monkeypat
         return dict(withheld=False, coverage={}, sources=[source('s' + n), source('unused' + n)],
                     items=[dict(source_id='s' + n, citations=[])])
     monkeypatch.setattr(N, 'rows', fake_rows)
+    # Readings now load through the shared reading cache.
+    monkeypatch.setattr(N.sentiment, 'readings', lambda conn, ids, instrument_id=None: {r: readings[r] for r in ids})
     monkeypatch.setattr(N.sentiment, 'present', present)
     result = N.list_alerts(None, 'owner')
     assert sorted(calls) == ['r1', 'r2', 'r3']  # r2 is shared by both alerts

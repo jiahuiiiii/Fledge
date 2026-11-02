@@ -8,11 +8,7 @@ from .sentiment_context import changed_common_context
 
 
 def record(conn, iid, identity):
-    value = one(
-        conn,
-        "SELECT * FROM sentiment_analyses WHERE instrument_id=%s AND id=%s",
-        (iid, identity),
-    )
+    value = sentiment.reading(conn, identity, iid)
     if not value:
         raise Missing("Sentiment sample not found for this company.")
     return value
@@ -59,13 +55,19 @@ def history(iid, before=None):
                 cursor["created_at"],
                 cursor["id"],
             ]
-        values = rows(
-            conn,
-            "SELECT * FROM sentiment_analyses WHERE instrument_id=%s"
-            + condition
-            + " ORDER BY cutoff DESC,created_at DESC,id DESC LIMIT 21",
-            params,
-        )
+        # Ids in order from the index, then the rows from the reading cache.
+        ids = [
+            r["id"]
+            for r in rows(
+                conn,
+                "SELECT id FROM sentiment_analyses WHERE instrument_id=%s"
+                + condition
+                + " ORDER BY cutoff DESC,created_at DESC,id DESC LIMIT 21",
+                params,
+            )
+        ]
+        found = sentiment.readings(conn, ids)
+        values = [found[str(i)] for i in ids if str(i) in found]
         return dict(
             items=[summary(conn, v) for v in values[:20]],
             next_cursor=str(values[19]["id"]) if len(values) > 20 else None,

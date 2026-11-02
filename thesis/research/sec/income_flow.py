@@ -3,6 +3,7 @@
 Exact decimal reconciliation precedes visualization. This is a new presentation
 method; existing financial calculations, snapshots and monitoring are unchanged.
 """
+from . import saved_payload
 from decimal import Decimal, localcontext
 from .normalize import REVENUE, filing_rows, annual_form
 from .performance import collect, select, decimal_text
@@ -149,13 +150,13 @@ def present(conn, iid):
 
 
 def build(conn, iid):
-    saved = one(conn, 'SELECT p.id,p.payload,p.retrieved_at,c.cik,k.checked_at FROM sec_payload_current k JOIN source_payloads p ON p.id=k.payload_id AND p.instrument_id=k.instrument_id JOIN sec_companies c ON c.instrument_id=k.instrument_id WHERE k.instrument_id=%s', (iid,))
+    saved = saved_payload.current(conn, iid)
     if not saved:
         return dict(status='empty', periods=[], reason='Collect company filings to see the revenue and expense flow.', method=METHOD)
     from .amendments import retained_resolver
     try:
         from .filing_facts import enrich
-        saved['payload']=enrich(conn,iid,saved['payload'],saved['cik'],saved['checked_at'])
+        saved['payload']=enrich(conn,iid,saved['payload'],saved['cik'],saved['checked_at'],payload_id=saved['id'])
         resolver=retained_resolver(conn,iid,saved['payload'],saved['cik'],saved['checked_at'])
         result = normalize_flow(saved['payload'], saved['cik'], saved['checked_at'],resolver)
     except (ValueError, KeyError):
