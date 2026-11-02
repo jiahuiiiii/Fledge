@@ -80,6 +80,30 @@ def usable_item(record, item):
     )
 
 
+def _recent_readings(conn, instrument_id, chunk=5):
+    """The newest saved readings, newest first, through the shared reading
+    cache: ids from the index, rows decoded once per process and loaded a
+    few at a time so an early stop skips the rest."""
+    from . import sentiment
+
+    ids = [
+        r["id"]
+        for r in rows(
+            conn,
+            "SELECT id FROM sentiment_analyses WHERE instrument_id=%s "
+            "ORDER BY created_at DESC,id DESC LIMIT %s",
+            (instrument_id, LOOKBACK_READINGS),
+        )
+    ]
+    for start in range(0, len(ids), chunk):
+        part = ids[start:start + chunk]
+        loaded = sentiment.readings(conn, part)
+        for identity in part:
+            record = loaded.get(str(identity))
+            if record:
+                yield record
+
+
 def find(conn, packet):
     """Return {source_id: saved} for current sources with an unchanged saved label.
 
@@ -87,12 +111,7 @@ def find(conn, packet):
     """
     wanted = {content_key(s): s for s in packet["sources"]}
     found = {}
-    for record in rows(
-        conn,
-        "SELECT id,call_id,packet,result FROM sentiment_analyses WHERE instrument_id=%s "
-        "ORDER BY created_at DESC,id DESC LIMIT %s",
-        (packet["instrument_id"], LOOKBACK_READINGS),
-    ):
+    for record in _recent_readings(conn, packet["instrument_id"]):
         if len(found) == len(wanted):
             break
         if not compatible(record, packet):

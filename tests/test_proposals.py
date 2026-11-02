@@ -300,6 +300,13 @@ def test_revoked_source_withholds_proposal_and_blocks_approval(owner, monkeypatc
         "permitted_documents",
         lambda *a, **kw: [d for d in original(*a, **kw) if str(d["id"]) != cited],
     )
+    # Permission checks that need only ids use the ids-only twin (same rules).
+    original_ids = service.permitted_document_ids
+    monkeypatch.setattr(
+        service,
+        "permitted_document_ids",
+        lambda *a, **kw: original_ids(*a, **kw) - {cited},
+    )
     scoped = service.state(owner)["proposals"][0]
     assert (
         scoped["candidate"] is None

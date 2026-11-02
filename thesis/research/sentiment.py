@@ -1013,6 +1013,21 @@ def reading(conn, identity, instrument_id=None):
     return readings(conn, [identity], instrument_id).get(str(identity))
 
 
+def warm_ids(conn, owner, limit=120):
+    """Readings worth decoding after a restart, least important first (the
+    cache drops the least recently used): readings the owner's newest idea
+    checks and alerts point to, then each company's latest reading."""
+    checks = [r["analysis_id"] for r in rows(
+        conn, "SELECT analysis_id FROM idea_alert_checks WHERE owner_id=%s ORDER BY created_at DESC,id DESC LIMIT 60", (owner,))]
+    alerts = [i for r in rows(
+        conn, "SELECT current_id,previous_id FROM research_alerts WHERE owner_id=%s ORDER BY created_at DESC,id DESC LIMIT 60", (owner,))
+        for i in (r["current_id"], r["previous_id"])]
+    latest = [r["id"] for r in rows(
+        conn, "SELECT DISTINCT ON (instrument_id) id FROM sentiment_analyses ORDER BY instrument_id,cutoff DESC,created_at DESC,id DESC")]
+    ordered = list(dict.fromkeys(str(i) for i in reversed(latest + alerts + checks) if i))
+    return list(reversed(ordered[:limit]))
+
+
 def latest_record(conn, iid):
     """The company's newest saved reading (same order as LATEST_SQL)."""
     row = one(conn, LATEST_ID_SQL, (iid,))

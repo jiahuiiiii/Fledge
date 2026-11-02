@@ -179,7 +179,7 @@ def test_carry_over_requires_matching_policies_and_whole_source_context(monkeypa
     result["model"]="earlier-model"
     for item in result["items"]: item.pop("model")
     record=dict(id=str(uuid4()),call_id=str(uuid4()),packet=p,result=result)
-    with patch.object(U,"rows",return_value=[record]):
+    with patch.object(U,"_recent_readings",return_value=[record]):
         reused=U.find(None,p)
         assert len(reused) == 8
         assert all(s["item"]["model"] == "earlier-model" for s in reused.values())
@@ -275,7 +275,7 @@ def test_reused_quick_check_keeps_quick_model_and_calls_instead_of_bulk_call():
     result["items"][0].pop("model"); result["items"][0].pop("call_id")
     result["prefilter"]=dict(policy=relevance_prefilter.POLICY,model="quick-model",call_ids=["quick-call"])
     record=dict(id=str(uuid4()),call_id="bulk-call",packet=p,result=result)
-    with patch.object(U,"rows",return_value=[record]):
+    with patch.object(U,"_recent_readings",return_value=[record]):
         saved=U.find(None,p)[p["sources"][0]["id"]]["item"]
     assert saved["model"] == "quick-model" and saved["call_ids"] == ["quick-call"]
     assert "call_id" not in saved

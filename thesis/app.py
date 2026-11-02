@@ -209,6 +209,16 @@ async def lifespan(app):
             owner = next(iter(auth.background_owners()), None)
             if owner is None:
                 return
+            # Saved AI readings first: alerts and the company read need them,
+            # and decoding one is the slow part of a first open.
+            from .research import sentiment
+            with transaction(owner) as conn:
+                warm = sentiment.warm_ids(conn, owner)
+            for start in range(0, len(warm), 4):
+                if stop.wait(0.5):
+                    return
+                with transaction(owner) as conn:
+                    sentiment.readings(conn, warm[start:start + 4])
             with transaction(owner) as conn:
                 companies = [str(r["instrument_id"]) for r in rows(conn,
                     "SELECT DISTINCT instrument_id FROM disclosure_documents WHERE source_id='sec-disclosures'")]

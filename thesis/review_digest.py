@@ -156,12 +156,9 @@ def change_detail(conn, owner, event):
         WHERE c.id=%s AND c.owner_id=%s""",
         (event["id"], owner),
     )
-    allowed = {
-        str(d["id"])
-        for d in service.permitted_documents(
-            conn, datetime.now(timezone.utc), row["instrument_id"]
-        )
-    }
+    allowed = service.permitted_document_ids(
+        conn, datetime.now(timezone.utc), row["instrument_id"]
+    )
     manifests = rows(
         conn,
         "SELECT manifest FROM evaluations WHERE owner_id=%s AND id=ANY(%s::uuid[])",

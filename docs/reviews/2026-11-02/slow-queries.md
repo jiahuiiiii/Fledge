@@ -77,3 +77,43 @@ Disposable PostgreSQL 16, offline:
 - Two unit tests that faked `rows`/`one` now fake the batched paths
   (`test_alert_payload.py`, `test_sentiment_context.py`); what they assert
   is unchanged.
+
+## Second round (owner's run after the first)
+
+Owner's run after the first round: alerts 2.1 s and 9.9 s (first opens
+after a restart), company read 1.8–4.3 s, financial story 2.6 s,
+financial recovery 18.0 s. What was left, and what changed:
+
+- **Background reuse lookup** (`sentiment_reuse.find`) loaded the 40 newest
+  full readings on every scheduled check (3.6–9.7 s each). It now reads the
+  ids from the index and the rows through the reading cache, a few at a time
+  so an early stop skips the rest.
+- **First opens.** After a restart, a background warm-up decodes (in
+  batches of four, half a second apart) the readings the owner's newest idea
+  checks and alerts point to and each company's latest reading
+  (`sentiment.warm_ids`; most important last so the cache keeps them), then
+  continues with the existing financial warm-up.
+- **Ids-only permission checks** where only ids were used: proposal
+  scoping (two places), event-review readability, evaluation input checks
+  and the review digest. The company read ran 15 full article reads for
+  these (1.1–1.5 s). `answers` and `expectations` also filter by source type
+  and keep the full read.
+- **Evaluation results**: one query per idea version for event results and
+  one for condition results, instead of two per evaluation (80 + 80 on the
+  owner's data); each evaluation's rows keep their previous order.
+- **Financial recovery** read the raw HTML of every saved 10-K/10-Q (up to
+  15 s) to open one. It now hashes them in the database, reads only the
+  opened filing in full, and gets the parsed facts from the parsed-filing
+  cache (same result as `attach`: the cache stores exactly the `_original_*`
+  and `_recovery_*` keys `attach` adds).
+
+`test_proposals.py::test_revoked_source_withholds_proposal_and_blocks_approval`
+simulates a revoked source by replacing `service.permitted_documents`; it now
+also replaces the ids-only twin, which proposals use. Its assertions are
+unchanged. Two `test_sentiment_reliability.py` tests fed a reading to
+`sentiment_reuse.find` by faking `rows`; they now fake `_recent_readings`.
+
+Second-round tests (disposable PostgreSQL 16): full suite 3,024 passed,
+108 skipped, the same 7 environment failures as before; new
+`test_warm_up_list_ends_with_each_companys_latest_reading`. Not yet
+measured on the owner's data.
